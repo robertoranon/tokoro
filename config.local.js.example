@@ -1,0 +1,12 @@
+// Local configuration — copy this file to config.local.js and fill in your values.
+// config.local.js is gitignored and must NOT be committed.
+
+var TOKORO_CONFIG = {
+  workerUrl: 'https://happenings-worker.YOUR_SUBDOMAIN.workers.dev',
+  crawlerWorkerUrl: 'https://happenings-crawler-worker.YOUR_SUBDOMAIN.workers.dev',
+  crawlerApiKey: 'your-api-key-here',
+  relayUrl: 'https://happenings-query.pages.dev/',
+};
+
+// Node.js compatibility
+if (typeof module !== 'undefined') module.exports = TOKORO_CONFIG;
