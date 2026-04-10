@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tokoro Admin</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a1a;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 56px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    header h1 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    header .subtitle {
+      font-size: 0.75rem;
+      color: #8888aa;
+      margin-top: 2px;
+    }
+    #gear-btn {
+      background: none;
+      border: none;
+      color: #8888aa;
+      cursor: pointer;
+      font-size: 1.4rem;
+      padding: 6px;
+      border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+      line-height: 1;
+    }
+    #gear-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
+
+    /* Main content */
+    main {
+      max-width: 1100px;
+      margin: 32px auto;
+      padding: 0 16px;
+    }
+
+    /* Query form card */
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
+    }
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #333;
+    }
+
+    .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1 1 160px;
+    }
+    .form-group label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .form-group input {
+      border: 1px solid #d0d5dd;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 0.9rem;
+      color: #1a1a1a;
+      background: #fafafa;
+      transition: border-color 0.15s;
+      width: 100%;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #5a67d8;
+      background: #fff;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 18px;
+      border-radius: 6px;
+      border: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .btn-primary { background: #5a67d8; color: #fff; }
+    .btn-primary:hover { background: #4c56c0; }
+    .btn-danger { background: #e53e3e; color: #fff; font-size: 0.8rem; padding: 4px 10px; }
+    .btn-danger:hover { background: #c53030; }
+    .btn-copy-id { background: #edf2f7; color: #333; font-size: 0.8rem; padding: 4px 10px; }
+    .btn-copy-id:hover { background: #e2e8f0; }
+    .btn-secondary { background: #edf2f7; color: #333; }
+    .btn-secondary:hover { background: #e2e8f0; }
+
+    #status {
+      font-size: 0.85rem;
+      margin-top: 12px;
+      min-height: 20px;
+      color: #555;
+    }
+    #status.error { color: #c53030; }
+    #status.success { color: #276749; }
+
+    /* Results table */
+    .table-wrap {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    thead tr {
+      background: #f7f8fa;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    th {
+      text-align: left;
+      padding: 10px 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #666;
+      white-space: nowrap;
+    }
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f0f2f5;
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #fafbff; }
+
+    .pubkey-cell {
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: #444;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .pubkey-cell:hover { color: #5a67d8; text-decoration: underline; }
+
+    .title-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .time-cell { white-space: nowrap; font-size: 0.82rem; color: #555; }
+    .category-cell {
+      display: inline-block;
+      background: #ebf4ff;
+      color: #2b6cb0;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    .empty-state {
+      text-align: center;
+      color: #aaa;
+      padding: 48px 0;
+      font-size: 0.9rem;
+    }
+
+    /* Modal overlay */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .overlay.open { display: flex; }
+
+    .modal {
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px;
+      width: 480px;
+      max-width: calc(100vw - 32px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    .modal h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+      color: #1a1a1a;
+    }
+    .modal .form-group { flex: none; }
+    .modal .form-group + .form-group { margin-top: 14px; }
+    .modal input { width: 100%; }
+    .modal-note {
+      font-size: 0.78rem;
+      color: #888;
+      margin-top: 4px;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .masked-key {
+      font-family: monospace;
+      font-size: 0.82rem;
+      color: #555;
+      margin-top: 6px;
+    }
+
+    .copy-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1a1a2e;
+      color: #fff;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 200;
+    }
+    .copy-toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div>
+    <h1>Tokoro Admin</h1>
+    <div class="subtitle" id="header-url">Not configured</div>
+  </div>
+  <button id="gear-btn" title="Settings">&#9881;</button>
+</header>
+
+<!-- Main -->
+<main>
+  <!-- Query form -->
+  <div class="card">
+    <h2>Search Events</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="f-pubkey">Pubkey</label>
+        <input type="text" id="f-pubkey" placeholder="author public key hex" />
+      </div>
+      <div class="form-group">
+        <label for="f-from">From</label>
+        <input type="datetime-local" id="f-from" />
+      </div>
+      <div class="form-group">
+        <label for="f-to">To</label>
+        <input type="datetime-local" id="f-to" />
+      </div>
+      <div class="form-group">
+        <label for="f-category">Category</label>
+        <input type="text" id="f-category" placeholder="music, food, sports…" />
+      </div>
+      <div style="display:flex;align-items:flex-end;">
+        <button class="btn btn-primary" id="search-btn">Search</button>
+      </div>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <!-- Results -->
+  <div class="card">
+    <div class="table-wrap">
+      <table id="results-table">
+        <thead>
+          <tr>
+            <th>Pubkey</th>
+            <th>Title</th>
+            <th>Start time</th>
+            <th>Category</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="results-body">
+          <tr><td colspan="5" class="empty-state">Run a search to see events.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="load-more-wrap" style="display:none;text-align:center;padding:16px;">
+      <button class="btn btn-secondary" id="load-more-btn">Load more</button>
+    </div>
+  </div>
+</main>
+
+<!-- Settings Modal -->
+<div class="overlay" id="settings-overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <h2 id="settings-title">Settings</h2>
+    <div class="form-group">
+      <label for="s-worker-url">Worker URL</label>
+      <input type="url" id="s-worker-url" placeholder="https://your-worker.workers.dev" />
+      <p class="modal-note">Base URL of the Tokoro Cloudflare Worker.</p>
+    </div>
+    <div class="form-group">
+      <label for="s-privkey">Admin Private Key (hex)</label>
+      <input type="password" id="s-privkey" placeholder="64-char hex private key" autocomplete="off" />
+      <p class="modal-note">Stored locally in localStorage. Never sent to the server.</p>
+    </div>
+    <div class="form-group">
+      <label for="s-pubkey">Admin Public Key (hex)</label>
+      <input type="text" id="s-pubkey" placeholder="64-char hex public key" />
+      <div class="masked-key" id="s-pubkey-display"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="settings-cancel-btn">Cancel</button>
+      <button class="btn btn-primary" id="settings-save-btn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Copy toast -->
+<div class="copy-toast" id="copy-toast">Copied to clipboard</div>
+
+<script type="module">
+  import * as ed from 'https://esm.sh/@noble/ed25519@2';
+
+  // SHA-512 shim required for noble/ed25519 in browser
+  ed.etc.sha512Async = async (...msgs) => {
+    const combined = new Uint8Array(msgs.reduce((acc, m) => acc + m.length, 0));
+    let offset = 0;
+    for (const m of msgs) { combined.set(m, offset); offset += m.length; }
+    const buf = await crypto.subtle.digest('SHA-512', combined);
+    return new Uint8Array(buf);
+  };
+
+  // ── Utilities ──────────────────────────────────────────────────────────────
+
+  function hexToBytes(hex) {
+    if (hex.length % 2 !== 0) throw new Error('Invalid hex');
+    const arr = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < arr.length; i++) {
+      arr[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    }
+    return arr;
+  }
+
+  function bytesToHex(bytes) {
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function truncateKey(key) {
+    if (!key || key.length <= 16) return key;
+    return key.slice(0, 8) + '\u2026' + key.slice(-8);
+  }
+
+  function datetimeLocalToISO(val) {
+    // Convert "YYYY-MM-DDTHH:MM" → "YYYY-MM-DDTHH:MM:SS"
+    if (!val) return '';
+    return val.length === 16 ? val + ':00' : val;
+  }
+
+  // ── localStorage helpers ───────────────────────────────────────────────────
+
+  function loadSettings() {
+    return {
+      workerUrl: localStorage.getItem('hap_admin_worker_url') || '',
+      privKey:   localStorage.getItem('hap_admin_priv_key')   || '',
+      pubKey:    localStorage.getItem('hap_admin_pub_key')     || '',
+    };
+  }
+
+  function saveSettings(workerUrl, privKey, pubKey) {
+    localStorage.setItem('hap_admin_worker_url', workerUrl.replace(/\/$/, ''));
+    localStorage.setItem('hap_admin_priv_key',   privKey);
+    localStorage.setItem('hap_admin_pub_key',    pubKey);
+  }
+
+  // ── Signing ───────────────────────────────────────────────────────────────
+
+  async function signDeleteEvent(eventId, privateKeyHex) {
+    const message = hexToBytes(eventId); // event ID is already a hex SHA-256
+    const privKey = hexToBytes(privateKeyHex);
+    const sig = await ed.signAsync(message, privKey);
+    return bytesToHex(sig);
+  }
+
+  // ── UI state ──────────────────────────────────────────────────────────────
+
+  const statusEl = document.getElementById('status');
+
+  function setStatus(msg, type = '') {
+    statusEl.textContent = msg;
+    statusEl.className = type;
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('copy-toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
+  }
+
+  function updateHeaderUrl() {
+    const { workerUrl } = loadSettings();
+    document.getElementById('header-url').textContent = workerUrl || 'Not configured';
+  }
+
+  // ── Settings modal ────────────────────────────────────────────────────────
+
+  const overlay = document.getElementById('settings-overlay');
+
+  function openSettings() {
+    const s = loadSettings();
+    document.getElementById('s-worker-url').value = s.workerUrl;
+    document.getElementById('s-privkey').value    = s.privKey;
+    document.getElementById('s-pubkey').value     = s.pubKey;
+    document.getElementById('s-pubkey-display').textContent =
+      s.pubKey ? 'Current: ' + truncateKey(s.pubKey) : '';
+    overlay.classList.add('open');
+    document.getElementById('s-worker-url').focus();
+  }
+
+  function closeSettings() {
+    overlay.classList.remove('open');
+  }
+
+  document.getElementById('gear-btn').addEventListener('click', openSettings);
+
+  document.getElementById('settings-cancel-btn').addEventListener('click', closeSettings);
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) closeSettings();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeSettings();
+  });
+
+  document.getElementById('settings-save-btn').addEventListener('click', () => {
+    const workerUrl = document.getElementById('s-worker-url').value.trim();
+    const privKey   = document.getElementById('s-privkey').value.trim();
+    const pubKey    = document.getElementById('s-pubkey').value.trim();
+    if (!workerUrl) {
+      alert('Worker URL is required.');
+      return;
+    }
+    saveSettings(workerUrl, privKey, pubKey);
+    updateHeaderUrl();
+    closeSettings();
+  });
+
+  // Live-update the masked key display as user types
+  document.getElementById('s-pubkey').addEventListener('input', e => {
+    const v = e.target.value.trim();
+    document.getElementById('s-pubkey-display').textContent =
+      v ? 'Current: ' + truncateKey(v) : '';
+  });
+
+  // ── Search ────────────────────────────────────────────────────────────────
+
+  let currentOffset = 0;
+  let totalLoaded = 0;
+
+  document.getElementById('search-btn').addEventListener('click', runSearch);
+  document.getElementById('load-more-btn').addEventListener('click', loadMore);
+
+  async function runSearch() {
+    currentOffset = 0;
+    totalLoaded = 0;
+    document.getElementById('results-body').innerHTML = '';
+    document.getElementById('load-more-wrap').style.display = 'none';
+    await fetchEvents(true);
+  }
+
+  async function loadMore() {
+    await fetchEvents(false);
+  }
+
+  async function fetchEvents(replace) {
+    const { workerUrl } = loadSettings();
+    if (!workerUrl) { openSettings(); return; }
+
+    const pubkey   = document.getElementById('f-pubkey').value.trim();
+    const fromVal  = document.getElementById('f-from').value;
+    const toVal    = document.getElementById('f-to').value;
+    const category = document.getElementById('f-category').value.trim();
+
+    const params = new URLSearchParams();
+    if (pubkey)   params.set('pubkey',   pubkey);
+    if (fromVal)  params.set('from',     datetimeLocalToISO(fromVal));
+    if (toVal)    params.set('to',       datetimeLocalToISO(toVal));
+    if (category) params.set('category', category);
+
+    // Only the no-params path supports pagination
+    const isNoParams = !pubkey && !fromVal && !toVal && !category;
+    if (isNoParams) params.set('offset', String(currentOffset));
+
+    const url = `${workerUrl}/events${params.toString() ? '?' + params.toString() : ''}`;
+
+    setStatus('Loading…');
+    document.getElementById('search-btn').disabled = true;
+    document.getElementById('load-more-btn').disabled = true;
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`HTTP ${res.status}: ${body}`);
+      }
+      const data = await res.json();
+      const events = Array.isArray(data) ? data : (data.events || []);
+      const hasMore = Array.isArray(data) ? false : (data.has_more || false);
+
+      if (replace) {
+        renderResults(events);
+      } else {
+        appendResults(events);
+      }
+
+      totalLoaded += events.length;
+      currentOffset += events.length;
+
+      setStatus(`Showing ${totalLoaded} event${totalLoaded !== 1 ? 's' : ''}.`, 'success');
+      document.getElementById('load-more-wrap').style.display = hasMore ? 'block' : 'none';
+    } catch (err) {
+      setStatus('Error: ' + err.message, 'error');
+      if (replace) renderResults([]);
+    } finally {
+      document.getElementById('search-btn').disabled = false;
+      document.getElementById('load-more-btn').disabled = false;
+    }
+  }
+
+  // ── Results table ─────────────────────────────────────────────────────────
+
+  function appendResults(events) {
+    const tbody = document.getElementById('results-body');
+    buildRows(events, tbody);
+  }
+
+  function renderResults(events) {
+    const tbody = document.getElementById('results-body');
+    tbody.innerHTML = '';
+
+    if (!events.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No events found.</td></tr>';
+      return;
+    }
+
+    buildRows(events, tbody);
+  }
+
+  function buildRows(events, tbody) {
+    for (const ev of events) {
+      const tr = document.createElement('tr');
+      tr.dataset.id = ev.id;
+
+      // Pubkey cell — click to copy
+      const tdPubkey = document.createElement('td');
+      tdPubkey.className = 'pubkey-cell';
+      tdPubkey.textContent = truncateKey(ev.pubkey || '');
+      tdPubkey.title = 'Click to copy full key';
+      tdPubkey.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(ev.pubkey || '');
+          showToast('Public key copied!');
+        } catch {
+          prompt('Copy this key:', ev.pubkey || '');
+        }
+      });
+
+      // Title cell
+      const tdTitle = document.createElement('td');
+      tdTitle.className = 'title-cell';
+      tdTitle.textContent = ev.title || '—';
+      tdTitle.title = ev.title || '';
+
+      // Start time cell
+      const tdTime = document.createElement('td');
+      tdTime.className = 'time-cell';
+      tdTime.textContent = ev.start_time || '—';
+
+      // Category cell
+      const tdCat = document.createElement('td');
+      const span = document.createElement('span');
+      span.className = 'category-cell';
+      span.textContent = ev.category || '—';
+      tdCat.appendChild(span);
+
+      // Actions cell
+      const tdDel = document.createElement('td');
+      tdDel.style.whiteSpace = 'nowrap';
+
+      const copyIdBtn = document.createElement('button');
+      copyIdBtn.className = 'btn btn-copy-id';
+      copyIdBtn.textContent = 'Copy ID';
+      copyIdBtn.title = ev.id;
+      copyIdBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(ev.id);
+          showToast('Event ID copied!');
+        } catch {
+          prompt('Copy this ID:', ev.id);
+        }
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn btn-danger';
+      delBtn.textContent = 'Delete';
+      delBtn.style.marginLeft = '6px';
+      delBtn.addEventListener('click', () => handleDelete(ev, tr));
+      tdDel.appendChild(copyIdBtn);
+      tdDel.appendChild(delBtn);
+
+      tr.appendChild(tdPubkey);
+      tr.appendChild(tdTitle);
+      tr.appendChild(tdTime);
+      tr.appendChild(tdCat);
+      tr.appendChild(tdDel);
+
+      tbody.appendChild(tr);
+    }
+  }
+
+  // ── Delete ────────────────────────────────────────────────────────────────
+
+  async function handleDelete(ev, rowEl) {
+    const confirmed = confirm(
+      `Delete event?\n\n"${ev.title}"\nID: ${ev.id}\n\nThis cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    const { workerUrl, privKey, pubKey } = loadSettings();
+    if (!privKey || !pubKey) {
+      alert('Admin private key and public key must be set in Settings before deleting events.');
+      openSettings();
+      return;
+    }
+    if (!workerUrl) {
+      alert('Worker URL not configured.');
+      openSettings();
+      return;
+    }
+
+    const delBtn = rowEl.querySelector('.btn-danger');
+    delBtn.disabled = true;
+    delBtn.textContent = '…';
+
+    try {
+      const signature = await signDeleteEvent(ev.id, privKey);
+      const res = await fetch(`${workerUrl}/events/${ev.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pubkey: pubKey, signature }),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`HTTP ${res.status}: ${body}`);
+      }
+      rowEl.remove();
+      showToast('Event deleted.');
+
+      // Update status count
+      const remaining = document.querySelectorAll('#results-body tr[data-id]').length;
+      if (remaining === 0) {
+        document.getElementById('results-body').innerHTML =
+          '<tr><td colspan="5" class="empty-state">No events found.</td></tr>';
+      }
+      const statusEl = document.getElementById('status');
+      const match = statusEl.textContent.match(/^(\d+)/);
+      if (match) {
+        const newCount = parseInt(match[1], 10) - 1;
+        setStatus(`${newCount} event${newCount !== 1 ? 's' : ''} found.`, 'success');
+      }
+    } catch (err) {
+      alert('Delete failed: ' + err.message);
+      delBtn.disabled = false;
+      delBtn.textContent = 'Delete';
+    }
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+
+  function init() {
+    updateHeaderUrl();
+    const { workerUrl } = loadSettings();
+    if (!workerUrl) {
+      openSettings();
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
