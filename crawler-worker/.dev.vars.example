@@ -1,0 +1,25 @@
+# Local development secrets for wrangler dev
+# Copy this file to .dev.vars and fill in your actual values
+
+# API Keys (comma-separated for multiple clients)
+CRAWLER_API_KEYS=test-key-1,test-key-2
+
+# Crawler Keypair (generate with: cd ../crawler && npm run crawl -- --generate-keypair)
+CRAWLER_PRIVKEY=your_private_key_hex_here
+CRAWLER_PUBKEY=your_public_key_hex_here
+
+# LLM Provider Configuration
+LLM_PROVIDER=openai
+# or: anthropic, openrouter
+
+# LLM API Key (depends on provider)
+LLM_API_KEY=your_llm_api_key_here
+
+# Optional: LLM Model Override
+# LLM_MODEL=gpt-4o-mini
+# LLM_MODEL=claude-3-5-sonnet-20241022
+# LLM_MODEL=google/gemini-2.0-flash-exp:free
+
+# Optional: Jina AI Reader API Key (improves rate limits)
+# Get a free API key at https://jina.ai/reader
+# JINA_API_KEY=jina_98f6ee76c22c4c579f469e242c7f275cxYKCPWqU-kDFAff_m7JFggNq7kk7

@@ -1,0 +1,38 @@
+name = "happenings-crawler-worker"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# Service Bindings - Direct worker-to-worker communication
+[[services]]
+binding = "TOKORO_API"
+service = "happenings-worker"
+
+[[kv_namespaces]]
+binding = "PREVIEW_CACHE"
+id = "YOUR_KV_NAMESPACE_ID"
+
+# R2 Bindings - Object storage for logs
+# DISABLED: Uncomment the lines below to enable log storage to R2
+# Before enabling:
+#   1. Enable R2 in your Cloudflare dashboard (requires payment method, but has generous free tier)
+#   2. Create the bucket: wrangler r2 bucket create happenings-crawler-logs
+#   3. Uncomment the [[r2_buckets]] section below
+# When disabled, logs are only written to console (not persisted to files)
+#
+# [[r2_buckets]]
+# binding = "CRAWLER_LOGS"
+# bucket_name = "happenings-crawler-logs"
+
+# Environment variables
+[vars]
+# Default API URL for publishing events (can be overridden in request)
+TOKORO_API_URL = "https://happenings-worker.YOUR_SUBDOMAIN.workers.dev"
+
+# Secrets (set via: wrangler secret put <name>)
+# - CRAWLER_API_KEYS: Comma-separated list of allowed API keys
+# - CRAWLER_PRIVKEY: Ed25519 private key (hex) for signing events
+# - CRAWLER_PUBKEY: Ed25519 public key (hex) for signing events
+# - LLM_API_KEY: API key for LLM provider (OpenAI, Anthropic, etc.)
+# - LLM_PROVIDER: LLM provider name (openai, anthropic, ollama)
