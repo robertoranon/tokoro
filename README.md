@@ -51,11 +51,9 @@ Tokoro gives you everything you need to run your own event platform: a serverles
 | [**Crawler Worker**](crawler-worker/)     | Serverless LLM crawler — extract & publish events from any URL or image           |
 | [**Chrome Extension**](chrome-extension/) | One-click crawl from the browser toolbar or right-click menu                      |
 | [**Bookmarklet**](public-web/)            | Same capability in any browser, no extension install needed                       |
-| [**Apple Shortcut**](apple-shortcut/)     | Share Sheet integration for Safari on iOS/iPadOS/macOS                            |
 | [**Web Publisher**](web-publisher/)       | Static HTML form for manually composing and publishing events                     |
 | [**Public Web**](public-web/)             | Example event browser — query by location, date, category; embeds the bookmarklet |
 | [**Admin Panel**](admin/)                 | Static HTML moderation UI — browse and delete events with admin key auth          |
-| [**Node.js Crawler**](crawler/)           | CLI crawler using Playwright / Jina AI Reader                                     |
 
 ---
 
