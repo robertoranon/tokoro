@@ -443,25 +443,10 @@ Then restore it:
 wrangler r2 object list happenings-backups --prefix backups/
 ```
 
-## Deployment Checklist
-
-- [x] Database created and migrations applied (local & remote)
-- [x] Worker deployed to production
-- [x] Signature verification tested and working
-- [x] CORS configured
-- [x] API documentation endpoint working
-- [x] Geohash indexing verified
-- [x] End-to-end testing completed
-- [x] R2 backup bucket created
-
-## Next Steps
-
-- [ ] Deploy web publisher to Cloudflare Pages
-- [ ] Add event update functionality
-- [ ] Implement collaborative filtering (stars, follows)
-- [ ] Add event recommendations
-- [ ] iOS app development
-
 ## Support
 
 For issues or questions, see the main [project README](../README.md).
+
+## License
+
+MIT
