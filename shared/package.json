@@ -1,0 +1,15 @@
+{
+  "name": "@tokoro/shared",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    "./extractors/*": "./extractors/*",
+    "./types/*": "./types/*",
+    "./llm/*": "./llm/*"
+  },
+  "dependencies": {
+    "zod": "^3.22.4",
+    "@anthropic-ai/sdk": "^0.30.0",
+    "openai": "^6.33.0"
+  }
+}

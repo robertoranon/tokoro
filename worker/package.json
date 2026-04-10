@@ -1,0 +1,30 @@
+{
+  "name": "happenings-worker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "db:clean": "wrangler d1 execute happenings-db --local --command 'DELETE FROM events'",
+    "db:count": "wrangler d1 execute happenings-db --local --command 'SELECT COUNT(*) as total FROM events'",
+    "db:list": "wrangler d1 execute happenings-db --local --command 'SELECT * FROM events ORDER BY start_time'",
+    "db:remote:clean": "wrangler d1 execute happenings-db --remote --command 'DELETE FROM events'",
+    "db:remote:count": "wrangler d1 execute happenings-db --remote --command 'SELECT COUNT(*) as total FROM events'",
+    "db:remote:list": "wrangler d1 execute happenings-db --remote --command 'SELECT * FROM events ORDER BY start_time'",
+    "db:remote:delete": "wrangler d1 execute happenings-db --remote --command \"DELETE FROM events WHERE id='$EVENT_ID'\"",
+    "check-duplicate": "npx tsx scripts/check-duplicate.ts"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.70.0"
+  },
+  "dependencies": {
+    "@noble/ed25519": "^2.1.0",
+    "ngeohash": "^0.6.3",
+    "openai": "^6.33.0"
+  }
+}
