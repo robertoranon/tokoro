@@ -19,6 +19,10 @@ bucket_name = "happenings-backups"
 [vars]
 # Secrets (set via: wrangler secret put <name>)
 # - ADMIN_PUBKEY: admin public key for blocklist management
+# - ALLOWED_PUBKEYS: Comma-separated Ed25519 public keys (hex) allowed to publish events.
+#   If not set, any valid signature is accepted.
+#   Always include the crawler CLI's CRAWLER_PUBKEY value for automated publishing.
+#   Example: wrangler secret put ALLOWED_PUBKEYS
 # - LLM_API_KEY: API key for LLM provider (used for duplicate detection)
 # - LLM_PROVIDER: LLM provider name (default: openrouter)
 # - LLM_MODEL: Optional model override

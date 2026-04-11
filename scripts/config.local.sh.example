@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Local configuration for shell scripts — copy to scripts/config.local.sh and fill in your values.
+# scripts/config.local.sh is gitignored and must NOT be committed.
+
+export CRAWLER_WORKER_URL="https://happenings-crawler-worker.YOUR_SUBDOMAIN.workers.dev"
+export CRAWLER_API_KEY="your-api-key-here"

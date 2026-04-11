@@ -200,6 +200,17 @@ Events are authenticated using Ed25519 public key cryptography:
 3. **Signature verification**: Worker verifies signatures before accepting events
 4. **Ownership**: Only the original publisher (matching pubkey) or admin can delete events
 
+### Allowlist (optional)
+
+Set `ALLOWED_PUBKEYS` as a Worker secret to restrict publishing to known curators. The value is a comma-separated list of Ed25519 public keys (64-char hex):
+
+```bash
+wrangler secret put ALLOWED_PUBKEYS --cwd worker
+# Enter comma-separated list, e.g.: aabbcc...,ddeeff...
+```
+
+If the secret is absent, any valid signature is accepted. If set, events signed by unlisted keys are rejected with HTTP 403.
+
 **Canonical Event Data (for signing):**
 
 ```json
@@ -443,10 +454,25 @@ Then restore it:
 wrangler r2 object list happenings-backups --prefix backups/
 ```
 
+## Deployment Checklist
+
+- [x] Database created and migrations applied (local & remote)
+- [x] Worker deployed to production
+- [x] Signature verification tested and working
+- [x] CORS configured
+- [x] API documentation endpoint working
+- [x] Geohash indexing verified
+- [x] End-to-end testing completed
+- [x] R2 backup bucket created
+
+## Next Steps
+
+- [ ] Deploy web publisher to Cloudflare Pages
+- [ ] Add event update functionality
+- [ ] Implement collaborative filtering (stars, follows)
+- [ ] Add event recommendations
+- [ ] iOS app development
+
 ## Support
 
 For issues or questions, see the main [project README](../README.md).
-
-## License
-
-MIT

@@ -69,6 +69,26 @@ export interface NormalizedEvent {
   created_at: string; // ISO 8601 format
 }
 
+// Event data normalised and ready for client-side signing.
+// All geocoding and timestamp normalisation is complete.
+// The client adds pubkey and signature before posting to the API.
+export interface PreparedEvent {
+  title: string;
+  description?: string;
+  url?: string;
+  venue_name?: string;
+  address?: string;
+  lat: number;
+  lng: number;
+  start_time: string; // ISO 8601 local time (e.g. "2026-03-15T21:00:00")
+  end_time?: string;
+  category: string;
+  tags?: string[];
+  festival_name?: string;
+  festival_url?: string;
+  created_at: string; // ISO 8601, set at normalisation time
+}
+
 // Fetched page data (standardized across crawler and crawler-worker)
 export interface FetchedPage {
   url: string;

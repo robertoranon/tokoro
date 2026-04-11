@@ -8,6 +8,7 @@ export interface Env {
 	DB: D1Database;
 	BACKUP_BUCKET?: R2Bucket;   // set via wrangler.toml [[r2_buckets]] binding
 	ADMIN_PUBKEY?: string;       // set via: wrangler secret put ADMIN_PUBKEY
+	ALLOWED_PUBKEYS?: string;    // Comma-separated hex pubkeys allowed to publish events
 	LLM_API_KEY?: string;        // set via: wrangler secret put LLM_API_KEY
 	LLM_PROVIDER?: string;       // set via: wrangler secret put LLM_PROVIDER (default: openrouter)
 	LLM_MODEL?: string;          // set via: wrangler secret put LLM_MODEL (optional override)
@@ -604,6 +605,14 @@ async function handlePostEvent(request: Request, env: Env): Promise<Response> {
 
 	if (await isBlocklisted(env, event.pubkey)) {
 		return jsonResponse({ error: 'Forbidden' }, 403);
+	}
+
+	// Check allowlist (if configured)
+	if (env.ALLOWED_PUBKEYS) {
+		const allowed = env.ALLOWED_PUBKEYS.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+		if (!allowed.includes(event.pubkey.toLowerCase())) {
+			return jsonResponse({ error: 'Forbidden', message: 'Public key not in allowlist' }, 403);
+		}
 	}
 
 	// Verify signature

@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="it">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tokoro – Discover Events</title>
+    <title>Tokoro – Scopri eventi</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -666,77 +666,6 @@
         color: var(--text-2);
       }
 
-      /* FESTIVAL CARD */
-      .festival-card__toggle {
-        background: none;
-        border: none;
-        padding: 0;
-        font-family: 'Figtree', sans-serif;
-        font-size: 12.5px;
-        font-weight: 600;
-        color: var(--accent);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        margin-top: 10px;
-        transition: color 0.15s;
-      }
-      .festival-card__toggle:hover {
-        color: var(--accent-hover);
-      }
-      .festival-card__events {
-        display: none;
-        flex-direction: column;
-        gap: 10px;
-        margin-top: 14px;
-        padding-top: 14px;
-        border-top: 1px solid var(--border);
-      }
-      .festival-card.is-open .festival-card__events {
-        display: flex;
-      }
-      .festival-card__sub {
-        background: var(--bg);
-        border-radius: var(--radius-sm);
-        padding: 10px 14px;
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 12px;
-      }
-      .festival-card__sub-title {
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--text);
-        line-height: 1.3;
-      }
-      .festival-card__sub-meta {
-        font-size: 11.5px;
-        color: var(--text-muted);
-        margin-top: 3px;
-      }
-      .festival-card__sub-desc {
-        font-size: 11.5px;
-        color: var(--text-muted);
-        margin-top: 4px;
-        line-height: 1.4;
-        opacity: 0.8;
-      }
-      .festival-card__sub-link {
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--accent);
-        text-decoration: none;
-        white-space: nowrap;
-        flex-shrink: 0;
-        align-self: center;
-      }
-      .festival-card__sub-link:hover {
-        color: var(--accent-hover);
-        text-decoration: underline;
-      }
-
       /* LOADING */
       .loading {
         text-align: center;
@@ -882,6 +811,71 @@
         }
       }
 
+      /* FESTIVAL CARD */
+      .festival-card__toggle {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--accent);
+        padding: 6px 0;
+        margin-bottom: 4px;
+        transition: color 0.15s;
+      }
+      .festival-card__toggle:hover {
+        color: var(--accent-hover);
+      }
+      .festival-card__events {
+        display: none;
+        flex-direction: column;
+        gap: 8px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border);
+      }
+      .festival-card.is-open .festival-card__events {
+        display: flex;
+      }
+      .festival-card__sub {
+        background: var(--bg);
+        border-radius: var(--radius-sm);
+        padding: 10px 12px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .festival-card__sub-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        line-height: 1.3;
+      }
+      .festival-card__sub-meta {
+        font-size: 11.5px;
+        color: var(--text-muted);
+        margin-top: 3px;
+      }
+      .festival-card__sub-desc {
+        font-size: 11.5px;
+        color: var(--text-muted);
+        margin-top: 4px;
+        line-height: 1.4;
+        opacity: 0.8;
+      }
+      .festival-card__sub-link {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--accent);
+        text-decoration: none;
+        flex-shrink: 0;
+        align-self: center;
+      }
+      .festival-card__sub-link:hover {
+        color: var(--accent-hover);
+        text-decoration: underline;
+      }
+
       /* ── Relay mode (bookmarklet popup) ──────────────────── */
       #relay-ui {
         min-height: 100vh;
@@ -939,16 +933,6 @@
         border-left: 3px solid var(--accent);
         padding: 10px 12px;
         border-radius: var(--radius-sm);
-        position: relative;
-      }
-      .relay-card__cb {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        width: 15px;
-        height: 15px;
-        cursor: pointer;
-        accent-color: var(--accent);
       }
       .relay-card h4 {
         color: var(--accent);
@@ -1001,27 +985,6 @@
         background: #aaa;
         cursor: not-allowed;
       }
-      .relay-notice {
-        display: none;
-        background: #fff8e1;
-        border: 1px solid #ffc107;
-        border-radius: var(--radius-sm);
-        padding: 12px;
-        font-size: 12px;
-        color: #5d4037;
-        line-height: 1.6;
-      }
-      .relay-notice.show { display: block; }
-      .relay-notice__key {
-        font-family: monospace;
-        font-size: 11px;
-        word-break: break-all;
-        background: rgba(0,0,0,0.06);
-        padding: 4px 6px;
-        border-radius: 4px;
-        margin: 6px 0;
-        user-select: all;
-      }
     </style>
   </head>
   <body>
@@ -1031,21 +994,15 @@
         <div class="relay-hd">Tokoro</div>
         <div class="relay-bd">
           <div id="relay-st" class="relay-st info">
-            Connecting to page&hellip;
-          </div>
-          <div id="relay-notice" class="relay-notice">
-            <strong>New publishing identity created.</strong>
-            Send your public key to the Tokoro admin to get publishing access:
-            <div class="relay-notice__key" id="relay-notice-key"></div>
-            Your private key is stored in this browser&rsquo;s local storage &mdash; save it somewhere safe if you want to publish from other browsers.
+            Connessione alla pagina&hellip;
           </div>
           <div id="relay-events"></div>
           <div id="relay-acts" class="relay-acts">
             <button id="relay-pub" class="relay-btn relay-btn-pub">
-              Publish Events
+              Pubblica eventi
             </button>
             <button id="relay-cancel" class="relay-btn relay-btn-sec">
-              Cancel
+              Annulla
             </button>
           </div>
         </div>
@@ -1054,11 +1011,11 @@
 
     <header class="site-header">
       <div class="lang-selector">
-        <span class="lang-selector__current">EN</span>
-        <span class="lang-selector__sep">|</span>
-        <a class="lang-selector__link" id="langSwitchLink" href="/it.html"
-          >IT</a
+        <a class="lang-selector__link" id="langSwitchLink" href="/index.html"
+          >EN</a
         >
+        <span class="lang-selector__sep">|</span>
+        <span class="lang-selector__current">IT</span>
       </div>
       <div class="experimental-badge">
         <strong>⚠ Experimental</strong>
@@ -1067,7 +1024,7 @@
       <div class="header-inner">
         <h1 class="header-title">Tokoro <em>ところ</em></h1>
         <p class="header-sub">
-          Concerts, markets, exhibitions &amp; more — near you, right now
+          Concerti, mercati, mostre e altro — vicino a te, adesso
         </p>
         <div class="header-stats">
           <span class="stat-pill" id="eventCountPill">Loading…</span>
@@ -1083,7 +1040,7 @@
     <main class="main">
       <!-- Search -->
       <div class="search-card">
-        <h2>Find events near you</h2>
+        <h2>Trova eventi vicino a te</h2>
 
         <input
           type="number"
@@ -1100,13 +1057,13 @@
           style="display: none"
         />
 
-        <label>Search by address</label>
+        <label>Cerca per indirizzo</label>
         <div class="input-row">
           <input
             type="text"
             id="queryAddress"
-            placeholder="e.g. London, Central Park NYC, Udine Italy"
-            value="Udine, Italy"
+            placeholder="es. Roma, Piazza Navona, Milano Italia"
+            value="Udine, Italia"
           />
           <span
             id="coordsDisplay"
@@ -1124,26 +1081,26 @@
             <label>Longitude</label><input type="number" tabindex="-1" />
           </div>
           <div style="grid-column: span 2">
-            <label>Radius (km)</label>
+            <label>Raggio (km)</label>
             <input type="number" id="queryRadius" value="100" />
           </div>
           <div style="grid-column: span 2">
-            <label>Category</label>
+            <label>Categoria</label>
             <select id="queryCategory">
-              <option value="">All categories</option>
-              <option value="music">Music</option>
-              <option value="food">Food</option>
-              <option value="sports">Sports</option>
-              <option value="art">Art</option>
-              <option value="theater">Theater</option>
-              <option value="film">Film</option>
-              <option value="nightlife">Nightlife</option>
-              <option value="community">Community</option>
+              <option value="">Tutte le categorie</option>
+              <option value="music">Musica</option>
+              <option value="food">Cibo</option>
+              <option value="sports">Sport</option>
+              <option value="art">Arte</option>
+              <option value="theater">Teatro</option>
+              <option value="film">Cinema</option>
+              <option value="nightlife">Vita notturna</option>
+              <option value="community">Comunità</option>
               <option value="outdoor">Outdoor</option>
-              <option value="learning">Learning</option>
-              <option value="wellness">Wellness</option>
-              <option value="talks">Talks</option>
-              <option value="other">Other</option>
+              <option value="learning">Formazione</option>
+              <option value="wellness">Benessere</option>
+              <option value="talks">Talk</option>
+              <option value="other">Altro</option>
             </select>
           </div>
         </div>
@@ -1158,17 +1115,17 @@
           "
         >
           <div style="flex: 1; min-width: 140px">
-            <label>Time range</label>
+            <label>Periodo</label>
             <select
               id="timeRangePreset"
               onchange="handleTimeRangePresetChange()"
             >
-              <option value="7" selected>Next 7 days</option>
-              <option value="30">Next 30 days</option>
-              <option value="90">Next 90 days</option>
-              <option value="180">Next 6 months</option>
-              <option value="365">Next year</option>
-              <option value="custom">Custom range</option>
+              <option value="7" selected>Prossimi 7 giorni</option>
+              <option value="30">Prossimi 30 giorni</option>
+              <option value="90">Prossimi 90 giorni</option>
+              <option value="180">Prossimi 6 mesi</option>
+              <option value="365">Prossimo anno</option>
+              <option value="custom">Periodo personalizzato</option>
             </select>
           </div>
           <div
@@ -1177,11 +1134,11 @@
           >
             <div style="display: flex; gap: 8px">
               <div style="flex: 1">
-                <label>From</label>
+                <label>Da</label>
                 <input type="datetime-local" id="queryFromTime" />
               </div>
               <div style="flex: 1">
-                <label>To</label>
+                <label>A</label>
                 <input type="datetime-local" id="queryToTime" />
               </div>
             </div>
@@ -1190,7 +1147,7 @@
 
         <div class="load-btn-row">
           <button class="btn btn-primary" onclick="listEvents()">
-            Search Events
+            Cerca eventi
           </button>
         </div>
       </div>
@@ -1204,21 +1161,21 @@
           </div>
           <div class="share-buttons">
             <button class="btn btn-ghost" id="copyLinkBtn" onclick="shareUrl()">
-              🔗 Copy link
+              🔗 Copia link
             </button>
             <button
               class="btn btn-ghost"
               id="copyTextBtn"
               onclick="copyAsText()"
             >
-              📋 Copy as text
+              📋 Copia come testo
             </button>
             <button
               class="btn btn-ghost"
               id="copyICalBtn"
               onclick="copyICalUrl()"
             >
-              📅 Subscribe (iCal)
+              📅 Abbonati (iCal)
             </button>
           </div>
         </div>
@@ -1229,13 +1186,14 @@
 
       <!-- Publish tools -->
       <div class="tools-section">
-        <div class="section-title">Publish events</div>
+        <div class="section-title">Pubblica eventi</div>
         <div class="tools-grid">
           <div class="tool-card">
-            <h3>🧩 Chrome Extension</h3>
+            <h3>🧩 Estensione Chrome</h3>
             <p>
-              Install the extension once, then click its icon on any event page
-              to extract and publish events to Tokoro.
+              Installa l'estensione una volta sola, poi clicca sulla sua icona
+              su qualsiasi pagina di eventi per estrarre e pubblicare eventi su
+              Tokoro.
             </p>
             <p>
               <a
@@ -1243,46 +1201,47 @@
                 target="_blank"
                 rel="noopener noreferrer"
                 class="ext-link"
-                >Install from Chrome Web Store →</a
+                >Installa dal Chrome Web Store →</a
               >
             </p>
             <p class="note">
-              1. Click the link above and hit
-              <strong>Add to Chrome</strong>.<br />
-              2. Ask the DB maintainer for the Crawler Worker URL, API Worker
-              URL, and API key, then enter them in the extension's ⚙
-              Settings.<br />
-              3. Navigate to any event page and click the Tokoro icon to extract
-              &amp; publish.
+              1. Clicca sul link sopra e premi
+              <strong>Aggiungi a Chrome</strong>.<br />
+              2. Chiedi al gestore del DB il Crawler Worker URL, l'API Worker
+              URL e l'API key, poi inseriscili nelle ⚙ Impostazioni
+              dell'estensione.<br />
+              3. Vai su una pagina di eventi e clicca sull'icona Tokoro per
+              estrarre &amp; pubblicare.
             </p>
           </div>
           <div class="tool-card">
             <h3>⚡ Bookmarklet</h3>
             <p>
-              Drag the button below to your bookmarks bar. Click it on any event
-              page to extract and publish events directly.
+              Trascina il pulsante nella barra dei preferiti. Cliccalo su
+              qualsiasi pagina di eventi per estrarre e pubblicare eventi
+              direttamente.
             </p>
             <div style="margin: 14px 0">
               <a
                 id="happenings-bookmarklet"
                 href="#"
                 class="bm-link"
-                title="Drag to bookmarks bar"
-                >⚡ Extract Events</a
+                title="Trascina nella barra dei preferiti"
+                >⚡ Estrai eventi</a
               >
             </div>
             <p class="note">
-              Works in all modern browsers. On first use the sidebar will ask
-              you for your <strong>API Key</strong> — ask the DB maintainer to
-              get one. Settings are saved in the browser — you only need to
-              enter them once.
+              Funziona su tutti i browser moderni. Al primo utilizzo la barra
+              laterale chiederà l'<strong>API Key</strong> — richiedila al
+              gestore del DB. Le impostazioni vengono salvate nel browser —
+              basta inserirle una volta sola.
             </p>
           </div>
           <!-- <div class="tool-card">
-            <h3>📱 Apple Shortcut</h3>
+            <h3>📱 Scorciatoia Apple</h3>
             <p>
-              Extract and publish events from Safari on iPhone or Mac — no extra
-              app installation needed.
+              Estrai e pubblica eventi da Safari su iPhone o Mac — senza
+              installare app aggiuntive.
             </p>
             <p>
               <a
@@ -1290,13 +1249,15 @@
                 target="_blank"
                 rel="noopener noreferrer"
                 class="ext-link"
-                >Add to Shortcuts →</a
+                >Aggiungi a Scorciatoie →</a
               >
             </p>
             <p class="note">
-              <strong>iPhone:</strong> Share button → Tokoro.<br />
-              <strong>Mac:</strong> Run from menu bar or Shortcuts app.<br />
-              Requires: Settings → Shortcuts → Allow JavaScript in Shortcuts.
+              <strong>iPhone:</strong> Pulsante Condividi → Tokoro.<br />
+              <strong>Mac:</strong> Avvia dalla barra dei menu o dall'app
+              Scorciatoie.<br />
+              Richiede: Impostazioni → Scorciatoie → Consenti JavaScript nelle
+              scorciatoie.
             </p>
           </div> -->
         </div>
@@ -1320,12 +1281,12 @@
       (function initLangSwitch() {
         const params = window.location.search;
         const link = document.getElementById('langSwitchLink');
-        if (link && params) link.href = '/it.html' + params;
+        if (link && params) link.href = '/index.html' + params;
       })();
 
       document.getElementById('lastModified').textContent =
-        'Last modified: ' +
-        new Date(document.lastModified).toLocaleDateString();
+        'Ultima modifica: ' +
+        new Date(document.lastModified).toLocaleDateString('it-IT');
 
       const CAT_COLORS = {
         music: '#7c3aed',
@@ -1352,9 +1313,9 @@
           const data = await res.json();
           const pill = document.getElementById('eventCountPill');
           if (data.total_events != null) {
-            pill.innerHTML = `<strong>${data.total_events}</strong> events in database`;
+            pill.innerHTML = `<strong>${data.total_events}</strong> eventi nel database`;
           } else {
-            pill.textContent = 'Discover events';
+            pill.textContent = 'Scopri eventi';
           }
           if (data.last_event) {
             const e = data.last_event;
@@ -1362,11 +1323,11 @@
               e.venue_name || `${e.lat.toFixed(3)}, ${e.lng.toFixed(3)}`;
             const lastPill = document.getElementById('lastEventPill');
             lastPill.style.display = '';
-            lastPill.textContent = `Latest: "${e.title}" — ${loc}`;
+            lastPill.textContent = `Ultimo: "${e.title}" — ${loc}`;
           }
         } catch (_) {
           document.getElementById('eventCountPill').textContent =
-            'Discover events';
+            'Scopri eventi';
         }
       })();
 
@@ -1481,7 +1442,7 @@
         if (address) {
           coordsDisplay.style.display = 'none';
           feedback.innerHTML =
-            '<div class="loading">Geocoding address <span class="spinner"></span></div>';
+            '<div class="loading">Geocodifica indirizzo <span class="spinner"></span></div>';
           try {
             const geoResp = await fetch(
               `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`,
@@ -1498,12 +1459,12 @@
               coordsDisplay.style.display = '';
             } else {
               resultDiv.innerHTML =
-                '<div class="status-error" style="margin-top:6px">Address not found. Try a different search term.</div>';
+                '<div class="status-error" style="margin-top:6px">Indirizzo non trovato. Prova un termine diverso.</div>';
               feedback.innerHTML = '';
               return;
             }
           } catch (err) {
-            resultDiv.innerHTML = `<div class="status-error" style="margin-top:6px">Geocoding error: ${escHtml(err.message)}</div>`;
+            resultDiv.innerHTML = `<div class="status-error" style="margin-top:6px">Errore di geocodifica: ${escHtml(err.message)}</div>`;
             feedback.innerHTML = '';
             return;
           }
@@ -1515,7 +1476,7 @@
         const category = document.getElementById('queryCategory').value;
 
         feedback.innerHTML =
-          '<div class="loading">Searching for events <span class="spinner"></span></div>';
+          '<div class="loading">Ricerca eventi <span class="spinner"></span></div>';
 
         try {
           let fromTime, toTime;
@@ -1525,7 +1486,7 @@
             const toInput = document.getElementById('queryToTime').value;
             if (!fromInput || !toInput) {
               feedback.innerHTML =
-                '<div class="status-error">Please set both From and To times for custom range.</div>';
+                '<div class="status-error">Imposta sia la data di inizio che quella di fine per il periodo personalizzato.</div>';
               return;
             }
             fromTime = fromInput + ':00';
@@ -1558,15 +1519,15 @@
           if (data.events && data.events.length > 0) {
             _loadedEvents = data.events;
             const fmt = t =>
-              new Date(t).toLocaleDateString('en-GB', {
+              new Date(t).toLocaleDateString('it-IT', {
                 day: 'numeric',
                 month: 'short',
                 year: 'numeric',
               });
             document.getElementById('resultsTitle').textContent =
-              `${data.events.length} event${data.events.length !== 1 ? 's' : ''} found`;
+              `${data.events.length} event${data.events.length !== 1 ? 'i' : 'o'} trovat${data.events.length !== 1 ? 'i' : 'o'}`;
             document.getElementById('resultsMeta').textContent =
-              `${fmt(fromTime)} – ${fmt(toTime)} · within ${radius} km`;
+              `${fmt(fromTime)} – ${fmt(toTime)} · entro ${radius} km`;
             const useColumns = !category;
             const { festivalItems, remainingEvents } = groupFestivals(
               data.events
@@ -1580,15 +1541,15 @@
           } else {
             _loadedEvents = [];
             const fmt = t =>
-              new Date(t).toLocaleDateString('en-GB', {
+              new Date(t).toLocaleDateString('it-IT', {
                 day: 'numeric',
                 month: 'short',
                 year: 'numeric',
               });
-            feedback.innerHTML = `<div class="status-info">No events found between ${fmt(fromTime)} and ${fmt(toTime)} in this area.</div>`;
+            feedback.innerHTML = `<div class="status-info">Nessun evento trovato tra ${fmt(fromTime)} e ${fmt(toTime)} in questa zona.</div>`;
           }
         } catch (err) {
-          feedback.innerHTML = `<div class="status-error">Error: ${escHtml(err.message)}</div>`;
+          feedback.innerHTML = `<div class="status-error">Errore: ${escHtml(err.message)}</div>`;
         }
       }
 
@@ -1657,21 +1618,21 @@
             ? parseInt(event.start_time.slice(11, 13))
             : 12;
           const label =
-            evDateStr === todayStr && hour >= 17 ? 'TONIGHT' : 'TODAY';
+            evDateStr === todayStr && hour >= 17 ? 'STASERA' : 'OGGI';
           return `<span class="urgency-pill urgency-pill--filled" style="background:${color}">${label}</span>`;
         }
         if (evDateStr === tomorrowStr) {
-          return `<span class="urgency-pill urgency-pill--outlined" style="border-color:${color};color:${color}">TOMORROW</span>`;
+          return `<span class="urgency-pill urgency-pill--outlined" style="border-color:${color};color:${color}">DOMANI</span>`;
         }
         const { satStr, sunStr } = weekendStrs();
         if (evDateStr === satStr || evDateStr === sunStr) {
-          return `<span class="urgency-pill urgency-pill--outlined" style="border-color:${color};color:${color}">THIS WEEKEND</span>`;
+          return `<span class="urgency-pill urgency-pill--outlined" style="border-color:${color};color:${color}">QUESTO WEEKEND</span>`;
         }
         const daysUntilStart = Math.round(
           (new Date(evDateStr) - new Date(todayStr)) / 86400000
         );
         if (daysUntilStart >= 2 && daysUntilStart <= 4) {
-          return `<span class="urgency-pill urgency-pill--outlined urgency-pill--muted">in ${daysUntilStart} days</span>`;
+          return `<span class="urgency-pill urgency-pill--outlined urgency-pill--muted">fra ${daysUntilStart} giorni</span>`;
         }
         return '';
       }
@@ -1738,7 +1699,7 @@
         const c1 = colHtml(col1Cat, col1, 0);
         const c2 = colHtml(col2Cat, col2, col1.length);
         const c3 = col3.length
-          ? colHtml('More', col3, col1.length + col2.length)
+          ? colHtml('Altro', col3, col1.length + col2.length)
           : '';
 
         const cols = [c1, c2, c3].filter(Boolean);
@@ -1813,71 +1774,8 @@
             ${e.description ? `<p class="event-card__desc">${escHtml(stripHtml(e.description))}</p>` : ''}
             <div class="event-card__footer">
               <div class="event-card__tags">${tags}</div>
-              ${url ? `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" class="event-link">View event <span class="arrow">→</span></a>` : ''}
+              ${url ? `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" class="event-link">Vedi evento <span class="arrow">→</span></a>` : ''}
             </div>
-          </div>
-        </div>`;
-      }
-
-      function renderFestivalCard(item, idx) {
-        const delay = Math.min(idx * 60, 400);
-        const festColor = 'var(--header)';
-
-        const firstTime = item.events[0].start_time;
-        const lastTime = item.events[item.events.length - 1].start_time;
-        const dateRange = escHtml(fmtRange(firstTime, lastTime));
-
-        const venues = [
-          ...new Set(item.events.map(e => e.venue_name).filter(Boolean)),
-        ];
-        const venueStr = venues.slice(0, 2).map(escHtml).join(' · ');
-
-        const count = item.events.length;
-
-        const subRows = item.events
-          .map(e => {
-            const url = safeUrl(e.url);
-            const timeStr = escHtml(fmtRange(e.start_time, e.end_time));
-            const venuePart = e.venue_name ? ` · ${escHtml(e.venue_name)}` : '';
-            const desc = e.description ? e.description.trim() : '';
-            const descSnippet =
-              desc.length > 120
-                ? escHtml(desc.slice(0, 120)) + '…'
-                : escHtml(desc);
-            return `<div class="festival-card__sub">
-            <div>
-              <div class="festival-card__sub-title">${escHtml(e.title)}</div>
-              <div class="festival-card__sub-meta">${timeStr}${venuePart}</div>
-              ${descSnippet ? `<div class="festival-card__sub-desc">${descSnippet}</div>` : ''}
-            </div>
-            ${url ? `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" class="festival-card__sub-link">→</a>` : ''}
-          </div>`;
-          })
-          .join('');
-
-        const id = `fc-${idx}`;
-        return `
-        <div class="event-card festival-card" id="${id}" style="animation-delay:${delay}ms">
-          <div class="event-card__stripe" style="background:${festColor}"></div>
-          <div class="event-card__body">
-            <div class="event-card__top">
-              <span class="event-card__badge" style="background:${festColor}">Festival</span>
-              <span class="event-card__date">${dateRange}</span>
-            </div>
-            <h3 class="event-card__title">${escHtml(item.festival_name)}</h3>
-            <div class="event-card__meta">
-              ${
-                venueStr
-                  ? `<span class="event-card__meta-item">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                ${venueStr}
-              </span>`
-                  : ''
-              }
-              <span class="event-card__meta-item">${count} events</span>
-            </div>
-            <button class="festival-card__toggle" data-fc-id="${escHtml(id)}">Show events ▼</button>
-            <div class="festival-card__events">${subRows}</div>
           </div>
         </div>`;
       }
@@ -1946,6 +1844,69 @@
         </div>`;
       }
 
+      function renderFestivalCard(item, idx) {
+        const delay = Math.min(idx * 60, 400);
+        const festColor = 'var(--header)';
+
+        const firstTime = item.events[0].start_time;
+        const lastTime = item.events[item.events.length - 1].start_time;
+        const dateRange = escHtml(fmtRange(firstTime, lastTime));
+
+        const venues = [
+          ...new Set(item.events.map(e => e.venue_name).filter(Boolean)),
+        ];
+        const venueStr = venues.slice(0, 2).map(escHtml).join(' · ');
+
+        const count = item.events.length;
+
+        const subRows = item.events
+          .map(e => {
+            const url = safeUrl(e.url);
+            const timeStr = escHtml(fmtRange(e.start_time, e.end_time));
+            const venuePart = e.venue_name ? ` · ${escHtml(e.venue_name)}` : '';
+            const desc = e.description ? e.description.trim() : '';
+            const descSnippet =
+              desc.length > 120
+                ? escHtml(desc.slice(0, 120)) + '…'
+                : escHtml(desc);
+            return `<div class="festival-card__sub">
+            <div>
+              <div class="festival-card__sub-title">${escHtml(e.title)}</div>
+              <div class="festival-card__sub-meta">${timeStr}${venuePart}</div>
+              ${descSnippet ? `<div class="festival-card__sub-desc">${descSnippet}</div>` : ''}
+            </div>
+            ${url ? `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" class="festival-card__sub-link">→</a>` : ''}
+          </div>`;
+          })
+          .join('');
+
+        const id = `fc-${idx}`;
+        return `
+        <div class="event-card festival-card" id="${id}" style="animation-delay:${delay}ms">
+          <div class="event-card__stripe" style="background:${festColor}"></div>
+          <div class="event-card__body">
+            <div class="event-card__top">
+              <span class="event-card__badge" style="background:${festColor}">Festival</span>
+              <span class="event-card__date">${dateRange}</span>
+            </div>
+            <h3 class="event-card__title">${escHtml(item.festival_name)}</h3>
+            <div class="event-card__meta">
+              ${
+                venueStr
+                  ? `<span class="event-card__meta-item">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                ${venueStr}
+              </span>`
+                  : ''
+              }
+              <span class="event-card__meta-item">${count} eventi</span>
+            </div>
+            <button class="festival-card__toggle" data-fc-id="${escHtml(id)}">Mostra eventi ▼</button>
+            <div class="festival-card__events">${subRows}</div>
+          </div>
+        </div>`;
+      }
+
       function renderItems(items, fromTime, toTime) {
         return items
           .map((item, i) =>
@@ -1957,17 +1918,6 @@
           )
           .join('');
       }
-
-      document.addEventListener('click', function (e) {
-        const btn = e.target.closest('.festival-card__toggle');
-        if (!btn) return;
-        const card = document.getElementById(btn.dataset.fcId);
-        if (!card) return;
-        card.classList.toggle('is-open');
-        btn.textContent = card.classList.contains('is-open')
-          ? 'Hide events ▲'
-          : 'Show events ▼';
-      });
 
       function buildShareUrl() {
         const params = new URLSearchParams();
@@ -1996,14 +1946,14 @@
         const btn = document.getElementById('copyICalBtn');
         try {
           await navigator.clipboard.writeText(url);
-          btn.textContent = '✓ URL copied!';
+          btn.textContent = '✓ URL copiato!';
           btn.classList.add('copied');
           setTimeout(() => {
-            btn.textContent = '📅 Subscribe (iCal)';
+            btn.textContent = '📅 Abbonati (iCal)';
             btn.classList.remove('copied');
           }, 2000);
         } catch (_) {
-          prompt('Paste this URL into your calendar app:', url);
+          prompt('Incolla questo URL nella tua app calendario:', url);
         }
       }
 
@@ -2012,14 +1962,14 @@
         const btn = document.getElementById('copyLinkBtn');
         try {
           await navigator.clipboard.writeText(url);
-          btn.textContent = '✓ Link copied!';
+          btn.textContent = '✓ Link copiato!';
           btn.classList.add('copied');
           setTimeout(() => {
-            btn.textContent = '🔗 Copy link';
+            btn.textContent = '🔗 Copia link';
             btn.classList.remove('copied');
           }, 2000);
         } catch (_) {
-          prompt('Copy this link:', url);
+          prompt('Copia questo link:', url);
         }
       }
 
@@ -2027,14 +1977,14 @@
         if (!_loadedEvents.length) return;
         const { lat, lng, radius, category, fromTime, toTime } = _loadedMeta;
         const fmt = t =>
-          new Date(t).toLocaleDateString('en-GB', {
+          new Date(t).toLocaleDateString('it-IT', {
             day: 'numeric',
             month: 'long',
             year: 'numeric',
           });
         const sep = '─'.repeat(48);
-        let text = `TOKORO — ${_loadedEvents.length} event${_loadedEvents.length !== 1 ? 's' : ''}\n`;
-        text += `${fmt(fromTime)} – ${fmt(toTime)} · within ${radius} km`;
+        let text = `TOKORO — ${_loadedEvents.length} event${_loadedEvents.length !== 1 ? 'i' : 'o'}\n`;
+        text += `${fmt(fromTime)} – ${fmt(toTime)} · entro ${radius} km`;
         if (category) text += ` · ${category}`;
         text += `\n\n${sep}\n\n`;
         _loadedEvents.forEach(e => {
@@ -2043,20 +1993,20 @@
           const venue = [e.venue_name, e.address].filter(Boolean).join(', ');
           if (venue) text += `${venue}\n`;
           if (e.description) text += `\n${e.description}\n`;
-          if (e.url && safeUrl(e.url)) text += `\nView event: ${e.url}\n`;
+          if (e.url && safeUrl(e.url)) text += `\nVedi evento: ${e.url}\n`;
           text += `\n${sep}\n\n`;
         });
         const btn = document.getElementById('copyTextBtn');
         try {
           await navigator.clipboard.writeText(text);
-          btn.textContent = '✓ Text copied!';
+          btn.textContent = '✓ Testo copiato!';
           btn.classList.add('copied');
           setTimeout(() => {
-            btn.textContent = '📋 Copy as text';
+            btn.textContent = '📋 Copia come testo';
             btn.classList.remove('copied');
           }, 2000);
         } catch (_) {
-          prompt('Copy this text:', text);
+          prompt('Copia questo testo:', text);
         }
       }
 
@@ -2085,107 +2035,20 @@
         let previewToken = null;
         let crawlData = null;
 
-        // ── Curator keypair (Web Crypto API, Ed25519) ─────────────────────────────────
-        function bytesToHexR(bytes) {
-          return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-
-        async function getRelayKeypair() {
-          const stored = localStorage.getItem('happenings_keypair');
-          if (stored) {
-            const kp = JSON.parse(stored);
-            if (kp.pubkey && kp.privkeyB64) return { ...kp, isNew: false };
-          }
-          const pair = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
-          const pubBytes = new Uint8Array(await crypto.subtle.exportKey('raw', pair.publicKey));
-          const privBytes = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
-          const kp = {
-            pubkey: bytesToHexR(pubBytes),
-            privkeyB64: btoa(String.fromCharCode(...privBytes)),
-          };
-          localStorage.setItem('happenings_keypair', JSON.stringify(kp));
-          return { ...kp, isNew: true };
-        }
-
-        async function signEventForRelay(preparedEvent, kp) {
-          const eventData = {
-            pubkey: kp.pubkey,
-            title: preparedEvent.title,
-            description: preparedEvent.description || '',
-            url: preparedEvent.url || '',
-            venue_name: preparedEvent.venue_name || '',
-            address: preparedEvent.address || '',
-            lat: preparedEvent.lat,
-            lng: preparedEvent.lng,
-            start_time: preparedEvent.start_time,
-            end_time: preparedEvent.end_time,
-            category: preparedEvent.category,
-            tags: preparedEvent.tags || [],
-            created_at: preparedEvent.created_at,
-          };
-          const canonical = JSON.stringify(eventData);
-          const msgBytes = new TextEncoder().encode(canonical);
-          const hashBuffer = await crypto.subtle.digest('SHA-256', msgBytes);
-          const privBytes = Uint8Array.from(atob(kp.privkeyB64), c => c.charCodeAt(0));
-          const cryptoKey = await crypto.subtle.importKey('pkcs8', privBytes.buffer, 'Ed25519', false, ['sign']);
-          const sigBuffer = await crypto.subtle.sign('Ed25519', cryptoKey, new Uint8Array(hashBuffer));
-          return { ...eventData, signature: bytesToHexR(new Uint8Array(sigBuffer)) };
-        }
-        // ─────────────────────────────────────────────────────────────────────────────
-
-        function getSelectedRelayEvents() {
-          return Array.from(
-            eventsEl.querySelectorAll('.relay-card__cb:checked')
-          ).map(function (cb) {
-            return extractedEvents[parseInt(cb.dataset.idx, 10)];
-          });
-        }
-
-        function updatePubBtn() {
-          var total = extractedEvents.length;
-          var selected = eventsEl.querySelectorAll(
-            '.relay-card__cb:checked'
-          ).length;
-          if (selected === 0) {
-            pubBtn.disabled = true;
-            pubBtn.textContent = 'Publish Events';
-          } else if (selected < total) {
-            pubBtn.disabled = false;
-            pubBtn.textContent =
-              'Publish ' + selected + ' Event' + (selected === 1 ? '' : 's');
-          } else {
-            pubBtn.disabled = false;
-            pubBtn.textContent = 'Publish Events';
-          }
-        }
-
         function setSt(msg, cls) {
           stEl.textContent = msg;
           stEl.className = 'relay-st ' + cls;
         }
 
-        // Signal the opener that the relay page is ready (after keypair is loaded)
-        if (!window.opener) {
-          setSt('No opener found. Please use the bookmarklet.', 'err');
+        // Signal the opener that the relay page is ready
+        if (window.opener) {
+          window.opener.postMessage({ type: 'ready' }, '*');
+        } else {
+          setSt('Nessuna finestra di origine. Usa il bookmarklet.', 'err');
           return;
         }
 
-        // Load keypair, show first-use notice if new, then signal ready with pubkey
-        getRelayKeypair().then(function(kp) {
-          if (kp.isNew) {
-            var noticeEl = document.getElementById('relay-notice');
-            var noticeKeyEl = document.getElementById('relay-notice-key');
-            if (noticeEl && noticeKeyEl) {
-              noticeKeyEl.textContent = kp.pubkey;
-              noticeEl.classList.add('show');
-            }
-          }
-          window.opener.postMessage({ type: 'ready', pubkey: kp.pubkey }, '*');
-        }).catch(function(err) {
-          setSt('Failed to load keypair: ' + (err.message || err), 'err');
-        });
-
-        // Register listener synchronously (before ready fires) so crawl_data is never missed
+        // Receive crawl data from the bookmarklet
         window.addEventListener('message', async function (evt) {
           if (evt.source !== window.opener) return;
           if (!evt.data || evt.data.type !== 'crawl_data') return;
@@ -2194,7 +2057,7 @@
         });
 
         async function runCrawl(data) {
-          setSt('Extracting events\u2026', 'info');
+          setSt('Estrazione eventi\u2026', 'info');
           try {
             const resp = await fetch(data.workerUrl + '/crawl', {
               method: 'POST',
@@ -2225,25 +2088,23 @@
               setSt(
                 dropped && dropped.length
                   ? dropped.length +
-                      ' event(s) extracted but dropped during normalization.'
-                  : 'No events found on this page. The page may only contain past events.',
+                      ' evento/i estratto/i ma scartato/i durante la normalizzazione.'
+                  : 'Nessun evento trovato in questa pagina.',
                 'info'
               );
               return;
             }
             extractedEvents = evs;
-            setSt('Found ' + evs.length + ' event(s). Review below:', 'ok');
+            setSt(
+              'Trovato/i ' + evs.length + ' evento/i. Controlla qui sotto:',
+              'ok'
+            );
             eventsEl.innerHTML = evs
-              .map(function (e, i) {
+              .map(function (e) {
                 return (
                   '<div class="relay-card">' +
-                  '<input type="checkbox" class="relay-card__cb" data-idx="' +
-                  i +
-                  '" checked aria-label="Select ' +
-                  escHtml(e.title || 'Untitled') +
-                  '">' +
                   '<h4>' +
-                  escHtml(e.title || 'Untitled') +
+                  escHtml(e.title || 'Senza titolo') +
                   '</h4>' +
                   '<p>' +
                   fmtRange(e.start_time, e.end_time) +
@@ -2259,80 +2120,66 @@
                 );
               })
               .join('');
-            eventsEl.querySelectorAll('.relay-card__cb').forEach(function (cb) {
-              cb.addEventListener('change', updatePubBtn);
-            });
-            updatePubBtn();
             actsEl.style.display = 'flex';
           } catch (e) {
-            setSt('Network error: ' + e.message, 'err');
+            setSt('Errore di rete: ' + e.message, 'err');
           }
         }
 
         pubBtn.addEventListener('click', async function () {
-          var selectedEvents = getSelectedRelayEvents();
-          if (!selectedEvents.length) { setSt('No events selected.', 'err'); return; }
-
-          // Prefer API Worker URL supplied by the bookmarklet; fall back to build-time constant
-          var apiUrl = (crawlData && crawlData.apiUrl && crawlData.apiUrl.trim() && !crawlData.apiUrl.trim().startsWith('__'))
-            ? crawlData.apiUrl.trim().replace(/\/$/, '')
-            : (typeof API_URL !== 'undefined' && API_URL && !API_URL.startsWith('__'))
-              ? API_URL.replace(/\/$/, '')
-              : null;
-          if (!apiUrl) { setSt('API URL not configured. Set it in the bookmarklet settings or redeploy with config.local.js filled in.', 'err'); return; }
-
           pubBtn.disabled = cancelBtn.disabled = true;
-          pubBtn.textContent = 'Publishing\u2026';
-          setSt('Publishing events\u2026', 'info');
-
+          pubBtn.textContent = 'Pubblicazione\u2026';
+          setSt('Pubblicazione eventi\u2026', 'info');
           try {
-            const kp = await getRelayKeypair();
-            let published = 0;
-            let failed = 0;
-
-            for (const event of selectedEvents) {
-              try {
-                const signed = await signEventForRelay(event, kp);
-                // Append unsigned metadata fields (not part of signature)
-                if (event.festival_name) signed.festival_name = event.festival_name;
-                if (event.festival_url)  signed.festival_url  = event.festival_url;
-                const resp = await fetch(apiUrl + '/events', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(signed),
-                });
-                if (resp.ok || resp.status === 409) {
-                  published++;
-                } else {
-                  const err = await resp.json().catch(() => ({}));
-                  console.error('Failed to publish "' + event.title + '":', err);
-                  failed++;
+            const body = previewToken
+              ? {
+                  url: crawlData.url,
+                  mode: 'direct',
+                  preview: false,
+                  preview_token: previewToken,
                 }
-              } catch (e) {
-                console.error('Network error publishing "' + event.title + '":', e);
-                failed++;
-              }
+              : {
+                  url: crawlData.url,
+                  mode: 'direct',
+                  preview: false,
+                  events: extractedEvents,
+                };
+            const resp = await fetch(crawlData.workerUrl + '/crawl', {
+              method: 'POST',
+              headers: {
+                Authorization: 'Bearer ' + crawlData.apiKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(body),
+            });
+            const result = await resp.json();
+            if (!resp.ok || !result.success) {
+              setSt(
+                'Error: ' + (result.message || result.error || 'Unknown error'),
+                'err'
+              );
+              pubBtn.disabled = cancelBtn.disabled = false;
+              pubBtn.textContent = 'Pubblica eventi';
+              return;
             }
-
-            if (failed === 0) {
-              setSt('Published ' + published + ' event(s) successfully!', 'ok');
-              eventsEl.innerHTML = '';
-              actsEl.style.display = 'none';
-            } else {
-              setSt('Published ' + published + ', failed ' + failed + '. Check console.', 'err');
-            }
+            const stats = result.stats || {};
+            setSt(
+              'Pubblicato/i ' + (stats.events_published || 0) + ' evento/i!',
+              'ok'
+            );
+            eventsEl.innerHTML = '';
+            actsEl.style.display = 'none';
           } catch (e) {
-            setSt('Error: ' + e.message, 'err');
-          } finally {
+            setSt('Errore di rete: ' + e.message, 'err');
             pubBtn.disabled = cancelBtn.disabled = false;
-            pubBtn.textContent = 'Publish Selected';
+            pubBtn.textContent = 'Pubblica eventi';
           }
         });
 
         cancelBtn.addEventListener('click', function () {
           eventsEl.innerHTML = '';
           actsEl.style.display = 'none';
-          setSt('Cancelled.', 'info');
+          setSt('Annullato.', 'info');
         });
       })();
 
@@ -2367,6 +2214,15 @@
         }
         listEvents();
       })();
+
+      document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.festival-card__toggle');
+        if (!btn) return;
+        const card = document.getElementById(btn.dataset.fcId);
+        if (!card) return;
+        const open = card.classList.toggle('is-open');
+        btn.textContent = open ? 'Nascondi eventi ▲' : 'Mostra eventi ▼';
+      });
     </script>
 
     <script>

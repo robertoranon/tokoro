@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tokoro - Event Publisher</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .keypair-section {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 30px;
+        }
+
+        .keypair-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4caf50;
+        }
+
+        .pubkey {
+            font-family: monospace;
+            font-size: 12px;
+            color: #666;
+            word-break: break-all;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        label {
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        #map {
+            width: 100%;
+            height: 300px;
+            border-radius: 4px;
+            margin-top: 5px;
+        }
+
+        .location-info {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .tags-input {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .tags-input input {
+            flex: 1;
+        }
+
+        .tags-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .tag {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 5px 10px;
+            border-radius: 16px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .tag button {
+            background: none;
+            border: none;
+            color: #1976d2;
+            cursor: pointer;
+            padding: 0;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #1565c0;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .message {
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+
+        .message.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #a5d6a7;
+        }
+
+        .message.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ef9a9a;
+        }
+
+        .datetime-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        @media (max-width: 600px) {
+            .datetime-inputs {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎉 Tokoro Event Publisher</h1>
+        <p class="subtitle">Publish events to the decentralized network</p>
+
+        <div class="keypair-section">
+            <div class="keypair-status">
+                <div class="status-indicator"></div>
+                <strong>Identity</strong>
+            </div>
+            <div class="pubkey" id="pubkey">Generating keypair...</div>
+        </div>
+
+        <form id="event-form">
+            <div>
+                <label for="title">Event Title *</label>
+                <input type="text" id="title" required placeholder="Jazz Night at Blue Note">
+            </div>
+
+            <div>
+                <label for="description">Description</label>
+                <textarea id="description" placeholder="An evening of live jazz featuring local artists..."></textarea>
+            </div>
+
+            <div>
+                <label for="url">Event URL</label>
+                <input type="url" id="url" placeholder="https://example.com/event">
+            </div>
+
+            <div>
+                <label for="venue_name">Venue Name</label>
+                <input type="text" id="venue_name" placeholder="Blue Note Jazz Club">
+            </div>
+
+            <div>
+                <label for="category">Category *</label>
+                <select id="category" required>
+                    <option value="">Select a category</option>
+                    <option value="music">Music</option>
+                    <option value="food">Food</option>
+                    <option value="sports">Sports</option>
+                    <option value="art">Art</option>
+                    <option value="theater">Theater</option>
+                    <option value="film">Film</option>
+                    <option value="nightlife">Nightlife</option>
+                    <option value="community">Community</option>
+                    <option value="outdoor">Outdoor</option>
+                    <option value="learning">Learning</option>
+                    <option value="wellness">Wellness</option>
+                    <option value="talks">Talks</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="tags">Tags (optional)</label>
+                <div class="tags-input">
+                    <input type="text" id="tag-input" placeholder="jazz, live, free entry...">
+                    <button type="button" onclick="addTag()">Add</button>
+                </div>
+                <div class="tags-list" id="tags-list"></div>
+            </div>
+
+            <div>
+                <label for="address">Location * (Search address or click on map)</label>
+                <div class="tags-input">
+                    <input type="text" id="address" placeholder="123 Main St, New York, NY">
+                    <button type="button" onclick="searchAddress()">Search</button>
+                </div>
+                <div id="map"></div>
+                <div class="location-info" id="location-info">Search for an address or click on the map to set event location</div>
+            </div>
+
+            <div class="datetime-inputs">
+                <div>
+                    <label for="start_date">Start Date *</label>
+                    <input type="datetime-local" id="start_date" required>
+                </div>
+
+                <div>
+                    <label for="end_date">End Date</label>
+                    <input type="datetime-local" id="end_date">
+                </div>
+            </div>
+
+            <button type="submit" id="submit-btn">Publish Event</button>
+        </form>
+
+        <div id="message"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Local config: copy config.local.js.example to config.local.js at project root -->
+    <script src="../config.local.js"></script>
+    <script type="module">
+        import * as ed from 'https://esm.sh/@noble/ed25519@2.1.0';
+
+        // Configure SHA-512 for browser
+        ed.etc.sha512Async = async (...m) => {
+            return new Uint8Array(await crypto.subtle.digest('SHA-512', m[0]));
+        };
+
+        let keypair = null;
+        let selectedLocation = null;
+        let eventTags = [];
+        let map = null;
+        let marker = null;
+
+        let WORKER_URL = window.TOKORO_CONFIG?.workerUrl || localStorage.getItem('tokoro_worker_url');
+
+        function promptForWorkerUrl() {
+            return new Promise((resolve) => {
+                const section = document.createElement('div');
+                section.style.cssText = 'background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:15px;margin-bottom:20px';
+                section.innerHTML = `
+                    <label style="font-weight:500;display:block;margin-bottom:8px">Worker URL not configured. Enter your Tokoro worker URL:</label>
+                    <div style="display:flex;gap:10px">
+                        <input type="url" id="worker-url-input" placeholder="https://happenings-worker.YOUR_SUBDOMAIN.workers.dev" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px">
+                        <button type="button" id="worker-url-save">Save</button>
+                    </div>
+                `;
+                document.querySelector('.container').prepend(section);
+
+                const save = () => {
+                    const val = document.getElementById('worker-url-input').value.trim();
+                    if (!val) return;
+                    localStorage.setItem('tokoro_worker_url', val);
+                    section.remove();
+                    resolve(val);
+                };
+
+                document.getElementById('worker-url-save').addEventListener('click', save);
+                document.getElementById('worker-url-input').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') save();
+                });
+            });
+        }
+
+        // Initialize
+        async function init() {
+            if (!WORKER_URL) {
+                WORKER_URL = await promptForWorkerUrl();
+            }
+            await generateKeypair();
+            initMap();
+
+            document.getElementById('event-form').addEventListener('submit', handleSubmit);
+            document.getElementById('tag-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addTag();
+                }
+            });
+            document.getElementById('address').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchAddress();
+                }
+            });
+        }
+
+        async function generateKeypair() {
+            // Check if keypair exists in localStorage
+            const stored = localStorage.getItem('happenings_keypair');
+            if (stored) {
+                keypair = JSON.parse(stored);
+                document.getElementById('pubkey').textContent = `Public Key: ${keypair.pubkey}`;
+                return;
+            }
+
+            // Generate new keypair
+            const privKey = ed.utils.randomPrivateKey();
+            const pubKey = await ed.getPublicKeyAsync(privKey);
+
+            keypair = {
+                privkey: bytesToHex(privKey),
+                pubkey: bytesToHex(pubKey)
+            };
+
+            localStorage.setItem('happenings_keypair', JSON.stringify(keypair));
+            document.getElementById('pubkey').textContent = `Public Key: ${keypair.pubkey}`;
+        }
+
+        function initMap() {
+            map = L.map('map').setView([51.505, -0.09], 13); // Default: London
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            map.on('click', (e) => {
+                selectedLocation = e.latlng;
+
+                if (marker) {
+                    marker.setLatLng(e.latlng);
+                } else {
+                    marker = L.marker(e.latlng).addTo(map);
+                }
+
+                document.getElementById('location-info').textContent =
+                    `Selected: ${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
+            });
+        }
+
+        window.searchAddress = async function() {
+            const addressInput = document.getElementById('address');
+            const address = addressInput.value.trim();
+
+            if (!address) {
+                showMessage('Please enter an address', 'error');
+                return;
+            }
+
+            const locationInfo = document.getElementById('location-info');
+            locationInfo.textContent = 'Searching...';
+
+            try {
+                // Use OpenStreetMap Nominatim API for geocoding
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+                    {
+                        headers: {
+                            'User-Agent': 'Tokoro Event Publisher'
+                        }
+                    }
+                );
+
+                const results = await response.json();
+
+                if (results.length === 0) {
+                    locationInfo.textContent = 'Address not found. Try a different search or click on the map.';
+                    showMessage('Address not found', 'error');
+                    return;
+                }
+
+                const result = results[0];
+                const lat = parseFloat(result.lat);
+                const lng = parseFloat(result.lon);
+
+                // Update map
+                map.setView([lat, lng], 15);
+
+                if (marker) {
+                    marker.setLatLng([lat, lng]);
+                } else {
+                    marker = L.marker([lat, lng]).addTo(map);
+                }
+
+                // Set selected location
+                selectedLocation = { lat, lng };
+
+                locationInfo.textContent = `Found: ${result.display_name}`;
+                showMessage('Location found!', 'success');
+            } catch (error) {
+                locationInfo.textContent = 'Error searching address. Try again or click on the map.';
+                showMessage(`Error: ${error.message}`, 'error');
+            }
+        };
+
+        window.addTag = function() {
+            const input = document.getElementById('tag-input');
+            const tag = input.value.trim();
+
+            if (tag && !eventTags.includes(tag)) {
+                eventTags.push(tag);
+                renderTags();
+                input.value = '';
+            }
+        };
+
+        function removeTag(tag) {
+            eventTags = eventTags.filter(t => t !== tag);
+            renderTags();
+        }
+
+        function renderTags() {
+            const container = document.getElementById('tags-list');
+            container.innerHTML = eventTags.map(tag => `
+                <div class="tag">
+                    ${tag}
+                    <button onclick="window.removeTag('${tag}')">×</button>
+                </div>
+            `).join('');
+        }
+
+        window.removeTag = removeTag;
+
+        async function handleSubmit(e) {
+            e.preventDefault();
+
+            if (!selectedLocation) {
+                showMessage('Please select a location on the map', 'error');
+                return;
+            }
+
+            const submitBtn = document.getElementById('submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Publishing...';
+
+            try {
+                const startDate = new Date(document.getElementById('start_date').value);
+                const endDate = document.getElementById('end_date').value
+                    ? new Date(document.getElementById('end_date').value)
+                    : null;
+
+                const event = {
+                    pubkey: keypair.pubkey,
+                    title: document.getElementById('title').value,
+                    description: document.getElementById('description').value || '',
+                    url: document.getElementById('url').value || '',
+                    venue_name: document.getElementById('venue_name').value || '',
+                    address: document.getElementById('address').value || '',
+                    lat: selectedLocation.lat,
+                    lng: selectedLocation.lng,
+                    start_time: Math.floor(startDate.getTime() / 1000),
+                    end_time: endDate ? Math.floor(endDate.getTime() / 1000) : null,
+                    category: document.getElementById('category').value,
+                    tags: eventTags,
+                    created_at: Math.floor(Date.now() / 1000)
+                };
+
+                // Sign the event
+                const eventData = {
+                    pubkey: event.pubkey,
+                    title: event.title,
+                    description: event.description,
+                    url: event.url,
+                    venue_name: event.venue_name,
+                    address: event.address,
+                    lat: event.lat,
+                    lng: event.lng,
+                    start_time: event.start_time,
+                    end_time: event.end_time,
+                    category: event.category,
+                    tags: event.tags,
+                    created_at: event.created_at
+                };
+
+                const message = await hashEventData(eventData);
+                const signature = await ed.signAsync(hexToBytes(message), hexToBytes(keypair.privkey));
+                event.signature = bytesToHex(signature);
+
+                // POST to worker
+                const response = await fetch(`${WORKER_URL}/events`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(event)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage(`Event published successfully! ID: ${result.id}`, 'success');
+                    document.getElementById('event-form').reset();
+                    eventTags = [];
+                    renderTags();
+                    if (marker) {
+                        map.removeLayer(marker);
+                        marker = null;
+                    }
+                    selectedLocation = null;
+                    document.getElementById('address').value = '';
+                    document.getElementById('location-info').textContent = 'Search for an address or click on the map to set event location';
+                } else {
+                    showMessage(`Error: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`Error: ${error.message}`, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Publish Event';
+            }
+        }
+
+        async function hashEventData(eventData) {
+            const canonical = JSON.stringify(eventData);
+            const encoder = new TextEncoder();
+            const data = encoder.encode(canonical);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function bytesToHex(bytes) {
+            return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function hexToBytes(hex) {
+            const bytes = new Uint8Array(hex.length / 2);
+            for (let i = 0; i < hex.length; i += 2) {
+                bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
+            }
+            return bytes;
+        }
+
+        init();
+    </script>
+</body>
+</html>

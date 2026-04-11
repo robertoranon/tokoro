@@ -64,18 +64,26 @@ node build-bookmarklet.js
 
 The script reads `config.local.js`, substitutes placeholders, minifies the bookmarklet, and writes the results into `index.html` and `it.html`:
 
-| Config key         | Placeholder             | Purpose                                                           |
-| ------------------ | ----------------------- | ----------------------------------------------------------------- |
-| `relayUrl`         | `__RELAY_URL__`         | URL of this Cloudflare Pages site — used to open the relay popup  |
-| `crawlerWorkerUrl` | `__DEFAULT_WORKER__`    | Default crawler-worker URL pre-filled in the bookmarklet UI       |
-| `crawlerApiKey`    | `__DEFAULT_API_KEY__`   | Default API key pre-filled in the bookmarklet UI                  |
-| `workerUrl`        | `__TOKORO_WORKER_URL__` | Tokoro API base URL injected into `index.html` and `it.html`      |
+| Config key         | Placeholder             | Purpose                                                                                                     |
+| ------------------ | ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `relayUrl`         | `__RELAY_URL__`         | URL of this Cloudflare Pages site — used to open the relay popup                                           |
+| `crawlerWorkerUrl` | `__DEFAULT_WORKER__`    | Default crawler-worker URL pre-filled in the bookmarklet settings                                          |
+| `crawlerApiKey`    | `__DEFAULT_API_KEY__`   | Default API key pre-filled in the bookmarklet settings                                                      |
+| `workerUrl`        | `__DEFAULT_API_URL__`   | Default API Worker URL pre-filled in the bookmarklet settings (also injected as `__TOKORO_WORKER_URL__` into `index.html` and `it.html`) |
 
-Users can override `crawlerWorkerUrl` and `crawlerApiKey` at runtime via the bookmarklet's input fields; their values are saved to `localStorage` and restored on subsequent uses.
+Users can override `crawlerWorkerUrl`, `crawlerApiKey`, and `workerUrl` at runtime via the bookmarklet's settings panel; their values are saved to `localStorage` and restored on subsequent uses. The settings panel collapses automatically when all three values are configured.
 
 ## Local Testing
 
 Simply open `index.html` in a web browser. No build step required.
+
+## Bookmarklet Publisher
+
+The bookmarklet relay (activated via `?relay=1` or by clicking the bookmarklet) generates an Ed25519 keypair on first use, stored in `localStorage` on the Pages origin. Events extracted by the Crawler Worker are signed locally with this keypair and published directly to the API worker — no signing happens server-side.
+
+On first use the relay shows an amber notice with the new public key, prompting the curator to share it with the admin and back it up for other browsers. The bookmarklet also caches the public key locally and displays it in its settings panel after the first relay interaction.
+
+To allow a new curator to publish, obtain their public key (shown in the relay first-use notice or the bookmarklet settings) and add it to the `ALLOWED_PUBKEYS` secret on the API worker.
 
 ## CORS Requirements
 

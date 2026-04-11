@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Tokoro Crawler</title>
+  <style>
+    body {
+      width: 320px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 18px;
+      margin: 0 0 16px 0;
+      color: #333;
+    }
+
+    .settings {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: #666;
+      margin-bottom: 4px;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+      margin-bottom: 12px;
+    }
+
+    input[type="text"]:focus,
+    input[type="password"]:focus {
+      outline: none;
+      border-color: #4CAF50;
+    }
+
+    .url-display {
+      background: #f5f5f5;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 16px;
+      word-break: break-all;
+      max-height: 60px;
+      overflow-y: auto;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #45a049;
+    }
+
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .status {
+      margin-top: 12px;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      display: none;
+    }
+
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .status.info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+
+    .stats {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #666;
+    }
+
+    .save-config {
+      font-size: 11px;
+      color: #666;
+      margin-top: 8px;
+      text-align: center;
+    }
+
+    .settings-toggle {
+      margin-bottom: 12px;
+      text-align: right;
+    }
+
+    .settings-toggle a {
+      font-size: 11px;
+      color: #999;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .settings-toggle a:hover {
+      color: #666;
+    }
+
+    .preview-section {
+      display: none;
+      margin-top: 16px;
+      border-top: 1px solid #ddd;
+      padding-top: 16px;
+    }
+
+    .preview-section.visible {
+      display: block;
+    }
+
+    .event-preview {
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 12px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      position: relative;
+    }
+
+    .event-select {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: #4CAF50;
+    }
+
+    .event-preview h3 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      color: #333;
+    }
+
+    .event-preview p {
+      margin: 4px 0;
+      color: #666;
+    }
+
+    .event-preview .event-date {
+      font-weight: 600;
+      color: #4CAF50;
+    }
+
+    .preview-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .preview-actions button {
+      width: 50%;
+    }
+
+    .preview-actions button.cancel {
+      background: #666;
+    }
+
+    .preview-actions button.cancel:hover {
+      background: #555;
+    }
+  </style>
+</head>
+<body>
+  <h1>Tokoro Event Crawler</h1>
+
+  <div class="settings" id="settingsSection">
+    <label for="apiKey">API Key</label>
+    <input type="password" id="apiKey" placeholder="Enter your API key">
+
+    <label for="workerUrl">Crawler Worker URL</label>
+    <input type="text" id="workerUrl" placeholder="https://happenings-crawler-worker.YOUR_SUBDOMAIN.workers.dev">
+
+    <label for="apiUrl">API Worker URL</label>
+    <input type="text" id="apiUrl" placeholder="https://happenings-worker.YOUR_SUBDOMAIN.workers.dev">
+
+    <div id="pubkeySection" style="margin-top:8px; display:none;">
+      <div id="newKeypairNotice" style="display:none; background:#fff8e1; border:1px solid #ffc107; border-radius:4px; padding:8px; margin-bottom:8px; font-size:11px; color:#5d4037; line-height:1.5;">
+        New publishing identity created. Share your public key below with the Tokoro admin to activate publishing. Your private key is stored in Chrome sync storage &mdash; it will be available on other Chrome browsers where you are signed in with the same account.
+      </div>
+      <label>Your Public Key</label>
+      <div id="pubkeyDisplay" style="font-family:monospace;font-size:10px;background:#f5f5f5;padding:6px;border-radius:4px;word-break:break-all;color:#333;user-select:all;"></div>
+    </div>
+  </div>
+  <div class="settings-toggle" id="settingsToggleRow" style="display:none;">
+    <a href="#" id="settingsToggle">⚙ Settings</a>
+  </div>
+
+  <div class="url-display">
+    <strong>Current page:</strong> <span id="currentUrl">Loading...</span>
+  </div>
+
+  <button id="crawlButton">Crawl This Page</button>
+
+  <div id="status" class="status"></div>
+
+  <div id="previewSection" class="preview-section">
+    <h2 style="font-size: 14px; margin: 0 0 12px 0;">Preview Extracted Events</h2>
+    <div id="eventsPreview"></div>
+    <div class="preview-actions">
+      <button id="cancelButton" class="cancel">Cancel</button>
+      <button id="publishButton">Publish Events</button>
+    </div>
+  </div>
+
+  <div class="save-config">Settings are saved automatically</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

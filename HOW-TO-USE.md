@@ -151,6 +151,8 @@ wrangler secret put LLM_PROVIDER --config worker/wrangler.toml
 
 `ADMIN_PUBKEY` is set in [Section 4](#4-key-management) after generating the admin keypair.
 
+`ALLOWED_PUBKEYS` is set in [Section 4](#4-key-management) once you have curator public keys to allowlist.
+
 ### 2.6 Deploy the Worker
 
 ```bash
@@ -163,7 +165,7 @@ The worker will be live at `https://happenings-worker.YOUR_SUBDOMAIN.workers.dev
 
 ## 3. Deploy the Crawler Worker _(required)_
 
-The Crawler Worker extracts events from URLs using an LLM and publishes them to the API. The Chrome extension, bookmarklet, and Apple Shortcut all talk to this service.
+The Crawler Worker extracts events from URLs using an LLM and returns them as unsigned `PreparedEvent[]`. The Chrome extension, bookmarklet, and Apple Shortcut all talk to this service — they sign extracted events locally and publish directly to the API worker.
 
 ### 3.1 Install dependencies
 
@@ -172,23 +174,7 @@ cd crawler-worker
 npm install
 ```
 
-### 3.2 Create the KV namespace (preview cache)
-
-The Crawler Worker uses a KV namespace to temporarily cache extracted events before publishing (preview mode).
-
-```bash
-wrangler kv namespace create PREVIEW_CACHE
-```
-
-Copy the `id` from the output and update `crawler-worker/wrangler.toml`:
-
-```toml
-[[kv_namespaces]]
-binding = "PREVIEW_CACHE"
-id = "YOUR_KV_NAMESPACE_ID_HERE"   # <-- paste here
-```
-
-### 3.3 Set secrets
+### 3.2 Set secrets
 
 Secrets are sensitive values that must not be stored in code or config files. Set them via Wrangler:
 
@@ -199,20 +185,6 @@ Generate one or more API keys (any random string, e.g. `openssl rand -hex 32`). 
 ```bash
 wrangler secret put CRAWLER_API_KEYS --config crawler-worker/wrangler.toml
 # Enter a comma-separated list, e.g.: key1abc,key2def
-```
-
-#### Ed25519 keypair for signing published events
-
-Events must be signed before being accepted by the API. You need an Ed25519 keypair. The easiest way to generate one is to open `web-publisher/index.html` in a browser — it auto-generates a keypair and displays it in the settings panel.
-
-Then set the secrets:
-
-```bash
-wrangler secret put CRAWLER_PRIVKEY --config crawler-worker/wrangler.toml
-# Paste the private key (hex string)
-
-wrangler secret put CRAWLER_PUBKEY --config crawler-worker/wrangler.toml
-# Paste the public key (hex string)
 ```
 
 #### LLM provider credentials
@@ -227,18 +199,7 @@ wrangler secret put LLM_PROVIDER --config crawler-worker/wrangler.toml
 # Enter one of: openai, anthropic, openrouter, ollama
 ```
 
-### 3.4 Verify the API connection
-
-The Crawler Worker connects to the API Worker via a **service binding** (`TOKORO_API → happenings-worker`) already configured in `crawler-worker/wrangler.toml`. As long as both workers are deployed under the same Cloudflare account with their default names, no changes are needed.
-
-The `TOKORO_API_URL` var in `[vars]` is a fallback used when the binding is unavailable (e.g. local development). Update it if you renamed the API Worker or are testing locally:
-
-```toml
-[vars]
-TOKORO_API_URL = "https://happenings-worker.YOUR_SUBDOMAIN.workers.dev"
-```
-
-### 3.5 Deploy the Crawler Worker
+### 3.3 Deploy the Crawler Worker
 
 ```bash
 cd crawler-worker
@@ -255,14 +216,23 @@ Every event must be signed by its author. Identity is an Ed25519 keypair — no 
 
 ### Curator keys (human publishers)
 
-A curator is anyone who publishes events manually via the web publisher or Chrome extension.
+A curator is anyone who publishes events — via the web publisher, Chrome extension, or bookmarklet.
 
-1. Open `web-publisher/index.html` in your browser (or your deployed Web Publisher URL).
-2. A keypair is generated automatically on first load and stored in the browser's localStorage.
-3. The public key is displayed in the settings panel — this is the curator's persistent identity on the platform.
-4. The private key never leaves the browser. Each curator's keypair is tied to the browser they used; if they clear localStorage they lose their identity.
+Each curator generates their own Ed25519 keypair locally on first use:
+- **Web publisher**: open `web-publisher/index.html` — keypair auto-generated in localStorage; pubkey shown in settings panel
+- **Chrome extension**: open the popup — keypair auto-generated in `chrome.storage.sync`; pubkey shown in settings
+- **Bookmarklet relay**: open the relay popup — keypair auto-generated in localStorage of `happenings-query.pages.dev`
 
-To give a curator their public key (e.g. to whitelist them or attribute their events), they just copy it from the settings panel.
+The private key never leaves the browser. Each curator's keypair is tied to their browser/device.
+
+To activate a curator, obtain their public key (64-char hex) and add it to the `ALLOWED_PUBKEYS` secret on the API worker:
+
+```bash
+wrangler secret put ALLOWED_PUBKEYS --cwd worker
+# Enter comma-separated list: <existing_pubkeys>,<new_curator_pubkey>
+```
+
+Always include the crawler CLI's `CRAWLER_PUBKEY` in `ALLOWED_PUBKEYS` if you use automated publishing via `crawler/`.
 
 ### Admin key (moderation)
 
@@ -300,20 +270,22 @@ curl "https://happenings-worker.YOUR_SUBDOMAIN.workers.dev/events?lat=51.5&lng=-
 
 Should return `{"events": []}` (empty list if no events yet).
 
-Test a crawl (the `preview` flag extracts events without publishing, useful for testing):
+Test a crawl (the crawler worker extracts events and returns them — sign and publish manually to test the full flow):
 
 ```bash
 curl -X POST "https://happenings-crawler-worker.YOUR_SUBDOMAIN.workers.dev/crawl" \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d '{"url": "https://example-venue.com/events", "preview": true}'
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{"url": "https://example-venue.com/events", "mode": "direct"}'
 ```
+
+Should return `{"success": true, "events": [...]}` with extracted events (unsigned, ready for client signing).
 
 ---
 
 ## 6. Install Client Tools _(optional)_
 
-Links to the Chrome extension and bookmarklet are all available in the **public web interface** — open `public-web/index.html` (or your deployed Cloudflare Pages URL) and look for the "Add Events" section.
+Links to the Chrome extension, bookmarklet, and Apple Shortcut are all available in the **public web interface** — open `public-web/index.html` (or your deployed Cloudflare Pages URL) and look for the "Add Events" section.
 
 ### Chrome Extension
 
@@ -322,7 +294,14 @@ Install directly from the [Chrome Web Store](https://chromewebstore.google.com/d
 After installing, click the extension icon → **Settings** and set:
 
 - **Crawler Worker URL**: `https://happenings-crawler-worker.YOUR_SUBDOMAIN.workers.dev`
+- **API Worker URL**: `https://happenings-worker.YOUR_SUBDOMAIN.workers.dev`
 - **API Key**: one of the keys you set in `CRAWLER_API_KEYS`
+
+Your public key is displayed in the settings panel — share it with your admin to be added to the `ALLOWED_PUBKEYS` allowlist before you can publish events.
+
+### Apple Shortcut
+
+The Apple Shortcut link is available on the public web page. It extracts and publishes events from Safari on iPhone or Mac (no extra app needed).
 
 ### Bookmarklet
 

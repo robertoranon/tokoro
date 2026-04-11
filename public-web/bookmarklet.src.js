@@ -5,6 +5,7 @@
 
   var DEFAULT_WORKER = '__DEFAULT_WORKER__';
   var DEFAULT_API_KEY = '__DEFAULT_API_KEY__';
+  var DEFAULT_API_URL = '__DEFAULT_API_URL__';
   var RELAY_URL = '__RELAY_URL__';
 
   var host = document.createElement('div');
@@ -33,15 +34,18 @@
     + '#st.ok{background:#d4edda;color:#155724;display:block;}'
     + '#cf{display:flex;flex-direction:column;gap:10px;}'
     + '#tg{font-size:11px;color:#999;text-decoration:none;cursor:pointer;text-align:right;display:none;}'
-    + '#tg:hover{color:#666;}';
+    + '#tg:hover{color:#666;}'
+    + '.pk{font-family:monospace;font-size:10px;background:#f5f5f5;padding:6px;border-radius:4px;word-break:break-all;color:#333;user-select:all;margin-top:2px;}';
 
   shadow.innerHTML = '<style>' + css + '</style>'
     + '<div id="sb">'
     + '<div id="hd"><h2>Tokoro</h2><button id="xb">&#x2715;</button></div>'
     + '<div id="bd">'
     + '<div id="cf">'
-    + '<div><label>API Key</label><input type="text" id="ak"/></div>'
-    + '<div><label>Worker URL</label><input type="url" id="wu"/></div>'
+    + '<div><label>API Key</label><input type="password" id="ak"/></div>'
+    + '<div><label>Crawler Worker URL</label><input type="url" id="wu"/></div>'
+    + '<div><label>API Worker URL</label><input type="url" id="au"/></div>'
+    + '<div id="pk-row" style="display:none"><label>Your Public Key</label><div class="pk" id="pk"></div></div>'
     + '</div>'
     + '<a href="#" id="tg">&#9881; Settings</a>'
     + '<hr class="divider"/>'
@@ -51,17 +55,21 @@
     + '</div></div>';
 
   var S = function (id) { return shadow.getElementById(id); };
-  var ak = S('ak'), wu = S('wu'), cu = S('cu'), eb = S('eb'), st = S('st');
-  var cf = S('cf'), tg = S('tg');
+  var ak = S('ak'), wu = S('wu'), au = S('au'), cu = S('cu'), eb = S('eb'), st = S('st');
+  var cf = S('cf'), tg = S('tg'), pk = S('pk'), pkRow = S('pk-row');
 
   ak.value = localStorage.getItem('happenings_api_key') || DEFAULT_API_KEY;
   wu.value = localStorage.getItem('happenings_worker_url') || DEFAULT_WORKER;
+  au.value = localStorage.getItem('happenings_api_url') || DEFAULT_API_URL;
   cu.textContent = window.location.href;
+  var cachedPk = localStorage.getItem('happenings_pubkey');
+  if (cachedPk) { pk.textContent = cachedPk; pkRow.style.display = 'block'; }
 
   function updateCfVisibility(forceShow) {
-    var hasKey = ak.value && ak.value !== DEFAULT_API_KEY && ak.value !== '__DEFAULT_API_KEY__';
-    var hasUrl = wu.value && wu.value !== DEFAULT_WORKER && wu.value !== '__DEFAULT_WORKER__';
-    if (forceShow || !hasKey || !hasUrl) {
+    var hasKey = ak.value && !ak.value.startsWith('__');
+    var hasUrl = wu.value && !wu.value.startsWith('__');
+    var hasApiUrl = au.value && !au.value.startsWith('__');
+    if (forceShow || !hasKey || !hasUrl || !hasApiUrl) {
       cf.style.display = 'flex';
       tg.style.display = 'none';
     } else {
@@ -73,6 +81,7 @@
 
   ak.addEventListener('input', function () { localStorage.setItem('happenings_api_key', ak.value); });
   wu.addEventListener('input', function () { localStorage.setItem('happenings_worker_url', wu.value); });
+  au.addEventListener('input', function () { localStorage.setItem('happenings_api_url', au.value); });
   S('xb').addEventListener('click', function () { host.remove(); });
   tg.addEventListener('click', function (e) { e.preventDefault(); updateCfVisibility(true); });
 
@@ -130,6 +139,11 @@
       clearTimeout(timer);
       window.removeEventListener('message', listener);
       sent = true;
+      if (evt.data.pubkey) {
+        localStorage.setItem('happenings_pubkey', evt.data.pubkey);
+        pk.textContent = evt.data.pubkey;
+        pkRow.style.display = 'block';
+      }
       popup.postMessage({
         type: 'crawl_data',
         url: window.location.href,
@@ -137,6 +151,7 @@
         title: document.title,
         apiKey: apiKey,
         workerUrl: workerUrl,
+        apiUrl: au.value.trim(),
       }, '*');
       setStatus('Extracting events in popup\u2026', 'info');
       eb.disabled = false;

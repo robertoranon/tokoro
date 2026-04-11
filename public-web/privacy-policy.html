@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy Policy – Tokoro Event Crawler</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&family=Figtree:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: 'Figtree', sans-serif;
+        font-weight: 400;
+        background: #faf9f6;
+        color: #1a1a1a;
+        line-height: 1.7;
+        padding: 3rem 1.5rem 6rem;
+      }
+
+      .container {
+        max-width: 680px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        font-family: 'Fraunces', serif;
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 0.3rem;
+      }
+
+      .subtitle {
+        color: #666;
+        font-size: 0.95rem;
+        margin-bottom: 2.5rem;
+      }
+
+      h2 {
+        font-family: 'Fraunces', serif;
+        font-size: 1.2rem;
+        font-weight: 700;
+        margin-top: 2rem;
+        margin-bottom: 0.5rem;
+      }
+
+      p { margin-bottom: 1rem; }
+
+      ul {
+        margin: 0.5rem 0 1rem 1.5rem;
+      }
+
+      ul li { margin-bottom: 0.3rem; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Privacy Policy</h1>
+      <p class="subtitle">Tokoro Event Crawler &mdash; Chrome Extension &middot; Last updated: March 2026</p>
+
+      <h2>What this extension does</h2>
+      <p>
+        Tokoro Event Crawler lets you extract event information from web pages and images, and publish those events to the Tokoro platform.
+      </p>
+
+      <h2>Data collected</h2>
+      <p>The extension collects only what is necessary to publish events:</p>
+      <ul>
+        <li><strong>Page content and URLs</strong> — when you explicitly trigger a crawl, the content of the active tab (or a selected image) is sent to the Tokoro crawler service for event extraction.</li>
+        <li><strong>Published event data</strong> — title, description, location, date/time, category, and tags that you choose to publish are stored in the Tokoro database.</li>
+        <li><strong>Your public key</strong> — a cryptographic identity (Ed25519 keypair) is generated locally on your device the first time you use the extension. The private key never leaves your device. The public key is attached to events you publish as proof of authorship.</li>
+      </ul>
+
+      <h2>Data not collected</h2>
+      <ul>
+        <li>No browsing history is recorded or transmitted.</li>
+        <li>No analytics or tracking of any kind.</li>
+        <li>No personal information (name, email, account) is ever requested or stored.</li>
+      </ul>
+
+      <h2>How data is used</h2>
+      <p>
+        Page content sent during a crawl is processed solely to extract structured event information and is not retained beyond that operation. Published events are stored in the Tokoro database and are publicly visible to other users of the platform.
+      </p>
+
+      <h2>Third-party services</h2>
+      <p>
+        The extension communicates only with the Tokoro crawler and API services. No data is shared with third-party analytics, advertising, or tracking services.
+      </p>
+
+      <h2>Local storage</h2>
+      <p>
+        Your Ed25519 keypair is stored locally in Chrome's extension storage on your device. It is never transmitted to any server.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        Questions? Reach out at <a href="mailto:roberto.ranon@hey.com">roberto.ranon@hey.com</a>.
+      </p>
+    </div>
+  </body>
+</html>

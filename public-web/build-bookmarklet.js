@@ -44,6 +44,7 @@ let src = fs.readFileSync(SRC_FILE, 'utf8');
 src = src.replace(/__RELAY_URL__/g, RELAY_URL);
 src = src.replace(/__DEFAULT_WORKER__/g, DEFAULT_WORKER);
 src = src.replace(/__DEFAULT_API_KEY__/g, DEFAULT_API_KEY);
+src = src.replace(/__DEFAULT_API_URL__/g, API_URL);
 
 // Minify: strip comments, collapse whitespace
 function minify(code) {
@@ -58,27 +59,29 @@ function minify(code) {
 
 const minified = minify(src);
 
-// Inject bookmarklet into index.html
+// Inject bookmarklet into index.html and it.html
 const OPEN_TAG  = '<script type="text/x-bookmarklet" id="bm-src">';
 const CLOSE_TAG = '</script>';
 
-let html = fs.readFileSync(HTML_FILE, 'utf8');
+for (const f of [HTML_FILE, IT_HTML]) {
+  let html = fs.readFileSync(f, 'utf8');
 
-const openIdx  = html.indexOf(OPEN_TAG);
-const closeIdx = html.indexOf(CLOSE_TAG, openIdx + OPEN_TAG.length);
+  const openIdx  = html.indexOf(OPEN_TAG);
+  const closeIdx = html.indexOf(CLOSE_TAG, openIdx + OPEN_TAG.length);
 
-if (openIdx === -1 || closeIdx === -1) {
-  console.error('ERROR: Could not find <script type="text/x-bookmarklet" id="bm-src"> in index.html');
-  process.exit(1);
+  if (openIdx === -1 || closeIdx === -1) {
+    console.error(`ERROR: Could not find <script type="text/x-bookmarklet" id="bm-src"> in ${path.basename(f)}`);
+    process.exit(1);
+  }
+
+  html =
+    html.slice(0, openIdx + OPEN_TAG.length) +
+    '\n    ' + minified + '\n  ' +
+    html.slice(closeIdx);
+
+  fs.writeFileSync(f, html, 'utf8');
+  console.log(`Bookmarklet built: ${minified.length} chars injected into ${path.basename(f)}`);
 }
-
-html =
-  html.slice(0, openIdx + OPEN_TAG.length) +
-  '\n    ' + minified + '\n  ' +
-  html.slice(closeIdx);
-
-fs.writeFileSync(HTML_FILE, html, 'utf8');
-console.log(`Bookmarklet built: ${minified.length} chars injected into index.html`);
 
 // Inject API_URL placeholder into both HTML files
 for (const f of [HTML_FILE, IT_HTML]) {
