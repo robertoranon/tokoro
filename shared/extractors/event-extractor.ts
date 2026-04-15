@@ -26,6 +26,7 @@ export interface EventExtractorConfig {
   llm: LLMProvider;
   jsonLdParser?: JsonLdParser; // Optional custom JSON-LD parser (JSDOM vs regex)
   referenceDate?: string; // Optional reference date to use instead of today (format: YYYY-MM-DD)
+  filterPastEvents?: boolean; // Whether to drop events before referenceDate/today (default: true)
   useJsonLd?: boolean; // Whether to attempt JSON-LD extraction before LLM (default: true)
   maxContentLength?: number; // Max chars of page content to send to LLM (default: DEFAULT_MAX_CONTENT_LENGTH)
   maxTokens?: number; // Max output tokens for LLM event extraction (default: DEFAULT_MAX_TOKENS)
@@ -45,6 +46,7 @@ export class EventExtractor {
   private llm: LLMProvider;
   private jsonLdParser?: JsonLdParser;
   private referenceDate?: string;
+  private filterPastEvents: boolean;
   private useJsonLd: boolean;
   private maxContentLength: number;
   private maxTokens: number;
@@ -53,6 +55,7 @@ export class EventExtractor {
     this.llm = config.llm;
     this.jsonLdParser = config.jsonLdParser;
     this.referenceDate = config.referenceDate;
+    this.filterPastEvents = config.filterPastEvents ?? true;
     this.useJsonLd = config.useJsonLd ?? true;
     this.maxContentLength = config.maxContentLength ?? DEFAULT_MAX_CONTENT_LENGTH;
     this.maxTokens = config.maxTokens ?? DEFAULT_MAX_TOKENS;
@@ -95,14 +98,16 @@ export class EventExtractor {
         console.log(
           `Extracted ${validated.length} valid event(s) from JSON-LD`
         );
-        const filtered = validated.filter(e => {
+        const filtered = this.filterPastEvents
+          ? validated.filter(e => {
           const startDateStr = String(e.start_time).slice(0, 10);
           if (startDateStr < todayISO) {
             console.log(`⚠ Skipping past event: "${e.title}" (${e.start_time})`);
             return false;
           }
           return true;
-        });
+            })
+          : validated;
         // correctEventYear not called: JSON-LD events always have explicit years,
         // and the LLM never populates day_name on this code path.
         return filtered;
@@ -239,10 +244,12 @@ export class EventExtractor {
       const fixed = correctEventYear(event);
       if (fixed === null) continue; // dropped by year correction
 
+      if (this.filterPastEvents) {
       const startDateStr = String(fixed.start_time).slice(0, 10);
       if (startDateStr < todayISO) {
         console.log(`⚠ Skipping past event: "${fixed.title}" (${fixed.start_time})`);
         continue;
+        }
       }
 
       corrected.push(fixed);
