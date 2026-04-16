@@ -1,8 +1,12 @@
 # Tokoro
 
-A thin, collaborative event calendar layer on top of the web. Not a replacement for Eventbrite or Resident Advisor — instead, a way for curators to harvest events from those sites and pool them into a shared geo-located calendar anyone can query.
+Finding out what's on near you is weirdly broken: events are scattered across dozens of sites, buried in social feeds, or locked behind logins. There's no common layer you can just query.
+This is my attempt to build one — open source, self-hosted, LLM-powered.
 
-Checkout the public web interface of my tokoro DB instance [**here**](https://happenings-query.pages.dev/). If you want to test event extraction tools, contact roberto.ranon@hey.com for an API key.
+Live demo of my instance: [**https://happenings-query.pages.dev/**](https://happenings-query.pages.dev/).
+If you want to test event extraction tools, contact me for an API key.
+
+Tokoro is a thin, collaborative event calendar layer on top of the web. Not a replacement for Eventbrite or Resident Advisor — instead, a way for curators to harvest events from those sites and pool them into a shared geo-located calendar anyone can query.
 
 **Example:** Imagine a loose network of jazz fans spread across a country. One of them lands on a label's tour page listing a dozen dates across different cities. Rather than manually copying each one, they use one of the browser tools to point the LLM at the page — it reads whatever structure the page happens to use, extracts all the events at once with their dates, locations, and categories, and presents them for a quick review. One click to publish, and all twelve gigs are in the shared calendar, signed under their key. Adding ten events takes the same effort as adding one.
 
