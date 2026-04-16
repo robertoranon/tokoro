@@ -6,7 +6,9 @@ Imagine a loose network of jazz fans spread across a country, each keeping an ey
 
 Each event is stored with its coordinates. A friend planning a trip to London for a week in July opens the web interface, sets a location and radius around the area they'll be staying, picks a date range, and instantly sees everything the group has curated there — concerts, club nights, pop-ups — sorted by date. No algorithm, no feed to scroll.
 
-Those same coordinates and timestamps are queryable through a simple API. Point it at a location, a radius, and a time interval, and you get back a list of events — ready to power a mobile app, a newsletter, a Telegram bot, or any other tool you want to build on top.
+You can checkout the public web interface of my tokoro DB instance [**here**](<[here](https://happenings-query.pages.dev/)>).
+
+Events are queryable through a simple API. Point it at a location, a radius, and a time interval, and you get back a list of events — ready to power a mobile app, a newsletter, a Telegram bot, or any other tool you want to build on top.
 
 **No accounts.** Identity is a local Ed25519 keypair — no registration, no email, no passwords. Every event is signed by its author and the backend verifies signatures before accepting writes.
 
