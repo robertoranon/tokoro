@@ -22,4 +22,4 @@ LLM_API_KEY=your_llm_api_key_here
 
 # Optional: Jina AI Reader API Key (improves rate limits)
 # Get a free API key at https://jina.ai/reader
-# JINA_API_KEY=jina_98f6ee76c22c4c579f469e242c7f275cxYKCPWqU-kDFAff_m7JFggNq7kk7
+# JINA_API_KEY=jina_key
