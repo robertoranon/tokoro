@@ -1059,6 +1059,8 @@
         <a class="lang-selector__link" id="langSwitchLink" href="/it.html"
           >IT</a
         >
+        <span class="lang-selector__sep">|</span>
+        <a class="lang-selector__link" href="/map.html">Map</a>
       </div>
       <div class="experimental-badge">
         <strong>⚠ Experimental</strong>
@@ -1308,6 +1310,7 @@
     </footer>
 
     <script src="./group-events.js"></script>
+    <script src="./shared.js"></script>
 
     <!-- Bookmarklet source -->
     <script type="text/x-bookmarklet" id="bm-src">
@@ -1370,11 +1373,6 @@
         }
       })();
 
-      function formatLocalDateTime(date) {
-        const pad = n => String(n).padStart(2, '0');
-        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-      }
-
       function handleTimeRangePresetChange() {
         const preset = document.getElementById('timeRangePreset').value;
         const customDiv = document.getElementById('customTimeRange');
@@ -1393,61 +1391,6 @@
         }
       }
 
-      function fmtRange(sv, ev) {
-        const sht =
-          typeof sv === 'string' ? sv.includes('T') : typeof sv === 'number';
-        const eht =
-          typeof ev === 'string' ? ev.includes('T') : typeof ev === 'number';
-        function pv(v) {
-          if (!v) return null;
-          if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v))
-            v = v + 'T12:00:00';
-          const d = typeof v === 'number' ? new Date(v * 1000) : new Date(v);
-          return isNaN(d.getTime()) ? null : d;
-        }
-        const s = pv(sv);
-        if (!s) return 'Date not specified';
-        const e = pv(ev);
-        const dp = d =>
-          String(d.getDate()).padStart(2, '0') +
-          '.' +
-          String(d.getMonth() + 1).padStart(2, '0') +
-          '.' +
-          d.getFullYear();
-        const ds = d =>
-          String(d.getDate()).padStart(2, '0') +
-          '.' +
-          String(d.getMonth() + 1).padStart(2, '0');
-        const tp = d => {
-          const h = d.getHours(),
-            m = d.getMinutes(),
-            ap = h >= 12 ? 'pm' : 'am',
-            h12 = h % 12 || 12;
-          return m ? h12 + ':' + String(m).padStart(2, '0') + ap : h12 + ap;
-        };
-        if (!e) return sht ? dp(s) + ' ' + tp(s) : dp(s);
-        const sd =
-          s.getFullYear() === e.getFullYear() &&
-          s.getMonth() === e.getMonth() &&
-          s.getDate() === e.getDate();
-        if (sd) {
-          if (!sht) return dp(s);
-          return eht ? dp(s) + ' ' + tp(s) + '–' + tp(e) : dp(s) + ' ' + tp(s);
-        }
-        const overnight = e.getHours() < 12 && e - s < 24 * 3600 * 1000;
-        if (overnight) return dp(s) + ' ' + tp(s) + '–' + tp(e);
-        if (s.getFullYear() === e.getFullYear()) return ds(s) + '–' + dp(e);
-        return dp(s) + '–' + dp(e);
-      }
-
-      function escHtml(s) {
-        if (!s) return '';
-        return String(s)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;');
-      }
       function stripHtml(s) {
         if (!s) return '';
         return String(s)
@@ -1459,12 +1402,6 @@
           .replace(/&#39;/g, "'")
           .trim();
       }
-      function safeUrl(s) {
-        if (!s) return null;
-        const str = String(s);
-        return /^https?:\/\//i.test(str) ? str : null;
-      }
-
       let _loadedEvents = [];
       let _loadedMeta = {};
 

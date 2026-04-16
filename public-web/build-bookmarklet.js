@@ -36,6 +36,7 @@ const API_URL          = config.workerUrl;
 const SRC_FILE   = path.join(__dirname, 'bookmarklet.src.js');
 const HTML_FILE  = path.join(__dirname, 'index.html');
 const IT_HTML    = path.join(__dirname, 'it.html');
+const MAP_HTML   = path.join(__dirname, 'map.html');
 
 // Read source
 let src = fs.readFileSync(SRC_FILE, 'utf8');
@@ -83,8 +84,8 @@ for (const f of [HTML_FILE, IT_HTML]) {
   console.log(`Bookmarklet built: ${minified.length} chars injected into ${path.basename(f)}`);
 }
 
-// Inject API_URL placeholder into both HTML files
-for (const f of [HTML_FILE, IT_HTML]) {
+// Inject API_URL placeholder into all HTML files
+for (const f of [HTML_FILE, IT_HTML, MAP_HTML]) {
   let content = fs.readFileSync(f, 'utf8');
   const updated = content.replace(/__TOKORO_WORKER_URL__/g, API_URL);
   if (updated === content) {

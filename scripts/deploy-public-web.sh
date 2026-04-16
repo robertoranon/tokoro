@@ -29,15 +29,15 @@ if [[ ! -f "${REPO_ROOT}/config.local.js" ]]; then
 fi
 
 # Ensure we can restore the HTML files via git
-if ! git -C "${REPO_ROOT}" diff --quiet HEAD -- public-web/index.html public-web/it.html; then
-  echo "Error: public-web/index.html or it.html has uncommitted changes." >&2
+if ! git -C "${REPO_ROOT}" diff --quiet HEAD -- public-web/index.html public-web/it.html public-web/map.html; then
+  echo "Error: public-web/index.html, it.html, or map.html has uncommitted changes." >&2
   echo "Commit or stash them before deploying." >&2
   exit 1
 fi
 
 cleanup() {
   echo "Restoring source HTML files..."
-  git -C "${REPO_ROOT}" checkout -- public-web/index.html public-web/it.html
+  git -C "${REPO_ROOT}" checkout -- public-web/index.html public-web/it.html public-web/map.html
   echo "Source files restored."
 }
 trap cleanup EXIT

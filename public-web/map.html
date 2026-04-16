@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tokoro – Map</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,800;1,9..144,400&family=Figtree:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      :root {
+        --header-dark: #18155e;
+        --header: #1e1b6e;
+        --accent: #6366f1;
+        --accent-hover: #4f46e5;
+        --radius-sm: 8px;
+        --cat-music: #7c3aed;
+        --cat-food: #d97706;
+        --cat-sports: #059669;
+        --cat-art: #db2777;
+        --cat-theater: #dc2626;
+        --cat-film: #2563eb;
+        --cat-nightlife: #9333ea;
+        --cat-community: #0891b2;
+        --cat-outdoor: #16a34a;
+        --cat-learning: #0d9488;
+        --cat-wellness: #65a30d;
+        --cat-talks: #ea580c;
+        --cat-other: #6b7280;
+      }
+
+      body {
+        font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+
+      /* ── Site header ───────────────────────────────────────────────────── */
+      .site-header {
+        background: linear-gradient(
+          135deg,
+          var(--header-dark) 0%,
+          #2d1a6e 50%,
+          #1e3a8a 100%
+        );
+        color: white;
+        position: relative;
+        overflow: hidden;
+      }
+      .site-header::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(
+            ellipse at 70% 50%,
+            rgba(99, 102, 241, 0.3) 0%,
+            transparent 60%
+          ),
+          radial-gradient(
+            ellipse at 20% 80%,
+            rgba(249, 115, 22, 0.15) 0%,
+            transparent 50%
+          );
+        pointer-events: none;
+      }
+      .header-inner {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 16px 24px 20px;
+        position: relative;
+      }
+      .header-title {
+        font-family: 'Fraunces', serif;
+        font-size: clamp(2.4rem, 6vw, 3.8rem);
+        font-weight: 800;
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+      }
+      .header-title em {
+        font-style: italic;
+        color: #a5b4fc;
+      }
+      .header-sub {
+        font-size: 15px;
+        color: rgba(255, 255, 255, 0.6);
+        margin-top: 10px;
+        font-weight: 300;
+        letter-spacing: 0.01em;
+      }
+      .lang-selector {
+        position: absolute;
+        bottom: 16px;
+        right: 24px;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        z-index: 10;
+      }
+      .lang-selector__current {
+        color: white;
+        opacity: 0.95;
+      }
+      .lang-selector__sep {
+        color: rgba(255, 255, 255, 0.3);
+      }
+      .lang-selector__link {
+        color: rgba(255, 255, 255, 0.5);
+        text-decoration: none;
+        transition: color 0.15s;
+      }
+      .lang-selector__link:hover {
+        color: rgba(255, 255, 255, 0.9);
+      }
+      .experimental-badge {
+        position: absolute;
+        top: 16px;
+        right: 24px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: var(--radius-sm);
+        padding: 8px 14px;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(8px);
+        line-height: 1.5;
+        text-align: right;
+      }
+      .experimental-badge strong {
+        display: block;
+        color: #fbbf24;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        font-size: 10px;
+        margin-bottom: 2px;
+      }
+      .experimental-badge a {
+        color: rgba(255, 255, 255, 0.75);
+        text-decoration: none;
+      }
+      .experimental-badge a:hover {
+        color: white;
+        text-decoration: underline;
+      }
+
+      /* ── Control strip ─────────────────────────────────────────────────── */
+      .controls {
+        flex-shrink: 0;
+        height: 52px;
+        background: #fff;
+        border-bottom: 1px solid #e0e0e0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 12px;
+        z-index: 1000;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+
+      .controls label {
+        font-size: 11px;
+        color: #888;
+        margin-right: 2px;
+      }
+
+      .controls input[type="text"] {
+        font-size: 13px;
+        padding: 4px 8px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        height: 32px;
+        width: 160px;
+      }
+
+      .controls input[type="number"] {
+        font-size: 13px;
+        padding: 4px 6px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        height: 32px;
+        width: 60px;
+      }
+
+      .controls input[type="datetime-local"] {
+        font-size: 12px;
+        padding: 4px 6px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        height: 32px;
+      }
+
+      .controls select {
+        font-size: 13px;
+        padding: 4px 6px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        height: 32px;
+        background: #fff;
+      }
+
+      .controls button {
+        font-size: 13px;
+        padding: 4px 12px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        height: 32px;
+        white-space: nowrap;
+        font-weight: 500;
+      }
+
+      .btn-search {
+        background: var(--accent);
+        color: #fff;
+      }
+      .btn-search:hover { background: var(--accent-hover); }
+
+      .btn-search-here {
+        background: #e0e7ff;
+        color: var(--accent);
+      }
+      .btn-search-here:hover:not(:disabled) { background: #c7d2fe; }
+      .btn-search-here:disabled {
+        background: #f0f0f0;
+        color: #bbb;
+        cursor: not-allowed;
+      }
+
+      .ctrl-sep {
+        color: #ccc;
+        font-size: 14px;
+        flex-shrink: 0;
+      }
+
+      .nav-link {
+        font-size: 12px;
+        color: var(--accent);
+        text-decoration: none;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .nav-link:hover { text-decoration: underline; }
+
+      .ctrl-unit {
+        font-size: 11px;
+        color: #888;
+        flex-shrink: 0;
+      }
+
+      #customTimeRange {
+        display: none;
+        align-items: center;
+        gap: 4px;
+      }
+
+      #mapStatus {
+        font-size: 12px;
+        padding: 3px 8px;
+        border-radius: 4px;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      #mapStatus.info  { color: var(--accent); background: #e0e7ff; }
+      #mapStatus.error { color: #b91c1c; background: #fee2e2; }
+
+      /* ── Map ───────────────────────────────────────────────────────────── */
+      #map {
+        flex: 1;
+        min-height: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="experimental-badge">
+        <strong>⚠ Experimental</strong>
+        <a href="mailto:roberto.ranon@hey.com">roberto.ranon@hey.com</a>
+      </div>
+      <div class="header-inner">
+        <h1 class="header-title">Tokoro <em>ところ</em></h1>
+        <p class="header-sub">
+          Concerts, markets, exhibitions &amp; more — near you, right now
+        </p>
+      </div>
+      <div class="lang-selector">
+        <a class="lang-selector__link" href="/index.html">EN</a>
+        <span class="lang-selector__sep">|</span>
+        <a class="lang-selector__link" href="/it.html">IT</a>
+        <span class="lang-selector__sep">|</span>
+        <span class="lang-selector__current">Map</span>
+      </div>
+    </header>
+
+    <div class="controls">
+      <input type="text" id="queryAddress" placeholder="Address or place" value="Udine, Italy" />
+
+      <input type="number" id="queryRadius" value="100" min="1" max="500" title="Search radius" />
+      <span class="ctrl-unit">km</span>
+
+      <select id="timeRangePreset" onchange="handlePresetChange()">
+        <option value="1">Today</option>
+        <option value="7" selected>Next 7 days</option>
+        <option value="30">Next 30 days</option>
+        <option value="90">Next 3 months</option>
+        <option value="custom">Custom…</option>
+      </select>
+
+      <span id="customTimeRange">
+        <label>From</label>
+        <input type="datetime-local" id="queryFrom" />
+        <label>To</label>
+        <input type="datetime-local" id="queryTo" />
+      </span>
+
+      <select id="queryCategory">
+        <option value="">All categories</option>
+        <option value="music">Music</option>
+        <option value="food">Food</option>
+        <option value="sports">Sports</option>
+        <option value="art">Art</option>
+        <option value="theater">Theater</option>
+        <option value="film">Film</option>
+        <option value="nightlife">Nightlife</option>
+        <option value="community">Community</option>
+        <option value="outdoor">Outdoor</option>
+        <option value="learning">Learning</option>
+        <option value="wellness">Wellness</option>
+        <option value="talks">Talks</option>
+        <option value="other">Other</option>
+      </select>
+
+      <button class="btn-search" onclick="runQuery()">Search</button>
+      <button class="btn-search-here" id="btnSearchHere" disabled onclick="searchHere()">Search here</button>
+
+      <span id="mapStatus"></span>
+
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="./shared.js"></script>
+    <script>
+      const API_URL = '__TOKORO_WORKER_URL__';
+
+      const DEFAULT_LAT    = 46.0637;
+      const DEFAULT_LNG    = 13.2353;
+      const DEFAULT_RADIUS = 100;
+
+      const CAT_COLORS = {
+        music:     '#7c3aed',
+        food:      '#d97706',
+        sports:    '#059669',
+        art:       '#db2777',
+        theater:   '#dc2626',
+        film:      '#2563eb',
+        nightlife: '#9333ea',
+        community: '#0891b2',
+        outdoor:   '#16a34a',
+        learning:  '#0d9488',
+        wellness:  '#65a30d',
+        talks:     '#ea580c',
+        other:     '#6b7280',
+      };
+
+      // ── Haversine: distance in km between two {lat, lng} points ───────────
+      function haversine(a, b) {
+        const R = 6371;
+        const dLat = (b.lat - a.lat) * Math.PI / 180;
+        const dLng = (b.lng - a.lng) * Math.PI / 180;
+        const sinLat = Math.sin(dLat / 2);
+        const sinLng = Math.sin(dLng / 2);
+        const h =
+          sinLat * sinLat +
+          Math.cos(a.lat * Math.PI / 180) *
+          Math.cos(b.lat * Math.PI / 180) *
+          sinLng * sinLng;
+        return R * 2 * Math.asin(Math.sqrt(h));
+      }
+
+      // ── Map initialisation ────────────────────────────────────────────────
+      const map = L.map('map').setView([DEFAULT_LAT, DEFAULT_LNG], 10);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+      }).addTo(map);
+
+      let markerLayer = L.layerGroup().addTo(map);
+      let searchHereArmed = false;
+
+      map.on('moveend zoomend', () => {
+        if (!searchHereArmed) {
+          searchHereArmed = true;
+          document.getElementById('btnSearchHere').disabled = false;
+        }
+      });
+
+      // ── Status helper ─────────────────────────────────────────────────────
+      function setStatus(msg, cls) {
+        const el = document.getElementById('mapStatus');
+        el.textContent = msg;
+        el.className = cls || '';
+      }
+
+      // ── Time range preset ─────────────────────────────────────────────────
+      function handlePresetChange() {
+        const preset = document.getElementById('timeRangePreset').value;
+        const customDiv = document.getElementById('customTimeRange');
+        if (preset === 'custom') {
+          customDiv.style.display = 'flex';
+          const now = new Date();
+          const future = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+          document.getElementById('queryFrom').value = formatLocalDateTime(now).slice(0, 16);
+          document.getElementById('queryTo').value   = formatLocalDateTime(future).slice(0, 16);
+        } else {
+          customDiv.style.display = 'none';
+        }
+      }
+
+      function getTimeRange() {
+        const preset = document.getElementById('timeRangePreset').value;
+        const now = new Date();
+        if (preset === 'custom') {
+          const from = document.getElementById('queryFrom').value;
+          const to   = document.getElementById('queryTo').value;
+          if (!from || !to) throw new Error('Please set both From and To times.');
+          return { from: from + ':00', to: to + ':00' };
+        }
+        const future = new Date(now.getTime() + parseInt(preset, 10) * 24 * 60 * 60 * 1000);
+        return { from: formatLocalDateTime(now), to: formatLocalDateTime(future) };
+      }
+
+      // ── Radius from current map bounds (half-diagonal, capped 500 km) ─────
+      function radiusFromBounds() {
+        const bounds = map.getBounds();
+        const center = map.getCenter();
+        const ne = bounds.getNorthEast();
+        const km = haversine(
+          { lat: center.lat, lng: center.lng },
+          { lat: ne.lat,     lng: ne.lng }
+        );
+        return Math.min(Math.round(km), 500);
+      }
+
+      // ── URL state ─────────────────────────────────────────────────────────
+      function pushState(params) {
+        const sp = new URLSearchParams();
+        for (const [k, v] of Object.entries(params)) {
+          if (v !== undefined && v !== null && v !== '') sp.set(k, String(v));
+        }
+        history.replaceState(null, '', '?' + sp.toString());
+      }
+
+      // ── Render markers ────────────────────────────────────────────────────
+      function renderMarkers(events, lat, lng, radiusKm, skipFitBounds) {
+        markerLayer.clearLayers();
+
+        // Draw a circle showing the searched area
+        const circle = L.circle(L.latLng(lat, lng), {
+          radius:  radiusKm * 1000,
+          fill:    false,
+          color:   '#6366f1',
+          weight:  1,
+          opacity: 0.4,
+        }).addTo(markerLayer);
+
+        // Group events by exact location so co-located events share one marker
+        const byLocation = new Map();
+        for (const e of events) {
+          const key = e.lat + ',' + e.lng;
+          if (!byLocation.has(key)) byLocation.set(key, []);
+          byLocation.get(key).push(e);
+        }
+
+        for (const [, group] of byLocation) {
+          const first = group[0];
+          const color = CAT_COLORS[first.category] || CAT_COLORS.other;
+
+          const eventItems = group.map(e => {
+            const c   = CAT_COLORS[e.category] || CAT_COLORS.other;
+            const url = safeUrl(e.url);
+            const titleHtml = url
+              ? '<a href="' + escHtml(url) + '" target="_blank" rel="noopener noreferrer">' +
+                escHtml(e.title) + '</a>'
+              : escHtml(e.title);
+            const venueHtml = e.venue_name
+              ? '<div style="font-size:12px;color:#666;margin-top:2px">' +
+                escHtml(e.venue_name) + '</div>'
+              : '';
+            return '<div style="padding:6px 0;border-top:1px solid #eee">' +
+              '<div style="font-weight:600;font-size:14px;margin-bottom:4px">' + titleHtml + '</div>' +
+              '<div style="font-size:12px;color:#555;margin-bottom:2px">' +
+                escHtml(fmtRange(e.start_time, e.end_time)) +
+              '</div>' +
+              venueHtml +
+              '<span style="display:inline-block;margin-top:6px;padding:2px 8px;' +
+                'border-radius:999px;font-size:11px;font-weight:600;color:#fff;' +
+                'background:' + escHtml(c) + '">' +
+                escHtml(e.category) +
+              '</span>' +
+            '</div>';
+          });
+
+          const popupHtml =
+            '<div style="font-family:-apple-system,sans-serif;min-width:180px;max-width:260px;' +
+              'max-height:320px;overflow-y:auto">' +
+              eventItems.join('') +
+            '</div>';
+
+          L.circleMarker([first.lat, first.lng], {
+            radius:      8,
+            fillColor:   color,
+            color:       '#fff',
+            weight:      1.5,
+            opacity:     1,
+            fillOpacity: 0.85,
+          })
+            .bindPopup(popupHtml)
+            .addTo(markerLayer);
+        }
+
+        // Fit the map view to the query circle (skip when "Search here" is used)
+        if (!skipFitBounds) {
+          try {
+            map.fitBounds(circle.getBounds(), { padding: [20, 20], maxZoom: 14 });
+          } catch (_) {}
+        }
+      }
+
+      // ── Run a query ───────────────────────────────────────────────────────
+      // overrideLat/overrideLng/overrideRadius are set by searchHere(); otherwise
+      // the form values are used.
+      async function runQuery(overrideLat, overrideLng, overrideRadius, skipFitBounds) {
+        const address = document.getElementById('queryAddress').value.trim();
+        let lat, lng;
+
+        if (overrideLat !== undefined) {
+          lat = overrideLat;
+          lng = overrideLng;
+        } else if (address) {
+          setStatus('Geocoding\u2026', 'info');
+          try {
+            const geo = await geocode(address);
+            lat = parseFloat(geo.lat);
+            lng = parseFloat(geo.lng);
+          } catch (_) {
+            setStatus('Address not found', 'error');
+            return;
+          }
+        } else {
+          lat = DEFAULT_LAT;
+          lng = DEFAULT_LNG;
+        }
+
+        const radius = overrideRadius !== undefined
+          ? overrideRadius
+          : (parseInt(document.getElementById('queryRadius').value, 10) || DEFAULT_RADIUS);
+
+        const category = document.getElementById('queryCategory').value;
+
+        let timeRange;
+        try { timeRange = getTimeRange(); } catch (e) { setStatus(e.message, 'error'); return; }
+
+        setStatus('Searching\u2026', 'info');
+
+        try {
+          const url = buildQueryUrl(API_URL, {
+            lat, lng, radius,
+            from:     timeRange.from,
+            to:       timeRange.to,
+            category: category || undefined,
+          });
+
+          const resp   = await fetch(url);
+          if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+          const data   = await resp.json();
+          const events = data.events || [];
+
+          document.getElementById('queryRadius').value = radius;
+
+          pushState({
+            lat:      lat.toFixed(4),
+            lng:      lng.toFixed(4),
+            radius,
+            from:     timeRange.from,
+            to:       timeRange.to,
+            category: category || undefined,
+          });
+
+          renderMarkers(events, lat, lng, radius, skipFitBounds);
+
+          setStatus(
+            events.length === 0
+              ? 'No events found'
+              : events.length + ' event' + (events.length !== 1 ? 's' : '') + ' found',
+            'info'
+          );
+        } catch (err) {
+          setStatus('Error: ' + err.message, 'error');
+        }
+      }
+
+      // ── Search here ───────────────────────────────────────────────────────
+      async function searchHere() {
+        const center = map.getCenter();
+        const radius = radiusFromBounds();
+        document.getElementById('queryRadius').value  = radius;
+        document.getElementById('queryAddress').value = '';
+        await runQuery(center.lat, center.lng, radius, true);
+      }
+
+      // ── Initialise from URL params ────────────────────────────────────────
+      (function init() {
+        const sp       = new URLSearchParams(window.location.search);
+        const lat      = parseFloat(sp.get('lat'));
+        const lng      = parseFloat(sp.get('lng'));
+        const radius   = parseInt(sp.get('radius'), 10);
+        const from     = sp.get('from');
+        const to       = sp.get('to');
+        const category = sp.get('category');
+
+        if (category) document.getElementById('queryCategory').value = category;
+
+        if (!isNaN(lat) && !isNaN(lng)) {
+          if (!isNaN(radius)) document.getElementById('queryRadius').value = radius;
+
+          if (from && to) {
+            document.getElementById('timeRangePreset').value = 'custom';
+            handlePresetChange();
+            document.getElementById('queryFrom').value = from.slice(0, 16);
+            document.getElementById('queryTo').value   = to.slice(0, 16);
+          }
+
+          map.setView([lat, lng], 11);
+          runQuery(lat, lng, isNaN(radius) ? DEFAULT_RADIUS : radius);
+        }
+      })();
+    </script>
+  </body>
+</html>

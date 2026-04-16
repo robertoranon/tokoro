@@ -100,12 +100,12 @@ export class EventExtractor {
         );
         const filtered = this.filterPastEvents
           ? validated.filter(e => {
-          const startDateStr = String(e.start_time).slice(0, 10);
-          if (startDateStr < todayISO) {
-            console.log(`⚠ Skipping past event: "${e.title}" (${e.start_time})`);
-            return false;
-          }
-          return true;
+              const startDateStr = String(e.start_time).slice(0, 10);
+              if (startDateStr < todayISO) {
+                console.log(`⚠ Skipping past event: "${e.title}" (${e.start_time})`);
+                return false;
+              }
+              return true;
             })
           : validated;
         // correctEventYear not called: JSON-LD events always have explicit years,
@@ -245,10 +245,10 @@ export class EventExtractor {
       if (fixed === null) continue; // dropped by year correction
 
       if (this.filterPastEvents) {
-      const startDateStr = String(fixed.start_time).slice(0, 10);
-      if (startDateStr < todayISO) {
-        console.log(`⚠ Skipping past event: "${fixed.title}" (${fixed.start_time})`);
-        continue;
+        const startDateStr = String(fixed.start_time).slice(0, 10);
+        if (startDateStr < todayISO) {
+          console.log(`⚠ Skipping past event: "${fixed.title}" (${fixed.start_time})`);
+          continue;
         }
       }
 
