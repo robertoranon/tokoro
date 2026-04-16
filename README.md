@@ -1,6 +1,6 @@
 # Tokoro
 
-Tokoro is a thin, collaborative event calendar layer on top of the web. It is not a replacement for event platforms like Eventbrite or Resident Advisor — instead it lets a group of curators harvest events from those sites and other venue pages, pool them into a shared geo-located calendar that anyone can query. The components are building blocks: use the included web interface as-is, or build your own app or feed directly on top of the API.
+Tokoro is a thin, collaborative event calendar layer on top of the web. It is not a replacement for event platforms like Eventbrite or Resident Advisor — instead it lets a group of curators harvest events from those sites and other venue pages, and pool them into a shared geo-located calendar that anyone can query. The components are building blocks: use the included web interface as-is, or build your own app or feed directly on top of the API.
 
 Imagine a loose network of jazz fans spread across a country, each keeping an eye on venues and promoters they follow. One of them lands on a label's tour page listing a dozen dates across different cities. Rather than manually copying each one, they use one of the browser tools to point the LLM at the page — it reads whatever structure the page happens to use, extracts all the events at once with their dates, locations, and categories, and presents them for a quick review. One click to publish, and all twelve gigs are in the shared calendar, signed under their key. Adding ten events takes the same effort as adding one.
 
