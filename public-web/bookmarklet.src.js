@@ -58,11 +58,17 @@
   var ak = S('ak'), wu = S('wu'), au = S('au'), cu = S('cu'), eb = S('eb'), st = S('st');
   var cf = S('cf'), tg = S('tg'), pk = S('pk'), pkRow = S('pk-row');
 
-  ak.value = localStorage.getItem('happenings_api_key') || DEFAULT_API_KEY;
+  ak.value = localStorage.getItem('happenings_api_key') || '';
   wu.value = localStorage.getItem('happenings_worker_url') || DEFAULT_WORKER;
   au.value = localStorage.getItem('happenings_api_url') || DEFAULT_API_URL;
   cu.textContent = window.location.href;
   var cachedPk = localStorage.getItem('happenings_pubkey');
+  if (!cachedPk) {
+    try {
+      var relayKp = JSON.parse(localStorage.getItem('happenings_keypair') || 'null');
+      if (relayKp && relayKp.pubkey) cachedPk = relayKp.pubkey;
+    } catch(e) {}
+  }
   if (cachedPk) { pk.textContent = cachedPk; pkRow.style.display = 'block'; }
 
   function updateCfVisibility(forceShow) {
