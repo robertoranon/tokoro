@@ -89,3 +89,4 @@ vite.config.ts.timestamp-*
 
 # dev docs
 **/SPECS.md
+worker/users.csv
