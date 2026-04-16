@@ -42,8 +42,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
+WORKER_URL="$(node -e "console.log(require('${REPO_ROOT}/config.local.js').workerUrl)")"
+if [[ -z "$WORKER_URL" ]]; then
+  echo "Error: could not read workerUrl from config.local.js." >&2
+  exit 1
+fi
+
+CRAWLER_URL="$(node -e "console.log(require('${REPO_ROOT}/config.local.js').crawlerWorkerUrl || '')")"
+
 echo "Building bookmarklet and injecting URLs..."
 node "${PUBLIC_WEB}/build-bookmarklet.js"
+node "${PUBLIC_WEB}/inject-worker-url.js" "$WORKER_URL" "$CRAWLER_URL"
 
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "[dry-run] Would deploy public-web to Cloudflare Pages (project: happenings-query)"

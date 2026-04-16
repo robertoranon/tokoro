@@ -11,15 +11,15 @@ A simple web interface for querying events from the Tokoro API.
 
 ## Deployment to Cloudflare Pages
 
-### Option 1: Using Wrangler CLI (Recommended)
+### Option 1: Deploy script (Recommended)
+
+From the repo root:
 
 ```bash
-# Install Wrangler if you haven't already
-npm install -g wrangler
-
-# Deploy the public-web directory
-wrangler pages deploy public-web --project-name happenings-query
+./scripts/deploy-public-web.sh
 ```
+
+This builds the bookmarklet, injects the real worker and crawler URLs into the HTML files, deploys to Cloudflare Pages, then restores the source files to their placeholder state so the repo stays clean. Use `--dry-run` to preview without deploying.
 
 ### Option 2: Via Cloudflare Dashboard
 
@@ -56,22 +56,24 @@ The default search location is **Udine, Italy** with a **100 km radius**. To cha
 
 ## Building the Bookmarklet
 
-The bookmarklet embedded in `index.html` is generated from `bookmarklet.src.js` by `build-bookmarklet.js`. Run it whenever you change the source or want to update the configuration:
+Two build scripts prepare the HTML files before deployment:
+
+- **`build-bookmarklet.js`** — reads `config.local.js`, substitutes bookmarklet placeholders (`__RELAY_URL__`), minifies, and writes the result into `index.html` and `it.html`.
+- **`inject-worker-url.js`** — replaces URL placeholders in all three HTML files. Takes two CLI arguments:
 
 ```bash
-node build-bookmarklet.js
+node inject-worker-url.js <worker-url> [<crawler-url>]
 ```
 
-The script reads `config.local.js`, substitutes placeholders, minifies the bookmarklet, and writes the results into `index.html` and `it.html`:
+Both scripts are run automatically by `scripts/deploy-public-web.sh` (see below). You only need to run them manually if you're not using that script.
 
-| Config key         | Placeholder             | Purpose                                                                                                     |
-| ------------------ | ----------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `relayUrl`         | `__RELAY_URL__`         | URL of this Cloudflare Pages site — used to open the relay popup                                           |
-| `crawlerWorkerUrl` | `__DEFAULT_WORKER__`    | Default crawler-worker URL pre-filled in the bookmarklet settings                                          |
-| `crawlerApiKey`    | `__DEFAULT_API_KEY__`   | Default API key pre-filled in the bookmarklet settings                                                      |
-| `workerUrl`        | `__DEFAULT_API_URL__`   | Default API Worker URL pre-filled in the bookmarklet settings (also injected as `__TOKORO_WORKER_URL__` into `index.html` and `it.html`) |
+| Config key         | Placeholder                | Script                   | Purpose                                                        |
+| ------------------ | -------------------------- | ------------------------ | -------------------------------------------------------------- |
+| `relayUrl`         | `__RELAY_URL__`            | `build-bookmarklet.js`   | URL of this Pages site — used by the bookmarklet to open the relay popup |
+| `workerUrl`        | `__TOKORO_WORKER_URL__`    | `inject-worker-url.js`   | API Worker URL used by the query page and as default in relay settings |
+| `crawlerWorkerUrl` | `__DEFAULT_CRAWLER_URL__`  | `inject-worker-url.js`   | Default Crawler Worker URL pre-filled in relay settings on first use |
 
-Users can override `crawlerWorkerUrl`, `crawlerApiKey`, and `workerUrl` at runtime via the bookmarklet's settings panel; their values are saved to `localStorage` and restored on subsequent uses. The settings panel collapses automatically when all three values are configured.
+Users can override all URLs and the API key at runtime via the relay popup's settings form; values are saved to the relay's `localStorage` and remembered across all sites. The settings form collapses automatically when API Key, Crawler Worker URL, and API Worker URL are all configured.
 
 ## Local Testing
 
@@ -79,11 +81,13 @@ Simply open `index.html` in a web browser. No build step required.
 
 ## Bookmarklet Publisher
 
-The bookmarklet relay (activated via `?relay=1` or by clicking the bookmarklet) generates an Ed25519 keypair on first use, stored in `localStorage` on the Pages origin. Events extracted by the Crawler Worker are signed locally with this keypair and published directly to the API worker — no signing happens server-side.
+The bookmarklet is a minimal trigger: it preprocesses the current page's HTML, opens the relay popup (`happenings-query.pages.dev?relay=1`), and hands off the page content via `postMessage`. It writes nothing to `localStorage` and shows no UI on the visited page.
 
-On first use the relay shows an amber notice with the new public key, prompting the curator to share it with the admin and back it up for other browsers. The bookmarklet also caches the public key locally and displays it in its settings panel after the first relay interaction.
+All settings — API Key, Crawler Worker URL, API Worker URL, and Ed25519 keypair — live in the relay popup's `localStorage` (scoped to `happenings-query.pages.dev`), so they persist across every site the bookmarklet is used on.
 
-To allow a new curator to publish, obtain their public key (shown in the relay first-use notice or the bookmarklet settings) and add it to the `ALLOWED_PUBKEYS` secret on the API worker.
+On first use the relay generates an Ed25519 keypair, stores it under `happenings_keypair`, and shows a dismissable amber notice prompting the curator to share their public key with the DB maintainer. The public and private keys are visible (and the private key editable for backup/restore) in the relay's Settings form.
+
+To allow a new curator to publish, obtain their public key from the relay's Settings form and add it to the `ALLOWED_PUBKEYS` secret on the API worker.
 
 ## CORS Requirements
 
