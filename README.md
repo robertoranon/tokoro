@@ -4,6 +4,7 @@ Finding out what's on near you is weirdly broken: events are scattered across do
 This is my attempt to build one — open source, self-hosted, LLM-powered.
 
 Live demo of my instance: [**https://happenings-query.pages.dev/**](https://happenings-query.pages.dev/).
+
 If you want to test event extraction tools, contact me for an API key.
 
 Tokoro is a thin, collaborative event calendar layer on top of the web. Not a replacement for Eventbrite or Resident Advisor — instead, a way for curators to harvest events from those sites and pool them into a shared geo-located calendar anyone can query.

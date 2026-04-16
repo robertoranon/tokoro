@@ -4,7 +4,6 @@
   if (existing) { existing.remove(); return; }
 
   var DEFAULT_WORKER = '__DEFAULT_WORKER__';
-  var DEFAULT_API_KEY = '__DEFAULT_API_KEY__';
   var DEFAULT_API_URL = '__DEFAULT_API_URL__';
   var RELAY_URL = '__RELAY_URL__';
 
@@ -94,10 +93,6 @@
   function setStatus(msg, cls) { st.textContent = msg; st.className = cls; }
 
   eb.addEventListener('click', async function () {
-    var apiKey = ak.value.trim();
-    var workerUrl = (wu.value.trim() || DEFAULT_WORKER).replace(/\/$/, '');
-    if (!apiKey) { updateCfVisibility(true); setStatus('API key not configured', 'err'); return; }
-
     eb.disabled = true;
     eb.textContent = 'Opening...';
     setStatus('Preparing page content...', 'info');
@@ -150,6 +145,35 @@
         pk.textContent = evt.data.pubkey;
         pkRow.style.display = 'block';
       }
+      // Apply relay-stored settings as fallback if current origin has none.
+      // This is done before the apiKey check so a returning user on a new site
+      // never sees "API key not configured".
+      if (evt.data.apiKey && !ak.value) {
+        ak.value = evt.data.apiKey;
+        localStorage.setItem('happenings_api_key', evt.data.apiKey);
+      }
+      if (evt.data.workerUrl && (!wu.value || wu.value.startsWith('__'))) {
+        wu.value = evt.data.workerUrl;
+        localStorage.setItem('happenings_worker_url', evt.data.workerUrl);
+      }
+      if (evt.data.apiUrl && (!au.value || au.value.startsWith('__'))) {
+        au.value = evt.data.apiUrl;
+        localStorage.setItem('happenings_api_url', evt.data.apiUrl);
+      }
+      updateCfVisibility(false);
+
+      // Validate after relay settings have been applied
+      var apiKey = ak.value.trim();
+      var workerUrl = (wu.value.trim() || DEFAULT_WORKER).replace(/\/$/, '');
+      if (!apiKey) {
+        popup.close();
+        eb.disabled = false;
+        eb.textContent = 'Extract Events';
+        updateCfVisibility(true);
+        setStatus('API key not configured', 'err');
+        return;
+      }
+
       popup.postMessage({
         type: 'crawl_data',
         url: window.location.href,

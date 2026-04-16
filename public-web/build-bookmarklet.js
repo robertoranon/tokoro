@@ -4,7 +4,10 @@
  *
  * Reads bookmarklet.src.js, substitutes placeholders, minifies the result,
  * and injects it into the <script type="text/x-bookmarklet"> tag in index.html
- * and it.html. Also injects the worker API URL into both HTML files.
+ * and it.html.
+ *
+ * NOTE: This script does NOT replace __TOKORO_WORKER_URL__ in the HTML files.
+ * That is a deploy-time step handled by inject-worker-url.js.
  *
  * Usage:
  *   node build-bookmarklet.js
@@ -29,9 +32,10 @@ try {
 
 const RELAY_URL        = config.relayUrl;
 const DEFAULT_WORKER   = config.crawlerWorkerUrl;
-const DEFAULT_API_KEY  = config.crawlerApiKey;
 const API_URL          = config.workerUrl;
 // ─────────────────────────────────────────────────────────────────────────────
+// NOTE: API_URL is used only for bookmarklet placeholder substitution below.
+// __TOKORO_WORKER_URL__ in the HTML files is injected separately by inject-worker-url.js.
 
 const SRC_FILE   = path.join(__dirname, 'bookmarklet.src.js');
 const HTML_FILE  = path.join(__dirname, 'index.html');
@@ -44,7 +48,6 @@ let src = fs.readFileSync(SRC_FILE, 'utf8');
 // Substitute placeholders
 src = src.replace(/__RELAY_URL__/g, RELAY_URL);
 src = src.replace(/__DEFAULT_WORKER__/g, DEFAULT_WORKER);
-src = src.replace(/__DEFAULT_API_KEY__/g, DEFAULT_API_KEY);
 src = src.replace(/__DEFAULT_API_URL__/g, API_URL);
 
 // Minify: strip comments, collapse whitespace
@@ -82,16 +85,4 @@ for (const f of [HTML_FILE, IT_HTML]) {
 
   fs.writeFileSync(f, html, 'utf8');
   console.log(`Bookmarklet built: ${minified.length} chars injected into ${path.basename(f)}`);
-}
-
-// Inject API_URL placeholder into all HTML files
-for (const f of [HTML_FILE, IT_HTML, MAP_HTML]) {
-  let content = fs.readFileSync(f, 'utf8');
-  const updated = content.replace(/__TOKORO_WORKER_URL__/g, API_URL);
-  if (updated === content) {
-    console.warn(`Warning: __TOKORO_WORKER_URL__ placeholder not found in ${path.basename(f)}`);
-  } else {
-    fs.writeFileSync(f, updated, 'utf8');
-    console.log(`Worker URL injected into ${path.basename(f)}`);
-  }
 }
