@@ -8,17 +8,21 @@ The **required** components for a working setup are:
 
 1. **Worker** — the API backend (events, stars, follows, recommendations)
 2. **Crawler Worker** — extracts events from URLs via LLM and publishes them to the API
+3. **Public Web** — hosts the bookmarklet and serves as the publishing relay; also lets you browse and query events to verify the system is working
 
-Everything else is optional depending on how you want to use the system:
+One could do without the public web if using the Chrome extension, which does not need a publishing relay, but anyway for convenience and easy testing, it is recommended to deploy it to Cloudflare Pages as part of initial setup.
 
-| Component        | Required? | When you need it                                                   |
-| ---------------- | --------- | ------------------------------------------------------------------ |
-| Worker           | **Yes**   | Always                                                             |
-| Crawler Worker   | **Yes**   | Always (needed by Chrome extension, bookmarklet, Apple Shortcut)   |
-| Chrome Extension | Optional  | To crawl pages from your browser with one click                    |
-| Web Publisher    | Optional  | To publish events manually via a form                              |
-| Public Web       | Optional  | To browse/query events in a UI                                     |
-| Node.js Crawler  | Optional  | To crawl pages from the command line (no browser extension needed) |
+After that, how you publish events depends on your preference:
+
+| Component        | Required? | When you need it                                                     |
+| ---------------- | --------- | -------------------------------------------------------------------- |
+| Worker           | **Yes**   | Always                                                               |
+| Crawler Worker   | **Yes**   | Always (needed by bookmarklet, Chrome extension, Apple Shortcut)     |
+| Public Web       | **Yes**   | Required for setup (bookmarklet source + relay); useful for browsing |
+| Bookmarklet      | **Yes**   | Primary way to extract and publish events from any browser           |
+| Chrome Extension | Optional  | Alternative to bookmarklet — one-click crawl with a dedicated UI     |
+| Web Publisher    | Optional  | To publish events manually via a form (no crawling)                  |
+| Node.js Crawler  | Optional  | To crawl pages from the command line (no browser extension needed)   |
 
 ---
 
