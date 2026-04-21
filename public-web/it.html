@@ -996,13 +996,31 @@
         line-height: 1.5;
         margin-bottom: 8px;
       }
-      .relay-notice.show { display: block; }
+      .relay-notice.show {
+        display: block;
+      }
 
       /* ── Relay settings form ─────────────────────────────── */
-      #relay-cfg { display: flex; flex-direction: column; gap: 6px; }
-      #relay-cfg-fields { display: flex; flex-direction: column; gap: 8px; }
-      .relay-field { display: flex; flex-direction: column; gap: 3px; }
-      .relay-label { font-size: 11px; font-weight: 600; color: var(--text-2); }
+      #relay-cfg {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      #relay-cfg-fields {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .relay-field {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .relay-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-2);
+      }
       .relay-input {
         width: 100%;
         padding: 6px 8px;
@@ -1012,7 +1030,10 @@
         color: var(--text);
         background: var(--surface);
       }
-      .relay-mono-input { font-family: monospace; font-size: 10px; }
+      .relay-mono-input {
+        font-family: monospace;
+        font-size: 10px;
+      }
       .relay-pubkey-display {
         font-family: monospace;
         font-size: 10px;
@@ -1032,7 +1053,9 @@
         text-align: right;
         display: none;
       }
-      #relay-cfg-toggle:hover { color: #666; }
+      #relay-cfg-toggle:hover {
+        color: #666;
+      }
     </style>
   </head>
   <body>
@@ -1045,19 +1068,33 @@
             <div id="relay-cfg-fields">
               <div class="relay-field">
                 <label class="relay-label">API Key</label>
-                <input type="password" id="rly-apikey" class="relay-input" autocomplete="off" placeholder="Incolla la tua API key"/>
+                <input
+                  type="password"
+                  id="rly-apikey"
+                  class="relay-input"
+                  autocomplete="off"
+                  placeholder="Incolla la tua API key"
+                />
               </div>
               <div class="relay-field">
                 <label class="relay-label">Crawler Worker URL</label>
-                <input type="url" id="rly-worker" class="relay-input"/>
+                <input type="url" id="rly-worker" class="relay-input" />
               </div>
               <div class="relay-field">
                 <label class="relay-label">API Worker URL</label>
-                <input type="url" id="rly-apiurl" class="relay-input"/>
+                <input type="url" id="rly-apiurl" class="relay-input" />
               </div>
               <div class="relay-field">
-                <label class="relay-label">Chiave privata (PKCS8 base64 &mdash; tienila segreta)</label>
-                <input type="text" id="rly-privkey" class="relay-input relay-mono-input" autocomplete="off" spellcheck="false"/>
+                <label class="relay-label"
+                  >Chiave privata (PKCS8 base64 &mdash; tienila segreta)</label
+                >
+                <input
+                  type="text"
+                  id="rly-privkey"
+                  class="relay-input relay-mono-input"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
               </div>
               <div class="relay-field">
                 <label class="relay-label">Chiave pubblica</label>
@@ -1071,10 +1108,17 @@
           </div>
           <div id="relay-notice" class="relay-notice">
             <strong>Nuova identit&agrave; creata.</strong>
-            Condividi la tua chiave pubblica (visibile in Impostazioni) con il responsabile del DB per attivare la pubblicazione.
-            La tua chiave privata &egrave; salvata nel localStorage di questo browser &mdash; fai un backup dalle Impostazioni per pubblicare da altri browser.
-            <div style="text-align:right;margin-top:6px;">
-              <a href="#" id="relay-notice-dismiss" style="font-size:11px;color:#5d4037;">Chiudi</a>
+            Condividi la tua chiave pubblica (visibile in Impostazioni) con il
+            responsabile del DB per attivare la pubblicazione. La tua chiave
+            privata &egrave; salvata nel localStorage di questo browser &mdash;
+            fai un backup dalle Impostazioni per pubblicare da altri browser.
+            <div style="text-align: right; margin-top: 6px">
+              <a
+                href="#"
+                id="relay-notice-dismiss"
+                style="font-size: 11px; color: #5d4037"
+                >Chiudi</a
+              >
             </div>
           </div>
           <div id="relay-events"></div>
@@ -1280,7 +1324,7 @@
             </p>
             <p>
               <a
-                href="https://chromewebstore.google.com/detail/happenings-event-crawler/lhfbgfaljjaaipfbdlfffbjfajenaphn"
+                href="https://chromewebstore.google.com/detail/tokoro-event-crawler/lhfbgfaljjaaipfbdlfffbjfajenaphn"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="ext-link"
@@ -1306,7 +1350,7 @@
             </p>
             <div style="margin: 14px 0">
               <a
-                id="happenings-bookmarklet"
+                id="tokoro-bookmarklet"
                 href="#"
                 class="bm-link"
                 title="Trascina nella barra dei preferiti"
@@ -1356,8 +1400,8 @@
 
     <!-- Bookmarklet source -->
     <script type="text/x-bookmarklet" id="bm-src">
-    (function () { var RELAY_URL = 'https://happenings-query.pages.dev/'; var clone = document.documentElement.cloneNode(true); clone.querySelectorAll('script:not([type="application/ld+json"]), style, noscript, svg') .forEach(function (el) { el.remove(); }); var keep = new Set(['IMG', 'INPUT', 'BR', 'HR', 'META', 'LINK', 'SOURCE', 'TRACK', 'WBR', 'AREA', 'BASE', 'COL', 'EMBED', 'PARAM']); Array.from(clone.querySelectorAll('*')).reverse().forEach(function (el) { if (!keep.has(el.tagName) && el.textContent.trim() === '' && el.querySelectorAll('img').length === 0) { el.remove(); } }); var html = clone.outerHTML; if (html.length > 400000) html = html.substring(0, 400000); var popup = window.open(RELAY_URL + '?relay=1', 'happenings_relay', 'width=440,height=680,resizable=yes,scrollbars=yes'); if (!popup) { alert('Tokoro: popup blocked. Please allow popups for this page.'); return; } var listener; var timer = setTimeout(function () { window.removeEventListener('message', listener); }, 20000); listener = function (evt) { if (evt.source !== popup) return; if (!evt.data || evt.data.type !== 'ready') return; clearTimeout(timer); window.removeEventListener('message', listener); popup.postMessage({ type: 'crawl_data', url: window.location.href, html: html, title: document.title }, '*'); }; window.addEventListener('message', listener); })()
-  </script>
+      (function () { var RELAY_URL = 'https://tokoro-query.pages.dev/'; var clone = document.documentElement.cloneNode(true); clone.querySelectorAll('script:not([type="application/ld+json"]), style, noscript, svg') .forEach(function (el) { el.remove(); }); var keep = new Set(['IMG', 'INPUT', 'BR', 'HR', 'META', 'LINK', 'SOURCE', 'TRACK', 'WBR', 'AREA', 'BASE', 'COL', 'EMBED', 'PARAM']); Array.from(clone.querySelectorAll('*')).reverse().forEach(function (el) { if (!keep.has(el.tagName) && el.textContent.trim() === '' && el.querySelectorAll('img').length === 0) { el.remove(); } }); var html = clone.outerHTML; if (html.length > 400000) html = html.substring(0, 400000); var popup = window.open(RELAY_URL + '?relay=1', 'tokoro_relay', 'width=440,height=680,resizable=yes,scrollbars=yes'); if (!popup) { alert('Tokoro: popup blocked. Please allow popups for this page.'); return; } var listener; var timer = setTimeout(function () { window.removeEventListener('message', listener); }, 20000); listener = function (evt) { if (evt.source !== popup) return; if (!evt.data || evt.data.type !== 'ready') return; clearTimeout(timer); window.removeEventListener('message', listener); popup.postMessage({ type: 'crawl_data', url: window.location.href, html: html, title: document.title }, '*'); }; window.addEventListener('message', listener); })()
+    </script>
 
     <script>
       const API_URL = '__TOKORO_WORKER_URL__';
@@ -2056,22 +2100,30 @@
         let crawlRunning = false;
 
         // ── Settings form ──────────────────────────────────────────────────────
-        const cfgFields  = document.getElementById('relay-cfg-fields');
-        const cfgToggle  = document.getElementById('relay-cfg-toggle');
-        const rlyCfgApiKey  = document.getElementById('rly-apikey');
-        const rlyCfgWorker  = document.getElementById('rly-worker');
-        const rlyCfgApiUrl  = document.getElementById('rly-apiurl');
+        const cfgFields = document.getElementById('relay-cfg-fields');
+        const cfgToggle = document.getElementById('relay-cfg-toggle');
+        const rlyCfgApiKey = document.getElementById('rly-apikey');
+        const rlyCfgWorker = document.getElementById('rly-worker');
+        const rlyCfgApiUrl = document.getElementById('rly-apiurl');
         const rlyCfgPrivKey = document.getElementById('rly-privkey');
-        const rlyCfgPubKey  = document.getElementById('rly-pubkey');
+        const rlyCfgPubKey = document.getElementById('rly-pubkey');
 
-        rlyCfgApiKey.value = localStorage.getItem('happenings_api_key') || '';
-        rlyCfgWorker.value = localStorage.getItem('happenings_worker_url') ||
-          (typeof DEFAULT_CRAWLER_URL !== 'undefined' && !DEFAULT_CRAWLER_URL.startsWith('__') ? DEFAULT_CRAWLER_URL : '');
-        rlyCfgApiUrl.value = localStorage.getItem('happenings_api_url') ||
-          (typeof API_URL !== 'undefined' && !API_URL.startsWith('__') ? API_URL : '');
+        rlyCfgApiKey.value = localStorage.getItem('tokoro_api_key') || '';
+        rlyCfgWorker.value =
+          localStorage.getItem('tokoro_worker_url') ||
+          (typeof DEFAULT_CRAWLER_URL !== 'undefined' &&
+          !DEFAULT_CRAWLER_URL.startsWith('__')
+            ? DEFAULT_CRAWLER_URL
+            : '');
+        rlyCfgApiUrl.value =
+          localStorage.getItem('tokoro_api_url') ||
+          (typeof API_URL !== 'undefined' && !API_URL.startsWith('__')
+            ? API_URL
+            : '');
 
         function updateCfgVisibility() {
-          const allSet = rlyCfgApiKey.value.trim() &&
+          const allSet =
+            rlyCfgApiKey.value.trim() &&
             rlyCfgWorker.value.trim() &&
             rlyCfgApiUrl.value.trim();
           cfgFields.style.display = allSet ? 'none' : 'flex';
@@ -2086,29 +2138,44 @@
         });
 
         rlyCfgApiKey.addEventListener('input', function () {
-          localStorage.setItem('happenings_api_key', rlyCfgApiKey.value);
+          localStorage.setItem('tokoro_api_key', rlyCfgApiKey.value);
           maybeRunBufferedCrawl();
         });
         rlyCfgWorker.addEventListener('input', function () {
-          localStorage.setItem('happenings_worker_url', rlyCfgWorker.value);
+          localStorage.setItem('tokoro_worker_url', rlyCfgWorker.value);
           maybeRunBufferedCrawl();
         });
         rlyCfgApiUrl.addEventListener('input', function () {
-          localStorage.setItem('happenings_api_url', rlyCfgApiUrl.value);
+          localStorage.setItem('tokoro_api_url', rlyCfgApiUrl.value);
         });
 
         rlyCfgPrivKey.addEventListener('change', async function () {
           const privB64 = rlyCfgPrivKey.value.trim();
           if (!privB64) return;
           try {
-            const privBytes = Uint8Array.from(atob(privB64), c => c.charCodeAt(0));
-            const cryptoKey = await crypto.subtle.importKey('pkcs8', privBytes.buffer, 'Ed25519', true, ['sign']);
+            const privBytes = Uint8Array.from(atob(privB64), c =>
+              c.charCodeAt(0)
+            );
+            const cryptoKey = await crypto.subtle.importKey(
+              'pkcs8',
+              privBytes.buffer,
+              'Ed25519',
+              true,
+              ['sign']
+            );
             const jwk = await crypto.subtle.exportKey('jwk', cryptoKey);
             const pubB64std = jwk.x.replace(/-/g, '+').replace(/_/g, '/');
-            const pubBytes = Uint8Array.from(atob(pubB64std), c => c.charCodeAt(0));
-            const pubHex = Array.from(pubBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+            const pubBytes = Uint8Array.from(atob(pubB64std), c =>
+              c.charCodeAt(0)
+            );
+            const pubHex = Array.from(pubBytes)
+              .map(b => b.toString(16).padStart(2, '0'))
+              .join('');
             rlyCfgPubKey.textContent = pubHex;
-            localStorage.setItem('happenings_keypair', JSON.stringify({ pubkey: pubHex, privkeyB64: privB64 }));
+            localStorage.setItem(
+              'tokoro_keypair',
+              JSON.stringify({ pubkey: pubHex, privkeyB64: privB64 })
+            );
           } catch (e) {
             setSt('Chiave privata non valida: ' + e.message, 'err');
           }
@@ -2121,8 +2188,10 @@
 
         function maybeRunBufferedCrawl() {
           if (!crawlData || crawlRunning) return;
-          const apiKey    = (localStorage.getItem('happenings_api_key') || '').trim();
-          const workerUrl = (localStorage.getItem('happenings_worker_url') || '').trim();
+          const apiKey = (localStorage.getItem('tokoro_api_key') || '').trim();
+          const workerUrl = (
+            localStorage.getItem('tokoro_worker_url') || ''
+          ).trim();
           if (apiKey && workerUrl) {
             updateCfgVisibility();
             runCrawl(crawlData);
@@ -2138,7 +2207,7 @@
         }
 
         async function getRelayKeypair() {
-          const stored = localStorage.getItem('happenings_keypair');
+          const stored = localStorage.getItem('tokoro_keypair');
           if (stored) {
             const kp = JSON.parse(stored);
             if (kp.pubkey && kp.privkeyB64) {
@@ -2146,14 +2215,23 @@
               return { ...kp, isNew: false };
             }
           }
-          const pair = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
-          const pubBytes = new Uint8Array(await crypto.subtle.exportKey('raw', pair.publicKey));
-          const privBytes = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+          const pair = await crypto.subtle.generateKey('Ed25519', true, [
+            'sign',
+            'verify',
+          ]);
+          const pubBytes = new Uint8Array(
+            await crypto.subtle.exportKey('raw', pair.publicKey)
+          );
+          const privBytes = new Uint8Array(
+            await crypto.subtle.exportKey('pkcs8', pair.privateKey)
+          );
           const kp = {
-            pubkey: Array.from(pubBytes).map(b => b.toString(16).padStart(2, '0')).join(''),
+            pubkey: Array.from(pubBytes)
+              .map(b => b.toString(16).padStart(2, '0'))
+              .join(''),
             privkeyB64: btoa(String.fromCharCode(...privBytes)),
           };
-          localStorage.setItem('happenings_keypair', JSON.stringify(kp));
+          localStorage.setItem('tokoro_keypair', JSON.stringify(kp));
           populateKeypairFields(kp);
           return { ...kp, isNew: true };
         }
@@ -2169,15 +2247,17 @@
           return;
         }
 
-        getRelayKeypair().then(function(kp) {
-          if (kp.isNew) {
-            const noticeEl = document.getElementById('relay-notice');
-            if (noticeEl) noticeEl.classList.add('show');
-          }
-          window.opener.postMessage({ type: 'ready' }, '*');
-        }).catch(function(err) {
-          setSt('Errore keypair: ' + (err.message || err), 'err');
-        });
+        getRelayKeypair()
+          .then(function (kp) {
+            if (kp.isNew) {
+              const noticeEl = document.getElementById('relay-notice');
+              if (noticeEl) noticeEl.classList.add('show');
+            }
+            window.opener.postMessage({ type: 'ready' }, '*');
+          })
+          .catch(function (err) {
+            setSt('Errore keypair: ' + (err.message || err), 'err');
+          });
 
         // Receive crawl data from the bookmarklet
         window.addEventListener('message', async function (evt) {
@@ -2188,12 +2268,17 @@
         });
 
         async function runCrawl(data) {
-          const workerUrl = (localStorage.getItem('happenings_worker_url') || '').trim().replace(/\/$/, '');
-          const apiKey    = (localStorage.getItem('happenings_api_key') || '').trim();
+          const workerUrl = (localStorage.getItem('tokoro_worker_url') || '')
+            .trim()
+            .replace(/\/$/, '');
+          const apiKey = (localStorage.getItem('tokoro_api_key') || '').trim();
           if (!workerUrl || !apiKey) {
             cfgFields.style.display = 'flex';
             cfgToggle.style.display = 'none';
-            setSt('Inserisci API key e Crawler Worker URL nelle Impostazioni per continuare.', 'err');
+            setSt(
+              'Inserisci API key e Crawler Worker URL nelle Impostazioni per continuare.',
+              'err'
+            );
             return;
           }
           crawlRunning = true;
@@ -2286,10 +2371,19 @@
                   preview: false,
                   events: extractedEvents,
                 };
-            const pubWorkerUrl = (localStorage.getItem('happenings_worker_url') || '').trim().replace(/\/$/, '');
-            const pubApiKey    = (localStorage.getItem('happenings_api_key') || '').trim();
+            const pubWorkerUrl = (
+              localStorage.getItem('tokoro_worker_url') || ''
+            )
+              .trim()
+              .replace(/\/$/, '');
+            const pubApiKey = (
+              localStorage.getItem('tokoro_api_key') || ''
+            ).trim();
             if (!pubWorkerUrl || !pubApiKey) {
-              setSt('Impostazioni mancanti. Apri le Impostazioni e completa i campi.', 'err');
+              setSt(
+                'Impostazioni mancanti. Apri le Impostazioni e completa i campi.',
+                'err'
+              );
               cfgFields.style.display = 'flex';
               cfgToggle.style.display = 'none';
               pubBtn.disabled = cancelBtn.disabled = false;
@@ -2380,7 +2474,7 @@
     <script>
       (function () {
         var code = document.getElementById('bm-src').textContent;
-        document.getElementById('happenings-bookmarklet').href =
+        document.getElementById('tokoro-bookmarklet').href =
           'javascript:' + encodeURIComponent(code);
       })();
     </script>

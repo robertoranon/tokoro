@@ -43,8 +43,8 @@ Edit `config.local.js` and fill in your values:
 
 ```js
 const TOKORO_CONFIG = {
-  workerUrl: 'https://happenings-worker.YOUR_SUBDOMAIN.workers.dev',
-  crawlerWorkerUrl: 'https://happenings-crawler-worker.YOUR_SUBDOMAIN.workers.dev',
+  workerUrl: 'https://tokoro-worker.YOUR_SUBDOMAIN.workers.dev',
+  crawlerWorkerUrl: 'https://tokoro-crawler-worker.YOUR_SUBDOMAIN.workers.dev',
   crawlerApiKey: 'your-api-key-here',
   relayUrl: 'https://YOUR_PUBLIC_WEB_URL/',
 };
@@ -93,13 +93,13 @@ npm install
 ### 2.2 Create the D1 database
 
 ```bash
-wrangler d1 create happenings-db
+wrangler d1 create tokoro-db
 ```
 
 The output will look like:
 
 ```
-✅ Successfully created DB 'happenings-db'
+✅ Successfully created DB 'tokoro-db'
 ...
 database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 ```
@@ -109,7 +109,7 @@ Copy the `database_id` and update `worker/wrangler.toml`:
 ```toml
 [[d1_databases]]
 binding = "DB"
-database_name = "happenings-db"
+database_name = "tokoro-db"
 database_id = "YOUR_DATABASE_ID_HERE"   # <-- paste here
 ```
 
@@ -118,13 +118,13 @@ database_id = "YOUR_DATABASE_ID_HERE"   # <-- paste here
 Apply the schema to the remote (production) database:
 
 ```bash
-wrangler d1 migrations apply happenings-db --remote
+wrangler d1 migrations apply tokoro-db --remote
 ```
 
 To also apply locally (for development):
 
 ```bash
-wrangler d1 migrations apply happenings-db
+wrangler d1 migrations apply tokoro-db
 ```
 
 ### 2.4 Create the R2 bucket (for backups)
@@ -132,7 +132,7 @@ wrangler d1 migrations apply happenings-db
 The Worker uses an R2 bucket to store periodic backups. Create it before deploying:
 
 ```bash
-wrangler r2 bucket create happenings-backups
+wrangler r2 bucket create tokoro-backups
 ```
 
 ### 2.5 Set Worker LLM secrets
@@ -156,10 +156,11 @@ wrangler secret put LLM_PROVIDER --config worker/wrangler.toml
 ### 2.6 Deploy the Worker
 
 ```bash
+cd worker
 npm run deploy
 ```
 
-The worker will be live at `https://happenings-worker.YOUR_SUBDOMAIN.workers.dev`.
+The worker will be live at `https://tokoro-worker.YOUR_SUBDOMAIN.workers.dev`.
 
 ---
 
@@ -180,7 +181,7 @@ Secrets are sensitive values that must not be stored in code or config files. Se
 
 #### API keys for authenticating crawl requests
 
-Generate one or more API keys (any random string, e.g. `openssl rand -hex 32`). You'll use these in the Chrome extension and Apple Shortcut settings.
+Generate one or more API keys (any random string, e.g. `openssl rand -hex 32`). You'll use these in the Chrome extension and bookmarklet settings.
 
 ```bash
 wrangler secret put CRAWLER_API_KEYS --config crawler-worker/wrangler.toml
@@ -206,7 +207,7 @@ cd crawler-worker
 npm run deploy
 ```
 
-The crawler will be live at `https://happenings-crawler-worker.YOUR_SUBDOMAIN.workers.dev`.
+The crawler will be live at `https://tokoro-crawler-worker.YOUR_SUBDOMAIN.workers.dev`.
 
 ---
 
@@ -219,9 +220,10 @@ Every event must be signed by its author. Identity is an Ed25519 keypair — no 
 A curator is anyone who publishes events — via the web publisher, Chrome extension, or bookmarklet.
 
 Each curator generates their own Ed25519 keypair locally on first use:
+
 - **Web publisher**: open `web-publisher/index.html` — keypair auto-generated in localStorage; pubkey shown in settings panel
 - **Chrome extension**: open the popup — keypair auto-generated in `chrome.storage.sync`; pubkey shown in settings
-- **Bookmarklet relay**: open the relay popup — keypair auto-generated in localStorage of `happenings-query.pages.dev`
+- **Bookmarklet relay**: open the relay popup — keypair auto-generated in localStorage of `tokoro-query.pages.dev`
 
 The private key never leaves the browser. Each curator's keypair is tied to their browser/device.
 
@@ -252,6 +254,7 @@ wrangler secret put ADMIN_PUBKEY --config worker/wrangler.toml
 **Use the admin panel:**
 
 Open `admin/admin.html` in a browser, go to Settings, and enter:
+
 - **Worker URL**: your deployed API Worker URL
 - **Admin Private Key**: the private key from the keypair above
 - **Admin Public Key**: the same public key you set as `ADMIN_PUBKEY`
@@ -265,7 +268,7 @@ The private key is stored in the browser's localStorage and used locally to sign
 Check that the API is working:
 
 ```bash
-curl "https://happenings-worker.YOUR_SUBDOMAIN.workers.dev/events?lat=51.5&lng=-0.09&radius=10"
+curl "https://tokoro-worker.YOUR_SUBDOMAIN.workers.dev/events?lat=51.5&lng=-0.09&radius=10"
 ```
 
 Should return `{"events": []}` (empty list if no events yet).
@@ -273,7 +276,7 @@ Should return `{"events": []}` (empty list if no events yet).
 Test a crawl (the crawler worker extracts events and returns them — sign and publish manually to test the full flow):
 
 ```bash
-curl -X POST "https://happenings-crawler-worker.YOUR_SUBDOMAIN.workers.dev/crawl" \
+curl -X POST "https://tokoro-crawler-worker.YOUR_SUBDOMAIN.workers.dev/crawl" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -d '{"url": "https://example-venue.com/events", "mode": "direct"}'
@@ -289,12 +292,12 @@ Links to the Chrome extension, bookmarklet, and Apple Shortcut are all available
 
 ### Chrome Extension
 
-Install directly from the [Chrome Web Store](https://chromewebstore.google.com/detail/happenings-event-crawler/lhfbgfaljjaaipfbdlfffbjfajenaphn), or load unpacked from `chrome-extension/` in developer mode.
+Install directly from the [Chrome Web Store](https://chromewebstore.google.com/detail/tokoro-event-crawler/lhfbgfaljjaaipfbdlfffbjfajenaphn), or load unpacked from `chrome-extension/` in developer mode.
 
 After installing, click the extension icon → **Settings** and set:
 
-- **Crawler Worker URL**: `https://happenings-crawler-worker.YOUR_SUBDOMAIN.workers.dev`
-- **API Worker URL**: `https://happenings-worker.YOUR_SUBDOMAIN.workers.dev`
+- **Crawler Worker URL**: `https://tokoro-crawler-worker.YOUR_SUBDOMAIN.workers.dev`
+- **API Worker URL**: `https://tokoro-worker.YOUR_SUBDOMAIN.workers.dev`
 - **API Key**: one of the keys you set in `CRAWLER_API_KEYS`
 
 Your public key is displayed in the settings panel — share it with your admin to be added to the `ALLOWED_PUBKEYS` allowlist before you can publish events.
@@ -343,7 +346,7 @@ Or deploy to Cloudflare Pages (make sure `config.local.js` is filled in first):
 ./scripts/deploy-public-web.sh
 ```
 
-This builds real URLs into the HTML, deploys to Cloudflare Pages (project: `happenings-query`), and restores the source files automatically.
+This builds real URLs into the HTML, deploys to Cloudflare Pages (project: `tokoro-query`), and restores the source files automatically.
 
 ---
 

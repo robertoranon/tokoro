@@ -6,7 +6,7 @@ set -euo pipefail
 # into the D1 database using wrangler d1 execute.
 #
 # WARNING: This inserts rows — it does NOT clear the table first.
-# Run manually: wrangler d1 execute happenings-db --command "DELETE FROM events"
+# Run manually: wrangler d1 execute tokoro-db --command "DELETE FROM events"
 # before restoring if you want a clean slate.
 
 if [ $# -lt 1 ]; then
@@ -15,7 +15,7 @@ if [ $# -lt 1 ]; then
 fi
 
 BACKUP_FILE="$1"
-DB_NAME="happenings-db"
+DB_NAME="tokoro-db"
 
 if [ ! -f "$BACKUP_FILE" ]; then
 	echo "Error: file not found: $BACKUP_FILE"
@@ -25,7 +25,7 @@ fi
 echo "Generating INSERT statements from $BACKUP_FILE ..."
 
 # Extract events array and generate INSERT SQL using node
-SQL_FILE=$(mktemp /tmp/happenings-restore-XXXXXX.sql)
+SQL_FILE=$(mktemp /tmp/tokoro-restore-XXXXXX.sql)
 
 node - "$BACKUP_FILE" "$SQL_FILE" <<'EOF'
 const fs = require('fs');

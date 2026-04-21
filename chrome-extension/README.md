@@ -39,10 +39,10 @@ Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/hap
    - Get your API key from the crawler-worker administrator
 
 3. **Configure Crawler Worker URL**:
-   - Set to `https://happenings-crawler-worker.YOUR_SUBDOMAIN.workers.dev`
+   - Set to `https://tokoro-crawler-worker.YOUR_SUBDOMAIN.workers.dev`
 
 4. **Configure API Worker URL**:
-   - Set to `https://happenings-worker.YOUR_SUBDOMAIN.workers.dev`
+   - Set to `https://tokoro-worker.YOUR_SUBDOMAIN.workers.dev`
    - Events are signed locally and published directly to this URL
 
 5. **Share your Public Key**:
@@ -211,9 +211,9 @@ Context menus are a core interaction pattern of this extension. Users can right-
 
 When the user triggers event extraction from the right-click context menu, processing occurs in the background service worker while the popup is closed. Desktop notifications are the only mechanism to communicate the result (success with event counts, or failure with an error message) back to the user. Notifications are only shown in response to direct user-initiated context menu actions.
 
-### `host_permissions`: `https://happenings-crawler-worker.YOUR_SUBDOMAIN.workers.dev/*`
+### `host_permissions`: `https://tokoro-crawler-worker.YOUR_SUBDOMAIN.workers.dev/*`
 
-The extension sends extracted page HTML and image data to the user's crawler service for LLM-based event extraction. The default service endpoint is `https://happenings-crawler-worker.YOUR_SUBDOMAIN.workers.dev`. This specific host permission is required by Chrome's MV3 fetch restrictions for cross-origin requests made from extension service workers and popups. Only this single domain is requested — no broad host access (`<all_urls>` or wildcards) is used.
+The extension sends extracted page HTML and image data to the user's crawler service for LLM-based event extraction. The default service endpoint is `https://tokoro-crawler-worker.YOUR_SUBDOMAIN.workers.dev`. This specific host permission is required by Chrome's MV3 fetch restrictions for cross-origin requests made from extension service workers and popups. Only this single domain is requested — no broad host access (`<all_urls>` or wildcards) is used.
 
 ### Content script on all URLs
 

@@ -55,9 +55,9 @@ node "${PUBLIC_WEB}/build-bookmarklet.js"
 node "${PUBLIC_WEB}/inject-worker-url.js" "$WORKER_URL" "$CRAWLER_URL"
 
 if [[ "$DRY_RUN" == "true" ]]; then
-  echo "[dry-run] Would deploy public-web to Cloudflare Pages (project: happenings-query)"
+  echo "[dry-run] Would deploy public-web to Cloudflare Pages (project: tokoro-query)"
   echo "[dry-run] Skipping deploy."
 else
   echo "Deploying to Cloudflare Pages..."
-  npx wrangler pages deploy "${PUBLIC_WEB}" --project-name happenings-query
+  npx wrangler pages deploy "${PUBLIC_WEB}" --project-name tokoro-query
 fi

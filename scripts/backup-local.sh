@@ -4,7 +4,7 @@ set -euo pipefail
 # Usage: ./scripts/backup-local.sh [output-dir]
 # Produces a full SQL dump of the D1 database locally using wrangler.
 
-DB_NAME="happenings-db"
+DB_NAME="tokoro-db"
 OUTPUT_DIR="${1:-.}"
 DATE=$(date +%Y-%m-%d)
 OUTPUT_FILE="$OUTPUT_DIR/backup-$DATE.sql"

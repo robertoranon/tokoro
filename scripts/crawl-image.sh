@@ -7,7 +7,7 @@
 # Pass --publish to actually publish the extracted events.
 #
 # Required env vars:
-#   CRAWLER_WORKER_URL  — e.g. https://happenings-crawler-worker.<subdomain>.workers.dev
+#   CRAWLER_WORKER_URL  — e.g. https://tokoro-crawler-worker.<subdomain>.workers.dev
 #   CRAWLER_API_KEY     — API key for the crawler worker
 
 
@@ -65,7 +65,7 @@ esac
 
 # Make up a plausible URL from the filename
 FILENAME=$(basename "$IMAGE_PATH")
-FAKE_URL="https://happenings.local/images/${FILENAME}"
+FAKE_URL="https://tokoro.local/images/${FILENAME}"
 
 IMAGE_B64=$(base64 -i "$IMAGE_PATH")
 

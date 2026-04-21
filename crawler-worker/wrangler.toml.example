@@ -1,4 +1,4 @@
-name = "happenings-crawler-worker"
+name = "tokoro-crawler-worker"
 main = "src/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
@@ -8,13 +8,13 @@ workers_dev = true
 # DISABLED: Uncomment the lines below to enable log storage to R2
 # Before enabling:
 #   1. Enable R2 in your Cloudflare dashboard (requires payment method, but has generous free tier)
-#   2. Create the bucket: wrangler r2 bucket create happenings-crawler-logs
+#   2. Create the bucket: wrangler r2 bucket create tokoro-crawler-logs
 #   3. Uncomment the [[r2_buckets]] section below
 # When disabled, logs are only written to console (not persisted to files)
 #
 # [[r2_buckets]]
 # binding = "CRAWLER_LOGS"
-# bucket_name = "happenings-crawler-logs"
+# bucket_name = "tokoro-crawler-logs"
 
 # Secrets (set via: wrangler secret put <name>)
 # - CRAWLER_API_KEYS: Comma-separated list of allowed API keys

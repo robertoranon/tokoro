@@ -33,7 +33,7 @@ This will open a browser window to authenticate.
 ### 2. Create D1 Database
 
 ```bash
-wrangler d1 create happenings-db
+wrangler d1 create tokoro-db
 ```
 
 Copy the `database_id` from the output and update it in `wrangler.toml`:
@@ -41,7 +41,7 @@ Copy the `database_id` from the output and update it in `wrangler.toml`:
 ```toml
 [[d1_databases]]
 binding = "DB"
-database_name = "happenings-db"
+database_name = "tokoro-db"
 database_id = "YOUR_DATABASE_ID_HERE"
 ```
 
@@ -49,10 +49,10 @@ database_id = "YOUR_DATABASE_ID_HERE"
 
 ```bash
 # Local database
-wrangler d1 migrations apply happenings-db
+wrangler d1 migrations apply tokoro-db
 
 # Production database
-wrangler d1 migrations apply happenings-db --remote
+wrangler d1 migrations apply tokoro-db --remote
 ```
 
 ### 4. Deploy
@@ -61,7 +61,7 @@ wrangler d1 migrations apply happenings-db --remote
 wrangler deploy
 ```
 
-Your worker will be deployed to `https://happenings-worker.YOUR_SUBDOMAIN.workers.dev`
+Your worker will be deployed to `https://tokoro-worker.YOUR_SUBDOMAIN.workers.dev`
 
 ## API Endpoints
 
@@ -70,7 +70,7 @@ Your worker will be deployed to `https://happenings-worker.YOUR_SUBDOMAIN.worker
 Returns API documentation with all available endpoints.
 
 ```bash
-curl https://happenings-worker.YOUR_SUBDOMAIN.workers.dev
+curl https://tokoro-worker.YOUR_SUBDOMAIN.workers.dev
 ```
 
 ### GET /stats
@@ -78,7 +78,7 @@ curl https://happenings-worker.YOUR_SUBDOMAIN.workers.dev
 Returns total event count and the most recently created event.
 
 ```bash
-curl https://happenings-worker.YOUR_SUBDOMAIN.workers.dev/stats
+curl https://tokoro-worker.YOUR_SUBDOMAIN.workers.dev/stats
 ```
 
 ### GET /events
@@ -87,8 +87,8 @@ Query events by location and time.
 
 **Parameters:**
 
-- `lat` (required*): Latitude
-- `lng` (required*): Longitude
+- `lat` (required\*): Latitude
+- `lng` (required\*): Longitude
 - `radius` (optional): Radius in km (default: 10)
 - `from` (optional): Start datetime ISO 8601 `YYYY-MM-DDTHH:MM:SS` (default: now)
 - `to` (optional): End datetime ISO 8601 `YYYY-MM-DDTHH:MM:SS` (default: 7 days from now)
@@ -99,12 +99,12 @@ Query events by location and time.
 - `format` (optional): `ical` returns an iCalendar feed (default window: 30 days)
 - `offset` (optional): Pagination offset for no-geo queries (default: 0)
 
-*`lat`/`lng` are optional when using `pubkey` alone or for admin browsing (no-geo path); results are paginated with `offset`.
+\*`lat`/`lng` are optional when using `pubkey` alone or for admin browsing (no-geo path); results are paginated with `offset`.
 
 **Example:**
 
 ```bash
-curl "https://happenings-worker.YOUR_SUBDOMAIN.workers.dev/events?lat=51.505&lng=-0.09&radius=10"
+curl "https://tokoro-worker.YOUR_SUBDOMAIN.workers.dev/events?lat=51.505&lng=-0.09&radius=10"
 ```
 
 ### POST /events
@@ -237,13 +237,13 @@ Note: `festival_name` and `festival_url` are unsigned metadata — they are stor
 
 Events use geohash-based spatial indexing for efficient location queries. The worker selects geohash precision dynamically based on the requested radius:
 
-| Radius | Precision | Cell size |
-|--------|-----------|-----------|
-| ≤ 5 km | 6 | ~1.2 km |
-| ≤ 15 km | 5 | ~4.9 km |
-| ≤ 50 km | 4 | ~39 km |
-| ≤ 200 km | 3 | ~156 km |
-| > 200 km | 2 | ~1250 km |
+| Radius   | Precision | Cell size |
+| -------- | --------- | --------- |
+| ≤ 5 km   | 6         | ~1.2 km   |
+| ≤ 15 km  | 5         | ~4.9 km   |
+| ≤ 50 km  | 4         | ~39 km    |
+| ≤ 200 km | 3         | ~156 km   |
+| > 200 km | 2         | ~1250 km  |
 
 Queries always include the center cell plus its 8 neighbors to avoid missing events near cell boundaries. Precisions 2–4 use prefix matching on the `geohash5` column; precisions 5 and 6 use indexed exact lookups. A final haversine distance filter is applied in the worker after the SQL query.
 
@@ -287,11 +287,11 @@ LLM_API_KEY=sk-... npm run check-duplicate -- --remote <event-id-1> <event-id-2>
 
 Optional env vars for LLM:
 
-| Variable | Default |
-|---|---|
-| `LLM_API_KEY` | — (no LLM, Levenshtein fallback) |
-| `LLM_PROVIDER` | `openrouter` |
-| `LLM_MODEL` | `google/gemini-2.5-flash-lite` |
+| Variable       | Default                          |
+| -------------- | -------------------------------- |
+| `LLM_API_KEY`  | — (no LLM, Levenshtein fallback) |
+| `LLM_PROVIDER` | `openrouter`                     |
+| `LLM_MODEL`    | `google/gemini-2.5-flash-lite`   |
 
 The script logs each check in order and stops at the first failure:
 
@@ -316,7 +316,7 @@ open web-publisher/index.html
 
 ```bash
 # Query events (no auth required)
-curl "https://happenings-worker.YOUR_SUBDOMAIN.workers.dev/events?lat=51.505&lng=-0.09&radius=10"
+curl "https://tokoro-worker.YOUR_SUBDOMAIN.workers.dev/events?lat=51.505&lng=-0.09&radius=10"
 
 # POST events require proper Ed25519 signatures
 # Use the web publisher for this
@@ -394,10 +394,10 @@ If migrations fail:
 
 ```bash
 # Check migration status
-wrangler d1 migrations list happenings-db
+wrangler d1 migrations list tokoro-db
 
 # Force apply if needed
-wrangler d1 migrations apply happenings-db --remote
+wrangler d1 migrations apply tokoro-db --remote
 ```
 
 ## Database Backup
@@ -408,7 +408,7 @@ The worker automatically backs up the `events` table to Cloudflare R2 daily at 2
 
 ```bash
 # Create the R2 bucket
-wrangler r2 bucket create happenings-backups
+wrangler r2 bucket create tokoro-backups
 ```
 
 The example `wrangler.toml` already includes the binding. Deploy after creating the bucket:
@@ -432,7 +432,7 @@ npm run deploy
 Download a backup file from R2:
 
 ```bash
-wrangler r2 object get happenings-backups/backups/backup-2026-03-26.json --file backup.json
+wrangler r2 object get tokoro-backups/backups/backup-2026-03-26.json --file backup.json
 ```
 
 Then restore it:
@@ -445,13 +445,13 @@ Then restore it:
 > **Warning:** The restore script uses `INSERT OR IGNORE` — it adds rows but does not clear the table first. To do a clean restore, run this first:
 >
 > ```bash
-> wrangler d1 execute happenings-db --command "DELETE FROM events" --remote
+> wrangler d1 execute tokoro-db --command "DELETE FROM events" --remote
 > ```
 
 ### List backups in R2
 
 ```bash
-wrangler r2 object list happenings-backups --prefix backups/
+wrangler r2 object list tokoro-backups --prefix backups/
 ```
 
 ## Deployment Checklist

@@ -8,7 +8,7 @@
 # If <html-file> is provided, its contents are sent as the rendered HTML (avoids a live fetch).
 #
 # Required env vars (or edit the defaults below):
-#   CRAWLER_WORKER_URL  — e.g. https://happenings-crawler-worker.<subdomain>.workers.dev
+#   CRAWLER_WORKER_URL  — e.g. https://tokoro-crawler-worker.<subdomain>.workers.dev
 #   CRAWLER_API_KEY     — API key for the crawler worker
 
 # Load local configuration

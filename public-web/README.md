@@ -28,7 +28,7 @@ This builds the bookmarklet, injects the real worker and crawler URLs into the H
 3. Click **Create a project**
 4. Choose **Direct Upload**
 5. Upload the contents of the `public-web` directory
-6. Set the project name (e.g., `happenings-query`)
+6. Set the project name (e.g., `tokoro-query`)
 7. Click **Deploy**
 
 ### Option 3: Git Integration
@@ -67,11 +67,11 @@ node inject-worker-url.js <worker-url> [<crawler-url>]
 
 Both scripts are run automatically by `scripts/deploy-public-web.sh` (see below). You only need to run them manually if you're not using that script.
 
-| Config key         | Placeholder                | Script                   | Purpose                                                        |
-| ------------------ | -------------------------- | ------------------------ | -------------------------------------------------------------- |
-| `relayUrl`         | `__RELAY_URL__`            | `build-bookmarklet.js`   | URL of this Pages site — used by the bookmarklet to open the relay popup |
-| `workerUrl`        | `__TOKORO_WORKER_URL__`    | `inject-worker-url.js`   | API Worker URL used by the query page and as default in relay settings |
-| `crawlerWorkerUrl` | `__DEFAULT_CRAWLER_URL__`  | `inject-worker-url.js`   | Default Crawler Worker URL pre-filled in relay settings on first use |
+| Config key         | Placeholder               | Script                 | Purpose                                                                  |
+| ------------------ | ------------------------- | ---------------------- | ------------------------------------------------------------------------ |
+| `relayUrl`         | `__RELAY_URL__`           | `build-bookmarklet.js` | URL of this Pages site — used by the bookmarklet to open the relay popup |
+| `workerUrl`        | `__TOKORO_WORKER_URL__`   | `inject-worker-url.js` | API Worker URL used by the query page and as default in relay settings   |
+| `crawlerWorkerUrl` | `__DEFAULT_CRAWLER_URL__` | `inject-worker-url.js` | Default Crawler Worker URL pre-filled in relay settings on first use     |
 
 Users can override all URLs and the API key at runtime via the relay popup's settings form; values are saved to the relay's `localStorage` and remembered across all sites. The settings form collapses automatically when API Key, Crawler Worker URL, and API Worker URL are all configured.
 
@@ -81,11 +81,11 @@ Simply open `index.html` in a web browser. No build step required.
 
 ## Bookmarklet Publisher
 
-The bookmarklet is a minimal trigger: it preprocesses the current page's HTML, opens the relay popup (`happenings-query.pages.dev?relay=1`), and hands off the page content via `postMessage`. It writes nothing to `localStorage` and shows no UI on the visited page.
+The bookmarklet is a minimal trigger: it preprocesses the current page's HTML, opens the relay popup (`tokoro-query.pages.dev?relay=1`), and hands off the page content via `postMessage`. It writes nothing to `localStorage` and shows no UI on the visited page.
 
-All settings — API Key, Crawler Worker URL, API Worker URL, and Ed25519 keypair — live in the relay popup's `localStorage` (scoped to `happenings-query.pages.dev`), so they persist across every site the bookmarklet is used on.
+All settings — API Key, Crawler Worker URL, API Worker URL, and Ed25519 keypair — live in the relay popup's `localStorage` (scoped to `tokoro-query.pages.dev`), so they persist across every site the bookmarklet is used on.
 
-On first use the relay generates an Ed25519 keypair, stores it under `happenings_keypair`, and shows a dismissable amber notice prompting the curator to share their public key with the DB maintainer. The public and private keys are visible (and the private key editable for backup/restore) in the relay's Settings form.
+On first use the relay generates an Ed25519 keypair, stores it under `tokoro_keypair`, and shows a dismissable amber notice prompting the curator to share their public key with the DB maintainer. The public and private keys are visible (and the private key editable for backup/restore) in the relay's Settings form.
 
 To allow a new curator to publish, obtain their public key from the relay's Settings form and add it to the `ALLOWED_PUBKEYS` secret on the API worker.
 

@@ -1,4 +1,4 @@
-name = "happenings-worker"
+name = "tokoro-worker"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
@@ -6,7 +6,7 @@ workers_dev = true
 
 [[d1_databases]]
 binding = "DB"
-database_name = "happenings-db"
+database_name = "tokoro-db"
 database_id = "YOUR_D1_DATABASE_ID"
 
 [triggers]
@@ -14,7 +14,7 @@ crons = ["0 2 * * *"]
 
 [[r2_buckets]]
 binding = "BACKUP_BUCKET"
-bucket_name = "happenings-backups"
+bucket_name = "tokoro-backups"
 
 [vars]
 # Secrets (set via: wrangler secret put <name>)

@@ -228,7 +228,7 @@ npm run deploy
 
 Your Worker will be available at:
 
-- Dev: `https://happenings-crawler-worker.<your-subdomain>.workers.dev`
+- Dev: `https://tokoro-crawler-worker.<your-subdomain>.workers.dev`
 - Production: Configure a custom domain in Cloudflare dashboard
 
 ## API Reference
@@ -293,7 +293,7 @@ Debug endpoint: runs LLM-only event extraction from plain text, bypassing JSON-L
 **Example using a local file:**
 
 ```bash
-curl -X POST https://happenings-crawler-worker.<subdomain>.workers.dev/extract-text \
+curl -X POST https://tokoro-crawler-worker.<subdomain>.workers.dev/extract-text \
   -H "Authorization: Bearer <api_key>" \
   -H "Content-Type: application/json" \
   -d "$(jq -n \
@@ -384,10 +384,10 @@ Submit a URL to crawl and extract events. Returns unsigned `PreparedEvent[]` —
 
 ```bash
 # Health check
-curl https://happenings-crawler-worker.<subdomain>.workers.dev/
+curl https://tokoro-crawler-worker.<subdomain>.workers.dev/
 
 # Discover mode — find event sub-pages and extract from each
-curl -s -X POST https://happenings-crawler-worker.<subdomain>.workers.dev/crawl \
+curl -s -X POST https://tokoro-crawler-worker.<subdomain>.workers.dev/crawl \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -396,7 +396,7 @@ curl -s -X POST https://happenings-crawler-worker.<subdomain>.workers.dev/crawl 
   }' | jq .
 
 # Direct mode — single page, no link discovery
-curl -s -X POST https://happenings-crawler-worker.<subdomain>.workers.dev/crawl \
+curl -s -X POST https://tokoro-crawler-worker.<subdomain>.workers.dev/crawl \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -405,7 +405,7 @@ curl -s -X POST https://happenings-crawler-worker.<subdomain>.workers.dev/crawl 
   }' | jq .
 
 # Pass HTML source inline (worker cleans it server-side)
-curl -s -X POST https://happenings-crawler-worker.<subdomain>.workers.dev/crawl \
+curl -s -X POST https://tokoro-crawler-worker.<subdomain>.workers.dev/crawl \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d "$(jq -n \
@@ -415,7 +415,7 @@ curl -s -X POST https://happenings-crawler-worker.<subdomain>.workers.dev/crawl 
   )" | jq .
 
 # Image mode — extract events from a poster/flyer image
-curl -s -X POST https://happenings-crawler-worker.<subdomain>.workers.dev/crawl \
+curl -s -X POST https://tokoro-crawler-worker.<subdomain>.workers.dev/crawl \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d "$(jq -n \

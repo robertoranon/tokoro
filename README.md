@@ -58,7 +58,6 @@ Events are queryable through a simple API. Point it at a location, a radius, and
 | [**Web Publisher**](web-publisher/)       | Static HTML form for manually composing and publishing events                     |
 | [**Public Web**](public-web/)             | Example event browser — query by location, date, category; embeds the bookmarklet |
 | [**Admin Panel**](admin/)                 | Static HTML moderation UI — browse and delete events with admin key auth          |
-| [**Node.js Crawler**](crawler/)           | CLI crawler using Playwright / Jina AI Reader                                     |
 
 ---
 
