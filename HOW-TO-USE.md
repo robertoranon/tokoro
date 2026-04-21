@@ -115,16 +115,18 @@ database_id = "YOUR_DATABASE_ID_HERE"   # <-- paste here
 
 ### 2.3 Run database migrations
 
+Run these from the project root (the `--config` flag points wrangler to `worker/wrangler.toml`):
+
 Apply the schema to the remote (production) database:
 
 ```bash
-wrangler d1 migrations apply tokoro-db --remote
+wrangler d1 migrations apply tokoro-db --remote --config worker/wrangler.toml
 ```
 
 To also apply locally (for development):
 
 ```bash
-wrangler d1 migrations apply tokoro-db
+wrangler d1 migrations apply tokoro-db --config worker/wrangler.toml
 ```
 
 ### 2.4 Create the R2 bucket (for backups)
@@ -155,9 +157,10 @@ wrangler secret put LLM_PROVIDER --config worker/wrangler.toml
 
 ### 2.6 Deploy the Worker
 
+Use the globally installed wrangler (not the local one in `node_modules`) to avoid version issues:
+
 ```bash
-cd worker
-npm run deploy
+wrangler deploy --config worker/wrangler.toml
 ```
 
 The worker will be live at `https://tokoro-worker.YOUR_SUBDOMAIN.workers.dev`.
@@ -175,7 +178,39 @@ cd crawler-worker
 npm install
 ```
 
-### 3.2 Set secrets
+### 3.2 Create the KV namespace
+
+The Crawler Worker uses a KV namespace for preview caching. Create it and update `crawler-worker/wrangler.toml`:
+
+```bash
+wrangler kv namespace create PREVIEW_CACHE
+```
+
+The output will look like:
+
+```
+✅ Successfully created namespace 'PREVIEW_CACHE'
+{ binding = "PREVIEW_CACHE", id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }
+```
+
+Copy the `id` and update `crawler-worker/wrangler.toml`:
+
+```toml
+[[kv_namespaces]]
+binding = "PREVIEW_CACHE"
+id = "YOUR_KV_NAMESPACE_ID_HERE"   # <-- paste here
+```
+
+### 3.3 Update the API URL
+
+Open `crawler-worker/wrangler.toml` and replace the placeholder with your actual subdomain:
+
+```toml
+[vars]
+TOKORO_API_URL = "https://tokoro-worker.YOUR_SUBDOMAIN.workers.dev"
+```
+
+### 3.4 Set secrets
 
 Secrets are sensitive values that must not be stored in code or config files. Set them via Wrangler:
 
@@ -200,11 +235,21 @@ wrangler secret put LLM_PROVIDER --config crawler-worker/wrangler.toml
 # Enter one of: openai, anthropic, openrouter, ollama
 ```
 
-### 3.3 Deploy the Crawler Worker
+#### Crawler signing keypair (optional)
+
+If you want the crawler worker to publish events directly to the API (rather than returning unsigned events for the client to sign), set an Ed25519 keypair. Generate one by opening `web-publisher/index.html` and noting the keys shown in settings.
 
 ```bash
-cd crawler-worker
-npm run deploy
+wrangler secret put CRAWLER_PRIVKEY --config crawler-worker/wrangler.toml
+wrangler secret put CRAWLER_PUBKEY --config crawler-worker/wrangler.toml
+```
+
+Then add `CRAWLER_PUBKEY` to `ALLOWED_PUBKEYS` on the API worker (see Section 4).
+
+### 3.5 Deploy the Crawler Worker
+
+```bash
+wrangler deploy --config crawler-worker/wrangler.toml
 ```
 
 The crawler will be live at `https://tokoro-crawler-worker.YOUR_SUBDOMAIN.workers.dev`.
@@ -253,9 +298,9 @@ wrangler secret put ADMIN_PUBKEY --config worker/wrangler.toml
 
 **Use the admin panel:**
 
-Open `admin/admin.html` in a browser, go to Settings, and enter:
+Open `admin/admin.html` in a browser. The Worker URL is pre-filled from `config.local.js` (if you have set it up). Go to Settings and enter:
 
-- **Worker URL**: your deployed API Worker URL
+- **Worker URL**: your deployed API Worker URL (pre-filled from `config.local.js`)
 - **Admin Private Key**: the private key from the keypair above
 - **Admin Public Key**: the same public key you set as `ADMIN_PUBKEY`
 
@@ -265,24 +310,48 @@ The private key is stored in the browser's localStorage and used locally to sign
 
 ## 5. Verify the Setup
 
-Check that the API is working:
+### 5.1 Check the API worker
 
 ```bash
 curl "https://tokoro-worker.YOUR_SUBDOMAIN.workers.dev/events?lat=51.5&lng=-0.09&radius=10"
 ```
 
-Should return `{"events": []}` (empty list if no events yet).
+Should return `{"events": []}` (empty list — no events yet).
 
-Test a crawl (the crawler worker extracts events and returns them — sign and publish manually to test the full flow):
+### 5.2 Deploy the public web and install the bookmarklet
 
-```bash
-curl -X POST "https://tokoro-crawler-worker.YOUR_SUBDOMAIN.workers.dev/crawl" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -d '{"url": "https://example-venue.com/events", "mode": "direct"}'
+Before deploying, make sure `config.local.js` is filled in (see the Local configuration file section above). The public web deploys to a Cloudflare Pages project named `tokoro-query`, so set `relayUrl` to:
+
+```js
+relayUrl: 'https://tokoro-query.pages.dev/',
 ```
 
-Should return `{"success": true, "events": [...]}` with extracted events (unsigned, ready for client signing).
+Then deploy from the project root:
+
+```bash
+./scripts/deploy-public-web.sh
+```
+
+Open `https://tokoro-query.pages.dev` in your browser. Find the **Add Events** section and drag the **⚡ Extract Events** link to your bookmarks bar.
+
+### 5.3 Register your publishing identity
+
+Navigate to any webpage and click the **⚡ Extract Events** bookmarklet. A relay popup opens (the public web page running in a small window).
+
+On first use, a keypair is generated and your **public key** is displayed with a notice that publishing must be activated. Copy that public key, then run:
+
+```bash
+wrangler secret put ALLOWED_PUBKEYS --config worker/wrangler.toml
+# Enter your public key (64-char hex). To add multiple keys: key1,key2
+```
+
+### 5.4 Extract and publish an event
+
+Navigate to a page listing real-world events (a venue website, festival page, etc.) and click the bookmarklet again. The crawler extracts events from the page and shows them in the relay popup. Review them and click **Publish**.
+
+### 5.5 Verify the event appears
+
+Go to `https://tokoro-query.pages.dev`, enter the coordinates near the event's venue and search. The published event should appear in the results.
 
 ---
 
@@ -368,7 +437,30 @@ npm run crawl
 
 ---
 
+## Debugging
+
+If a worker misbehaves, stream its live logs while hitting the endpoint:
+
+```bash
+# Terminal 1 — tail logs
+wrangler tail tokoro-worker --config worker/wrangler.toml
+
+# Terminal 2 — trigger a request
+curl "https://tokoro-worker.YOUR_SUBDOMAIN.workers.dev/events?lat=51.5&lng=-0.09&radius=10"
+```
+
+The tail session shows exceptions, console output, and request details in real time. Use `tokoro-crawler-worker` and `crawler-worker/wrangler.toml` for the Crawler Worker.
+
+---
+
 ## Troubleshooting
+
+**`error code: 1042`**
+The Cloudflare edge is not routing requests to your worker — the workers.dev route is inactive. Redeploy using the globally installed wrangler (not `npm run deploy`, which uses the local version in `node_modules` and may fail silently on some versions):
+
+```bash
+wrangler deploy --config worker/wrangler.toml
+```
 
 **"Database not found"**
 Make sure the `database_id` in `worker/wrangler.toml` matches the one created by `wrangler d1 create`, and that migrations have been applied with `--remote`.
