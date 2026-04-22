@@ -19,7 +19,7 @@ export interface Env {
 export interface CrawlRequest {
   url: string;
   mode?: 'direct' | 'discover' | 'image';
-  html?: string;       // Rendered HTML from Chrome extension (cleaned server-side)
+  html?: string; // Rendered HTML from Chrome extension (cleaned server-side)
   textContent?: string; // Deprecated: ignored
   title?: string;
   imageData?: string;
@@ -50,6 +50,11 @@ export interface CrawlResponse {
     events_extracted: number;
   };
   events?: PreparedEvent[];
-  dropped_events?: Array<{ title: string; reason: string; address?: string; venue_name?: string }>;
+  dropped_events?: Array<{
+    title: string;
+    reason: string;
+    address?: string;
+    venue_name?: string;
+  }>;
   cleaned_text?: string;
 }

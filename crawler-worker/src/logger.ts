@@ -79,7 +79,9 @@ export class CrawlerLogger {
    */
   async flush(): Promise<void> {
     if (!this.r2Bucket) {
-      console.warn('No R2 bucket configured, logs will not be persisted to file');
+      console.warn(
+        'No R2 bucket configured, logs will not be persisted to file'
+      );
       return;
     }
 

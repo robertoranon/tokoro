@@ -14,7 +14,12 @@ import { validateApiKey, unauthorizedResponse } from './auth';
 import { WorkerCrawler } from './crawler-adapter';
 import { createLLMProvider } from '../../shared/llm/factory';
 import { EventExtractor } from './event-extractor';
-import type { Env, CrawlRequest, CrawlResponse, ExtractTextRequest } from './types';
+import type {
+  Env,
+  CrawlRequest,
+  CrawlResponse,
+  ExtractTextRequest,
+} from './types';
 import { extractCleanText } from '../../shared/extractors/html-cleaner';
 
 const CORS_HEADERS = {
@@ -37,11 +42,13 @@ export default {
         return jsonResponse({
           name: 'Tokoro Crawler Worker',
           version: '2.0.0',
-          description: 'Event extraction service. Returns PreparedEvent[] for client-side signing.',
+          description:
+            'Event extraction service. Returns PreparedEvent[] for client-side signing.',
           endpoints: {
             'GET /': { description: 'API info and health check' },
             'POST /crawl': {
-              description: 'Extract events from a URL (requires API key). Returns PreparedEvent[] — client signs and publishes.',
+              description:
+                'Extract events from a URL (requires API key). Returns PreparedEvent[] — client signs and publishes.',
               headers: { Authorization: 'Bearer <api_key>' },
               body: {
                 url: 'URL to crawl (required)',
@@ -49,11 +56,13 @@ export default {
                 html: 'Optional rendered HTML from Chrome extension',
                 title: 'Optional page title from Chrome extension',
                 imageData: 'Base64 image data (required for mode=image)',
-                imageMimeType: 'MIME type e.g. "image/jpeg" (optional, for mode=image)',
+                imageMimeType:
+                  'MIME type e.g. "image/jpeg" (optional, for mode=image)',
               },
             },
             'POST /extract-text': {
-              description: 'Debug: LLM-only extraction from plain text (requires API key)',
+              description:
+                'Debug: LLM-only extraction from plain text (requires API key)',
               headers: { Authorization: 'Bearer <api_key>' },
               body: {
                 text: 'Clean text content (required)',
@@ -77,10 +86,13 @@ export default {
       return jsonResponse({ error: 'Not found' }, 404);
     } catch (error) {
       console.error('Error:', error);
-      return jsonResponse({
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      }, 500);
+      return jsonResponse(
+        {
+          error: 'Internal server error',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        },
+        500
+      );
     }
   },
 };
@@ -95,26 +107,53 @@ async function handleCrawl(request: Request, env: Env): Promise<Response> {
   try {
     body = await request.json();
   } catch {
-    return jsonResponse({ error: 'Invalid request body', message: 'Request body must be valid JSON' }, 400);
+    return jsonResponse(
+      {
+        error: 'Invalid request body',
+        message: 'Request body must be valid JSON',
+      },
+      400
+    );
   }
 
   if (!body.url) {
-    return jsonResponse({ error: 'Missing required field', message: 'The "url" field is required' }, 400);
+    return jsonResponse(
+      {
+        error: 'Missing required field',
+        message: 'The "url" field is required',
+      },
+      400
+    );
   }
 
   try {
     new URL(body.url);
   } catch {
-    return jsonResponse({ error: 'Invalid URL', message: 'The "url" field must be a valid URL' }, 400);
+    return jsonResponse(
+      { error: 'Invalid URL', message: 'The "url" field must be a valid URL' },
+      400
+    );
   }
 
   const mode = body.mode || 'discover';
   if (mode !== 'direct' && mode !== 'discover' && mode !== 'image') {
-    return jsonResponse({ error: 'Invalid mode', message: 'mode must be "direct", "discover", or "image"' }, 400);
+    return jsonResponse(
+      {
+        error: 'Invalid mode',
+        message: 'mode must be "direct", "discover", or "image"',
+      },
+      400
+    );
   }
 
   if (mode === 'image' && !body.imageData) {
-    return jsonResponse({ error: 'Missing required field', message: '"imageData" is required when mode is "image"' }, 400);
+    return jsonResponse(
+      {
+        error: 'Missing required field',
+        message: '"imageData" is required when mode is "image"',
+      },
+      400
+    );
   }
 
   try {
@@ -150,35 +189,70 @@ async function handleCrawl(request: Request, env: Env): Promise<Response> {
     return jsonResponse(response, 200);
   } catch (error) {
     console.error('Crawl error:', error);
-    return jsonResponse({
-      success: false,
-      error: 'Crawl failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    }, 500);
+    return jsonResponse(
+      {
+        success: false,
+        error: 'Crawl failed',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      500
+    );
   }
 }
 
-async function handleExtractText(request: Request, env: Env): Promise<Response> {
+async function handleExtractText(
+  request: Request,
+  env: Env
+): Promise<Response> {
   const authResult = validateApiKey(request, env.CRAWLER_API_KEYS);
-  if (!authResult.authorized) return unauthorizedResponse(authResult.error || 'Unauthorized');
+  if (!authResult.authorized)
+    return unauthorizedResponse(authResult.error || 'Unauthorized');
 
   let body: ExtractTextRequest;
   try {
     body = await request.json();
   } catch {
-    return jsonResponse({ error: 'Invalid request body', message: 'Request body must be valid JSON' }, 400);
+    return jsonResponse(
+      {
+        error: 'Invalid request body',
+        message: 'Request body must be valid JSON',
+      },
+      400
+    );
   }
 
-  if (!body.text) return jsonResponse({ error: 'Missing required field', message: '"text" is required' }, 400);
+  if (!body.text)
+    return jsonResponse(
+      { error: 'Missing required field', message: '"text" is required' },
+      400
+    );
 
   if (body.referenceDate && !/^\d{4}-\d{2}-\d{2}$/.test(body.referenceDate)) {
-    return jsonResponse({ error: 'Invalid referenceDate', message: 'Expected format: YYYY-MM-DD' }, 400);
+    return jsonResponse(
+      {
+        error: 'Invalid referenceDate',
+        message: 'Expected format: YYYY-MM-DD',
+      },
+      400
+    );
   }
 
-  const llm = createLLMProvider({ provider: env.LLM_PROVIDER, apiKey: env.LLM_API_KEY!, model: env.LLM_MODEL });
-  const extractor = new EventExtractor({ llm, referenceDate: body.referenceDate });
+  const llm = createLLMProvider({
+    provider: env.LLM_PROVIDER,
+    apiKey: env.LLM_API_KEY!,
+    model: env.LLM_MODEL,
+  });
+  const extractor = new EventExtractor({
+    llm,
+    referenceDate: body.referenceDate,
+  });
 
-  const page = { url: body.url || 'about:blank', html: '', text: body.text, title: body.title || 'Untitled' };
+  const page = {
+    url: body.url || 'about:blank',
+    html: '',
+    text: body.text,
+    title: body.title || 'Untitled',
+  };
   const events = await extractor.extractEvents(page);
   return jsonResponse({ model: llm.name, events });
 }

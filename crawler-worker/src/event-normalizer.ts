@@ -1,6 +1,10 @@
 import { ExtractedEvent, PreparedEvent } from './event-types';
 import { geocodeAddress } from '../../shared/utils/geocode';
-import { lookupTimezone, convertToLocalTime, isPlaceholderTime } from '../../shared/utils/timezone';
+import {
+  lookupTimezone,
+  convertToLocalTime,
+  isPlaceholderTime,
+} from '../../shared/utils/timezone';
 
 export interface NormalizeFailure {
   title: string;
@@ -10,7 +14,9 @@ export interface NormalizeFailure {
 }
 
 export class EventNormalizer {
-  async normalize(event: ExtractedEvent): Promise<{ event: PreparedEvent } | { failure: NormalizeFailure }> {
+  async normalize(
+    event: ExtractedEvent
+  ): Promise<{ event: PreparedEvent } | { failure: NormalizeFailure }> {
     console.log(`Normalizing event: ${event.title}`);
 
     let lat = event.lat;
@@ -21,9 +27,15 @@ export class EventNormalizer {
       if (!geocodeQuery) {
         const failure: NormalizeFailure = {
           title: event.title,
-          reason: 'No coordinates, no address, and no venue name — cannot geocode',
+          reason:
+            'No coordinates, no address, and no venue name — cannot geocode',
         };
-        console.error('❌ Event dropped:', failure.reason, '| title:', event.title);
+        console.error(
+          '❌ Event dropped:',
+          failure.reason,
+          '| title:',
+          event.title
+        );
         return { failure };
       }
 
@@ -47,18 +59,25 @@ export class EventNormalizer {
     }
 
     let start_time = this.normalizeTimestamp(event.start_time);
-    let end_time = event.end_time ? this.normalizeTimestamp(event.end_time) : undefined;
+    let end_time = event.end_time
+      ? this.normalizeTimestamp(event.end_time)
+      : undefined;
 
     if (event.start_time_utc) {
       const timezone = await lookupTimezone(lat, lng);
       if (timezone) {
         const jsonldLocal = convertToLocalTime(event.start_time_utc, timezone);
         if (jsonldLocal && isPlaceholderTime(start_time)) {
-          console.log(`⏰ Using JSON-LD-derived local time: ${jsonldLocal} (LLM placeholder: ${start_time}, tz: ${timezone})`);
+          console.log(
+            `⏰ Using JSON-LD-derived local time: ${jsonldLocal} (LLM placeholder: ${start_time}, tz: ${timezone})`
+          );
           start_time = jsonldLocal;
         }
         if (event.end_time_utc && !end_time) {
-          const jsonldEndLocal = convertToLocalTime(event.end_time_utc, timezone);
+          const jsonldEndLocal = convertToLocalTime(
+            event.end_time_utc,
+            timezone
+          );
           if (jsonldEndLocal) end_time = jsonldEndLocal;
         }
       }

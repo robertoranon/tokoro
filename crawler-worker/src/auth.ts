@@ -14,14 +14,17 @@ export interface AuthResult {
  * @param allowedKeys - Comma-separated list of allowed API keys
  * @returns AuthResult indicating if the request is authorized
  */
-export function validateApiKey(request: Request, allowedKeys: string): AuthResult {
+export function validateApiKey(
+  request: Request,
+  allowedKeys: string
+): AuthResult {
   // Extract Authorization header
   const authHeader = request.headers.get('Authorization');
 
   if (!authHeader) {
     return {
       authorized: false,
-      error: 'Missing Authorization header'
+      error: 'Missing Authorization header',
     };
   }
 
@@ -30,7 +33,7 @@ export function validateApiKey(request: Request, allowedKeys: string): AuthResul
   if (!match) {
     return {
       authorized: false,
-      error: 'Invalid Authorization header format. Use: Bearer <api_key>'
+      error: 'Invalid Authorization header format. Use: Bearer <api_key>',
     };
   }
 
@@ -42,7 +45,7 @@ export function validateApiKey(request: Request, allowedKeys: string): AuthResul
   if (!allowedKeysList.includes(apiKey)) {
     return {
       authorized: false,
-      error: 'Invalid API key'
+      error: 'Invalid API key',
     };
   }
 
@@ -58,14 +61,14 @@ export function unauthorizedResponse(error: string): Response {
   return new Response(
     JSON.stringify({
       error: 'Unauthorized',
-      message: error
+      message: error,
     }),
     {
       status: 401,
       headers: {
         'Content-Type': 'application/json',
-        'WWW-Authenticate': 'Bearer realm="Tokoro Crawler API"'
-      }
+        'WWW-Authenticate': 'Bearer realm="Tokoro Crawler API"',
+      },
     }
   );
 }
