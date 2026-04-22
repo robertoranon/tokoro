@@ -1101,6 +1101,13 @@
                 <div class="relay-pubkey-display" id="rly-pubkey"></div>
               </div>
             </div>
+            <button
+              id="relay-cfg-save"
+              class="relay-btn relay-btn-pub"
+              style="margin-top: 6px; width: 100%"
+            >
+              Salva impostazioni
+            </button>
             <a href="#" id="relay-cfg-toggle">&#9881; Impostazioni</a>
           </div>
           <div id="relay-st" class="relay-st info">
@@ -2121,12 +2128,15 @@
             ? API_URL
             : '');
 
+        const cfgSaveBtn = document.getElementById('relay-cfg-save');
+
         function updateCfgVisibility() {
           const allSet =
             rlyCfgApiKey.value.trim() &&
             rlyCfgWorker.value.trim() &&
             rlyCfgApiUrl.value.trim();
           cfgFields.style.display = allSet ? 'none' : 'flex';
+          cfgSaveBtn.style.display = allSet ? 'none' : 'block';
           cfgToggle.style.display = allSet ? 'block' : 'none';
         }
         updateCfgVisibility();
@@ -2134,20 +2144,41 @@
         cfgToggle.addEventListener('click', function (e) {
           e.preventDefault();
           cfgFields.style.display = 'flex';
+          cfgSaveBtn.style.display = 'block';
           cfgToggle.style.display = 'none';
         });
+
+        function saveRelaySettings() {
+          localStorage.setItem('tokoro_api_key', rlyCfgApiKey.value);
+          localStorage.setItem('tokoro_worker_url', rlyCfgWorker.value);
+          localStorage.setItem('tokoro_api_url', rlyCfgApiUrl.value);
+          updateCfgVisibility();
+          maybeRunBufferedCrawl();
+        }
+
+        document
+          .getElementById('relay-cfg-save')
+          .addEventListener('click', saveRelaySettings);
+
+        function handleSettingsEnter(e) {
+          if (e.key === 'Enter') saveRelaySettings();
+        }
 
         rlyCfgApiKey.addEventListener('input', function () {
           localStorage.setItem('tokoro_api_key', rlyCfgApiKey.value);
           maybeRunBufferedCrawl();
         });
+        rlyCfgApiKey.addEventListener('keydown', handleSettingsEnter);
         rlyCfgWorker.addEventListener('input', function () {
           localStorage.setItem('tokoro_worker_url', rlyCfgWorker.value);
           maybeRunBufferedCrawl();
         });
+        rlyCfgWorker.addEventListener('keydown', handleSettingsEnter);
         rlyCfgApiUrl.addEventListener('input', function () {
           localStorage.setItem('tokoro_api_url', rlyCfgApiUrl.value);
+          maybeRunBufferedCrawl();
         });
+        rlyCfgApiUrl.addEventListener('keydown', handleSettingsEnter);
 
         rlyCfgPrivKey.addEventListener('change', async function () {
           const privB64 = rlyCfgPrivKey.value.trim();

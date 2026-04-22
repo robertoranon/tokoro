@@ -15,7 +15,13 @@
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
     <style>
-      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
 
       :root {
         --header-dark: #18155e;
@@ -39,7 +45,12 @@
       }
 
       body {
-        font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-family:
+          'Figtree',
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
         overflow: hidden;
         display: flex;
         flex-direction: column;
@@ -180,7 +191,7 @@
         margin-right: 2px;
       }
 
-      .controls input[type="text"] {
+      .controls input[type='text'] {
         font-size: 13px;
         padding: 4px 8px;
         border: 1px solid #ccc;
@@ -189,7 +200,7 @@
         width: 160px;
       }
 
-      .controls input[type="number"] {
+      .controls input[type='number'] {
         font-size: 13px;
         padding: 4px 6px;
         border: 1px solid #ccc;
@@ -198,7 +209,7 @@
         width: 60px;
       }
 
-      .controls input[type="datetime-local"] {
+      .controls input[type='datetime-local'] {
         font-size: 12px;
         padding: 4px 6px;
         border: 1px solid #ccc;
@@ -230,13 +241,17 @@
         background: var(--accent);
         color: #fff;
       }
-      .btn-search:hover { background: var(--accent-hover); }
+      .btn-search:hover {
+        background: var(--accent-hover);
+      }
 
       .btn-search-here {
         background: #e0e7ff;
         color: var(--accent);
       }
-      .btn-search-here:hover:not(:disabled) { background: #c7d2fe; }
+      .btn-search-here:hover:not(:disabled) {
+        background: #c7d2fe;
+      }
       .btn-search-here:disabled {
         background: #f0f0f0;
         color: #bbb;
@@ -256,7 +271,9 @@
         white-space: nowrap;
         flex-shrink: 0;
       }
-      .nav-link:hover { text-decoration: underline; }
+      .nav-link:hover {
+        text-decoration: underline;
+      }
 
       .ctrl-unit {
         font-size: 11px;
@@ -277,8 +294,14 @@
         white-space: nowrap;
         flex-shrink: 0;
       }
-      #mapStatus.info  { color: var(--accent); background: #e0e7ff; }
-      #mapStatus.error { color: #b91c1c; background: #fee2e2; }
+      #mapStatus.info {
+        color: var(--accent);
+        background: #e0e7ff;
+      }
+      #mapStatus.error {
+        color: #b91c1c;
+        background: #fee2e2;
+      }
 
       /* ── Map ───────────────────────────────────────────────────────────── */
       #map {
@@ -309,9 +332,20 @@
     </header>
 
     <div class="controls">
-      <input type="text" id="queryAddress" placeholder="Address or place" value="Udine, Italy" />
+      <input
+        type="text"
+        id="queryAddress"
+        placeholder="Address or place"
+        value="Udine, Italy"
+      />
 
-      <input type="number" id="queryRadius" value="100" min="1" max="500" title="Search radius" />
+      <input
+        type="number"
+        id="queryRadius"
+        value="100"
+        min="1"
+        title="Search radius"
+      />
       <span class="ctrl-unit">km</span>
 
       <select id="timeRangePreset" onchange="handlePresetChange()">
@@ -347,10 +381,16 @@
       </select>
 
       <button class="btn-search" onclick="runQuery()">Search</button>
-      <button class="btn-search-here" id="btnSearchHere" disabled onclick="searchHere()">Search here</button>
+      <button
+        class="btn-search-here"
+        id="btnSearchHere"
+        disabled
+        onclick="searchHere()"
+      >
+        Search here
+      </button>
 
       <span id="mapStatus"></span>
-
     </div>
 
     <div id="map"></div>
@@ -360,38 +400,39 @@
     <script>
       const API_URL = '__TOKORO_WORKER_URL__';
 
-      const DEFAULT_LAT    = 46.0637;
-      const DEFAULT_LNG    = 13.2353;
+      const DEFAULT_LAT = 46.0637;
+      const DEFAULT_LNG = 13.2353;
       const DEFAULT_RADIUS = 100;
 
       const CAT_COLORS = {
-        music:     '#7c3aed',
-        food:      '#d97706',
-        sports:    '#059669',
-        art:       '#db2777',
-        theater:   '#dc2626',
-        film:      '#2563eb',
+        music: '#7c3aed',
+        food: '#d97706',
+        sports: '#059669',
+        art: '#db2777',
+        theater: '#dc2626',
+        film: '#2563eb',
         nightlife: '#9333ea',
         community: '#0891b2',
-        outdoor:   '#16a34a',
-        learning:  '#0d9488',
-        wellness:  '#65a30d',
-        talks:     '#ea580c',
-        other:     '#6b7280',
+        outdoor: '#16a34a',
+        learning: '#0d9488',
+        wellness: '#65a30d',
+        talks: '#ea580c',
+        other: '#6b7280',
       };
 
       // ── Haversine: distance in km between two {lat, lng} points ───────────
       function haversine(a, b) {
         const R = 6371;
-        const dLat = (b.lat - a.lat) * Math.PI / 180;
-        const dLng = (b.lng - a.lng) * Math.PI / 180;
+        const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+        const dLng = ((b.lng - a.lng) * Math.PI) / 180;
         const sinLat = Math.sin(dLat / 2);
         const sinLng = Math.sin(dLng / 2);
         const h =
           sinLat * sinLat +
-          Math.cos(a.lat * Math.PI / 180) *
-          Math.cos(b.lat * Math.PI / 180) *
-          sinLng * sinLng;
+          Math.cos((a.lat * Math.PI) / 180) *
+            Math.cos((b.lat * Math.PI) / 180) *
+            sinLng *
+            sinLng;
         return R * 2 * Math.asin(Math.sqrt(h));
       }
 
@@ -428,8 +469,12 @@
           customDiv.style.display = 'flex';
           const now = new Date();
           const future = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-          document.getElementById('queryFrom').value = formatLocalDateTime(now).slice(0, 16);
-          document.getElementById('queryTo').value   = formatLocalDateTime(future).slice(0, 16);
+          document.getElementById('queryFrom').value = formatLocalDateTime(
+            now
+          ).slice(0, 16);
+          document.getElementById('queryTo').value = formatLocalDateTime(
+            future
+          ).slice(0, 16);
         } else {
           customDiv.style.display = 'none';
         }
@@ -440,24 +485,30 @@
         const now = new Date();
         if (preset === 'custom') {
           const from = document.getElementById('queryFrom').value;
-          const to   = document.getElementById('queryTo').value;
-          if (!from || !to) throw new Error('Please set both From and To times.');
+          const to = document.getElementById('queryTo').value;
+          if (!from || !to)
+            throw new Error('Please set both From and To times.');
           return { from: from + ':00', to: to + ':00' };
         }
-        const future = new Date(now.getTime() + parseInt(preset, 10) * 24 * 60 * 60 * 1000);
-        return { from: formatLocalDateTime(now), to: formatLocalDateTime(future) };
+        const future = new Date(
+          now.getTime() + parseInt(preset, 10) * 24 * 60 * 60 * 1000
+        );
+        return {
+          from: formatLocalDateTime(now),
+          to: formatLocalDateTime(future),
+        };
       }
 
-      // ── Radius from current map bounds (half-diagonal, capped 500 km) ─────
+      // ── Radius from current map bounds (half-diagonal) ──────────────────────
       function radiusFromBounds() {
         const bounds = map.getBounds();
         const center = map.getCenter();
         const ne = bounds.getNorthEast();
         const km = haversine(
           { lat: center.lat, lng: center.lng },
-          { lat: ne.lat,     lng: ne.lng }
+          { lat: ne.lat, lng: ne.lng }
         );
-        return Math.min(Math.round(km), 500);
+        return Math.round(km);
       }
 
       // ── URL state ─────────────────────────────────────────────────────────
@@ -475,10 +526,10 @@
 
         // Draw a circle showing the searched area
         const circle = L.circle(L.latLng(lat, lng), {
-          radius:  radiusKm * 1000,
-          fill:    false,
-          color:   '#6366f1',
-          weight:  1,
+          radius: radiusKm * 1000,
+          fill: false,
+          color: '#6366f1',
+          weight: 1,
           opacity: 0.4,
         }).addTo(markerLayer);
 
@@ -495,42 +546,52 @@
           const color = CAT_COLORS[first.category] || CAT_COLORS.other;
 
           const eventItems = group.map(e => {
-            const c   = CAT_COLORS[e.category] || CAT_COLORS.other;
+            const c = CAT_COLORS[e.category] || CAT_COLORS.other;
             const url = safeUrl(e.url);
             const titleHtml = url
-              ? '<a href="' + escHtml(url) + '" target="_blank" rel="noopener noreferrer">' +
-                escHtml(e.title) + '</a>'
+              ? '<a href="' +
+                escHtml(url) +
+                '" target="_blank" rel="noopener noreferrer">' +
+                escHtml(e.title) +
+                '</a>'
               : escHtml(e.title);
             const venueHtml = e.venue_name
               ? '<div style="font-size:12px;color:#666;margin-top:2px">' +
-                escHtml(e.venue_name) + '</div>'
+                escHtml(e.venue_name) +
+                '</div>'
               : '';
-            return '<div style="padding:6px 0;border-top:1px solid #eee">' +
-              '<div style="font-weight:600;font-size:14px;margin-bottom:4px">' + titleHtml + '</div>' +
+            return (
+              '<div style="padding:6px 0;border-top:1px solid #eee">' +
+              '<div style="font-weight:600;font-size:14px;margin-bottom:4px">' +
+              titleHtml +
+              '</div>' +
               '<div style="font-size:12px;color:#555;margin-bottom:2px">' +
-                escHtml(fmtRange(e.start_time, e.end_time)) +
+              escHtml(fmtRange(e.start_time, e.end_time)) +
               '</div>' +
               venueHtml +
               '<span style="display:inline-block;margin-top:6px;padding:2px 8px;' +
-                'border-radius:999px;font-size:11px;font-weight:600;color:#fff;' +
-                'background:' + escHtml(c) + '">' +
-                escHtml(e.category) +
+              'border-radius:999px;font-size:11px;font-weight:600;color:#fff;' +
+              'background:' +
+              escHtml(c) +
+              '">' +
+              escHtml(e.category) +
               '</span>' +
-            '</div>';
+              '</div>'
+            );
           });
 
           const popupHtml =
             '<div style="font-family:-apple-system,sans-serif;min-width:180px;max-width:260px;' +
-              'max-height:320px;overflow-y:auto">' +
-              eventItems.join('') +
+            'max-height:320px;overflow-y:auto">' +
+            eventItems.join('') +
             '</div>';
 
           L.circleMarker([first.lat, first.lng], {
-            radius:      8,
-            fillColor:   color,
-            color:       '#fff',
-            weight:      1.5,
-            opacity:     1,
+            radius: 8,
+            fillColor: color,
+            color: '#fff',
+            weight: 1.5,
+            opacity: 1,
             fillOpacity: 0.85,
           })
             .bindPopup(popupHtml)
@@ -540,7 +601,10 @@
         // Fit the map view to the query circle (skip when "Search here" is used)
         if (!skipFitBounds) {
           try {
-            map.fitBounds(circle.getBounds(), { padding: [20, 20], maxZoom: 14 });
+            map.fitBounds(circle.getBounds(), {
+              padding: [20, 20],
+              maxZoom: 14,
+            });
           } catch (_) {}
         }
       }
@@ -548,7 +612,12 @@
       // ── Run a query ───────────────────────────────────────────────────────
       // overrideLat/overrideLng/overrideRadius are set by searchHere(); otherwise
       // the form values are used.
-      async function runQuery(overrideLat, overrideLng, overrideRadius, skipFitBounds) {
+      async function runQuery(
+        overrideLat,
+        overrideLng,
+        overrideRadius,
+        skipFitBounds
+      ) {
         const address = document.getElementById('queryAddress').value.trim();
         let lat, lng;
 
@@ -570,38 +639,47 @@
           lng = DEFAULT_LNG;
         }
 
-        const radius = overrideRadius !== undefined
-          ? overrideRadius
-          : (parseInt(document.getElementById('queryRadius').value, 10) || DEFAULT_RADIUS);
+        const radius =
+          overrideRadius !== undefined
+            ? overrideRadius
+            : parseInt(document.getElementById('queryRadius').value, 10) ||
+              DEFAULT_RADIUS;
 
         const category = document.getElementById('queryCategory').value;
 
         let timeRange;
-        try { timeRange = getTimeRange(); } catch (e) { setStatus(e.message, 'error'); return; }
+        try {
+          timeRange = getTimeRange();
+        } catch (e) {
+          setStatus(e.message, 'error');
+          return;
+        }
 
         setStatus('Searching\u2026', 'info');
 
         try {
           const url = buildQueryUrl(API_URL, {
-            lat, lng, radius,
-            from:     timeRange.from,
-            to:       timeRange.to,
+            lat,
+            lng,
+            radius,
+            from: timeRange.from,
+            to: timeRange.to,
             category: category || undefined,
           });
 
-          const resp   = await fetch(url);
+          const resp = await fetch(url);
           if (!resp.ok) throw new Error(`API error: ${resp.status}`);
-          const data   = await resp.json();
+          const data = await resp.json();
           const events = data.events || [];
 
           document.getElementById('queryRadius').value = radius;
 
           pushState({
-            lat:      lat.toFixed(4),
-            lng:      lng.toFixed(4),
+            lat: lat.toFixed(4),
+            lng: lng.toFixed(4),
             radius,
-            from:     timeRange.from,
-            to:       timeRange.to,
+            from: timeRange.from,
+            to: timeRange.to,
             category: category || undefined,
           });
 
@@ -610,7 +688,10 @@
           setStatus(
             events.length === 0
               ? 'No events found'
-              : events.length + ' event' + (events.length !== 1 ? 's' : '') + ' found',
+              : events.length +
+                  ' event' +
+                  (events.length !== 1 ? 's' : '') +
+                  ' found',
             'info'
           );
         } catch (err) {
@@ -622,31 +703,32 @@
       async function searchHere() {
         const center = map.getCenter();
         const radius = radiusFromBounds();
-        document.getElementById('queryRadius').value  = radius;
+        document.getElementById('queryRadius').value = radius;
         document.getElementById('queryAddress').value = '';
         await runQuery(center.lat, center.lng, radius, true);
       }
 
       // ── Initialise from URL params ────────────────────────────────────────
       (function init() {
-        const sp       = new URLSearchParams(window.location.search);
-        const lat      = parseFloat(sp.get('lat'));
-        const lng      = parseFloat(sp.get('lng'));
-        const radius   = parseInt(sp.get('radius'), 10);
-        const from     = sp.get('from');
-        const to       = sp.get('to');
+        const sp = new URLSearchParams(window.location.search);
+        const lat = parseFloat(sp.get('lat'));
+        const lng = parseFloat(sp.get('lng'));
+        const radius = parseInt(sp.get('radius'), 10);
+        const from = sp.get('from');
+        const to = sp.get('to');
         const category = sp.get('category');
 
         if (category) document.getElementById('queryCategory').value = category;
 
         if (!isNaN(lat) && !isNaN(lng)) {
-          if (!isNaN(radius)) document.getElementById('queryRadius').value = radius;
+          if (!isNaN(radius))
+            document.getElementById('queryRadius').value = radius;
 
           if (from && to) {
             document.getElementById('timeRangePreset').value = 'custom';
             handlePresetChange();
             document.getElementById('queryFrom').value = from.slice(0, 16);
-            document.getElementById('queryTo').value   = to.slice(0, 16);
+            document.getElementById('queryTo').value = to.slice(0, 16);
           }
 
           map.setView([lat, lng], 11);

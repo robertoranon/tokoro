@@ -31,11 +31,13 @@ if (!workerUrl) {
   process.exit(1);
 }
 
-const HTML_FILES = ['index.html', 'it.html', 'map.html'].map(f =>
+// map.html has no relay UI and therefore no __DEFAULT_CRAWLER_URL__ placeholder
+const ALL_FILES = ['index.html', 'it.html', 'map.html'].map(f =>
   path.join(__dirname, f)
 );
+const RELAY_FILES = ['index.html', 'it.html'].map(f => path.join(__dirname, f));
 
-for (const f of HTML_FILES) {
+for (const f of ALL_FILES) {
   let content = fs.readFileSync(f, 'utf8');
 
   const afterWorker = content.replace(/__TOKORO_WORKER_URL__/g, workerUrl);
@@ -48,7 +50,7 @@ for (const f of HTML_FILES) {
     console.log(`Worker URL injected into ${path.basename(f)}`);
   }
 
-  if (crawlerUrl) {
+  if (crawlerUrl && RELAY_FILES.includes(f)) {
     const afterCrawler = content.replace(
       /__DEFAULT_CRAWLER_URL__/g,
       crawlerUrl
