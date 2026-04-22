@@ -1,5 +1,10 @@
 {
   "devDependencies": {
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.3",
     "wrangler": "^4.84.1"
+  },
+  "lint-staged": {
+    "*.{ts,js,json,html,css}": "prettier --write"
   }
 }
