@@ -425,19 +425,74 @@ This builds real URLs into the HTML, deploys to Cloudflare Pages (project: `toko
 
 ## 9. Run the Node.js Crawler Locally _(optional)_
 
-An alternative to the Crawler Worker for running crawls from the command line. Unlike the Crawler Worker, this uses Playwright (a real headless browser) so it works on JavaScript-rendered pages.
+A local CLI alternative to the Crawler Worker. Unlike the serverless Crawler Worker, this runs on your machine and supports Playwright (a real headless browser) for JavaScript-rendered pages. It signs and publishes events directly to the API.
+
+### Setup
 
 ```bash
 cd crawler
 npm install
 npx playwright install chromium
 
+# Generate a signing keypair
+npm run crawl -- --generate-keypair
+
 cp .env.example .env
 # Edit .env: set LLM_PROVIDER, LLM_API_KEY, TOKORO_API_URL, CRAWLER_PRIVKEY, CRAWLER_PUBKEY
+```
 
-echo "https://example.com/events" >> seeds.txt
+Add the generated public key to `ALLOWED_PUBKEYS` on the API worker (see Section 4).
+
+### Basic usage
+
+```bash
+# Crawl a specific URL
+npm run crawl https://venue.com/events/concert-name
+
+# Crawl from seeds file
+echo "https://venue.com/events" >> seeds.txt
 npm run crawl
 ```
+
+### Crawler modes
+
+| Mode | Best for | Command |
+|------|----------|---------|
+| `direct` (default) | Single event pages | `npm run crawl https://venue.com/event/123` |
+| `discover` | Venue homepages with links to individual events | `npm run crawl -- --mode discover https://venue.com/events` |
+| `festival` | Festival homepages — crawls entire programme, deduplicates | `npm run crawl -- --mode festival https://www.flowfestival.com` |
+| `image` | Event flyers or posters | `npm run crawl -- --image path/to/flyer.jpg` |
+
+### Fetcher strategies
+
+| Fetcher | Best for | Command |
+|---------|----------|---------|
+| `playwright` (default) | JavaScript-heavy sites, SPAs | `npm run crawl -- --fetcher playwright <url>` |
+| `jina` | Static HTML sites, faster crawling | `npm run crawl -- --fetcher jina <url>` |
+
+### Debug mode
+
+Use `--debug` to test extraction without publishing:
+
+```bash
+# Print raw LLM output, skip geocoding/signing/publishing
+npm run crawl -- --debug https://venue.com/events
+
+# Geocode and sign but do not publish
+npm run crawl -- --debug --normalize https://venue.com/events
+```
+
+### Other options
+
+```bash
+# Override the LLM model for this run
+npm run crawl -- --model google/gemini-2.0-flash-exp:free https://venue.com/events
+
+# Set reference date for date inference (useful when testing with saved pages)
+npm run crawl -- --date 2026-03-02 https://venue.com/events
+```
+
+See [`crawler/README.md`](crawler/README.md) for the full options reference.
 
 ---
 

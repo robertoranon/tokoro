@@ -53,6 +53,7 @@ Events are queryable through a simple API. Point it at a location, a radius, and
 | ----------------------------------------- | --------------------------------------------------------------------------------- |
 | [**Worker**](worker/)                     | Cloudflare Worker + D1 backend — events, stars, follows, recommendations          |
 | [**Crawler Worker**](crawler-worker/)     | Serverless LLM crawler — extract events (unsigned) from any URL or image          |
+| [**Node.js Crawler**](crawler/)           | Local CLI crawler — Playwright/Jina fetching, direct/discover/festival/image modes |
 | [**Chrome Extension**](chrome-extension/) | One-click crawl from the browser toolbar or right-click menu                      |
 | [**Bookmarklet**](public-web/)            | Same capability in any browser, no extension install needed                       |
 | [**Web Publisher**](web-publisher/)       | Static HTML form for manually composing and publishing events                     |
@@ -67,6 +68,7 @@ Events are queryable through a simple API. Point it at a location, a radius, and
 - [API Reference](API_REFERENCE.md)
 - [Worker ReadMe](worker/README.md)
 - [Crawler Worker ReadMe](crawler-worker/README.md)
+- [Node.js Crawler ReadMe](crawler/README.md)
 - [Chrome Extension ReadMe](chrome-extension/README.md)
 - [Public Web ReadMe](public-web/README.md)
 
