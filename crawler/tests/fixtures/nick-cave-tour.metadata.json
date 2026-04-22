@@ -1,0 +1,320 @@
+{
+  "url": "https://www.nickcave.com/tour-dates/",
+  "capturedAt": "2026-03-17T10:26:24.003Z",
+  "captureDate": "2026-03-17",
+  "htmlFile": "nick-cave-tour.html",
+  "expectedEvents": [
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://www.ticketmaster.ie/artist/743143?venueId=197670",
+      "venue_name": "Malahide Castle,",
+      "address": "Dublin, Ireland",
+      "start_time": "2026-06-10",
+      "end_time": "2026-06-10",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "http://www.bestkeptsecret.nl/tickets",
+      "venue_name": "Best Kept Secret Festival, Beekse Bergen, ",
+      "address": "The Netherlands",
+      "start_time": "2026-06-13",
+      "end_time": "2026-06-13",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://www.eventim.de/event/nick-cave-the-bad-seeds-tour-2026-emslandarena-20734810/",
+      "venue_name": "Open Air an der Emslandarena",
+      "address": "Lingen, Germany",
+      "start_time": "2026-06-16",
+      "end_time": "2026-06-16",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://heartlandfestival.dk/billetter/",
+      "venue_name": "Heartland Festival,",
+      "address": "Egeskov Castle, Denmark",
+      "start_time": "2026-06-18",
+      "end_time": "2026-06-18",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://www.metronome.cz",
+      "venue_name": "Metronome Festival, ",
+      "address": "Prague, Czech Republic",
+      "start_time": "2026-06-20",
+      "end_time": "2026-06-20",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://www.oeticket.com/event/nick-cave-and-the-bad-seeds-clam-burgarena-20750100/?affiliate=EOE",
+      "venue_name": "Burg Clam, ",
+      "address": "Klam, Austria",
+      "start_time": "2026-06-21",
+      "end_time": "2026-06-21",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://www.more.com/gr-el/tickets/music/festival/release-athens-2026/nick-cave-the-bad-seeds",
+      "venue_name": "Release Athens Festival, ",
+      "address": "Athens, Greece",
+      "start_time": "2026-06-24",
+      "end_time": "2026-06-24",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://laprimaestate.it/tickets/",
+      "venue_name": "La Prima Estate, ",
+      "address": "Lido di Camaiore, Italy",
+      "start_time": "2026-06-26",
+      "end_time": "2026-06-26",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://feverup.com/m/587432/en?cp_landing_source=liveislive&utm_source=direct",
+      "venue_name": "Live is Live, ",
+      "address": "Antwerp, Belgium",
+      "start_time": "2026-06-28",
+      "end_time": "2026-06-28",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://www.eventim.de/event/nick-cave-the-bad-seeds-tour-2026-waldbuehne-berlin-20462658/",
+      "venue_name": "Waldbühne, ",
+      "address": "Berlin, Germany",
+      "start_time": "2026-06-30",
+      "end_time": "2026-06-30",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://opener.pl/en/tickets",
+      "venue_name": "Open’er Festival,",
+      "address": "Gdynia, Poland",
+      "start_time": "2026-07-02",
+      "end_time": "2026-07-02",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://tickets.jazzopen.com/shop/103/event/1764",
+      "venue_name": "Jazz Open, ",
+      "address": "Stuttgart, Germany",
+      "start_time": "2026-07-06",
+      "end_time": "2026-07-06",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://nosalive.com/en/ticket-office/",
+      "venue_name": "NOS Alive Festival, ",
+      "address": "Lisbon, Portugal",
+      "start_time": "2026-07-09",
+      "end_time": "2026-07-09",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://madcooltickets.com/",
+      "venue_name": "Mad Cool,",
+      "address": "Madrid, Spain",
+      "start_time": "2026-07-11",
+      "end_time": "2026-07-11",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://adamconcerts.trium.fr/fr/t/-/event/63303",
+      "venue_name": "Festival de Nîmes, ",
+      "address": "Nîmes, France",
+      "start_time": "2026-07-14",
+      "end_time": "2026-07-14",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://www.rpo.net/autres-spectacles/les-belles-soirees-nick-cave",
+      "venue_name": "Les Belles Soirées - Théâtre Antique de Vienne, ",
+      "address": "Vienne, France",
+      "start_time": "2026-07-15",
+      "end_time": "2026-07-15",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://www.vieillescharrues.asso.fr/#ticket",
+      "venue_name": "Les Vieilles Charrues, ",
+      "address": "Carhaix, France",
+      "start_time": "2026-07-17",
+      "end_time": "2026-07-17",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://nickcavebrighton.com/",
+      "venue_name": "Preston Park,",
+      "address": "Brighton, UK",
+      "start_time": "2026-07-31",
+      "end_time": "2026-07-31",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://www.eventim.de/event/nick-cave-the-bad-seeds-tour-2026-filmnaechte-am-elbufer-20733464/",
+      "venue_name": "Filmnächte am Elbufer, ",
+      "address": "Dresden, Germany",
+      "start_time": "2026-08-02",
+      "end_time": "2026-08-02",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://www.eventim.hr/artist/nick-cave-the-bad-seeds/nick-cave-and-the-bad-seeds-pula-04-08--4002605/",
+      "venue_name": "Arena Pula,",
+      "address": "Pula, Croatia",
+      "start_time": "2026-08-04",
+      "end_time": "2026-08-04",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://www.eventim.hr/artist/nick-cave-the-bad-seeds/",
+      "venue_name": "Arena Pula,",
+      "address": "Pula, Croatia",
+      "start_time": "2026-08-05",
+      "end_time": "2026-08-05",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://efinity.rs/event-details/nick_cave_bad_seeds_31902",
+      "venue_name": "Lower Town Kalemegdan Fortress, ",
+      "address": "Belgrade, Serbia",
+      "start_time": "2026-08-07",
+      "end_time": "2026-08-07",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://summerwell.ro/en#tickets",
+      "venue_name": "Summer Well Festival, ",
+      "address": "Buftea, Romania",
+      "start_time": "2026-08-09",
+      "end_time": "2026-08-09",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://oyafestivalen.seetickets.com/event/oyafestivalen-2026/t-yenparken/3458167?src=nctbs",
+      "venue_name": "Øyafestivalen, ",
+      "address": "Oslo, Norway",
+      "start_time": "2026-08-13",
+      "end_time": "2026-08-13",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://urldefense.com/v3/__https:/ddec1-0-en-ctp.trendmicro.com:443/wis/clicktime/v1/query?url=http*3a*2f*2fwayoutwest.se*2ftickets&umid=b4c51678-4b25-46cc-9fa3-34f1b85fa612&auth=add6798b82135137aab60184c867f63f4dc875bf-cfc1aedc5c0e3ba4a07e7a86ffcbb5db85e20232__;JSUlJQ!!FBl7RhjNdtJEi0k!vJfyy_d5nk6Ej6CkzLuGw9XsyorpPoF82Pz25kT95YHrhYgN33M-un0M2akQZBRGf6BT3P0vrCVP$",
+      "venue_name": "Way Out West Festival, Gothenburg,",
+      "address": "Sweden",
+      "start_time": "2026-08-14",
+      "end_time": "2026-08-14",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://www.flowfestival.com/en/tickets/",
+      "venue_name": "Flow Festival,",
+      "address": "Helsinki, Finland",
+      "start_time": "2026-08-16",
+      "end_time": "2026-08-16",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "http://www.bilietai.lt/lit/renginiai/koncertai/nick-cave--the-bad-seeds--kalnu-parkas--vilnius-481977/?shop_provider=NickCave",
+      "venue_name": "Kalnai Park, ",
+      "address": "Vilnius, Lithuania",
+      "start_time": "2026-08-18",
+      "end_time": "2026-08-18",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://cabaretvert.com/billetterie/",
+      "venue_name": "​Cabaret Vert, ",
+      "address": "Charleville-Mézières, France",
+      "start_time": "2026-08-21",
+      "end_time": "2026-08-21",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://www.eventim.de/event/nick-cave-the-bad-seeds-tour-2026-koenigsplatz-muenchen-20741550/",
+      "venue_name": "Königsplatz, ",
+      "address": "Munich, Germany",
+      "start_time": "2026-08-23",
+      "end_time": "2026-08-23",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://www.eventim.de/event/nick-cave-the-bad-seeds-tour-2026-kunstrasen-bonn-20709010/",
+      "venue_name": "Kunst!Rasen, ",
+      "address": "Bonn, Germany",
+      "start_time": "2026-08-25",
+      "end_time": "2026-08-25",
+      "category": "music"
+    },
+    {
+      "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+      "url": "https://www.rockenseine.com",
+      "venue_name": "Rock en Seine,",
+      "address": "Paris, France",
+      "start_time": "2026-08-28",
+      "end_time": "2026-08-28",
+      "category": "music"
+    }
+  ],
+  "minExpectedEvents": 31,
+  "maxExpectedEvents": 31
+}

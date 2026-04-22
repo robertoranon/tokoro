@@ -1,0 +1,22 @@
+{
+  "url": "https://alcatrazmilano.it/eventi/autechre/",
+  "capturedAt": "2026-03-02T14:50:23.602Z",
+  "captureDate": "2026-03-02",
+  "htmlFile": "alcatraz-autechre-event.html",
+  "expectedEvents": [
+    {
+      "title": "AUTECHRE",
+      "venue_name": "Alcatraz",
+      "address": "Via Valtellina 25, Milano, Italy",
+      "start_time": "2026-10-11T20:00:00",
+      "category": "music",
+      "tags": ["concert", "live-music"],
+      "description": "Following extensive sold out touring throughout 2025, Autechre (æ)’s Sean Booth and Rob Brown are set for another busy year with further live performances across Europe in September and October 2026, including two shows in Italy"
+    }
+  ],
+  "minExpectedEvents": 1,
+  "maxExpectedEvents": 1,
+  "notes": "Single     │\n│   event page for Autechre concert at Alcatraz Milano",
+  "tags": ["single-event", "music", "nightlife"],
+  "difficulty": "easy"
+}

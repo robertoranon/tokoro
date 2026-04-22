@@ -1,0 +1,11 @@
+# Test snapshots and results (can be regenerated)
+snapshots/report-*.json
+snapshots/*.md
+
+# Large HTML fixtures (optional - you may want to commit some for reproducibility)
+# Uncomment if fixtures get too large:
+# fixtures/*.html
+
+# Human review data (optional - can be personal)
+# Uncomment if you want to keep reviews private:
+# human-reviews.json

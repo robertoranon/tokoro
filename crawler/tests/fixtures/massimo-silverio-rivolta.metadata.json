@@ -1,0 +1,22 @@
+{
+  "url": "https://www.instagram.com/p/DU-h6ZbjMi4/",
+  "capturedAt": "2026-03-09T11:59:46.475Z",
+  "captureDate": "2026-03-09",
+  "imageFile": "massimo-silverio-rivolta.jpeg",
+  "imageMimeType": "image/jpeg",
+  "expectedEvents": [
+    {
+      "title": "Messa, Massimo Silverio, Blak Saagan, Overcharge, Mamuthones, Naga, Devoid of Thought, Kariti, Delrei",
+      "description": "A multi-artist music event featuring various bands, including a release show by Blak Saagan, with two stages, a market, distro, food, and drinks.",
+      "url": "https://www.instagram.com/p/DU-h6ZbjMi4/",
+      "venue_name": "CS Rivolta",
+      "address": "Via Fratelli Bandiera, 45, 30175 Venezia VE, Italy",
+      "start_time": "2026-03-14T18:30:00",
+      "category": "music",
+      "tags": ["live music", "concert", "festival", "release show"]
+    }
+  ],
+  "minExpectedEvents": 1,
+  "maxExpectedEvents": 1,
+  "tags": ["image"]
+}

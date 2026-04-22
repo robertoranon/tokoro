@@ -1,0 +1,735 @@
+{
+  "generatedAt": "2026-03-28T10:59:29.153Z",
+  "totalFixtures": 7,
+  "results": [
+    {
+      "fixtureName": "alcatraz-autechre-event",
+      "mode": "direct",
+      "fetcher": "playwright",
+      "model": "google/gemini-3.1-flash-lite-preview",
+      "executionTimeMs": 1880,
+      "extractedEvents": [
+        {
+          "title": "Autechre",
+          "description": "Sean Booth and Rob Brown of Autechre (æ) bring their live performance to Milan in collaboration with Terraforma, following extensive sold-out touring throughout 2025.",
+          "url": "https://alcatrazmilano.it/eventi/autechre/",
+          "venue_name": "Alcatraz",
+          "address": "Via Valtellina, 25,, Milano, 20159, IT",
+          "start_time": "2026-10-11T20:00:00",
+          "category": "music",
+          "tags": ["live", "electronic", "concert"]
+        }
+      ],
+      "metrics": {
+        "eventsExtracted": 1,
+        "expectedEventsFound": 1,
+        "recall": 1,
+        "duplicates": 0,
+        "fieldCompleteness": 1,
+        "missingFields": []
+      }
+    },
+    {
+      "fixtureName": "alcatraz-fat-freddys-drop-event",
+      "mode": "direct",
+      "fetcher": "playwright",
+      "model": "google/gemini-3.1-flash-lite-preview",
+      "executionTimeMs": 1891,
+      "extractedEvents": [
+        {
+          "title": "Fat Freddy’s Drop",
+          "description": "Fat Freddy’s Drop returns to the road to celebrate the 21st anniversary of their cult album 'Based On A True Story' with a world tour. Experience their unique blend of future funk, soul, reggae, and dancefloor vibes in this unmissable live performance.",
+          "url": "https://alcatrazmilano.it/eventi/fat-freddys-drop-5/",
+          "venue_name": "Alcatraz",
+          "address": "Via Valtellina, 25,, Milano, 20159, IT",
+          "start_time": "2026-09-30T20:00:00",
+          "category": "music",
+          "tags": ["funk", "soul", "reggae", "live music"]
+        }
+      ],
+      "metrics": {
+        "eventsExtracted": 1,
+        "expectedEventsFound": 1,
+        "recall": 1,
+        "duplicates": 0,
+        "fieldCompleteness": 1,
+        "missingFields": []
+      }
+    },
+    {
+      "fixtureName": "fareast-2026-events",
+      "mode": "direct",
+      "fetcher": "playwright",
+      "model": "google/gemini-3.1-flash-lite-preview",
+      "executionTimeMs": 16873,
+      "extractedEvents": [
+        {
+          "title": "ECHI D’ORIENTE. MUSICHE, STORIE E MANI CREATIVE!",
+          "description": "Letture e laboratorio creativo per bambini dai 6 ai 10 anni. I partecipanti realizzeranno draghi utilizzando materiali diversi, accompagnati da un sottofondo di musica orientale.",
+          "url": "https://events.fareastfilm.com/events/echi-doriente-musiche-storie-e-mani-creative/",
+          "venue_name": "Biblioteca comunale di Pasian di Prato",
+          "address": "Via G. Missio 3, Pasian di Prato (Ud)",
+          "start_time": "2026-03-27T16:30:00",
+          "end_time": "2026-03-27T18:30:00",
+          "category": "community",
+          "tags": ["bambini", "laboratorio", "oriente"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        },
+        {
+          "title": "INAUGURAZIONE MOSTRA “INTANT BUNDÌ\"",
+          "description": "Inaugurazione della mostra di 24 illustrazioni originali nate dal progetto “Il Lunari Intant Bundì”, reinterpretate con la tecnica del mosaico. L'evento si conclude con un tajut.",
+          "url": "https://events.fareastfilm.com/events/inaugurazione-mostra-intant-bundi/",
+          "venue_name": "Bottega di mosaico contemporaneo Carraro Chabarik",
+          "address": "Corso Roma 48, Spilimbergo (Pn)",
+          "start_time": "2026-03-27T18:30:00",
+          "category": "art",
+          "tags": ["mostra", "mosaico", "arte"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        },
+        {
+          "title": "SAPORI D’ORIENTE",
+          "description": "Cena-degustazione vegana dedicata alla cucina orientale curata dallo chef Max Noacco, con una selezione di sushi e bao.",
+          "url": "https://events.fareastfilm.com/events/sapori-doriente-2/",
+          "venue_name": "Al Tiglio",
+          "address": "Via Centa, 8/A, 33030 Moruzzo UD",
+          "start_time": "2026-03-27T19:00:00",
+          "category": "food",
+          "tags": ["cena", "vegano", "sushi"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        },
+        {
+          "title": "ALLA SCOPERTA DELLO SHINRIN YOKUDŌ - 森林浴道 - CASCATE DI KOT",
+          "description": "Bagno di foresta (Shinrin yokudō) presso le Cascate di Kot, un'esperienza basata sull'interazione con la natura per ridurre lo stress e rafforzare le difese immunitarie.",
+          "url": "https://events.fareastfilm.com/events/alla-scoperta-dello-shinrinyoku-do-%e6%a3%ae%e6%9e%97%e6%b5%b4%e9%81%93-cascate-di-kot/",
+          "venue_name": "Cascate di Kot",
+          "address": "San Leonardo (Ud)",
+          "start_time": "2026-03-28T09:30:00",
+          "end_time": "2026-03-28T11:30:00",
+          "category": "wellness",
+          "tags": ["natura", "benessere", "forest bathing"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        },
+        {
+          "title": "MINDFULNESS RELAZIONALE",
+          "description": "Sessione di 90 minuti dedicata alla Mindfulness relazionale attraverso il corpo in movimento, l'ascolto del respiro e l'osservazione della mente.",
+          "url": "https://events.fareastfilm.com/events/mindfulness-relazionale/",
+          "venue_name": "Essere Ora, Centro Mindfulness e Yoga",
+          "address": "Via Stiria 36, scala F, Udine",
+          "start_time": "2026-03-28T10:00:00",
+          "end_time": "2026-03-28T11:30:00",
+          "category": "wellness",
+          "tags": ["mindfulness", "yoga", "benessere"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        },
+        {
+          "title": "VISITA GUIDATA AL GIARDINO GIAPPONESE  - VISITA GUIDATA BREVE E KODŌ",
+          "description": "Visita guidata al My August Japanese Garden, un microcosmo di 1600 mq, con l'aggiunta della cerimonia del Kodō (ascolto dell'incenso).",
+          "url": "https://events.fareastfilm.com/events/visita-guidata-al-giardino-giapponese-visita-guidata-breve-e-kodo/",
+          "venue_name": "My August Japanese Garden",
+          "address": "Via Bombaiù 30, San Giorgio di Nogaro (Ud)",
+          "start_time": "2026-03-28T10:30:00",
+          "category": "outdoor",
+          "tags": ["giardino", "giappone", "cultura"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        },
+        {
+          "title": "FEFF AL PARCO",
+          "description": "Caccia al tesoro a tema Oriente per bambini dai 6 anni, con quiz, indovinelli e prove ingegnose.",
+          "url": "https://events.fareastfilm.com/events/feff-al-parco-2/",
+          "venue_name": "Parco Brun",
+          "address": "Viale Vat 1, Udine (UD)",
+          "start_time": "2026-03-28T15:00:00",
+          "end_time": "2026-03-28T17:00:00",
+          "category": "community",
+          "tags": ["bambini", "caccia al tesoro", "famiglia"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        },
+        {
+          "title": "COPPA CAPITAN TSUBASA + DRAGONI E YOKAI LAB + PICNIC ORIENTALE",
+          "description": "Torneo di calcio per bambini, laboratorio artistico per creare dragoni e yokai, e picnic sociale.",
+          "url": "https://events.fareastfilm.com/events/coppa-capitan-tsubasa-dragoni-e-yokai-lab-picnic-orientale/",
+          "venue_name": "Comunità Nove – Parco Sant’Osvaldo",
+          "address": "Via Pozzuolo 330, Udine (UD)",
+          "start_time": "2026-03-29T10:00:00",
+          "category": "sports",
+          "tags": ["calcio", "laboratorio", "picnic"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        },
+        {
+          "title": "PICNIC ORIENTALE",
+          "description": "Picnic vegetariano con sapori orientali a cura di Hattiva Lab, immersi nella quiete del Parco di Sant’Osvaldo.",
+          "url": "https://events.fareastfilm.com/events/picnic-orientale/",
+          "venue_name": "Comunità Nove – Parco Sant’Osvaldo",
+          "address": "Via Pozzuolo 330, Udine (UD)",
+          "start_time": "2026-03-29T12:30:00",
+          "end_time": "2026-03-29T14:30:00",
+          "category": "food",
+          "tags": ["picnic", "cibo", "vegetariano"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        },
+        {
+          "title": "ALLA SCOPERTA DELLO SHINRIN YOKUDŌ - 森林浴道 - CASTELLO DI MIRAMARE",
+          "description": "Bagno di foresta (Shinrin yokudō) presso il Parco e Foresta monumentale del Castello di Miramare a Trieste.",
+          "url": "https://events.fareastfilm.com/events/alla-scoperta-dello-shinrinyoku-do-%e6%a3%ae%e6%9e%97%e6%b5%b4%e9%81%93-castello-di-miramare/",
+          "venue_name": "Castello di Miramare",
+          "address": "Grignano (Ts)",
+          "start_time": "2026-03-29T14:30:00",
+          "end_time": "2026-03-29T16:30:00",
+          "category": "wellness",
+          "tags": ["natura", "benessere", "trieste"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        },
+        {
+          "title": "PIANTE DA COMPAGNIA",
+          "description": "Laboratorio artistico per bambini dai 4 anni ispirato al libro di Bruno Munari, per creare piccole composizioni verdi.",
+          "url": "https://events.fareastfilm.com/events/piante-da-compagnia/",
+          "venue_name": "Casa delle Culture Bambine",
+          "address": "Via Selvuzzis 2, Fagagna (Ud)",
+          "start_time": "2026-03-29T16:00:00",
+          "end_time": "2026-03-29T18:00:00",
+          "category": "community",
+          "tags": ["bambini", "laboratorio", "natura"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        },
+        {
+          "title": "FAR EAST FILM &amp; WINES - Il MALE NON ESISTE",
+          "description": "Proiezione del film giapponese “Il male non esiste” di Ryûsuke Hamaguchi, accompagnata da una degustazione di vini.",
+          "url": "https://events.fareastfilm.com/events/far-east-film-wines-il-male-non-esiste/",
+          "venue_name": "Enoteca di Cormòns",
+          "address": "Piazza XXIV Maggio 21, Cormòns (Go)",
+          "start_time": "2026-03-29T18:00:00",
+          "end_time": "2026-03-29T21:00:00",
+          "category": "film",
+          "tags": ["cinema", "vino", "degustazione"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        },
+        {
+          "title": "INVENTASTORIE IN VALIGIA",
+          "description": "Laboratorio creativo basato sul Kamishibai, antica forma di narrazione giapponese, per stimolare l'immaginazione dei bambini.",
+          "url": "https://events.fareastfilm.com/events/inventastorie-in-valigia/",
+          "venue_name": "Biblioteca “Novella Cantarutti”, Scuola G.B. Tiepolo",
+          "address": "Via del Pioppo 55, Udine",
+          "start_time": "2026-03-31T17:00:00",
+          "end_time": "2026-03-31T19:00:00",
+          "category": "community",
+          "tags": ["bambini", "narrazione", "giappone"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        },
+        {
+          "title": "ALBERI TRA CIELO E TERRA",
+          "description": "Inaugurazione della mostra d'arte che esplora l'armonia universale e il legame tra Oriente e Occidente attraverso il lavoro di diverse artiste.",
+          "url": "https://events.fareastfilm.com/events/alberi-tra-cielo-e-terra/",
+          "venue_name": "Biblioteca Tarcento Palazzo Frangipane",
+          "address": "Via Cornelio Frangipane 20, Tarcento (Ud)",
+          "start_time": "2026-04-11T18:00:00",
+          "category": "art",
+          "tags": ["mostra", "arte", "giappone"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        },
+        {
+          "title": "Far East Market",
+          "description": "Mercatino del Festival con bancarelle di prodotti Made in Asia, dalla gastronomia all’oggettistica all’artigianato.",
+          "url": "https://events.fareastfilm.com/events/far-east-market-2/",
+          "venue_name": "via Mercatovecchio",
+          "address": "via Mercatovecchio, Udine",
+          "start_time": "2026-04-24T10:00:00",
+          "end_time": "2026-05-03T20:00:00",
+          "category": "other",
+          "tags": ["mercato", "shopping", "cibo"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        },
+        {
+          "title": "K-POP DANCE FIGHT FEST",
+          "description": "Tappa ufficiale del K-Pop Dance Fight Fest, un'occasione per gli appassionati di K-pop di mostrare il proprio talento.",
+          "url": "https://events.fareastfilm.com/events/k-pop-dance-fight-fest/",
+          "venue_name": "Udine",
+          "address": "Udine",
+          "start_time": "2026-04-26T15:00:00",
+          "category": "music",
+          "tags": ["k-pop", "danza", "contest"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        },
+        {
+          "title": "Far East Market",
+          "description": "16^ edizione del Cosplay Contest, che trasforma Udine in un palcoscenico per personaggi tratti da manga, anime, fumetti, cinema e videogiochi.",
+          "url": "https://events.fareastfilm.com/events/far-east-market-2/",
+          "venue_name": "Udine",
+          "address": "Udine",
+          "start_time": "2026-05-01T16:00:00",
+          "category": "theater",
+          "tags": ["cosplay", "contest", "anime"],
+          "festival_name": "Far East Film Festival 2026",
+          "festival_url": "https://events.fareastfilm.com/"
+        }
+      ],
+      "metrics": {
+        "eventsExtracted": 17,
+        "expectedEventsFound": 17,
+        "recall": 1,
+        "duplicates": 0,
+        "fieldCompleteness": 0.9313725490196079,
+        "missingFields": ["end_time"]
+      }
+    },
+    {
+      "fixtureName": "massimo-silverio-rivolta",
+      "mode": "image",
+      "fetcher": "image",
+      "model": "google/gemini-3.1-flash-lite-preview",
+      "executionTimeMs": 3779,
+      "extractedEvents": [
+        {
+          "title": "Messa, Massimo Silverio, Blak Saagan, Overcharge, Mamuthones, Naga, Devoid of Thought, Kariti, Delrei",
+          "description": "A multi-act music event featuring various artists, including a release show by Blak Saagan, with two stages, a market, distro, food, and drinks.",
+          "url": "https://www.instagram.com/p/DU-h6ZbjMi4/",
+          "venue_name": "CS Rivolta",
+          "address": "Venezia",
+          "start_time": "2026-03-14T18:30:00",
+          "category": "music",
+          "tags": ["live music", "concert", "release show", "festival"]
+        }
+      ],
+      "metrics": {
+        "eventsExtracted": 1,
+        "expectedEventsFound": 1,
+        "recall": 1,
+        "duplicates": 0,
+        "fieldCompleteness": 1,
+        "missingFields": []
+      }
+    },
+    {
+      "fixtureName": "naon-event",
+      "mode": "direct",
+      "fetcher": "playwright",
+      "model": "google/gemini-3.1-flash-lite-preview",
+      "executionTimeMs": 3656,
+      "extractedEvents": [
+        {
+          "title": "Luca Dell’Anna TRIO – jazzAON",
+          "description": "The Luca Dell'Anna Trio presents their new project 'Shōjin', a musical encounter between contemporary jazz, composition, and improvisation. The trio, led by pianist and composer Luca Dell'Anna, features Alessandro Fedrigo on electric bass and Luca Colussi on drums. The performance includes two sets starting at 7:30 pm and 8:45 pm.",
+          "url": "https://birradinaon.com/evento/luca-dellanna-trio-jazzaon-12032026/",
+          "venue_name": "Naon Pub",
+          "start_time": "2026-03-12T19:30:00",
+          "end_time": "2026-03-12T22:00:00",
+          "category": "music",
+          "tags": ["jazz", "live music", "concert"],
+          "start_time_utc": "2026-03-12T19:30:00+00:00",
+          "end_time_utc": "2026-03-12T22:00:00+00:00"
+        }
+      ],
+      "metrics": {
+        "eventsExtracted": 1,
+        "expectedEventsFound": 1,
+        "recall": 1,
+        "duplicates": 0,
+        "fieldCompleteness": 0.8,
+        "missingFields": ["address"]
+      }
+    },
+    {
+      "fixtureName": "nick-cave-tour",
+      "mode": "direct",
+      "fetcher": "playwright",
+      "model": "google/gemini-3.1-flash-lite-preview",
+      "executionTimeMs": 9,
+      "extractedEvents": [
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://www.ticketmaster.ie/artist/743143?venueId=197670",
+          "venue_name": "Malahide Castle,",
+          "address": "Dublin, Ireland",
+          "start_time": "2026-06-10",
+          "end_time": "2026-06-10",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "http://www.bestkeptsecret.nl/tickets",
+          "venue_name": "Best Kept Secret Festival, Beekse Bergen, ",
+          "address": "The Netherlands",
+          "start_time": "2026-06-13",
+          "end_time": "2026-06-13",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://www.eventim.de/event/nick-cave-the-bad-seeds-tour-2026-emslandarena-20734810/",
+          "venue_name": "Open Air an der Emslandarena",
+          "address": "Lingen, Germany",
+          "start_time": "2026-06-16",
+          "end_time": "2026-06-16",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://heartlandfestival.dk/billetter/",
+          "venue_name": "Heartland Festival,",
+          "address": "Egeskov Castle, Denmark",
+          "start_time": "2026-06-18",
+          "end_time": "2026-06-18",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://www.metronome.cz",
+          "venue_name": "Metronome Festival, ",
+          "address": "Prague, Czech Republic",
+          "start_time": "2026-06-20",
+          "end_time": "2026-06-20",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://www.oeticket.com/event/nick-cave-and-the-bad-seeds-clam-burgarena-20750100/?affiliate=EOE",
+          "venue_name": "Burg Clam, ",
+          "address": "Klam, Austria",
+          "start_time": "2026-06-21",
+          "end_time": "2026-06-21",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://www.more.com/gr-el/tickets/music/festival/release-athens-2026/nick-cave-the-bad-seeds",
+          "venue_name": "Release Athens Festival, ",
+          "address": "Athens, Greece",
+          "start_time": "2026-06-24",
+          "end_time": "2026-06-24",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://laprimaestate.it/tickets/",
+          "venue_name": "La Prima Estate, ",
+          "address": "Lido di Camaiore, Italy",
+          "start_time": "2026-06-26",
+          "end_time": "2026-06-26",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://feverup.com/m/587432/en?cp_landing_source=liveislive&utm_source=direct",
+          "venue_name": "Live is Live, ",
+          "address": "Antwerp, Belgium",
+          "start_time": "2026-06-28",
+          "end_time": "2026-06-28",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://www.eventim.de/event/nick-cave-the-bad-seeds-tour-2026-waldbuehne-berlin-20462658/",
+          "venue_name": "Waldbühne, ",
+          "address": "Berlin, Germany",
+          "start_time": "2026-06-30",
+          "end_time": "2026-06-30",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://opener.pl/en/tickets",
+          "venue_name": "Open’er Festival,",
+          "address": "Gdynia, Poland",
+          "start_time": "2026-07-02",
+          "end_time": "2026-07-02",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://tickets.jazzopen.com/shop/103/event/1764",
+          "venue_name": "Jazz Open, ",
+          "address": "Stuttgart, Germany",
+          "start_time": "2026-07-06",
+          "end_time": "2026-07-06",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://nosalive.com/en/ticket-office/",
+          "venue_name": "NOS Alive Festival, ",
+          "address": "Lisbon, Portugal",
+          "start_time": "2026-07-09",
+          "end_time": "2026-07-09",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://madcooltickets.com/",
+          "venue_name": "Mad Cool,",
+          "address": "Madrid, Spain",
+          "start_time": "2026-07-11",
+          "end_time": "2026-07-11",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://adamconcerts.trium.fr/fr/t/-/event/63303",
+          "venue_name": "Festival de Nîmes, ",
+          "address": "Nîmes, France",
+          "start_time": "2026-07-14",
+          "end_time": "2026-07-14",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://www.rpo.net/autres-spectacles/les-belles-soirees-nick-cave",
+          "venue_name": "Les Belles Soirées - Théâtre Antique de Vienne, ",
+          "address": "Vienne, France",
+          "start_time": "2026-07-15",
+          "end_time": "2026-07-15",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://www.vieillescharrues.asso.fr/#ticket",
+          "venue_name": "Les Vieilles Charrues, ",
+          "address": "Carhaix, France",
+          "start_time": "2026-07-17",
+          "end_time": "2026-07-17",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://nickcavebrighton.com/",
+          "venue_name": "Preston Park,",
+          "address": "Brighton, UK",
+          "start_time": "2026-07-31",
+          "end_time": "2026-07-31",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://www.eventim.de/event/nick-cave-the-bad-seeds-tour-2026-filmnaechte-am-elbufer-20733464/",
+          "venue_name": "Filmnächte am Elbufer, ",
+          "address": "Dresden, Germany",
+          "start_time": "2026-08-02",
+          "end_time": "2026-08-02",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://www.eventim.hr/artist/nick-cave-the-bad-seeds/nick-cave-and-the-bad-seeds-pula-04-08--4002605/",
+          "venue_name": "Arena Pula,",
+          "address": "Pula, Croatia",
+          "start_time": "2026-08-04",
+          "end_time": "2026-08-04",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://www.eventim.hr/artist/nick-cave-the-bad-seeds/",
+          "venue_name": "Arena Pula,",
+          "address": "Pula, Croatia",
+          "start_time": "2026-08-05",
+          "end_time": "2026-08-05",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://efinity.rs/event-details/nick_cave_bad_seeds_31902",
+          "venue_name": "Lower Town Kalemegdan Fortress, ",
+          "address": "Belgrade, Serbia",
+          "start_time": "2026-08-07",
+          "end_time": "2026-08-07",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://summerwell.ro/en#tickets",
+          "venue_name": "Summer Well Festival, ",
+          "address": "Buftea, Romania",
+          "start_time": "2026-08-09",
+          "end_time": "2026-08-09",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://oyafestivalen.seetickets.com/event/oyafestivalen-2026/t-yenparken/3458167?src=nctbs",
+          "venue_name": "Øyafestivalen, ",
+          "address": "Oslo, Norway",
+          "start_time": "2026-08-13",
+          "end_time": "2026-08-13",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://urldefense.com/v3/__https:/ddec1-0-en-ctp.trendmicro.com:443/wis/clicktime/v1/query?url=http*3a*2f*2fwayoutwest.se*2ftickets&umid=b4c51678-4b25-46cc-9fa3-34f1b85fa612&auth=add6798b82135137aab60184c867f63f4dc875bf-cfc1aedc5c0e3ba4a07e7a86ffcbb5db85e20232__;JSUlJQ!!FBl7RhjNdtJEi0k!vJfyy_d5nk6Ej6CkzLuGw9XsyorpPoF82Pz25kT95YHrhYgN33M-un0M2akQZBRGf6BT3P0vrCVP$",
+          "venue_name": "Way Out West Festival, Gothenburg,",
+          "address": "Sweden",
+          "start_time": "2026-08-14",
+          "end_time": "2026-08-14",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://www.flowfestival.com/en/tickets/",
+          "venue_name": "Flow Festival,",
+          "address": "Helsinki, Finland",
+          "start_time": "2026-08-16",
+          "end_time": "2026-08-16",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "http://www.bilietai.lt/lit/renginiai/koncertai/nick-cave--the-bad-seeds--kalnu-parkas--vilnius-481977/?shop_provider=NickCave",
+          "venue_name": "Kalnai Park, ",
+          "address": "Vilnius, Lithuania",
+          "start_time": "2026-08-18",
+          "end_time": "2026-08-18",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://cabaretvert.com/billetterie/",
+          "venue_name": "​Cabaret Vert, ",
+          "address": "Charleville-Mézières, France",
+          "start_time": "2026-08-21",
+          "end_time": "2026-08-21",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://www.eventim.de/event/nick-cave-the-bad-seeds-tour-2026-koenigsplatz-muenchen-20741550/",
+          "venue_name": "Königsplatz, ",
+          "address": "Munich, Germany",
+          "start_time": "2026-08-23",
+          "end_time": "2026-08-23",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://www.eventim.de/event/nick-cave-the-bad-seeds-tour-2026-kunstrasen-bonn-20709010/",
+          "venue_name": "Kunst!Rasen, ",
+          "address": "Bonn, Germany",
+          "start_time": "2026-08-25",
+          "end_time": "2026-08-25",
+          "category": "music"
+        },
+        {
+          "title": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "description": "NICK CAVE AND THE BAD SEEDS LIVE - UK & EUROPE 2026",
+          "url": "https://www.rockenseine.com",
+          "venue_name": "Rock en Seine,",
+          "address": "Paris, France",
+          "start_time": "2026-08-28",
+          "end_time": "2026-08-28",
+          "category": "music"
+        }
+      ],
+      "metrics": {
+        "eventsExtracted": 31,
+        "expectedEventsFound": 31,
+        "recall": 1,
+        "duplicates": 0,
+        "fieldCompleteness": 1,
+        "missingFields": []
+      }
+    },
+    {
+      "fixtureName": "yazz-scena-sonica",
+      "mode": "image",
+      "fetcher": "image",
+      "model": "google/gemini-3.1-flash-lite-preview",
+      "executionTimeMs": 5018,
+      "extractedEvents": [
+        {
+          "title": "Aquavitae: Yazz Ahmed & Band",
+          "description": "A live concert featuring Yazz Ahmed & Band, performing experimental, jazz, world, and fusion music.",
+          "url": "https://edogq.r.a.d.sendibm1.com/mk/mr/sh/SMJz09SDriOHTBMpwmwICM5fzExk/YQJLc8WtvInG",
+          "venue_name": "Auditorium Comunale",
+          "address": "Precenicco (UD)",
+          "start_time": "2026-03-14T21:00:00",
+          "category": "music",
+          "tags": [
+            "jazz",
+            "experimental",
+            "world music",
+            "fusion",
+            "live music"
+          ]
+        }
+      ],
+      "metrics": {
+        "eventsExtracted": 1,
+        "expectedEventsFound": 1,
+        "recall": 1,
+        "duplicates": 0,
+        "fieldCompleteness": 1,
+        "missingFields": []
+      }
+    }
+  ],
+  "summaryByMode": {
+    "direct": {
+      "avgRecall": 1,
+      "avgExecutionTimeMs": 4861.8,
+      "avgFieldCompleteness": 0.9462745098039216,
+      "totalErrors": 0
+    },
+    "image": {
+      "avgRecall": 1,
+      "avgExecutionTimeMs": 4398.5,
+      "avgFieldCompleteness": 1,
+      "totalErrors": 0
+    }
+  },
+  "summaryByFetcher": {
+    "playwright": {
+      "avgRecall": 1,
+      "avgExecutionTimeMs": 4861.8,
+      "avgFieldCompleteness": 0.9462745098039216,
+      "totalErrors": 0
+    },
+    "image": {
+      "avgRecall": 1,
+      "avgExecutionTimeMs": 4398.5,
+      "avgFieldCompleteness": 1,
+      "totalErrors": 0
+    }
+  }
+}

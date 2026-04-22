@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+
+# Environment
+.env
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Benchmark results
+tests/benchmark-results/

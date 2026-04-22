@@ -1,0 +1,26 @@
+{
+  "url": "https://alcatrazmilano.it/eventi/fat-freddys-drop-5/",
+  "capturedAt": "2026-03-02T15:00:32.678Z",
+  "captureDate": "2026-03-02",
+  "htmlFile": "alcatraz-fat-freddys-drop-event.html",
+  "expectedEvents": [
+    {
+        "title": "FAT FREDDY’S DROP",
+        "venue_name": "Alcatraz",
+        "address": "Via Valtellina 25, Milano, Italy",
+        "start_time": "2026-09-30T20:00:00+01:00",
+        "category": "music",
+        "tags": ["concert", "live-music"],
+        "description": "Based On A True Story compie 21 anni e non li dimostra affatto! I Fat Freddy's Drop tornano on the road per festeggiare il loro album culto con un tour mondiale che passerà anche dall'Italia. Tre date imperdibili per celebrare insieme la loro miscela unica di future funk, soul, reggae e vibrazioni da dancefloor con un pensiero speciale per Chris MU Faiumu, mente e cuore del collettivo"
+      }
+  ],
+  "minExpectedEvents": 1,
+  "maxExpectedEvents": 1,
+  "notes": "Single     │\n│   event page for Fat Freddy's Drop concert at Alcatraz Milano",
+  "tags": [
+    "single-event",
+    "music",
+    "nightlife"
+  ],
+  "difficulty": "medium"
+}

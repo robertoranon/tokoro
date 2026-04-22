@@ -1,0 +1,21 @@
+{
+  "url": "https://birradinaon.com/evento/luca-dellanna-trio-jazzaon-12032026/",
+  "capturedAt": "2026-03-10T12:09:05.507Z",
+  "captureDate": "2026-03-10",
+  "htmlFile": "naon-event.html",
+  "expectedEvents": [
+    {
+      "title": "Luca Dell’Anna TRIO – jazzAON",
+      "description": "A un anno dall’uscita di Tactile, il Luca Dell’Anna Trio prosegue la collaborazione con Artesuono Records di Stefano Amerio presentando Shōjin, il nuovo progetto discografico realizzato insieme al sassofonista giapponese Ryoma Mano, primo contralto della All-Stars Big Band del Blue Note di Tokyo.",
+      "url": "https://birradinaon.com/evento/luca-dellanna-trio-jazzaon-12032026/",
+      "venue_name": "Naon Pub",
+      "address": "Via Gabelli 12/A, Porcia, Pordenone, Italy",
+      "start_time": "2026-03-12T19:30:00",
+      "category": "music",
+      "tags": ["live music", "concert", "festival", "release show"]
+    }
+  ],
+  "minExpectedEvents": 1,
+  "maxExpectedEvents": 1,
+  "difficulty": "hard"
+}

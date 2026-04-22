@@ -1,0 +1,21 @@
+{
+  "url": "https://edogq.r.a.d.sendibm1.com/mk/mr/sh/SMJz09SDriOHTBMpwmwICM5fzExk/YQJLc8WtvInG",
+  "capturedAt": "2026-03-09T11:59:46.475Z",
+  "captureDate": "2026-03-09",
+  "imageFile": "yazz-scena-sonica.jpg",
+  "imageMimeType": "image/jpeg",
+  "expectedEvents": [
+    {
+      "title": "YAZZ AHMED & BAND",
+      "description": "Experimental Jazz, World, Fusion.",
+      "url": "https://edogq.r.a.d.sendibm1.com/mk/mr/sh/SMJz09SDriOHTBMpwmwICM5fzExk/YQJLc8WtvInG",
+      "venue_name": "Auditorium Comunale Precenicco",
+      "start_time": "2026-03-14T21:00:00",
+      "category": "music",
+      "tags": ["live music", "concert"]
+    }
+  ],
+  "minExpectedEvents": 1,
+  "maxExpectedEvents": 1,
+  "tags": ["image"]
+}

@@ -1,0 +1,9 @@
+# Happenings Event Crawler - Seed URLs
+# Add one URL per line. Lines starting with # are ignored.
+# The crawler will automatically discover individual event pages from venue homepages.
+# You can also add direct links to individual event pages if needed.
+
+# Alcatraz Milano - Venue homepage
+https://alcatrazmilano.it/calendario/
+
+# Add more venue URLs or individual event URLs here...
