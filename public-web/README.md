@@ -109,7 +109,7 @@ A mobile-first publishing page deployed alongside the query interface. No build 
 
 **URL tab** — paste any event page URL; crawl request goes to `workerUrl/crawl` with `{ url, mode: 'direct' }` (Jina AI Reader fallback server-side, no HTML required).
 
-**Image tab** — pick a JPEG/PNG from Photos or Camera; optional source URL. Request goes to `workerUrl/crawl` with `{ imageData, imageMimeType, url?, mode: 'image' }`. For events with no URL, the URL field is pre-filled with a Google search URL.
+**Image tab** — pick a JPEG/PNG from Photos or Camera; optional source URL. Request goes to `workerUrl/crawl` with `{ imageData, imageMimeType, url?, mode: 'image' }`. Events extracted without a source URL get a Google search URL auto-constructed from the event title, venue, and date in the review card.
 
 ### Settings
 
