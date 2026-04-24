@@ -665,15 +665,36 @@
       // ── Init ──────────────────────────────────────────────────────────────────
       loadSettings();
       updateCfgVisibility();
-      loadOrCreateKeypair().then(function (kp) {
-        if (kp.isNew) {
-          cfgPrivKey.value = kp.privkeyB64;
-          cfgPubKey.textContent = kp.pubkey;
-          cfgFields.style.display = 'flex';
-          cfgSave.style.display = 'block';
-          cfgToggle.style.display = 'none';
+
+      // Hash-events mode: Shortcut encoded PreparedEvents[] in location.hash
+      (function tryHashEvents() {
+        var hash = window.location.hash;
+        if (!hash.startsWith('#events=')) return false;
+        try {
+          var encoded = hash.slice('#events='.length);
+          var events = JSON.parse(atob(encoded));
+          history.replaceState(
+            null,
+            '',
+            window.location.pathname + window.location.search
+          );
+          setSt('Review events from Shortcut:', 'ok');
+          showReview(events);
+          return true;
+        } catch (e) {
+          console.error('Failed to parse #events hash:', e);
+          return false;
         }
-      });
+      })() ||
+        loadOrCreateKeypair().then(function (kp) {
+          if (kp.isNew) {
+            cfgPrivKey.value = kp.privkeyB64;
+            cfgPubKey.textContent = kp.pubkey;
+            cfgFields.style.display = 'flex';
+            cfgSave.style.display = 'block';
+            cfgToggle.style.display = 'none';
+          }
+        });
     </script>
   </body>
 </html>
