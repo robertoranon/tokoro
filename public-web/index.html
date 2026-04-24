@@ -1418,6 +1418,7 @@
 
     <script src="./group-events.js"></script>
     <script src="./shared.js"></script>
+    <script src="./signing.js"></script>
 
     <!-- Bookmarklet source -->
     <script type="text/x-bookmarklet" id="bm-src">
@@ -2266,79 +2267,10 @@
         }
         // ──────────────────────────────────────────────────────────────────────
 
-        // ── Curator keypair (Web Crypto API, Ed25519) ─────────────────────────────────
-        function bytesToHexR(bytes) {
-          return Array.from(bytes)
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-        }
-
         async function getRelayKeypair() {
-          const stored = localStorage.getItem('tokoro_keypair');
-          if (stored) {
-            const kp = JSON.parse(stored);
-            if (kp.pubkey && kp.privkeyB64) {
-              populateKeypairFields(kp);
-              return { ...kp, isNew: false };
-            }
-          }
-          const pair = await crypto.subtle.generateKey('Ed25519', true, [
-            'sign',
-            'verify',
-          ]);
-          const pubBytes = new Uint8Array(
-            await crypto.subtle.exportKey('raw', pair.publicKey)
-          );
-          const privBytes = new Uint8Array(
-            await crypto.subtle.exportKey('pkcs8', pair.privateKey)
-          );
-          const kp = {
-            pubkey: bytesToHexR(pubBytes),
-            privkeyB64: btoa(String.fromCharCode(...privBytes)),
-          };
-          localStorage.setItem('tokoro_keypair', JSON.stringify(kp));
+          const kp = await loadOrCreateKeypair();
           populateKeypairFields(kp);
-          return { ...kp, isNew: true };
-        }
-
-        async function signEventForRelay(preparedEvent, kp) {
-          const eventData = {
-            pubkey: kp.pubkey,
-            title: preparedEvent.title,
-            description: preparedEvent.description || '',
-            url: preparedEvent.url || '',
-            venue_name: preparedEvent.venue_name || '',
-            address: preparedEvent.address || '',
-            lat: preparedEvent.lat,
-            lng: preparedEvent.lng,
-            start_time: preparedEvent.start_time,
-            end_time: preparedEvent.end_time,
-            category: preparedEvent.category,
-            tags: preparedEvent.tags || [],
-            created_at: preparedEvent.created_at,
-          };
-          const canonical = JSON.stringify(eventData);
-          const msgBytes = new TextEncoder().encode(canonical);
-          const hashBuffer = await crypto.subtle.digest('SHA-256', msgBytes);
-          const privBytes = Uint8Array.from(atob(kp.privkeyB64), c =>
-            c.charCodeAt(0)
-          );
-          const cryptoKey = await crypto.subtle.importKey(
-            'pkcs8',
-            privBytes.buffer,
-            'Ed25519',
-            false,
-            ['sign']
-          );
-          const sigBuffer = await crypto.subtle.sign(
-            'Ed25519',
-            cryptoKey,
-            new Uint8Array(hashBuffer)
-          );
-          return {
-            ...eventData,
-            signature: bytesToHexR(new Uint8Array(sigBuffer)),
-          };
+          return kp;
         }
         // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2530,7 +2462,7 @@
 
             for (const event of selectedEvents) {
               try {
-                const signed = await signEventForRelay(event, kp);
+                const signed = await signEvent(event, kp);
                 // Append unsigned metadata fields (not part of signature)
                 if (event.festival_name)
                   signed.festival_name = event.festival_name;
