@@ -69,6 +69,7 @@ MY-INSTALLATION.md
 
 # Local config (contains personal URLs/keys — see *.example files)
 config.local.js
+public-web/shortcut-bookmarklet.js
 scripts/config.local.sh
 worker/wrangler.toml
 crawler-worker/wrangler.toml
