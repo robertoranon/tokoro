@@ -375,9 +375,28 @@ After installing, click the extension icon → **Settings** and set:
 
 Your public key is displayed in the settings panel — share it with your admin to be added to the `ALLOWED_PUBKEYS` allowlist before you can publish events.
 
-### Apple Shortcut
+### Apple Shortcut (iOS)
 
-The Apple Shortcut link is available on the public web page. It extracts and publishes events from Safari on iPhone or Mac (no extra app needed).
+The Apple Shortcut lets you publish events directly from Safari's Share Sheet without switching apps.
+
+**Setup:**
+
+1. Build the shortcut bookmarklet (requires `config.local.js`):
+   ```bash
+   node public-web/build-bookmarklet.js
+   ```
+   This produces `public-web/shortcut-bookmarklet.js`.
+
+2. Open the **Shortcuts** app on your iPhone or iPad.
+3. Tap **+** to create a new shortcut.
+4. Add action: **Run JavaScript on Web Page**.
+5. Paste the full contents of `public-web/shortcut-bookmarklet.js` into the script field.
+6. Tap the shortcut name → enable **Show in Share Sheet**.
+7. Name it **Tokoro** and save.
+
+**Usage:** In Safari on any event page, tap **Share** → find **Tokoro** → tap it. The publish page opens in a new tab pre-loaded with the extracted events, ready to review and publish.
+
+**First time:** Open `https://YOUR_PUBLIC_WEB_URL/publish.html` in Safari, configure your API key and worker URLs in Settings, then tap **Share → Add to Home Screen** to install it as a PWA for quick access.
 
 ### Bookmarklet
 

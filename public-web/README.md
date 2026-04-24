@@ -92,3 +92,55 @@ To allow a new curator to publish, obtain their public key from the relay's Sett
 ## CORS Requirements
 
 Make sure your Cloudflare Worker has CORS headers enabled to allow requests from the Cloudflare Pages domain.
+
+---
+
+## Mobile Publishing (`publish.html`)
+
+A mobile-first publishing page deployed alongside the query interface. No build step — plain HTML + JS.
+
+### Entry modes (detected on load, highest priority first)
+
+1. **Hash-events** — `location.hash` starts with `#events=`: base64-decode → JSON-parse → `PreparedEvent[]` → Review UI directly. Hash is cleared from URL via `history.replaceState`.
+2. **Relay** — `window.opener` is present: hide input UI, post `{ type: 'ready' }` to opener after keypair is ready, listen for `{ type: 'crawl_data', url, html, title }`, run crawl on receipt.
+3. **Manual** (default): URL tab and Image tab.
+
+### Manual modes
+
+**URL tab** — paste any event page URL; crawl request goes to `workerUrl/crawl` with `{ url, mode: 'direct' }` (Jina AI Reader fallback server-side, no HTML required).
+
+**Image tab** — pick a JPEG/PNG from Photos or Camera; optional source URL. Request goes to `workerUrl/crawl` with `{ imageData, imageMimeType, url?, mode: 'image' }`. For events with no URL, the URL field is pre-filled with a Google search URL.
+
+### Settings
+
+Uses the same `localStorage` keys as `index.html`: `tokoro_api_key`, `tokoro_worker_url`, `tokoro_api_url`, `tokoro_keypair`. Settings configured in either page are immediately available in the other (same Cloudflare Pages domain).
+
+### PWA
+
+`publish.manifest.json` enables "Add to Home Screen" on iOS with `display: standalone`. No service worker required.
+
+---
+
+## Shared Signing Utilities (`signing.js`)
+
+Exports via `window.*`:
+
+- `bytesToHex(bytes)` — `Uint8Array` → lowercase hex string
+- `loadOrCreateKeypair()` — loads `tokoro_keypair` from `localStorage`; generates a new Ed25519 keypair and saves it if absent. Returns `{ pubkey, privkeyB64, isNew }`.
+- `signEvent(preparedEvent, keypair)` — builds canonical event object, SHA-256 hashes it, signs with Ed25519, returns signed event object ready to POST to the API worker.
+
+Used by both `index.html` relay and `publish.html`.
+
+---
+
+## Apple Shortcut (`shortcut-bookmarklet.js`)
+
+A build artifact produced by `build-bookmarklet.js` from `shortcut-bookmarklet.src.js`. Embeds the same DOM-cleaning logic as the bookmarklet, but opens `publish.html` instead of the relay popup.
+
+Build it with:
+
+```bash
+node public-web/build-bookmarklet.js
+```
+
+Output: `public-web/shortcut-bookmarklet.js` (gitignored). Embed the contents verbatim in an Apple Shortcut action "Run JavaScript on Web Page" — see HOW-TO-USE.md for setup instructions.
