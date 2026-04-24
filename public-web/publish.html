@@ -690,11 +690,12 @@
       if (!handledByHash) {
         // Relay mode: opened by bookmarklet or Shortcut via window.open
         if (window.opener) {
+          var trustedOpener = window.opener;
           inputUi.style.display = 'none';
           setSt('Waiting for page data…', 'info');
 
           window.addEventListener('message', async function (evt) {
-            if (evt.source !== window.opener) return;
+            if (evt.source !== trustedOpener) return;
             if (!evt.data || evt.data.type !== 'crawl_data') return;
             inputUi.style.display = 'none';
             await runCrawl(
@@ -716,7 +717,7 @@
               cfgSave.style.display = 'block';
               cfgToggle.style.display = 'none';
             }
-            window.opener.postMessage({ type: 'ready' }, '*');
+            trustedOpener.postMessage({ type: 'ready' }, '*');
           });
         } else {
           // Manual mode (default)
