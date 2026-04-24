@@ -666,8 +666,8 @@
       loadSettings();
       updateCfgVisibility();
 
-      // Hash-events mode: Shortcut encoded PreparedEvents[] in location.hash
-      (function tryHashEvents() {
+      // Hash-events mode (highest priority)
+      var handledByHash = (function tryHashEvents() {
         var hash = window.location.hash;
         if (!hash.startsWith('#events=')) return false;
         try {
@@ -685,16 +685,52 @@
           console.error('Failed to parse #events hash:', e);
           return false;
         }
-      })() ||
-        loadOrCreateKeypair().then(function (kp) {
-          if (kp.isNew) {
-            cfgPrivKey.value = kp.privkeyB64;
-            cfgPubKey.textContent = kp.pubkey;
-            cfgFields.style.display = 'flex';
-            cfgSave.style.display = 'block';
-            cfgToggle.style.display = 'none';
-          }
-        });
+      })();
+
+      if (!handledByHash) {
+        // Relay mode: opened by bookmarklet or Shortcut via window.open
+        if (window.opener) {
+          inputUi.style.display = 'none';
+          setSt('Waiting for page data…', 'info');
+
+          window.addEventListener('message', async function (evt) {
+            if (evt.source !== window.opener) return;
+            if (!evt.data || evt.data.type !== 'crawl_data') return;
+            inputUi.style.display = 'none';
+            await runCrawl(
+              {
+                url: evt.data.url,
+                html: evt.data.html,
+                title: evt.data.title,
+                mode: 'direct',
+              },
+              null
+            );
+          });
+
+          loadOrCreateKeypair().then(function (kp) {
+            if (kp.isNew) {
+              cfgPrivKey.value = kp.privkeyB64;
+              cfgPubKey.textContent = kp.pubkey;
+              cfgFields.style.display = 'flex';
+              cfgSave.style.display = 'block';
+              cfgToggle.style.display = 'none';
+            }
+            window.opener.postMessage({ type: 'ready' }, '*');
+          });
+        } else {
+          // Manual mode (default)
+          loadOrCreateKeypair().then(function (kp) {
+            if (kp.isNew) {
+              cfgPrivKey.value = kp.privkeyB64;
+              cfgPubKey.textContent = kp.pubkey;
+              cfgFields.style.display = 'flex';
+              cfgSave.style.display = 'block';
+              cfgToggle.style.display = 'none';
+            }
+          });
+        }
+      }
     </script>
   </body>
 </html>
