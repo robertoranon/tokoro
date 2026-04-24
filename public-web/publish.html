@@ -388,9 +388,11 @@
           );
           const jwk = await crypto.subtle.exportKey('jwk', cryptoKey);
           const pubB64std = jwk.x.replace(/-/g, '+').replace(/_/g, '/');
-          const pubBytes = Uint8Array.from(atob(pubB64std), c =>
-            c.charCodeAt(0)
+          const padded = pubB64std.padEnd(
+            Math.ceil(pubB64std.length / 4) * 4,
+            '='
           );
+          const pubBytes = Uint8Array.from(atob(padded), c => c.charCodeAt(0));
           const pubHex = bytesToHex(pubBytes);
           cfgPubKey.textContent = pubHex;
           localStorage.setItem(
