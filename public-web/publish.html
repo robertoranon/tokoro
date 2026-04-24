@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tokoro Publish</title>
+    <link rel="manifest" href="publish.manifest.json" />
+    <script src="shared.js"></script>
+    <script src="signing.js"></script>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: system-ui, sans-serif;
+        font-size: 15px;
+        background: #fff;
+        color: #111;
+        max-width: 480px;
+        margin: 0 auto;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 18px;
+        margin-bottom: 12px;
+      }
+      a {
+        color: #0066cc;
+      }
+
+      /* Settings */
+      #cfg {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 14px;
+      }
+      #cfg-toggle {
+        font-size: 13px;
+      }
+      #cfg-fields {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      #cfg-fields label {
+        font-size: 13px;
+        color: #555;
+      }
+      #cfg-fields input {
+        width: 100%;
+        padding: 7px 9px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 14px;
+      }
+      .cfg-pubkey {
+        font-size: 11px;
+        word-break: break-all;
+        color: #555;
+        margin-top: 2px;
+      }
+      #cfg-save {
+        margin-top: 6px;
+        padding: 7px 14px;
+        background: #111;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      /* Status */
+      #status {
+        min-height: 20px;
+        font-size: 13px;
+        margin-bottom: 10px;
+        padding: 6px 0;
+      }
+      #status.err {
+        color: #c00;
+      }
+      #status.ok {
+        color: #060;
+      }
+      #status.info {
+        color: #555;
+      }
+
+      /* Tabs */
+      #tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .tab {
+        padding: 6px 14px;
+        border: 1px solid #ccc;
+        border-radius: 20px;
+        background: #fff;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .tab.active {
+        background: #111;
+        color: #fff;
+        border-color: #111;
+      }
+
+      /* Inputs */
+      .pane {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .pane input[type='url'],
+      .pane input[type='text'] {
+        width: 100%;
+        padding: 9px 11px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        font-size: 15px;
+      }
+      .pane input[type='file'] {
+        font-size: 14px;
+      }
+      .pane button {
+        padding: 10px;
+        background: #111;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        cursor: pointer;
+      }
+      .pane button:disabled {
+        background: #999;
+        cursor: default;
+      }
+
+      /* Review */
+      #events-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+      .ev-card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 10px 12px;
+      }
+      .ev-card h3 {
+        font-size: 15px;
+        margin-bottom: 4px;
+      }
+      .ev-card p {
+        font-size: 13px;
+        color: #555;
+        margin-top: 2px;
+      }
+      .ev-card .ev-url {
+        width: 100%;
+        margin-top: 6px;
+        padding: 6px 8px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 12px;
+      }
+
+      /* Review actions */
+      #review-acts {
+        display: flex;
+        gap: 10px;
+      }
+      #pub-btn {
+        flex: 1;
+        padding: 11px;
+        background: #111;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        cursor: pointer;
+      }
+      #pub-btn:disabled {
+        background: #999;
+      }
+      #cancel-btn {
+        padding: 11px 16px;
+        border: 1px solid #ccc;
+        background: #fff;
+        border-radius: 8px;
+        font-size: 15px;
+        cursor: pointer;
+      }
+
+      /* Result */
+      #result-ui {
+        text-align: center;
+        padding: 20px 0;
+      }
+      #result-msg {
+        font-size: 16px;
+        margin-bottom: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Tokoro Publish</h1>
+
+    <!-- Settings -->
+    <section id="cfg">
+      <div id="cfg-summary"><a href="#" id="cfg-toggle">⚙ Settings</a></div>
+      <div id="cfg-fields">
+        <label
+          >API Key<input
+            type="password"
+            id="cfg-apikey"
+            placeholder="Bearer token for crawler-worker"
+        /></label>
+        <label
+          >Crawler Worker URL<input
+            type="url"
+            id="cfg-worker"
+            placeholder="https://tokoro-crawler-worker.xxx.workers.dev"
+        /></label>
+        <label
+          >API Worker URL<input
+            type="url"
+            id="cfg-apiurl"
+            placeholder="https://tokoro-worker.xxx.workers.dev"
+        /></label>
+        <label
+          >Private Key (PKCS8 base64)<input
+            type="text"
+            id="cfg-privkey"
+            autocomplete="off"
+            spellcheck="false"
+        /></label>
+        <label
+          >Public Key
+          <div class="cfg-pubkey" id="cfg-pubkey"></div
+        ></label>
+        <button id="cfg-save">Save</button>
+      </div>
+    </section>
+
+    <!-- Status -->
+    <p id="status"></p>
+
+    <!-- Input UI -->
+    <div id="input-ui">
+      <div id="tabs">
+        <button class="tab active" id="tab-url">URL</button>
+        <button class="tab" id="tab-img">Image</button>
+      </div>
+
+      <div id="pane-url" class="pane">
+        <input
+          type="url"
+          id="url-input"
+          placeholder="https://example.com/events"
+          autocorrect="off"
+          autocapitalize="none"
+        />
+        <button id="url-extract">Extract Events</button>
+      </div>
+
+      <div id="pane-img" class="pane" style="display: none">
+        <input type="file" id="img-input" accept="image/*" />
+        <input
+          type="url"
+          id="img-url"
+          placeholder="Source URL (leave blank to auto-construct)"
+          autocorrect="off"
+          autocapitalize="none"
+        />
+        <button id="img-extract">Extract Events</button>
+      </div>
+    </div>
+
+    <!-- Review UI -->
+    <div id="review-ui" style="display: none">
+      <div id="events-list"></div>
+      <div id="review-acts">
+        <button id="pub-btn">Publish All</button>
+        <button id="cancel-btn">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Result UI -->
+    <div id="result-ui" style="display: none">
+      <p id="result-msg"></p>
+      <a href="#" id="publish-more">Publish more</a>
+    </div>
+
+    <script>
+      'use strict';
+
+      // ── DOM refs ──────────────────────────────────────────────────────────────
+      const statusEl = document.getElementById('status');
+      const inputUi = document.getElementById('input-ui');
+      const reviewUi = document.getElementById('review-ui');
+      const resultUi = document.getElementById('result-ui');
+      const eventsList = document.getElementById('events-list');
+      const pubBtn = document.getElementById('pub-btn');
+      const cancelBtn = document.getElementById('cancel-btn');
+      const resultMsg = document.getElementById('result-msg');
+
+      // ── Settings ──────────────────────────────────────────────────────────────
+      const cfgFields = document.getElementById('cfg-fields');
+      const cfgToggle = document.getElementById('cfg-toggle');
+      const cfgSave = document.getElementById('cfg-save');
+      const cfgApiKey = document.getElementById('cfg-apikey');
+      const cfgWorker = document.getElementById('cfg-worker');
+      const cfgApiUrl = document.getElementById('cfg-apiurl');
+      const cfgPrivKey = document.getElementById('cfg-privkey');
+      const cfgPubKey = document.getElementById('cfg-pubkey');
+
+      function loadSettings() {
+        cfgApiKey.value = localStorage.getItem('tokoro_api_key') || '';
+        cfgWorker.value = localStorage.getItem('tokoro_worker_url') || '';
+        cfgApiUrl.value = localStorage.getItem('tokoro_api_url') || '';
+        const kp = getStoredKeypair();
+        if (kp) {
+          cfgPrivKey.value = kp.privkeyB64;
+          cfgPubKey.textContent = kp.pubkey;
+        }
+      }
+
+      function getStoredKeypair() {
+        try {
+          return JSON.parse(localStorage.getItem('tokoro_keypair') || 'null');
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function allConfigured() {
+        return (
+          cfgApiKey.value.trim() &&
+          cfgWorker.value.trim() &&
+          cfgApiUrl.value.trim()
+        );
+      }
+
+      function updateCfgVisibility() {
+        const ok = allConfigured();
+        cfgFields.style.display = ok ? 'none' : 'flex';
+        cfgSave.style.display = ok ? 'none' : 'block';
+        cfgToggle.style.display = ok ? 'block' : 'none';
+      }
+
+      cfgToggle.addEventListener('click', function (e) {
+        e.preventDefault();
+        cfgFields.style.display = 'flex';
+        cfgSave.style.display = 'block';
+        cfgToggle.style.display = 'none';
+      });
+
+      cfgSave.addEventListener('click', function () {
+        localStorage.setItem('tokoro_api_key', cfgApiKey.value.trim());
+        localStorage.setItem('tokoro_worker_url', cfgWorker.value.trim());
+        localStorage.setItem('tokoro_api_url', cfgApiUrl.value.trim());
+        updateCfgVisibility();
+      });
+
+      cfgPrivKey.addEventListener('change', async function () {
+        const privB64 = cfgPrivKey.value.trim();
+        if (!privB64) return;
+        try {
+          const privBytes = Uint8Array.from(atob(privB64), c =>
+            c.charCodeAt(0)
+          );
+          const cryptoKey = await crypto.subtle.importKey(
+            'pkcs8',
+            privBytes.buffer,
+            'Ed25519',
+            true,
+            ['sign']
+          );
+          const jwk = await crypto.subtle.exportKey('jwk', cryptoKey);
+          const pubB64std = jwk.x.replace(/-/g, '+').replace(/_/g, '/');
+          const pubBytes = Uint8Array.from(atob(pubB64std), c =>
+            c.charCodeAt(0)
+          );
+          const pubHex = bytesToHex(pubBytes);
+          cfgPubKey.textContent = pubHex;
+          localStorage.setItem(
+            'tokoro_keypair',
+            JSON.stringify({ pubkey: pubHex, privkeyB64: privB64 })
+          );
+        } catch (e) {
+          setSt('Invalid private key: ' + e.message, 'err');
+        }
+      });
+
+      // ── Status ────────────────────────────────────────────────────────────────
+      function setSt(msg, cls) {
+        statusEl.textContent = msg;
+        statusEl.className = cls || '';
+      }
+
+      // ── UI state switches ─────────────────────────────────────────────────────
+      function showInput() {
+        inputUi.style.display = '';
+        reviewUi.style.display = 'none';
+        resultUi.style.display = 'none';
+      }
+
+      function showReview(events) {
+        inputUi.style.display = 'none';
+        reviewUi.style.display = '';
+        resultUi.style.display = 'none';
+        renderEventCards(events);
+      }
+
+      function showResult(msg) {
+        inputUi.style.display = 'none';
+        reviewUi.style.display = 'none';
+        resultUi.style.display = '';
+        resultMsg.textContent = msg;
+      }
+
+      // ── Event card rendering ──────────────────────────────────────────────────
+      function buildGoogleSearchUrl(ev) {
+        const date = ev.start_time ? ev.start_time.slice(0, 10) : '';
+        const parts = [ev.title, ev.venue_name, date].filter(Boolean);
+        return (
+          'https://www.google.com/search?q=' +
+          encodeURIComponent(parts.join(' '))
+        );
+      }
+
+      function renderEventCards(events) {
+        eventsList.innerHTML = events
+          .map(function (ev, i) {
+            const url = ev.url || buildGoogleSearchUrl(ev);
+            return (
+              '<div class="ev-card" data-idx="' +
+              i +
+              '">' +
+              '<h3>' +
+              escHtml(ev.title || 'Untitled') +
+              '</h3>' +
+              '<p>' +
+              fmtRange(ev.start_time, ev.end_time) +
+              '</p>' +
+              (ev.venue_name ? '<p>' + escHtml(ev.venue_name) + '</p>' : '') +
+              (ev.address ? '<p>' + escHtml(ev.address) + '</p>' : '') +
+              '<p>' +
+              escHtml(ev.category || 'other') +
+              '</p>' +
+              '<input class="ev-url" type="url" value="' +
+              escHtml(url) +
+              '" placeholder="Event URL" />' +
+              '</div>'
+            );
+          })
+          .join('');
+        eventsList._events = events;
+      }
+
+      // ── Crawl ─────────────────────────────────────────────────────────────────
+      async function runCrawl(body, buttonEl) {
+        const workerUrl = (localStorage.getItem('tokoro_worker_url') || '')
+          .trim()
+          .replace(/\/$/, '');
+        const apiKey = (localStorage.getItem('tokoro_api_key') || '').trim();
+        if (!workerUrl || !apiKey) {
+          cfgFields.style.display = 'flex';
+          cfgSave.style.display = 'block';
+          cfgToggle.style.display = 'none';
+          setSt(
+            'Enter API key and Crawler Worker URL in Settings above.',
+            'err'
+          );
+          return;
+        }
+        if (buttonEl) buttonEl.disabled = true;
+        setSt('Extracting events…', 'info');
+        try {
+          const resp = await fetch(workerUrl + '/crawl', {
+            method: 'POST',
+            headers: {
+              Authorization: 'Bearer ' + apiKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+          });
+          const result = await resp.json();
+          if (!resp.ok || !result.success) {
+            setSt(
+              'Error: ' + (result.message || result.error || 'Unknown error'),
+              'err'
+            );
+            return;
+          }
+          const evs = result.events || [];
+          if (!evs.length) {
+            const dropped = result.dropped_events;
+            setSt(
+              dropped && dropped.length
+                ? dropped.length +
+                    ' event(s) found but dropped during normalization.'
+                : 'No events found on this page.',
+              'info'
+            );
+            return;
+          }
+          setSt('Found ' + evs.length + ' event(s). Review below:', 'ok');
+          showReview(evs);
+        } catch (e) {
+          setSt('Network error: ' + e.message, 'err');
+        } finally {
+          if (buttonEl) buttonEl.disabled = false;
+        }
+      }
+
+      // ── URL extraction ────────────────────────────────────────────────────────
+      document
+        .getElementById('url-extract')
+        .addEventListener('click', async function () {
+          const url = document.getElementById('url-input').value.trim();
+          if (!url) {
+            setSt('Enter a URL.', 'err');
+            return;
+          }
+          await runCrawl({ url: url, mode: 'direct' }, this);
+        });
+
+      // ── Image extraction ──────────────────────────────────────────────────────
+      document
+        .getElementById('img-extract')
+        .addEventListener('click', async function () {
+          const file = document.getElementById('img-input').files[0];
+          if (!file) {
+            setSt('Pick an image first.', 'err');
+            return;
+          }
+          const url = document.getElementById('img-url').value.trim() || '';
+          const base64 = await new Promise(function (resolve, reject) {
+            const reader = new FileReader();
+            reader.onload = function () {
+              resolve(reader.result.split(',')[1]);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          const body = {
+            mode: 'image',
+            imageData: base64,
+            imageMimeType: file.type,
+          };
+          if (url) body.url = url;
+          await runCrawl(body, this);
+        });
+
+      // ── Tabs ──────────────────────────────────────────────────────────────────
+      document.getElementById('tab-url').addEventListener('click', function () {
+        document.getElementById('pane-url').style.display = '';
+        document.getElementById('pane-img').style.display = 'none';
+        document.getElementById('tab-url').classList.add('active');
+        document.getElementById('tab-img').classList.remove('active');
+      });
+      document.getElementById('tab-img').addEventListener('click', function () {
+        document.getElementById('pane-url').style.display = 'none';
+        document.getElementById('pane-img').style.display = '';
+        document.getElementById('tab-url').classList.remove('active');
+        document.getElementById('tab-img').classList.add('active');
+      });
+
+      // ── Publish ───────────────────────────────────────────────────────────────
+      pubBtn.addEventListener('click', async function () {
+        const apiUrl = (localStorage.getItem('tokoro_api_url') || '')
+          .trim()
+          .replace(/\/$/, '');
+        if (!apiUrl) {
+          cfgFields.style.display = 'flex';
+          cfgSave.style.display = 'block';
+          cfgToggle.style.display = 'none';
+          setSt('Enter API Worker URL in Settings above.', 'err');
+          return;
+        }
+        pubBtn.disabled = cancelBtn.disabled = true;
+        pubBtn.textContent = 'Publishing…';
+        setSt('Publishing events…', 'info');
+        try {
+          const kp = await loadOrCreateKeypair();
+          if (kp.isNew) {
+            cfgPrivKey.value = kp.privkeyB64;
+            cfgPubKey.textContent = kp.pubkey;
+          }
+          const cards = Array.from(eventsList.querySelectorAll('.ev-card'));
+          const events = eventsList._events || [];
+          let published = 0,
+            failed = 0;
+          for (let i = 0; i < events.length; i++) {
+            const ev = { ...events[i] };
+            const input = cards[i] && cards[i].querySelector('.ev-url');
+            if (input) ev.url = input.value.trim();
+            try {
+              const signed = await signEvent(ev, kp);
+              if (ev.festival_name) signed.festival_name = ev.festival_name;
+              if (ev.festival_url) signed.festival_url = ev.festival_url;
+              const resp = await fetch(apiUrl + '/events', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(signed),
+              });
+              if (resp.ok || resp.status === 409) {
+                published++;
+              } else {
+                const err = await resp.json().catch(() => ({}));
+                console.error('Failed to publish "' + ev.title + '":', err);
+                failed++;
+              }
+            } catch (e) {
+              console.error('Network error publishing "' + ev.title + '":', e);
+              failed++;
+            }
+          }
+          if (failed === 0) {
+            showResult('Published ' + published + ' event(s) successfully!');
+          } else {
+            setSt(
+              'Published ' +
+                published +
+                ', failed ' +
+                failed +
+                '. Check console.',
+              'err'
+            );
+          }
+        } catch (e) {
+          setSt('Error: ' + e.message, 'err');
+        } finally {
+          pubBtn.disabled = cancelBtn.disabled = false;
+          pubBtn.textContent = 'Publish All';
+        }
+      });
+
+      cancelBtn.addEventListener('click', function () {
+        showInput();
+        setSt('', '');
+      });
+
+      document
+        .getElementById('publish-more')
+        .addEventListener('click', function (e) {
+          e.preventDefault();
+          showInput();
+          setSt('', '');
+        });
+
+      // ── Init ──────────────────────────────────────────────────────────────────
+      loadSettings();
+      updateCfgVisibility();
+      loadOrCreateKeypair().then(function (kp) {
+        if (kp.isNew) {
+          cfgPrivKey.value = kp.privkeyB64;
+          cfgPubKey.textContent = kp.pubkey;
+          cfgFields.style.display = 'flex';
+          cfgSave.style.display = 'block';
+          cfgToggle.style.display = 'none';
+        }
+      });
+    </script>
+  </body>
+</html>
