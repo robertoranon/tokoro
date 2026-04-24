@@ -26,7 +26,9 @@ async function loadOrCreateKeypair() {
   );
   const kp = {
     pubkey: bytesToHex(pubBytes),
-    privkeyB64: btoa(String.fromCharCode(...privBytes)),
+    privkeyB64: btoa(
+      Array.from(privBytes, b => String.fromCharCode(b)).join('')
+    ),
   };
   localStorage.setItem('tokoro_keypair', JSON.stringify(kp));
   return { ...kp, isNew: true };
@@ -67,7 +69,7 @@ async function signEvent(preparedEvent, kp) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { bytesToHex, loadOrCreateKeypair, signEvent };
+  module.exports = { bytesToHex, signEvent };
 }
 if (typeof window !== 'undefined') {
   window.bytesToHex = bytesToHex;
