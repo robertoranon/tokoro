@@ -37,16 +37,18 @@ npx playwright install chromium
 npm run crawl -- --generate-keypair
 ```
 
-4. Create `.env` file:
+4. Create `.env` file and fill in your keypair and LLM provider settings:
 
 ```bash
 cp .env.example .env
+# Edit .env: set CRAWLER_PRIVKEY, CRAWLER_PUBKEY (from step 3), LLM_PROVIDER, LLM_API_KEY
 ```
 
-5. Edit `.env` and add:
-   - Your keypair (from step 3)
-   - LLM provider settings
-   - API URL
+5. Sync `TOKORO_API_URL` from the repo's `config.local.js` (single source of truth for URLs):
+
+```bash
+cd .. && ./scripts/setup.sh
+```
 
 ## Usage
 

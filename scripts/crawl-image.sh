@@ -6,22 +6,22 @@
 # By default runs in preview mode (events are extracted but not published).
 # Pass --publish to actually publish the extracted events.
 #
-# Required env vars:
-#   CRAWLER_WORKER_URL  — e.g. https://tokoro-crawler-worker.<subdomain>.workers.dev
-#   CRAWLER_API_KEY     — API key for the crawler worker
-
-
-# Load local configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="${SCRIPT_DIR}/config.local.sh"
-if [[ ! -f "$CONFIG_FILE" ]]; then
-  echo "Error: ${CONFIG_FILE} not found. Copy scripts/config.local.sh.example to scripts/config.local.sh and fill in your values." >&2
-  exit 1
-fi
-# shellcheck source=scripts/config.local.sh
-source "$CONFIG_FILE"
+# Reads crawlerWorkerUrl and crawlerApiKey from config.local.js in the repo root.
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+CONFIG_JS="${REPO_ROOT}/config.local.js"
+
+if [[ ! -f "$CONFIG_JS" ]]; then
+  echo "Error: config.local.js not found." >&2
+  echo "Copy config.local.js.example to config.local.js and fill in your values." >&2
+  exit 1
+fi
+
+CRAWLER_WORKER_URL="$(node -e "console.log(require('${CONFIG_JS}').crawlerWorkerUrl)")"
+CRAWLER_API_KEY="$(node -e "console.log(require('${CONFIG_JS}').crawlerApiKey)")"
 
 IMAGE_PATH="${1:-}"
 PREVIEW=true

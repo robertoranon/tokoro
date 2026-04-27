@@ -54,14 +54,9 @@ const TOKORO_CONFIG = {
 };
 ```
 
-For the shell scripts (`scripts/crawl-page.sh`, `scripts/crawl-image.sh`), also create:
+`config.local.js` is the single source of truth for URLs and keys. All scripts (`deploy-public-web.sh`, `crawl-page.sh`, `crawl-image.sh`) read from it directly. Run `scripts/setup.sh` once after editing it to propagate values to dependent config files (e.g. `crawler/.env`).
 
-```bash
-cp scripts/config.local.sh.example scripts/config.local.sh
-# then edit scripts/config.local.sh
-```
-
-Neither file is committed — they stay on your machine only.
+This file is gitignored — it stays on your machine only.
 
 ---
 
@@ -457,7 +452,9 @@ npx playwright install chromium
 npm run crawl -- --generate-keypair
 
 cp .env.example .env
-# Edit .env: set LLM_PROVIDER, LLM_API_KEY, TOKORO_API_URL, CRAWLER_PRIVKEY, CRAWLER_PUBKEY
+# Edit crawler/.env: set LLM_PROVIDER, LLM_API_KEY, CRAWLER_PRIVKEY, CRAWLER_PUBKEY
+# Then sync TOKORO_API_URL from config.local.js:
+cd .. && ./scripts/setup.sh
 ```
 
 Add the generated public key to `ALLOWED_PUBKEYS` on the API worker (see Section 4).
