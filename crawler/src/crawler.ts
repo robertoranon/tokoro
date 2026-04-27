@@ -388,17 +388,19 @@ export class EventCrawler {
       return;
     }
 
+    const namePrefix = path.basename(filePath);
+    const eventsToPublish = this.config.groupByDay
+      ? groupEventsByDay(extractedEvents, namePrefix)
+      : extractedEvents;
+
     if (this.config.debug && !this.config.normalize) {
-      this.printRawEvents(extractedEvents);
+      this.printRawEvents(eventsToPublish);
     } else {
       const normalizedEvents = [];
-      for (const event of extractedEvents) {
+      for (const event of eventsToPublish) {
         const normalized = await this.normalizer.normalize(event);
-        if (normalized) {
-          normalizedEvents.push(normalized);
-        }
+        if (normalized) normalizedEvents.push(normalized);
       }
-
       if (normalizedEvents.length > 0) {
         await this.publisher.publishMultiple(normalizedEvents);
       }
@@ -675,19 +677,19 @@ Return JSON: {"remove": [], "reasons": {}}`;
 
         totalEvents += extractedEvents.length;
 
-        if (this.config.debug && !this.config.normalize) {
-          this.printRawEvents(extractedEvents);
-        } else {
-          // Normalize and sign events
-          const normalizedEvents = [];
-          for (const event of extractedEvents) {
-            const normalized = await this.normalizer.normalize(event);
-            if (normalized) {
-              normalizedEvents.push(normalized);
-            }
-          }
+        const namePrefix = path.basename(imagePath);
+        const eventsToPublish = this.config.groupByDay
+          ? groupEventsByDay(extractedEvents, namePrefix)
+          : extractedEvents;
 
-          // Publish to API
+        if (this.config.debug && !this.config.normalize) {
+          this.printRawEvents(eventsToPublish);
+        } else {
+          const normalizedEvents = [];
+          for (const event of eventsToPublish) {
+            const normalized = await this.normalizer.normalize(event);
+            if (normalized) normalizedEvents.push(normalized);
+          }
           if (normalizedEvents.length > 0) {
             const published =
               await this.publisher.publishMultiple(normalizedEvents);
@@ -771,8 +773,12 @@ Return JSON: {"remove": [], "reasons": {}}`;
 
         totalEvents += extractedEvents.length;
 
+        const eventsToPublish = this.config.groupByDay
+          ? groupEventsByDay(extractedEvents, filename)
+          : extractedEvents;
+
         const normalizedEvents = [];
-        for (const event of extractedEvents) {
+        for (const event of eventsToPublish) {
           const normalized = await this.normalizer.normalize(event);
           if (normalized) normalizedEvents.push(normalized);
         }
