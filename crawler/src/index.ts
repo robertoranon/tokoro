@@ -146,6 +146,20 @@ async function main() {
   }
   model = model || process.env.OPENROUTER_MODEL || process.env.LLM_MODEL;
 
+  // Parse max-tokens flag (override output token budget for LLM extraction)
+  let maxTokensOverride: number | undefined;
+  const maxTokensIndex = args.indexOf('--max-tokens');
+  if (maxTokensIndex !== -1 && args[maxTokensIndex + 1]) {
+    const parsed = parseInt(args[maxTokensIndex + 1], 10);
+    if (isNaN(parsed) || parsed <= 0) {
+      console.error(
+        `Error: Invalid --max-tokens value "${args[maxTokensIndex + 1]}". Must be a positive integer.`
+      );
+      process.exit(1);
+    }
+    maxTokensOverride = parsed;
+  }
+
   // Parse date flag (optional reference date for LLM, format: YYYY-MM-DD)
   let referenceDate: string | undefined;
   const dateIndex = args.indexOf('--date');
@@ -174,6 +188,9 @@ async function main() {
       return false;
     }
     if (arg === '--date' || (i > 0 && args[i - 1] === '--date')) {
+      return false;
+    }
+    if (arg === '--max-tokens' || (i > 0 && args[i - 1] === '--max-tokens')) {
       return false;
     }
     if (arg === '--text-file' || (i > 0 && args[i - 1] === '--text-file')) {
@@ -240,6 +257,9 @@ async function main() {
       );
       console.log(
         '  npm run crawl -- --date <YYYY-MM-DD> <url>           # Use specific reference date for extraction (default: today)'
+      );
+      console.log(
+        '  npm run crawl -- --max-tokens <N> <url>              # Override output token budget (default: auto-scaled from content length)'
       );
       console.log(
         '  npm run crawl -- --debug <url>                       # Debug mode: print raw LLM output, skip normalization/geocoding'
@@ -309,6 +329,7 @@ async function main() {
     normalize,
     referenceDate,
     useJsonLd,
+    maxTokens: maxTokensOverride,
   });
 
   // Start crawling

@@ -35,6 +35,7 @@ export interface CrawlerConfig {
   normalize?: boolean; // if true (with debug), run full normalization; if false (default with debug), skip geocoding/signing
   referenceDate?: string; // optional reference date for LLM (format: YYYY-MM-DD, defaults to today)
   useJsonLd?: boolean; // whether to attempt JSON-LD extraction before LLM (default: true)
+  maxTokens?: number; // override output token budget (default: auto-scaled from content length)
 }
 
 export class EventCrawler {
@@ -67,7 +68,9 @@ export class EventCrawler {
       maxContentLength: isFestival
         ? FESTIVAL_MAX_CONTENT_LENGTH
         : DEFAULT_MAX_CONTENT_LENGTH,
-      maxTokens: isFestival ? FESTIVAL_MAX_TOKENS : DEFAULT_MAX_TOKENS,
+      maxTokens:
+        config.maxTokens ??
+        (isFestival ? FESTIVAL_MAX_TOKENS : DEFAULT_MAX_TOKENS),
     });
     this.normalizer = new EventNormalizer(config.keypair);
     this.publisher = new APIPublisher(config.apiUrl, config.debug, config.llm);

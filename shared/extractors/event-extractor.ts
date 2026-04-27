@@ -34,9 +34,16 @@ export interface EventExtractorConfig {
 
 /** Compact single-line error formatter — no stack traces. */
 function formatError(error: unknown): string {
-  if (error && typeof error === 'object' && Array.isArray((error as any).issues)) {
+  if (
+    error &&
+    typeof error === 'object' &&
+    Array.isArray((error as any).issues)
+  ) {
     return (error as any).issues
-      .map((i: any) => `${i.path.length ? i.path.join('.') + ': ' : ''}${i.message}`)
+      .map(
+        (i: any) =>
+          `${i.path.length ? i.path.join('.') + ': ' : ''}${i.message}`
+      )
       .join('; ');
   }
   return error instanceof Error ? error.message : String(error);
@@ -57,7 +64,8 @@ export class EventExtractor {
     this.referenceDate = config.referenceDate;
     this.filterPastEvents = config.filterPastEvents ?? true;
     this.useJsonLd = config.useJsonLd ?? true;
-    this.maxContentLength = config.maxContentLength ?? DEFAULT_MAX_CONTENT_LENGTH;
+    this.maxContentLength =
+      config.maxContentLength ?? DEFAULT_MAX_CONTENT_LENGTH;
     this.maxTokens = config.maxTokens ?? DEFAULT_MAX_TOKENS;
   }
 
@@ -90,7 +98,9 @@ export class EventExtractor {
           const validEvent = ExtractedEventSchema.parse(event);
           validated.push(validEvent);
         } catch (error) {
-          console.error(`  ⚠️  JSON-LD validation error for "${(event as any).title}": ${formatError(error)}`);
+          console.error(
+            `  ⚠️  JSON-LD validation error for "${(event as any).title}": ${formatError(error)}`
+          );
         }
       }
 
@@ -102,7 +112,9 @@ export class EventExtractor {
           ? validated.filter(e => {
               const startDateStr = String(e.start_time).slice(0, 10);
               if (startDateStr < todayISO) {
-                console.log(`⚠ Skipping past event: "${e.title}" (${e.start_time})`);
+                console.log(
+                  `⚠ Skipping past event: "${e.title}" (${e.start_time})`
+                );
                 return false;
               }
               return true;
@@ -129,8 +141,17 @@ export class EventExtractor {
       .filter(line => line.trim().length > 0)
       .join('\n');
 
-    const contentSlice = contentWithoutEmptyLines.slice(0, this.maxContentLength);
-    const systemPrompt = getEventExtractionPrompt({ maxContentLength: this.maxContentLength });
+    const contentSlice = contentWithoutEmptyLines.slice(
+      0,
+      this.maxContentLength
+    );
+    // Scale output budget with actual content length: dense pages with many events need
+    // proportionally more output tokens to avoid JSON truncation. 1 token per input char
+    // is a generous upper bound (JSON is more compact than prose), floored at configured maxTokens.
+    const adaptiveMaxTokens = Math.max(this.maxTokens, contentSlice.length);
+    const systemPrompt = getEventExtractionPrompt({
+      maxContentLength: this.maxContentLength,
+    });
     const userPrompt = getEventExtractionUserPrompt(
       page,
       todayISO,
@@ -144,7 +165,7 @@ export class EventExtractor {
       ],
       {
         temperature: 0.1,
-        maxTokens: this.maxTokens,
+        maxTokens: adaptiveMaxTokens,
         responseFormat: 'json',
       }
     );
@@ -159,7 +180,9 @@ export class EventExtractor {
     try {
       parsed = JSON.parse(response.content);
     } catch (error) {
-      console.error(`❌ Failed to parse LLM response as JSON: ${formatError(error)}`);
+      console.error(
+        `❌ Failed to parse LLM response as JSON: ${formatError(error)}`
+      );
       throw new Error(
         `LLM returned malformed JSON (possibly truncated due to token limit). Consider shortening the description or using a model with larger output capacity.`
       );
@@ -174,7 +197,9 @@ export class EventExtractor {
 
     console.log(`LLM raw events:`);
     for (const e of events) {
-      console.log(`  - "${e.title}" start=${e.start_time} day_name=${e.day_name ?? '(none)'}`);
+      console.log(
+        `  - "${e.title}" start=${e.start_time} day_name=${e.day_name ?? '(none)'}`
+      );
     }
 
     // Validate each event and optionally merge with JSON-LD data
@@ -207,7 +232,9 @@ export class EventExtractor {
 
         validated.push(validEvent);
       } catch (error) {
-        console.error(`  ⚠️  Validation error for "${event.title}": ${formatError(error)}`);
+        console.error(
+          `  ⚠️  Validation error for "${event.title}": ${formatError(error)}`
+        );
       }
     }
 
@@ -216,7 +243,9 @@ export class EventExtractor {
     // Append any JSON-LD events not covered by the LLM (e.g. cut off by content length limit)
     if (jsonldResult.events.length > events.length) {
       const extra = jsonldResult.events.slice(events.length);
-      console.log(`📎 JSON-LD has ${extra.length} extra event(s) not extracted by LLM, appending...`);
+      console.log(
+        `📎 JSON-LD has ${extra.length} extra event(s) not extracted by LLM, appending...`
+      );
       for (const jsonldEvent of extra) {
         try {
           const eventData: any = { ...jsonldEvent };
@@ -232,10 +261,14 @@ export class EventExtractor {
           const validEvent = ExtractedEventSchema.parse(eventData);
           validated.push(validEvent);
         } catch (error) {
-          console.error(`  ⚠️  Validation error for extra JSON-LD event "${(jsonldEvent as any).title}": ${formatError(error)}`);
+          console.error(
+            `  ⚠️  Validation error for extra JSON-LD event "${(jsonldEvent as any).title}": ${formatError(error)}`
+          );
         }
       }
-      console.log(`Total after JSON-LD supplement: ${validated.length} event(s)`);
+      console.log(
+        `Total after JSON-LD supplement: ${validated.length} event(s)`
+      );
     }
 
     // Apply day_name year correction and past-event filter
@@ -247,7 +280,9 @@ export class EventExtractor {
       if (this.filterPastEvents) {
         const startDateStr = String(fixed.start_time).slice(0, 10);
         if (startDateStr < todayISO) {
-          console.log(`⚠ Skipping past event: "${fixed.title}" (${fixed.start_time})`);
+          console.log(
+            `⚠ Skipping past event: "${fixed.title}" (${fixed.start_time})`
+          );
           continue;
         }
       }
@@ -317,7 +352,9 @@ export class EventExtractor {
     try {
       parsed = JSON.parse(response.content);
     } catch (error) {
-      console.error(`❌ Failed to parse LLM response as JSON: ${formatError(error)}`);
+      console.error(
+        `❌ Failed to parse LLM response as JSON: ${formatError(error)}`
+      );
       throw new Error(
         `LLM returned malformed JSON (possibly truncated due to token limit). Consider using a model with larger output capacity.`
       );
@@ -355,7 +392,9 @@ export class EventExtractor {
         const validEvent = ExtractedEventSchema.parse(event);
         validated.push(validEvent);
       } catch (error) {
-        console.error(`  ⚠️  Validation error for "${event.title}": ${formatError(error)}`);
+        console.error(
+          `  ⚠️  Validation error for "${event.title}": ${formatError(error)}`
+        );
       }
     }
 
