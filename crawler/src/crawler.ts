@@ -73,7 +73,12 @@ export function groupEventsByDay(
 
     const descLines = unique.map(e => {
       const time = String(e.start_time).slice(11, 16);
-      const subTitle = e.title.replace(/^.+?–\s*/, '');
+      const prefixPattern = new RegExp(
+        `^${namePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*–\\s*`
+      );
+      const subTitle = prefixPattern.test(e.title)
+        ? e.title.replace(prefixPattern, '')
+        : e.title;
       const venue = e.venue_name ? ` (${e.venue_name})` : '';
       return `${time} ${subTitle}${venue}`;
     });
