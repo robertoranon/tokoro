@@ -480,24 +480,31 @@ export class EventCrawler {
             `\n📦 Extracted ${allStampedEvents.length} raw event(s) across all pages`
           );
 
-          // Group into one event per day
-          const groupedEvents = this.groupFestivalEventsByDay(
-            allStampedEvents,
-            festivalName
-          );
+          // LLM deduplication pass (removes redundant wrappers and semantic duplicates)
+          const dedupedEvents =
+            await this.deduplicateFestivalEvents(allStampedEvents);
 
-          console.log(
-            `\n✅ Grouped into ${groupedEvents.length} day event(s):`
-          );
-          for (const e of groupedEvents) {
-            console.log(`  • "${e.title}"`);
+          let eventsToPublish: ExtractedEvent[];
+          if (this.config.groupByDay) {
+            eventsToPublish = groupEventsByDay(dedupedEvents, festivalName);
+            console.log(
+              `\n✅ Grouped into ${eventsToPublish.length} day event(s):`
+            );
+            for (const e of eventsToPublish) {
+              console.log(`  • "${e.title}"`);
+            }
+          } else {
+            eventsToPublish = dedupedEvents;
+            console.log(
+              `\n📦 ${eventsToPublish.length} event(s) after deduplication`
+            );
           }
 
           if (this.config.debug && !this.config.normalize) {
-            this.printRawEvents(groupedEvents);
+            this.printRawEvents(eventsToPublish);
           } else {
             const normalizedEvents = [];
-            for (const event of groupedEvents) {
+            for (const event of eventsToPublish) {
               const normalized = await this.normalizer.normalize(event);
               if (normalized) normalizedEvents.push(normalized);
             }
