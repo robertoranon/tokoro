@@ -135,6 +135,9 @@ async function main() {
   // Parse --normalize flag (only meaningful with --debug: run full normalization even in debug mode)
   const normalize = args.includes('--normalize');
 
+  // Parse --group-by-day flag
+  const groupByDay = args.includes('--group-by-day');
+
   // Parse --no-jsonld flag
   const useJsonLd = !args.includes('--no-jsonld');
 
@@ -196,7 +199,12 @@ async function main() {
     if (arg === '--text-file' || (i > 0 && args[i - 1] === '--text-file')) {
       return false;
     }
-    if (arg === '--debug' || arg === '--no-jsonld' || arg === '--normalize') {
+    if (
+      arg === '--debug' ||
+      arg === '--no-jsonld' ||
+      arg === '--normalize' ||
+      arg === '--group-by-day'
+    ) {
       return false;
     }
     if (arg === '--image') {
@@ -271,6 +279,9 @@ async function main() {
         '  npm run crawl -- --no-jsonld <url>                   # Disable JSON-LD extraction, use LLM only'
       );
       console.log(
+        '  npm run crawl -- --group-by-day <url>                # Group extracted events into one per calendar day'
+      );
+      console.log(
         '  npm run crawl -- --text-file <path>                  # Skip fetching, pass text file directly to LLM (debug prompt testing)'
       );
       console.log(
@@ -330,6 +341,7 @@ async function main() {
     referenceDate,
     useJsonLd,
     maxTokens: maxTokensOverride,
+    groupByDay,
   });
 
   // Start crawling

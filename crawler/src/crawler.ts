@@ -135,6 +135,7 @@ export interface CrawlerConfig {
   referenceDate?: string; // optional reference date for LLM (format: YYYY-MM-DD, defaults to today)
   useJsonLd?: boolean; // whether to attempt JSON-LD extraction before LLM (default: true)
   maxTokens?: number; // override output token budget (default: auto-scaled from content length)
+  groupByDay?: boolean; // if true, group events into one per calendar day after extraction
 }
 
 export class EventCrawler {
