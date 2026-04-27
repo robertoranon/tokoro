@@ -777,16 +777,20 @@ Return JSON: {"remove": [], "reasons": {}}`;
           ? groupEventsByDay(extractedEvents, filename)
           : extractedEvents;
 
-        const normalizedEvents = [];
-        for (const event of eventsToPublish) {
-          const normalized = await this.normalizer.normalize(event);
-          if (normalized) normalizedEvents.push(normalized);
-        }
+        if (this.config.debug && !this.config.normalize) {
+          this.printRawEvents(eventsToPublish);
+        } else {
+          const normalizedEvents = [];
+          for (const event of eventsToPublish) {
+            const normalized = await this.normalizer.normalize(event);
+            if (normalized) normalizedEvents.push(normalized);
+          }
 
-        if (normalizedEvents.length > 0) {
-          const published =
-            await this.publisher.publishMultiple(normalizedEvents);
-          totalPublished += published;
+          if (normalizedEvents.length > 0) {
+            const published =
+              await this.publisher.publishMultiple(normalizedEvents);
+            totalPublished += published;
+          }
         }
       } catch (error) {
         console.error(`\n❌ Error processing PDF ${source}:`, error);
