@@ -274,18 +274,19 @@ export class EventCrawler {
             }
           }
 
+          const namePrefix = seedPage.title || new URL(seedUrl).hostname;
+
           // Phase 2: Extract events from each discovered URL
+          const seedEvents: ExtractedEvent[] = [];
           for (const eventUrl of urlsToProcess) {
             try {
               console.log(`\n  Processing event page: ${eventUrl}`);
 
-              // Fetch the event page (or reuse seed page if it's the same URL)
               const page =
                 eventUrl === seedUrl
                   ? seedPage
                   : await this.fetcherForUrl(eventUrl).fetchPage(eventUrl);
 
-              // Extract events using LLM
               const rawEvents = await this.extractor.extractEvents(page);
 
               if (rawEvents.length === 0) {
@@ -293,8 +294,6 @@ export class EventCrawler {
                 continue;
               }
 
-              // Force the event URL to the page we actually crawled — the LLM may pick up
-              // a homepage link from navigation instead of the actual event page URL.
               const extractedEvents = rawEvents.map(e => ({
                 ...e,
                 url: eventUrl,
@@ -302,23 +301,22 @@ export class EventCrawler {
 
               totalEvents += extractedEvents.length;
 
-              if (this.config.debug && !this.config.normalize) {
-                this.printRawEvents(extractedEvents);
+              if (this.config.groupByDay) {
+                seedEvents.push(...extractedEvents);
               } else {
-                // Normalize and sign events
-                const normalizedEvents = [];
-                for (const event of extractedEvents) {
-                  const normalized = await this.normalizer.normalize(event);
-                  if (normalized) {
-                    normalizedEvents.push(normalized);
+                if (this.config.debug && !this.config.normalize) {
+                  this.printRawEvents(extractedEvents);
+                } else {
+                  const normalizedEvents = [];
+                  for (const event of extractedEvents) {
+                    const normalized = await this.normalizer.normalize(event);
+                    if (normalized) normalizedEvents.push(normalized);
                   }
-                }
-
-                // Publish to API
-                if (normalizedEvents.length > 0) {
-                  const published =
-                    await this.publisher.publishMultiple(normalizedEvents);
-                  totalPublished += published;
+                  if (normalizedEvents.length > 0) {
+                    const published =
+                      await this.publisher.publishMultiple(normalizedEvents);
+                    totalPublished += published;
+                  }
                 }
               }
             } catch (error) {
@@ -326,6 +324,28 @@ export class EventCrawler {
                 `\n  ❌ Error processing event page ${eventUrl}:`,
                 error
               );
+            }
+          }
+
+          // After all pages for this seed: group and publish when --group-by-day is set
+          if (this.config.groupByDay && seedEvents.length > 0) {
+            const groupedEvents = groupEventsByDay(seedEvents, namePrefix);
+            console.log(
+              `\n📅 Grouped into ${groupedEvents.length} day event(s)`
+            );
+            if (this.config.debug && !this.config.normalize) {
+              this.printRawEvents(groupedEvents);
+            } else {
+              const normalizedEvents = [];
+              for (const event of groupedEvents) {
+                const normalized = await this.normalizer.normalize(event);
+                if (normalized) normalizedEvents.push(normalized);
+              }
+              if (normalizedEvents.length > 0) {
+                const published =
+                  await this.publisher.publishMultiple(normalizedEvents);
+                totalPublished += published;
+              }
             }
           }
         } catch (error) {
