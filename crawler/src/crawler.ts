@@ -17,6 +17,100 @@ import {
   PAGE_DISCOVERY_MAX_TOKENS,
 } from '../../shared/extractors/extraction-limits.js';
 
+/**
+ * Group events into per-calendar-day buckets.
+ * - Days with exactly 1 event (after within-day title dedup) pass through **unchanged**.
+ * - Days with >1 events produce a day-aggregate event titled "{namePrefix} – {Weekday}, {Month Day}".
+ */
+export function groupEventsByDay(
+  events: ExtractedEvent[],
+  namePrefix: string
+): ExtractedEvent[] {
+  const byDate = new Map<string, ExtractedEvent[]>();
+  for (const event of events) {
+    const date = String(event.start_time).slice(0, 10);
+    if (!byDate.has(date)) byDate.set(date, []);
+    byDate.get(date)!.push(event);
+  }
+
+  const result: ExtractedEvent[] = [];
+
+  for (const [date, dayEvents] of [...byDate.entries()].sort()) {
+    dayEvents.sort((a, b) =>
+      String(a.start_time).localeCompare(String(b.start_time))
+    );
+
+    // Within-day dedup by title
+    const seen = new Set<string>();
+    const unique = dayEvents.filter(e => {
+      if (seen.has(e.title)) return false;
+      seen.add(e.title);
+      return true;
+    });
+
+    // Single event: pass through unchanged
+    if (unique.length === 1) {
+      result.push(unique[0]);
+      continue;
+    }
+
+    // Multiple events: build aggregate
+    const festival_name =
+      unique.find(e => e.festival_name)?.festival_name ?? namePrefix;
+    const festival_url = unique.find(e => e.festival_url)?.festival_url;
+
+    const dayDate = new Date(`${date}T12:00:00Z`);
+    const weekday = dayDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      timeZone: 'UTC',
+    });
+    const dayLabel = dayDate.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'UTC',
+    });
+    const title = `${namePrefix} – ${weekday}, ${dayLabel}`;
+
+    const descLines = unique.map(e => {
+      const time = String(e.start_time).slice(11, 16);
+      const subTitle = e.title.replace(/^.+?–\s*/, '');
+      const venue = e.venue_name ? ` (${e.venue_name})` : '';
+      return `${time} ${subTitle}${venue}`;
+    });
+
+    const withVenue = unique.find(e => e.venue_name);
+    const withAddress = unique.find(e => e.address);
+    const withCoords = unique.find(e => e.lat != null && e.lng != null);
+
+    const catCounts = new Map<string, number>();
+    for (const e of unique)
+      catCounts.set(e.category, (catCounts.get(e.category) ?? 0) + 1);
+    const category = [...catCounts.entries()].sort(
+      (a, b) => b[1] - a[1]
+    )[0][0] as ExtractedEvent['category'];
+
+    const allTags = [...new Set(unique.flatMap(e => e.tags ?? []))];
+
+    result.push({
+      title,
+      description: descLines.join('\n'),
+      url: festival_url ?? unique[0].url,
+      venue_name: withVenue?.venue_name,
+      address: withAddress?.address,
+      lat: withCoords?.lat,
+      lng: withCoords?.lng,
+      start_time: `${date}T00:00:00`,
+      end_time: `${date}T23:59:59`,
+      category,
+      tags: allTags.length > 0 ? allTags : undefined,
+      festival_name,
+      festival_url,
+    });
+  }
+
+  return result;
+}
+
 // Domains where Playwright is reliably blocked (bot detection, sign-in walls, etc.)
 // For these, the Jina fetcher is used automatically even when playwright is the default.
 const JINA_PREFERRED_DOMAINS = new Set(['bandsintown.com']);
@@ -420,102 +514,6 @@ export class EventCrawler {
     } finally {
       await this.fetcher.close();
     }
-  }
-
-  /**
-   * Group individually-extracted festival events into one event per calendar day.
-   * Each day event has a description listing all sub-events with their times and venues.
-   */
-  private groupFestivalEventsByDay(
-    events: ExtractedEvent[],
-    fallbackFestivalName: string
-  ): ExtractedEvent[] {
-    // Group by date (YYYY-MM-DD)
-    const byDate = new Map<string, ExtractedEvent[]>();
-    for (const event of events) {
-      const date = String(event.start_time).slice(0, 10);
-      if (!byDate.has(date)) byDate.set(date, []);
-      byDate.get(date)!.push(event);
-    }
-
-    const grouped: ExtractedEvent[] = [];
-
-    for (const [date, dayEvents] of [...byDate.entries()].sort()) {
-      // Sort by start_time within the day
-      dayEvents.sort((a, b) =>
-        String(a.start_time).localeCompare(String(b.start_time))
-      );
-
-      // Deduplicate by title within the day
-      const seen = new Set<string>();
-      const unique = dayEvents.filter(e => {
-        if (seen.has(e.title)) return false;
-        seen.add(e.title);
-        return true;
-      });
-
-      const festival_name =
-        unique.find(e => e.festival_name)?.festival_name ??
-        fallbackFestivalName;
-      const festival_url = unique.find(e => e.festival_url)?.festival_url;
-
-      // Build title: "Festival Name – Weekday DD Month"
-      // Use noon UTC to avoid date-shift issues with local timezone
-      const dayDate = new Date(`${date}T12:00:00Z`);
-      const weekday = dayDate.toLocaleDateString('en-US', {
-        weekday: 'long',
-        timeZone: 'UTC',
-      });
-      const dayLabel = dayDate.toLocaleDateString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        timeZone: 'UTC',
-      });
-      const title = `${festival_name} – ${weekday}, ${dayLabel}`;
-
-      // Build description: "HH:MM Sub-event title (Venue)" per line
-      const descLines = unique.map(e => {
-        const time = String(e.start_time).slice(11, 16);
-        // Strip "Festival Name – " or "Festival Name DayX – " prefix from sub-event titles
-        const subTitle = e.title.replace(/^.+?–\s*/, '');
-        const venue = e.venue_name ? ` (${e.venue_name})` : '';
-        return `${time} ${subTitle}${venue}`;
-      });
-
-      // Pick venue/address/coords from first event that has them
-      const withVenue = unique.find(e => e.venue_name);
-      const withAddress = unique.find(e => e.address);
-      const withCoords = unique.find(e => e.lat != null && e.lng != null);
-
-      // Most common category
-      const catCounts = new Map<string, number>();
-      for (const e of unique)
-        catCounts.set(e.category, (catCounts.get(e.category) ?? 0) + 1);
-      const category = [...catCounts.entries()].sort(
-        (a, b) => b[1] - a[1]
-      )[0][0] as ExtractedEvent['category'];
-
-      // Merged tags (deduplicated)
-      const allTags = [...new Set(unique.flatMap(e => e.tags ?? []))];
-
-      grouped.push({
-        title,
-        description: descLines.join('\n'),
-        url: festival_url ?? unique[0].url,
-        venue_name: withVenue?.venue_name,
-        address: withAddress?.address,
-        lat: withCoords?.lat,
-        lng: withCoords?.lng,
-        start_time: `${date}T00:00:00`,
-        end_time: `${date}T23:59:59`,
-        category,
-        tags: allTags.length > 0 ? allTags : undefined,
-        festival_name,
-        festival_url,
-      });
-    }
-
-    return grouped;
   }
 
   /**
