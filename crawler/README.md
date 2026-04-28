@@ -7,6 +7,7 @@ LLM-powered semantic crawler for extracting structured event data from web pages
 - **Festival Mode**: Crawl entire festival programs — discovers all listing/schedule pages and stamps every event with festival metadata
 - **Two-Phase Discovery**: Automatically discovers individual event pages from venue homepages
 - **Multiple Fetcher Options**: Choose between Playwright (JS rendering) or Jina AI Reader (fast, lightweight)
+- **Pluggable Browser Engine**: Playwright can drive headless Chrome (default) or [Obscura](https://github.com/h4ckf0r0day/obscura) (lightweight Rust-based CDP browser with built-in anti-detection)
 - **Multi-LLM Support**: Easy switching between OpenRouter, OpenAI, Anthropic, and local Ollama
 - **Smart Extraction**: Uses LLMs to extract event details from any web page format with intelligent address parsing
 - **Geocoding**: Automatically geocodes addresses to coordinates using OpenStreetMap
@@ -29,6 +30,22 @@ npm install
 
 ```bash
 npx playwright install chromium
+```
+
+2b. *(Optional)* Install [Obscura](https://github.com/h4ckf0r0day/obscura) for a faster, stealth-capable alternative to headless Chrome:
+
+```bash
+# macOS Apple Silicon
+curl -LO https://github.com/h4ckf0r0day/obscura/releases/latest/download/obscura-aarch64-macos.tar.gz
+tar xzf obscura-aarch64-macos.tar.gz && sudo mv obscura /usr/local/bin/
+
+# macOS Intel
+curl -LO https://github.com/h4ckf0r0day/obscura/releases/latest/download/obscura-x86_64-macos.tar.gz
+tar xzf obscura-x86_64-macos.tar.gz && sudo mv obscura /usr/local/bin/
+
+# Linux x86_64
+curl -LO https://github.com/h4ckf0r0day/obscura/releases/latest/download/obscura-x86_64-linux.tar.gz
+tar xzf obscura-x86_64-linux.tar.gz && sudo mv obscura /usr/local/bin/
 ```
 
 3. Generate a crawler keypair:
@@ -133,6 +150,36 @@ npm run crawl -- --fetcher playwright https://modern-spa.com/events
 npm run crawl -- --fetcher jina --mode direct https://example.com/event/123
 ```
 
+### Choose Browser Engine (Playwright only)
+
+When using the Playwright fetcher, you can choose which headless browser engine drives it:
+
+#### Chrome (Default)
+
+- **Engine**: Full headless Chromium via Playwright
+- **Best for**: Maximum compatibility; complex JS-heavy pages
+- **Pros**: Most faithful rendering, highest compatibility
+- **Cons**: ~200 MB RAM, ~500 ms page load, ~2 s startup
+- **Usage**: `npm run crawl -- <url>` (default) or `npm run crawl -- --browser chrome <url>`
+
+#### Obscura (Opt-in)
+
+- **Engine**: Lightweight Rust-based browser with V8 JS, exposes Chrome DevTools Protocol
+- **Best for**: High-volume crawling, bot-detection-prone sites
+- **Pros**: ~30 MB RAM, ~85 ms page load, instant startup, built-in anti-fingerprinting and tracker blocking
+- **Cons**: May render JS-heavy pages differently from Chrome; requires [separate install](https://github.com/h4ckf0r0day/obscura/releases); auto-launched by the crawler on first use
+- **Usage**: `npm run crawl -- --browser obscura <url>`
+- **Persistent default**: set `BROWSER_ENGINE=obscura` in `.env`
+- **Pre-running Obscura**: set `OBSCURA_WS_ENDPOINT=ws://127.0.0.1:9222` to connect to an already-running `obscura serve` instance instead of auto-launching
+
+```bash
+# Use Obscura for a single crawl
+npm run crawl -- --browser obscura https://example.com/events
+
+# Use Chrome explicitly
+npm run crawl -- --browser chrome https://example.com/events
+```
+
 ### Choose Crawler Mode
 
 The crawler supports four operational modes:
@@ -145,14 +192,16 @@ The crawler supports four operational modes:
 
 #### 2. Discover Mode
 
-- **Best for**: Venue homepages with links to individual event pages
-- **Process**: Fetch homepage → LLM discovers event URLs → Fetch each → Clean HTML → LLM extracts
+- **Best for**: Venue homepages or calendar pages that link to individual event pages (one event per page)
+- **Process**: Fetch homepage → LLM discovers individual event page URLs → Fetch each event page → Clean HTML → LLM extracts
+- **Key behavior**: follows links to individual event pages; each page typically yields one event
 - **Usage**: `npm run crawl -- --mode discover <url>`
 
 #### 3. Festival Mode
 
-- **Best for**: Festival homepages (e.g. flowfestival.com, glastonbury.co.uk)
-- **Process**: Fetch homepage → LLM discovers program/schedule listing pages → Fetch each listing page → LLM extracts all events → stamp every event with `festival_name` and `festival_url` → LLM deduplication pass removes wrapper events and semantic duplicates
+- **Best for**: Festival homepages (e.g. flowfestival.com, glastonbury.co.uk) where the program is spread across schedule/listing sub-pages
+- **Process**: Fetch homepage → LLM discovers program/schedule listing pages → Fetch each listing page → LLM extracts all events directly (no further link following) → stamp every event with `festival_name` and `festival_url` → LLM deduplication pass removes wrapper events and semantic duplicates
+- **Key behavior**: does NOT follow links to individual event pages; instead extracts all events in bulk from each listing page; use `--group-by-day` to collapse per-day into a single aggregate event
 - **Usage**: `npm run crawl -- --mode festival <url>`
 
 All extracted events automatically receive `festival_name` (from the page title) and `festival_url` (the homepage origin), which enables festival-scoped queries via `GET /events?festival_url=...`.
@@ -297,22 +346,30 @@ See `.env.example` for all available options.
 npm run crawl -- [options] <url>
 
 Options:
-  --mode <mode>           Crawler mode: direct, discover, image, or festival (default: direct)
+  --mode <mode>           Crawler mode: direct, discover, image, festival, or pdf (default: direct)
   --fetcher <fetcher>     Fetcher strategy: playwright or jina (default: playwright)
+  --browser <engine>      Browser engine when using Playwright: chrome or obscura (default: chrome)
   --model <model>         Override LLM model (OpenRouter models only)
   --date <YYYY-MM-DD>     Reference date for LLM date inference (default: today)
+  --max-tokens <N>        Override output token budget for LLM extraction
+  --group-by-day          Collapse extracted events into one aggregate event per calendar day
+  --no-jsonld             Disable JSON-LD extraction; use LLM only
   --debug                 Print raw LLM output, skip normalization/geocoding and API publishing
   --normalize             (With --debug) run full normalization (geocoding + signing) but skip publishing
   --image                 Shorthand for --mode image
+  --pdf                   Shorthand for --mode pdf
+  --text-file <path>      Skip fetching; pass text file directly to LLM (prompt testing)
   --generate-keypair      Generate new Ed25519 keypair
 
 Examples:
   npm run crawl https://venue.com/events
   npm run crawl -- --mode discover --fetcher jina https://venue.com/events
   npm run crawl -- --mode festival https://www.flowfestival.com
+  npm run crawl -- --browser obscura https://venue.com/events
   npm run crawl -- --model google/gemini-2.0-flash-exp:free https://venue.com/events
   npm run crawl -- --date 2026-03-02 --debug https://venue.com/events
   npm run crawl -- --image path/to/flyer.jpg
+  npm run crawl -- --pdf path/to/schedule.pdf
 ```
 
 ## Testing

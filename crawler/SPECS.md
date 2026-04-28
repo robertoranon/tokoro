@@ -1,7 +1,7 @@
 # Event Crawler — Technical Specification
 
-**Version:** 1.9
-**Date:** 2026-04-02
+**Version:** 2.0
+**Date:** 2026-04-28
 **Status:** Reference implementation exists — this spec enables reimplementation in any language
 
 ---
@@ -34,6 +34,7 @@ This specification is implementation-agnostic and provides sufficient detail to 
 │              Crawler Core                            │
 │  - Mode: direct | discover | image | festival | pdf  │
 │  - Fetcher: playwright | jina (web modes only)       │
+│  - Browser: chrome | obscura (playwright only)       │
 └──────┬───────────────────────────────────────────────┘
        ↓
    ┌───┴───┐
@@ -46,7 +47,9 @@ This specification is implementation-agnostic and provides sufficient detail to 
 ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
 │ HTML Fetcher     │  │ Image Fetcher    │  │ PDF Fetcher      │
 │ • Playwright     │  │ • File loader    │  │ • File loader    │
-│ • Jina AI Reader │  │ • URL downloader │  │ • URL downloader │
+│   - Chrome       │  │ • URL downloader │  │ • URL downloader │
+│   - Obscura      │  │ • Base64 encoder │  │ • Text extract   │
+│ • Jina AI Reader │  │                  │  │ • Page rendering │
 └────────┬─────────┘  │ • Base64 encoder │  │ • Text extract   │
          ↓            └────────┬─────────┘  │ • Page rendering │
 ┌──────────────────┐           │            └────────┬─────────┘
@@ -364,18 +367,19 @@ for each source (file path or URL):
 
 #### Playwright Fetcher (Default)
 
-**Purpose:** Fetch JavaScript-rendered pages using headless Chromium
+**Purpose:** Fetch JavaScript-rendered pages via a headless browser controlled by Playwright. Supports two browser engines (see below).
 
 **Algorithm:**
 
-1. Launch headless Chromium browser
-2. Navigate to URL with `waitUntil: 'load'`
-3. Wait 2 seconds for dynamic content to render
-4. Extract main frame HTML via `page.content()`
-5. Collect rendered HTML from all child frames (including cross-origin iframes) via `frame.content()` on each non-main frame — Playwright operates at the browser automation level and bypasses same-origin policy, enabling access to third-party embedded widgets (e.g. Laylo tour widgets, Bandsintown embeds). Each frame content call is raced against a 5-second timeout so a stuck iframe (e.g. a third-party widget that never resolves) cannot hang the crawl indefinitely.
-6. Concatenate main frame HTML with all iframe HTMLs into combined HTML
-7. Extract clean text from combined HTML using DOM-based cleaning (see 5.2)
-8. Return `FetchedPage` object
+1. Initialize browser (see engine options below)
+2. Create a new page (Chrome: default context; Obscura: explicit `newContext()` required by CDP)
+3. Navigate to URL with `waitUntil: 'load'`, timeout 30 s
+4. Wait 2 seconds for dynamic content to render
+5. Extract main frame HTML via `page.content()`
+6. Collect rendered HTML from all child frames (including cross-origin iframes) via `frame.content()` on each non-main frame — Playwright operates at the browser automation level and bypasses same-origin policy, enabling access to third-party embedded widgets (e.g. Laylo tour widgets, Bandsintown embeds). Each frame content call is raced against a 5-second timeout so a stuck iframe cannot hang the crawl indefinitely.
+7. Concatenate main frame HTML with all iframe HTMLs into combined HTML
+8. Extract clean text from combined HTML using DOM-based cleaning (see 5.2)
+9. Return `FetchedPage` object
 
 **FetchedPage Interface:**
 
@@ -388,11 +392,35 @@ interface FetchedPage {
 }
 ```
 
+**Browser Engines:**
+
+Two engines are supported via `--browser <engine>` (or `BROWSER_ENGINE` env var):
+
+| | Chrome (default) | Obscura |
+|---|---|---|
+| Launch | `chromium.launch()` | `chromium.connectOverCDP()` |
+| Memory | ~200 MB | ~30 MB |
+| Startup | ~2 s | instant |
+| Page load | ~500 ms | ~85 ms |
+| Anti-detect | No | Built-in (stealth mode) |
+| Compatibility | Highest | Good; may differ on complex JS apps |
+
+**Chrome engine:**
+- Playwright launches a managed Chromium subprocess directly
+- No external binary required (Playwright bundles Chromium)
+
+**Obscura engine:**
+- Playwright connects via Chrome DevTools Protocol (CDP) to an Obscura server
+- Auto-launch: if `OBSCURA_WS_ENDPOINT` is not set, the crawler spawns `obscura serve --port 9222` and polls TCP port 9222 until it accepts connections (up to 10 s timeout) before connecting
+- External server: set `OBSCURA_WS_ENDPOINT=ws://host:port` to connect to an already-running instance (no auto-launch)
+- Requires the `obscura` binary in `PATH`; download from https://github.com/h4ckf0r0day/obscura/releases
+- On close: Playwright disconnects and the crawler kills the spawned `obscura serve` process
+
 **Configuration:**
 
 - Timeout: 30 seconds
 - Wait after load: 2 seconds
-- User agent: Default Chromium user agent
+- User agent: default for the selected engine
 
 #### Jina AI Reader Fetcher (Alternative)
 
@@ -1854,6 +1882,9 @@ interface CrawlerConfig {
   // Fetcher type
   fetcher?: 'playwright' | 'jina'; // Default: 'playwright'
 
+  // Browser engine (only relevant when fetcher = 'playwright')
+  browserEngine?: 'chrome' | 'obscura'; // Default: 'chrome'
+
   // Jina API key (required if fetcher = 'jina')
   jinaKey?: string;
 
@@ -1878,6 +1909,8 @@ LLM_BASE_URL=http://localhost:11434  # Optional (for Ollama)
 # Crawler Configuration
 CRAWLER_MODE=discover                # direct | discover
 CRAWLER_FETCHER=playwright           # playwright | jina
+BROWSER_ENGINE=chrome                # chrome | obscura (default: chrome; playwright only)
+OBSCURA_WS_ENDPOINT=ws://127.0.0.1:9222  # Connect to running Obscura instance (skips auto-launch)
 JINA_API_KEY=jina_...                # Jina API key (if using Jina fetcher)
 
 # API Configuration
@@ -1906,6 +1939,7 @@ crawler [options] --image <image-path1> [image-path2] ...
 --image                         Shorthand for --mode image (extract from images)
 --pdf                           Shorthand for --mode pdf (extract from PDFs)
 --fetcher <playwright|jina>     HTML fetcher (default: playwright) - not used in image mode
+--browser <chrome|obscura>      Browser engine when using Playwright (default: chrome)
 --llm <provider>                LLM provider (openai, anthropic, ollama, openrouter)
 --model <model-name>            LLM model identifier (must support vision for image mode)
 --api-url <url>                 Tokoro API endpoint
@@ -1930,6 +1964,12 @@ crawler --llm ollama --model llama3.2 https://www.bluenote.it
 
 # Use Jina fetcher instead of Playwright
 crawler --fetcher jina --llm openai https://www.bluenote.it
+
+# Use Obscura browser engine instead of headless Chrome
+crawler --browser obscura https://www.bluenote.it
+
+# Use Chrome explicitly (same as default)
+crawler --browser chrome https://www.bluenote.it
 
 # Debug mode: fast — prints raw LLM output, skips geocoding/signing
 crawler --debug https://www.bluenote.it
@@ -2655,6 +2695,13 @@ User-Agent: Tokoro-Crawler/1.0
 ---
 
 ## Version History
+
+- **2.0.0** (2026-04-28): Pluggable browser engine — Chrome (default) and Obscura
+  - New `--browser <chrome|obscura>` CLI flag selects the browser engine used by the Playwright fetcher
+  - Chrome (`chromium.launch()`) remains the default for maximum compatibility
+  - Obscura (`chromium.connectOverCDP()`) is an opt-in lightweight alternative: ~30 MB RAM, instant startup, built-in anti-fingerprinting; auto-launched by the crawler via `obscura serve`, or connected to a pre-running instance via `OBSCURA_WS_ENDPOINT`
+  - New `BROWSER_ENGINE` and `OBSCURA_WS_ENDPOINT` environment variables
+  - `CrawlerConfig` gains `browserEngine?: 'chrome' | 'obscura'`
 
 - **1.9.0** (2026-04-27): `--group-by-day` flag
   - Removed always-on per-day grouping from festival mode
