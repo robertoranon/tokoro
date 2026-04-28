@@ -7,6 +7,8 @@ const TEXT_DENSITY_THRESHOLD = 200;
 const MAX_IMAGE_PAGES = 10;
 const MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
+export type PdfParserType = 'pdfjs' | 'liteparse';
+
 export type PdfData =
   | { type: 'text'; text: string; pageCount: number }
   | { type: 'images'; pages: ImageData[]; pageCount: number };
@@ -17,12 +19,44 @@ export function isTextDense(text: string): boolean {
 }
 
 export class PdfFetcher {
+  constructor(private parser: PdfParserType = 'pdfjs') {}
+
   async loadPdf(source: string): Promise<PdfData> {
     const buffer =
       source.startsWith('http://') || source.startsWith('https://')
         ? await this.fetchFromUrl(source)
         : await this.loadFromFile(source);
 
+    if (this.parser === 'liteparse') {
+      return this.loadWithLiteparse(buffer, source);
+    }
+    return this.loadWithPdfjs(buffer, source);
+  }
+
+  private async loadWithLiteparse(
+    buffer: Buffer,
+    source: string
+  ): Promise<PdfData> {
+    const { LiteParse } = await import('@llamaindex/liteparse');
+    const parser = new LiteParse({});
+    const result = await parser.parse(new Uint8Array(buffer));
+    const text = result.text ?? '';
+    const nonWhitespace = text.replace(/\s/g, '').length;
+    console.log(`  PDF (liteparse): ${nonWhitespace} non-whitespace chars`);
+
+    if (isTextDense(text)) {
+      console.log('  → Text path');
+      return { type: 'text', text, pageCount: 0 };
+    }
+
+    console.log('  → Image fallback (sparse text)');
+    return this.imagesFallback(buffer, source);
+  }
+
+  private async loadWithPdfjs(
+    buffer: Buffer,
+    source: string
+  ): Promise<PdfData> {
     const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
     (pdfjsLib as any).GlobalWorkerOptions.workerSrc = '';
 
@@ -32,7 +66,6 @@ export class PdfFetcher {
 
     const pageCount: number = pdfDoc.numPages;
 
-    // Extract text from all pages
     let text = '';
     for (let i = 1; i <= pageCount; i++) {
       const page = await pdfDoc.getPage(i);
@@ -55,6 +88,21 @@ export class PdfFetcher {
     }
 
     console.log('  → Image fallback (sparse text)');
+    const pages = await this.renderToImages(pdfDoc, source, pageCount);
+    await pdfDoc.destroy();
+    return { type: 'images', pages, pageCount };
+  }
+
+  private async imagesFallback(
+    buffer: Buffer,
+    source: string
+  ): Promise<PdfData> {
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    (pdfjsLib as any).GlobalWorkerOptions.workerSrc = '';
+    const pdfDoc = await (pdfjsLib as any).getDocument({
+      data: new Uint8Array(buffer),
+    }).promise;
+    const pageCount: number = pdfDoc.numPages;
     const pages = await this.renderToImages(pdfDoc, source, pageCount);
     await pdfDoc.destroy();
     return { type: 'images', pages, pageCount };

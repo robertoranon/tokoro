@@ -29,6 +29,7 @@
   "license": "ISC",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
+    "@llamaindex/liteparse": "^1.5.2",
     "@napi-rs/canvas": "^0.1.97",
     "@noble/ed25519": "^2.1.0",
     "jsdom": "^25.0.1",

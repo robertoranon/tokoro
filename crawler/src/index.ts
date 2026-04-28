@@ -7,6 +7,7 @@ import {
   CrawlerMode,
   FetcherType,
   BrowserEngine,
+  PdfParserType,
 } from './crawler.js';
 import { createLLMProvider } from '../../shared/llm/factory.js';
 import * as ed from '@noble/ed25519';
@@ -144,6 +145,21 @@ async function main() {
     }
   }
 
+  // Parse pdf-parser flag
+  let pdfParser: PdfParserType = 'pdfjs';
+  const pdfParserIndex = args.indexOf('--pdf-parser');
+  if (pdfParserIndex !== -1 && args[pdfParserIndex + 1]) {
+    const pdfParserArg = args[pdfParserIndex + 1];
+    if (pdfParserArg === 'pdfjs' || pdfParserArg === 'liteparse') {
+      pdfParser = pdfParserArg;
+    } else {
+      console.error(
+        `Error: Invalid --pdf-parser "${pdfParserArg}". Must be "pdfjs" or "liteparse"`
+      );
+      process.exit(1);
+    }
+  }
+
   // Parse text-file flag (debug mode: skip fetching, pass file content directly to LLM)
   let textFilePath: string | undefined;
   const textFileIndex = args.indexOf('--text-file');
@@ -224,6 +240,9 @@ async function main() {
     if (arg === '--text-file' || (i > 0 && args[i - 1] === '--text-file')) {
       return false;
     }
+    if (arg === '--pdf-parser' || (i > 0 && args[i - 1] === '--pdf-parser')) {
+      return false;
+    }
     if (
       arg === '--debug' ||
       arg === '--no-jsonld' ||
@@ -275,6 +294,9 @@ async function main() {
       );
       console.log(
         '  npm run crawl -- --mode pdf <file|url>               # Extract events from PDF'
+      );
+      console.log(
+        '  npm run crawl -- --pdf-parser liteparse <file|url>   # Use LiteParse for PDF text extraction (default: pdfjs)'
       );
       console.log(
         '  npm run crawl -- --mode festival <url>                # Festival mode: discover program pages + extract all events'
@@ -374,6 +396,7 @@ async function main() {
     useJsonLd,
     maxTokens: maxTokensOverride,
     groupByDay,
+    pdfParser,
   });
 
   // Start crawling

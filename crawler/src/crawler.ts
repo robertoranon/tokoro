@@ -1,7 +1,7 @@
 import { HTMLFetcher, BrowserEngine } from './extractors/html-fetcher.js';
 import { JinaFetcher } from './extractors/jina-fetcher.js';
 import { ImageFetcher } from './extractors/image-fetcher.js';
-import { PdfFetcher } from './extractors/pdf-fetcher.js';
+import { PdfFetcher, type PdfParserType } from './extractors/pdf-fetcher.js';
 import * as path from 'path';
 import { EventExtractor } from './extractors/event-extractor.js';
 import { PageDiscovery } from './extractors/page-discovery.js';
@@ -122,7 +122,7 @@ const JINA_PREFERRED_DOMAINS = new Set(['bandsintown.com']);
 
 export type CrawlerMode = 'direct' | 'discover' | 'image' | 'festival' | 'pdf';
 export type FetcherType = 'playwright' | 'jina';
-export type { BrowserEngine };
+export type { BrowserEngine, PdfParserType };
 
 export interface CrawlerConfig {
   llm: LLMProvider;
@@ -138,6 +138,7 @@ export interface CrawlerConfig {
   useJsonLd?: boolean; // whether to attempt JSON-LD extraction before LLM (default: true)
   maxTokens?: number; // override output token budget (default: auto-scaled from content length)
   groupByDay?: boolean; // if true, group events into one per calendar day after extraction
+  pdfParser?: PdfParserType; // PDF text extraction backend (default: 'pdfjs')
 }
 
 export class EventCrawler {
@@ -160,7 +161,7 @@ export class EventCrawler {
     this.jinaFallback =
       fetcherType === 'playwright' ? new JinaFetcher(config.jinaKey) : null;
     this.imageFetcher = new ImageFetcher();
-    this.pdfFetcher = new PdfFetcher();
+    this.pdfFetcher = new PdfFetcher(config.pdfParser || 'pdfjs');
     this.discovery = new PageDiscovery(config.llm);
     const isFestival = (config.mode || 'discover') === 'festival';
     this.extractor = new EventExtractor({
