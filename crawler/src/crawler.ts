@@ -1,4 +1,4 @@
-import { HTMLFetcher } from './extractors/html-fetcher.js';
+import { HTMLFetcher, BrowserEngine } from './extractors/html-fetcher.js';
 import { JinaFetcher } from './extractors/jina-fetcher.js';
 import { ImageFetcher } from './extractors/image-fetcher.js';
 import { PdfFetcher } from './extractors/pdf-fetcher.js';
@@ -122,6 +122,7 @@ const JINA_PREFERRED_DOMAINS = new Set(['bandsintown.com']);
 
 export type CrawlerMode = 'direct' | 'discover' | 'image' | 'festival' | 'pdf';
 export type FetcherType = 'playwright' | 'jina';
+export type { BrowserEngine };
 
 export interface CrawlerConfig {
   llm: LLMProvider;
@@ -129,6 +130,7 @@ export interface CrawlerConfig {
   apiUrl: string;
   mode?: CrawlerMode; // defaults to 'discover'
   fetcher?: FetcherType; // defaults to 'playwright'
+  browserEngine?: BrowserEngine; // defaults to 'obscura'
   jinaKey?: string;
   debug?: boolean; // if true, output events to console only (skip API publishing)
   normalize?: boolean; // if true (with debug), run full normalization; if false (default with debug), skip geocoding/signing
@@ -153,7 +155,7 @@ export class EventCrawler {
     this.fetcher =
       fetcherType === 'jina'
         ? new JinaFetcher(config.jinaKey)
-        : new HTMLFetcher();
+        : new HTMLFetcher(config.browserEngine || 'obscura');
     // Keep a Jina instance ready for domain-based routing when playwright is primary
     this.jinaFallback =
       fetcherType === 'playwright' ? new JinaFetcher(config.jinaKey) : null;

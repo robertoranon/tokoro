@@ -2,7 +2,12 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { EventCrawler, CrawlerMode, FetcherType } from './crawler.js';
+import {
+  EventCrawler,
+  CrawlerMode,
+  FetcherType,
+  BrowserEngine,
+} from './crawler.js';
 import { createLLMProvider } from '../../shared/llm/factory.js';
 import * as ed from '@noble/ed25519';
 
@@ -122,6 +127,23 @@ async function main() {
     }
   }
 
+  // Parse browser engine flag (only relevant when fetcher=playwright)
+  const defaultEngine =
+    (process.env.BROWSER_ENGINE as BrowserEngine) || 'obscura';
+  let browserEngine: BrowserEngine = defaultEngine;
+  const browserIndex = args.indexOf('--browser');
+  if (browserIndex !== -1 && args[browserIndex + 1]) {
+    const browserArg = args[browserIndex + 1];
+    if (browserArg === 'obscura' || browserArg === 'chrome') {
+      browserEngine = browserArg;
+    } else {
+      console.error(
+        `Error: Invalid browser "${browserArg}". Must be "obscura" or "chrome"`
+      );
+      process.exit(1);
+    }
+  }
+
   // Parse text-file flag (debug mode: skip fetching, pass file content directly to LLM)
   let textFilePath: string | undefined;
   const textFileIndex = args.indexOf('--text-file');
@@ -185,6 +207,9 @@ async function main() {
       return false;
     }
     if (arg === '--fetcher' || (i > 0 && args[i - 1] === '--fetcher')) {
+      return false;
+    }
+    if (arg === '--browser' || (i > 0 && args[i - 1] === '--browser')) {
       return false;
     }
     if (arg === '--model' || (i > 0 && args[i - 1] === '--model')) {
@@ -261,6 +286,12 @@ async function main() {
         '  npm run crawl -- --fetcher playwright <url>          # Use Playwright + clean HTML (default)'
       );
       console.log(
+        '  npm run crawl -- --browser obscura <url>             # Use Obscura headless browser (default, faster + stealth)'
+      );
+      console.log(
+        '  npm run crawl -- --browser chrome <url>              # Use headless Chrome instead of Obscura'
+      );
+      console.log(
         '  npm run crawl -- --model <model-name> <url>          # Use specific OpenRouter model (overrides .env)'
       );
       console.log(
@@ -335,6 +366,7 @@ async function main() {
     apiUrl,
     mode,
     fetcher,
+    browserEngine,
     jinaKey,
     debug,
     normalize,
