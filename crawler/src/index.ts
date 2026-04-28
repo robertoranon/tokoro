@@ -129,7 +129,7 @@ async function main() {
 
   // Parse browser engine flag (only relevant when fetcher=playwright)
   const defaultEngine =
-    (process.env.BROWSER_ENGINE as BrowserEngine) || 'obscura';
+    (process.env.BROWSER_ENGINE as BrowserEngine) || 'chrome';
   let browserEngine: BrowserEngine = defaultEngine;
   const browserIndex = args.indexOf('--browser');
   if (browserIndex !== -1 && args[browserIndex + 1]) {
@@ -286,10 +286,10 @@ async function main() {
         '  npm run crawl -- --fetcher playwright <url>          # Use Playwright + clean HTML (default)'
       );
       console.log(
-        '  npm run crawl -- --browser obscura <url>             # Use Obscura headless browser (default, faster + stealth)'
+        '  npm run crawl -- --browser chrome <url>              # Use headless Chrome (default)'
       );
       console.log(
-        '  npm run crawl -- --browser chrome <url>              # Use headless Chrome instead of Obscura'
+        '  npm run crawl -- --browser obscura <url>             # Use Obscura instead of Chrome (faster + stealth)'
       );
       console.log(
         '  npm run crawl -- --model <model-name> <url>          # Use specific OpenRouter model (overrides .env)'

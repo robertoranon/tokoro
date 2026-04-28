@@ -14,7 +14,7 @@ export class HTMLFetcher {
   private wsEndpoint: string;
   private autoLaunch: boolean;
 
-  constructor(engine: BrowserEngine = 'obscura') {
+  constructor(engine: BrowserEngine = 'chrome') {
     this.engine = engine;
     this.wsEndpoint = process.env.OBSCURA_WS_ENDPOINT || 'ws://127.0.0.1:9222';
     this.autoLaunch = engine === 'obscura' && !process.env.OBSCURA_WS_ENDPOINT;
