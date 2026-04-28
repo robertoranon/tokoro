@@ -105,9 +105,9 @@ The page embeds a relay panel (hidden by default, activated via `?relay=1`) that
 
 **FR-5.2: Publish**
 
-- MUST generate an Ed25519 keypair on first use (Web Crypto API) and store it in `localStorage` under `happenings_keypair` (`{ pubkey, privkeyB64 }`)
+- MUST generate an Ed25519 keypair on first use (Web Crypto API) and store it in `localStorage` under `tokoro_keypair` (`{ pubkey, privkeyB64 }`)
 - For each selected event, MUST sign the `PreparedEvent` using the stored private key
-- MUST POST each signed event directly to the API Worker URL stored in `localStorage` under `happenings_api_url`; falls back to the build-time `API_URL` constant if localStorage value is absent
+- MUST POST each signed event directly to the API Worker URL stored in `localStorage` under `tokoro_api_url`; falls back to the build-time `API_URL` constant if localStorage value is absent
 - MUST treat HTTP 409 (duplicate) as success
 - MUST show success/error feedback
 - MUST clear the event list and hide the actions bar after fully successful publish
@@ -117,9 +117,9 @@ The page embeds a relay panel (hidden by default, activated via `?relay=1`) that
 - MUST show a settings form at the top of the relay popup with five fields: API Key (password), Crawler Worker URL, API Worker URL, Private Key (editable), Public Key (read-only, derived)
 - MUST collapse the form behind a "⚙ Settings" link when API Key, Crawler Worker URL, and API Worker URL are all set; MUST expand when any is missing
 - MUST show a "Save Settings" button below the Public Key field; the button MUST be hidden when all three required settings are filled and visible when any is missing
-- MUST persist API Key, Crawler Worker URL, and API Worker URL to `localStorage` (`happenings_api_key`, `happenings_worker_url`, `happenings_api_url`) on every input change
+- MUST persist API Key, Crawler Worker URL, and API Worker URL to `localStorage` (`tokoro_api_key`, `tokoro_worker_url`, `tokoro_api_url`) on every input change
 - MUST pre-fill Crawler Worker URL from `DEFAULT_CRAWLER_URL` constant and API Worker URL from `API_URL` constant on first use if localStorage is empty
-- When the private key field is edited and loses focus, MUST import the PKCS8 key, derive the public key via JWK export, update the public key display, and persist both as `happenings_keypair` in localStorage
+- When the private key field is edited and loses focus, MUST import the PKCS8 key, derive the public key via JWK export, update the public key display, and persist both as `tokoro_keypair` in localStorage
 - MUST auto-retry the buffered crawl when API Key and Crawler Worker URL become set after a failed attempt due to missing settings
 
 **FR-5.4: Keypair notice**
