@@ -40,9 +40,6 @@ const API_URL = config.workerUrl;
 // __TOKORO_WORKER_URL__ in the HTML files is injected separately by inject-worker-url.js.
 
 const SRC_FILE = path.join(__dirname, 'bookmarklet.src.js');
-const HTML_FILE = path.join(__dirname, 'index.html');
-const IT_HTML = path.join(__dirname, 'it.html');
-const MAP_HTML = path.join(__dirname, 'map.html');
 
 // Read source
 let src = fs.readFileSync(SRC_FILE, 'utf8');
@@ -64,36 +61,9 @@ function minify(code) {
 }
 
 const minified = minify(src);
-
-// Inject bookmarklet into index.html and it.html
-const OPEN_TAG = '<script type="text/x-bookmarklet" id="bm-src">';
-const CLOSE_TAG = '</script>';
-
-for (const f of [HTML_FILE, IT_HTML]) {
-  let html = fs.readFileSync(f, 'utf8');
-
-  const openIdx = html.indexOf(OPEN_TAG);
-  const closeIdx = html.indexOf(CLOSE_TAG, openIdx + OPEN_TAG.length);
-
-  if (openIdx === -1 || closeIdx === -1) {
-    console.error(
-      `ERROR: Could not find <script type="text/x-bookmarklet" id="bm-src"> in ${path.basename(f)}`
-    );
-    process.exit(1);
-  }
-
-  html =
-    html.slice(0, openIdx + OPEN_TAG.length) +
-    '\n    ' +
-    minified +
-    '\n  ' +
-    html.slice(closeIdx);
-
-  fs.writeFileSync(f, html, 'utf8');
-  console.log(
-    `Bookmarklet built: ${minified.length} chars injected into ${path.basename(f)}`
-  );
-}
+console.log(
+  `Bookmarklet built: ${minified.length} chars (inject via inject-worker-url.js)`
+);
 
 // Build shortcut bookmarklet (output file only, not injected into HTML)
 const SHORTCUT_SRC = path.join(__dirname, 'shortcut-bookmarklet.src.js');

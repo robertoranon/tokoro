@@ -49,10 +49,11 @@ if [[ -z "$WORKER_URL" ]]; then
 fi
 
 CRAWLER_URL="$(node -e "console.log(require('${REPO_ROOT}/config.local.js').crawlerWorkerUrl || '')")"
+RELAY_URL="$(node -e "console.log(require('${REPO_ROOT}/config.local.js').relayUrl || '')")"
 
 echo "Building bookmarklet and injecting URLs..."
 node "${PUBLIC_WEB}/build-bookmarklet.js"
-node "${PUBLIC_WEB}/inject-worker-url.js" "$WORKER_URL" "$CRAWLER_URL"
+node "${PUBLIC_WEB}/inject-worker-url.js" "$WORKER_URL" "$CRAWLER_URL" "$RELAY_URL"
 
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "[dry-run] Would deploy public-web to Cloudflare Pages (project: tokoro-query)"
