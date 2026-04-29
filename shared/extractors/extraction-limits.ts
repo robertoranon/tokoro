@@ -21,6 +21,11 @@ export const FESTIVAL_MAX_CONTENT_LENGTH = 50000;
  *  Used by: crawler (direct/discover), crawler-worker */
 export const DEFAULT_MAX_TOKENS = 10000;
 
+/** Hard ceiling on adaptive max output tokens — must not exceed the model's own limit.
+ *  Set to the max output tokens of the configured model (google/gemini-3.1-flash-lite-preview = 65535).
+ *  Used by: shared EventExtractor adaptive token budget logic */
+export const MODEL_MAX_OUTPUT_TOKENS = 65535;
+
 /** Max output tokens for festival mode extraction (more events per page).
  *  Used by: crawler (festival mode only) */
 export const FESTIVAL_MAX_TOKENS = 20000;

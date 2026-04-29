@@ -19,6 +19,7 @@ import {
   DEFAULT_MAX_CONTENT_LENGTH,
   DEFAULT_MAX_TOKENS,
   IMAGE_MAX_TOKENS,
+  MODEL_MAX_OUTPUT_TOKENS,
 } from './extraction-limits';
 import { correctEventYear } from './year-inference.js';
 
@@ -145,10 +146,10 @@ export class EventExtractor {
       0,
       this.maxContentLength
     );
-    // Scale output budget with actual content length: dense pages with many events need
-    // proportionally more output tokens to avoid JSON truncation. 1 token per input char
-    // is a generous upper bound (JSON is more compact than prose), floored at configured maxTokens.
-    const adaptiveMaxTokens = Math.max(this.maxTokens, contentSlice.length);
+    const adaptiveMaxTokens = Math.min(
+      Math.max(this.maxTokens, contentSlice.length),
+      MODEL_MAX_OUTPUT_TOKENS
+    );
     const systemPrompt = getEventExtractionPrompt({
       maxContentLength: this.maxContentLength,
     });
