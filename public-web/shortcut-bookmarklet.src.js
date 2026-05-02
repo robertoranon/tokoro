@@ -1,5 +1,7 @@
 (function () {
   var RELAY_URL = '__RELAY_URL__';
+  var CRAWLER_URL = '__CRAWLER_URL__';
+  var API_KEY = '__API_KEY__';
 
   var clone = document.documentElement.cloneNode(true);
   clone
@@ -39,31 +41,37 @@
   var html = clone.outerHTML;
   if (html.length > 400000) html = html.substring(0, 400000);
 
-  var pub = window.open(RELAY_URL + 'publish.html');
-  if (!pub) {
-    alert('Tokoro: popup blocked. Please allow popups for this page.');
-    return;
-  }
-
-  var listener;
-  var timer = setTimeout(function () {
-    window.removeEventListener('message', listener);
-  }, 20000);
-
-  listener = function (evt) {
-    if (evt.source !== pub) return;
-    if (!evt.data || evt.data.type !== 'ready') return;
-    clearTimeout(timer);
-    window.removeEventListener('message', listener);
-    pub.postMessage(
-      {
-        type: 'crawl_data',
-        url: window.location.href,
-        html: html,
-        title: document.title,
-      },
-      '*'
-    );
-  };
-  window.addEventListener('message', listener);
+  fetch(CRAWLER_URL + '/crawl', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      url: window.location.href,
+      html: html,
+      title: document.title,
+      mode: 'direct',
+    }),
+  })
+    .then(function (resp) {
+      return resp.json();
+    })
+    .then(function (result) {
+      if (!result.success || !result.events || !result.events.length) {
+        completion(
+          result.dropped_events && result.dropped_events.length
+            ? 'Found events but they were dropped during normalization.'
+            : 'No events found on this page.'
+        );
+        return;
+      }
+      var encoded = btoa(
+        unescape(encodeURIComponent(JSON.stringify(result.events)))
+      );
+      completion(RELAY_URL + 'publish.html#events=' + encoded);
+    })
+    .catch(function (err) {
+      completion('Error: ' + err.message);
+    });
 })();
