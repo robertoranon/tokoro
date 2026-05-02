@@ -93,3 +93,4 @@ vite.config.ts.timestamp-*
 worker/users.csv
 .playwright-mcp
 docs/superpowers
+worker/users.txt
