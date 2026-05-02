@@ -16,7 +16,7 @@
     "tokoro"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "MPL-2.0",
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241127.0",
     "typescript": "^5.7.2",

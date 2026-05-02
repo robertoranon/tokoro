@@ -26,7 +26,7 @@
     "extraction"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "MPL-2.0",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
     "@llamaindex/liteparse": "^1.5.2",
