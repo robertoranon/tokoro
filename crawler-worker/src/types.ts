@@ -17,7 +17,7 @@ export interface Env {
  * Request body for the /crawl endpoint
  */
 export interface CrawlRequest {
-  url: string;
+  url?: string;
   mode?: 'direct' | 'discover' | 'image';
   html?: string; // Rendered HTML from Chrome extension (cleaned server-side)
   textContent?: string; // Deprecated: ignored

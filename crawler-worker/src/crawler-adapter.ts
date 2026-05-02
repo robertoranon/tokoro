@@ -52,7 +52,7 @@ export class WorkerCrawler {
     this.normalizer = new EventNormalizer();
   }
 
-  async crawl(url: string): Promise<CrawlResult> {
+  async crawl(url: string | undefined): Promise<CrawlResult> {
     const result: CrawlResult = {
       urls_processed: 0,
       events_extracted: 0,
@@ -72,11 +72,13 @@ export class WorkerCrawler {
         if (!this.config.imageData)
           throw new Error('Image data is required for image mode');
 
+        const imageSourceUrl = url || '';
+
         this.logger.info(
           'image_extraction_start',
           'Image extraction mode',
           { model: this.llm.name },
-          url
+          imageSourceUrl
         );
         result.urls_processed = 1;
 
@@ -84,14 +86,14 @@ export class WorkerCrawler {
         const extractedEvents = await this.extractor.extractEventsFromImage(
           this.config.imageData,
           imageMimeType,
-          url
+          imageSourceUrl
         );
         result.events_extracted = extractedEvents.length;
 
         for (const event of extractedEvents) {
           const normalized = await this.normalizeEvent(
             event,
-            url,
+            imageSourceUrl,
             droppedEvents
           );
           if (normalized) result.events.push(normalized);
@@ -101,12 +103,14 @@ export class WorkerCrawler {
           'image_extraction_complete',
           'Image extraction complete',
           result,
-          url
+          imageSourceUrl
         );
         await this.logger.flush();
         if (droppedEvents.length > 0) result.dropped_events = droppedEvents;
         return result;
       }
+
+      if (!url) throw new Error('URL is required for non-image mode');
 
       const page = await this.fetchPage(
         url,

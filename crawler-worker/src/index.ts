@@ -116,7 +116,9 @@ async function handleCrawl(request: Request, env: Env): Promise<Response> {
     );
   }
 
-  if (!body.url) {
+  const mode = body.mode || 'discover';
+
+  if (!body.url && mode !== 'image') {
     return jsonResponse(
       {
         error: 'Missing required field',
@@ -126,16 +128,19 @@ async function handleCrawl(request: Request, env: Env): Promise<Response> {
     );
   }
 
-  try {
-    new URL(body.url);
-  } catch {
-    return jsonResponse(
-      { error: 'Invalid URL', message: 'The "url" field must be a valid URL' },
-      400
-    );
+  if (body.url) {
+    try {
+      new URL(body.url);
+    } catch {
+      return jsonResponse(
+        {
+          error: 'Invalid URL',
+          message: 'The "url" field must be a valid URL',
+        },
+        400
+      );
+    }
   }
-
-  const mode = body.mode || 'discover';
   if (mode !== 'direct' && mode !== 'discover' && mode !== 'image') {
     return jsonResponse(
       {
