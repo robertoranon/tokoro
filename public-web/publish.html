@@ -687,6 +687,48 @@
         }
       })();
 
+      // Hash-crawl mode: page HTML handed off by the Apple Shortcut.
+      // The Shortcut's JS action has a tight execution budget, so the LLM
+      // crawl runs here in the browser instead of inside the Shortcut.
+      if (!handledByHash) {
+        handledByHash = (function tryHashCrawl() {
+          var hash = window.location.hash;
+          if (!hash.startsWith('#crawl=')) return false;
+          try {
+            var encoded = hash.slice('#crawl='.length);
+            var payload = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+            history.replaceState(
+              null,
+              '',
+              window.location.pathname + window.location.search
+            );
+            inputUi.style.display = 'none';
+            loadOrCreateKeypair().then(function (kp) {
+              if (kp.isNew) {
+                cfgPrivKey.value = kp.privkeyB64;
+                cfgPubKey.textContent = kp.pubkey;
+                cfgFields.style.display = 'flex';
+                cfgSave.style.display = 'block';
+                cfgToggle.style.display = 'none';
+              }
+              runCrawl(
+                {
+                  url: payload.url,
+                  html: payload.html,
+                  title: payload.title,
+                  mode: 'direct',
+                },
+                null
+              );
+            });
+            return true;
+          } catch (e) {
+            console.error('Failed to parse #crawl hash:', e);
+            return false;
+          }
+        })();
+      }
+
       if (!handledByHash) {
         // Relay mode: opened by bookmarklet or Shortcut via window.open
         if (window.opener) {

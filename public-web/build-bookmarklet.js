@@ -71,8 +71,6 @@ const SHORTCUT_OUT = path.join(__dirname, 'shortcut-bookmarklet.js');
 
 let shortcutSrc = fs.readFileSync(SHORTCUT_SRC, 'utf8');
 shortcutSrc = shortcutSrc.replace(/__RELAY_URL__/g, RELAY_URL);
-shortcutSrc = shortcutSrc.replace(/__CRAWLER_URL__/g, DEFAULT_WORKER);
-shortcutSrc = shortcutSrc.replace(/__API_KEY__/g, config.crawlerApiKey);
 const minifiedShortcut = minify(shortcutSrc);
 fs.writeFileSync(SHORTCUT_OUT, minifiedShortcut, 'utf8');
 console.log(
