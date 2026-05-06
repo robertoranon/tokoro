@@ -20,10 +20,6 @@
     title: document.title,
     html: jsonLds + (jsonLds ? '\n' : '') + text,
   });
-  console.log(
-    '[tokoro] crawler-worker payload (' + payload.length + ' chars):',
-    payload
-  );
   var encoded = btoa(unescape(encodeURIComponent(payload)));
   completion(RELAY_URL + 'publish.html#crawl=' + encoded);
 })();
