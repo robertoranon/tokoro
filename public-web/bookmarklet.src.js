@@ -39,11 +39,6 @@
     });
   var html = clone.outerHTML;
   if (html.length > 400000) html = html.substring(0, 400000);
-  console.log(
-    '[tokoro] bookmarklet payload (' + html.length + ' chars):',
-    html
-  );
-
   var popup = window.open(
     RELAY_URL + '?relay=1',
     'tokoro_relay',

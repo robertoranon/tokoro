@@ -498,6 +498,14 @@
             body: JSON.stringify(body),
           });
           const result = await resp.json();
+          if (result.cleaned_text) {
+            console.log(
+              '[tokoro] cleaned text sent to LLM (' +
+                result.cleaned_text.length +
+                ' chars):',
+              result.cleaned_text
+            );
+          }
           if (!resp.ok || !result.success) {
             setSt(
               'Error: ' + (result.message || result.error || 'Unknown error'),
