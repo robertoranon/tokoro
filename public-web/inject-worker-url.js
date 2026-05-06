@@ -28,20 +28,21 @@ const path = require('path');
 const workerUrl = process.argv[2];
 const crawlerUrl = process.argv[3];
 const relayUrl = process.argv[4];
+const targetDir = process.argv[5] || __dirname;
 
 if (!workerUrl) {
   console.error('ERROR: worker URL argument required.');
   console.error(
-    'Usage: node inject-worker-url.js <worker-url> [<crawler-url>] [<relay-url>]'
+    'Usage: node inject-worker-url.js <worker-url> [<crawler-url>] [<relay-url>] [<target-dir>]'
   );
   process.exit(1);
 }
 
 // map.html has no relay UI and therefore no crawler/bookmarklet placeholders
 const ALL_FILES = ['index.html', 'it.html', 'map.html'].map(f =>
-  path.join(__dirname, f)
+  path.join(targetDir, f)
 );
-const RELAY_FILES = ['index.html', 'it.html'].map(f => path.join(__dirname, f));
+const RELAY_FILES = ['index.html', 'it.html'].map(f => path.join(targetDir, f));
 
 // Build bookmarklet if relay URL is provided
 let bookmarklet = null;

@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # deploy-public-web.sh — Build and deploy public-web to Cloudflare Pages.
 #
-# Injects real URLs into index.html and it.html from config.local.js,
-# deploys to Cloudflare Pages, then restores the source files to their
-# placeholder state so the repo stays clean.
+# Injects real URLs into a temp copy of public-web so the source tree stays
+# clean (no uncommitted changes during deployment).
 #
 # Usage: ./scripts/deploy-public-web.sh [--dry-run]
 
@@ -28,17 +27,9 @@ if [[ ! -f "${REPO_ROOT}/config.local.js" ]]; then
   exit 1
 fi
 
-# Ensure we can restore the HTML files via git
-if ! git -C "${REPO_ROOT}" diff --quiet HEAD -- public-web/index.html public-web/it.html public-web/map.html; then
-  echo "Error: public-web/index.html, it.html, or map.html has uncommitted changes." >&2
-  echo "Commit or stash them before deploying." >&2
-  exit 1
-fi
-
+DEPLOY_DIR="$(mktemp -d)"
 cleanup() {
-  echo "Restoring source HTML files..."
-  git -C "${REPO_ROOT}" checkout -- public-web/index.html public-web/it.html public-web/map.html
-  echo "Source files restored."
+  rm -rf "${DEPLOY_DIR}"
 }
 trap cleanup EXIT
 
@@ -51,14 +42,19 @@ fi
 CRAWLER_URL="$(node -e "console.log(require('${REPO_ROOT}/config.local.js').crawlerWorkerUrl || '')")"
 RELAY_URL="$(node -e "console.log(require('${REPO_ROOT}/config.local.js').relayUrl || '')")"
 
-echo "Building bookmarklet and injecting URLs..."
+echo "Building bookmarklet..."
 node "${PUBLIC_WEB}/build-bookmarklet.js"
-node "${PUBLIC_WEB}/inject-worker-url.js" "$WORKER_URL" "$CRAWLER_URL" "$RELAY_URL"
+
+echo "Copying public-web to temp directory..."
+cp -r "${PUBLIC_WEB}/." "${DEPLOY_DIR}/"
+
+echo "Injecting URLs into temp copy..."
+node "${PUBLIC_WEB}/inject-worker-url.js" "$WORKER_URL" "$CRAWLER_URL" "$RELAY_URL" "${DEPLOY_DIR}"
 
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "[dry-run] Would deploy public-web to Cloudflare Pages (project: tokoro-query)"
   echo "[dry-run] Skipping deploy."
 else
   echo "Deploying to Cloudflare Pages..."
-  npx wrangler pages deploy "${PUBLIC_WEB}" --project-name tokoro-query
+  npx wrangler pages deploy "${DEPLOY_DIR}" --project-name tokoro-query
 fi
