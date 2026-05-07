@@ -84,6 +84,9 @@ async function main() {
   let succeeded = 0;
   let failed = 0;
 
+  const defaultBrowserEngine =
+    (process.env.BROWSER_ENGINE as BrowserEngine) || 'chrome';
+
   for (let i = 0; i < jobs.length; i++) {
     const job = jobs[i];
     const label = job.name ? `"${job.name}"` : `job ${i + 1}`;
@@ -98,7 +101,7 @@ async function main() {
         apiUrl: env.apiUrl,
         mode: job.mode ?? 'direct',
         fetcher: job.fetcher ?? 'playwright',
-        browserEngine: job.browser,
+        browserEngine: job.browser ?? defaultBrowserEngine,
         jinaKey: env.jinaKey,
         debug: job.debug,
         normalize: job.normalize,
