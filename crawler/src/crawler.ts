@@ -396,8 +396,10 @@ export class EventCrawler {
       ? groupEventsByDay(extractedEvents, namePrefix)
       : extractedEvents;
 
+    let publishedCount = 0;
     if (this.config.debug && !this.config.normalize) {
       this.printRawEvents(eventsToPublish);
+      publishedCount = eventsToPublish.length;
     } else {
       const normalizedEvents = [];
       for (const event of eventsToPublish) {
@@ -407,11 +409,12 @@ export class EventCrawler {
       if (normalizedEvents.length > 0) {
         await this.publisher.publishMultiple(normalizedEvents);
       }
+      publishedCount = normalizedEvents.length;
     }
 
     console.log(`\n${'='.repeat(60)}`);
     console.log(`✅ Text file extraction complete!`);
-    console.log(`Total events extracted: ${extractedEvents.length}`);
+    console.log(`Total events extracted: ${publishedCount}`);
     console.log(`${'='.repeat(60)}\n`);
   }
 
