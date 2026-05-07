@@ -7,8 +7,8 @@ import {
   isPlaceholderTime,
 } from '../../../shared/utils/timezone.js';
 import * as ed from '@noble/ed25519';
-import { LLMProvider } from '../../../shared/types/llm.js';
-import type { FetchedPage } from '../extractors/html-fetcher.js';
+import type { LLMProvider } from '../../../shared/types/llm.js';
+import type { FetchedPage } from '../types/event.js';
 
 // Configure SHA-512 for Node.js
 if (typeof crypto !== 'undefined' && crypto.subtle) {
