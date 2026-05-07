@@ -24,24 +24,24 @@
       }
 
       :root {
-        --header-dark: #18155e;
-        --header: #1e1b6e;
-        --accent: #6366f1;
-        --accent-hover: #4f46e5;
+        --header-dark: #0a1520;
+        --header: #cce8f4;
+        --accent: #22d3ee;
+        --accent-hover: #0891b2;
         --radius-sm: 8px;
-        --cat-music: #7c3aed;
-        --cat-food: #d97706;
-        --cat-sports: #059669;
-        --cat-art: #db2777;
-        --cat-theater: #dc2626;
-        --cat-film: #2563eb;
-        --cat-nightlife: #9333ea;
-        --cat-community: #0891b2;
-        --cat-outdoor: #16a34a;
-        --cat-learning: #0d9488;
-        --cat-wellness: #65a30d;
-        --cat-talks: #ea580c;
-        --cat-other: #6b7280;
+        --cat-music: #a78bfa;
+        --cat-food: #fbbf24;
+        --cat-sports: #34d399;
+        --cat-art: #f472b6;
+        --cat-theater: #f87171;
+        --cat-film: #60a5fa;
+        --cat-nightlife: #c084fc;
+        --cat-community: #22d3ee;
+        --cat-outdoor: #4ade80;
+        --cat-learning: #2dd4bf;
+        --cat-wellness: #a3e635;
+        --cat-talks: #fb923c;
+        --cat-other: #94a3b8;
       }
 
       body {
@@ -62,8 +62,8 @@
         background: linear-gradient(
           135deg,
           var(--header-dark) 0%,
-          #2d1a6e 50%,
-          #1e3a8a 100%
+          #142030 50%,
+          #0c1a30 100%
         );
         color: white;
         position: relative;
@@ -75,14 +75,14 @@
         inset: 0;
         background:
           radial-gradient(
-            ellipse at 70% 50%,
-            rgba(99, 102, 241, 0.3) 0%,
-            transparent 60%
+            ellipse at 30% 50%,
+            rgba(34, 211, 238, 0.08) 0%,
+            transparent 70%
           ),
           radial-gradient(
-            ellipse at 20% 80%,
-            rgba(249, 115, 22, 0.15) 0%,
-            transparent 50%
+            ellipse at 80% 20%,
+            rgba(8, 145, 178, 0.06) 0%,
+            transparent 60%
           );
         pointer-events: none;
       }
@@ -101,7 +101,7 @@
       }
       .header-title em {
         font-style: italic;
-        color: #a5b4fc;
+        color: #67e8f9;
       }
       .header-sub {
         font-size: 15px;
@@ -174,8 +174,8 @@
       .controls {
         flex-shrink: 0;
         height: 52px;
-        background: #fff;
-        border-bottom: 1px solid #e0e0e0;
+        background: #192534;
+        border-bottom: 1px solid #243445;
         display: flex;
         align-items: center;
         gap: 6px;
@@ -187,43 +187,50 @@
 
       .controls label {
         font-size: 11px;
-        color: #888;
+        color: #5a7a8e;
         margin-right: 2px;
       }
 
       .controls input[type='text'] {
         font-size: 13px;
         padding: 4px 8px;
-        border: 1px solid #ccc;
+        border: 1px solid #243445;
         border-radius: 6px;
         height: 32px;
         width: 160px;
+        background: #111a24;
+        color: #e8f4fb;
       }
 
       .controls input[type='number'] {
         font-size: 13px;
         padding: 4px 6px;
-        border: 1px solid #ccc;
+        border: 1px solid #243445;
         border-radius: 6px;
         height: 32px;
         width: 60px;
+        background: #111a24;
+        color: #e8f4fb;
       }
 
       .controls input[type='datetime-local'] {
         font-size: 12px;
         padding: 4px 6px;
-        border: 1px solid #ccc;
+        border: 1px solid #243445;
         border-radius: 6px;
         height: 32px;
+        background: #111a24;
+        color: #e8f4fb;
       }
 
       .controls select {
         font-size: 13px;
         padding: 4px 6px;
-        border: 1px solid #ccc;
+        border: 1px solid #243445;
         border-radius: 6px;
         height: 32px;
-        background: #fff;
+        background: #111a24;
+        color: #e8f4fb;
       }
 
       .controls button {
@@ -246,20 +253,20 @@
       }
 
       .btn-search-here {
-        background: #e0e7ff;
+        background: rgba(34, 211, 238, 0.15);
         color: var(--accent);
       }
       .btn-search-here:hover:not(:disabled) {
-        background: #c7d2fe;
+        background: rgba(34, 211, 238, 0.25);
       }
       .btn-search-here:disabled {
-        background: #f0f0f0;
-        color: #bbb;
+        background: #1e2e3e;
+        color: #3a5060;
         cursor: not-allowed;
       }
 
       .ctrl-sep {
-        color: #ccc;
+        color: #243445;
         font-size: 14px;
         flex-shrink: 0;
       }
@@ -277,7 +284,7 @@
 
       .ctrl-unit {
         font-size: 11px;
-        color: #888;
+        color: #5a7a8e;
         flex-shrink: 0;
       }
 
@@ -296,11 +303,11 @@
       }
       #mapStatus.info {
         color: var(--accent);
-        background: #e0e7ff;
+        background: rgba(34, 211, 238, 0.1);
       }
       #mapStatus.error {
-        color: #b91c1c;
-        background: #fee2e2;
+        color: #f87171;
+        background: rgba(248, 113, 113, 0.1);
       }
 
       /* ── Map ───────────────────────────────────────────────────────────── */
@@ -405,19 +412,19 @@
       const DEFAULT_RADIUS = 100;
 
       const CAT_COLORS = {
-        music: '#7c3aed',
-        food: '#d97706',
-        sports: '#059669',
-        art: '#db2777',
-        theater: '#dc2626',
-        film: '#2563eb',
-        nightlife: '#9333ea',
-        community: '#0891b2',
-        outdoor: '#16a34a',
-        learning: '#0d9488',
-        wellness: '#65a30d',
-        talks: '#ea580c',
-        other: '#6b7280',
+        music: '#a78bfa',
+        food: '#fbbf24',
+        sports: '#34d399',
+        art: '#f472b6',
+        theater: '#f87171',
+        film: '#60a5fa',
+        nightlife: '#c084fc',
+        community: '#22d3ee',
+        outdoor: '#4ade80',
+        learning: '#2dd4bf',
+        wellness: '#a3e635',
+        talks: '#fb923c',
+        other: '#94a3b8',
       };
 
       // ── Haversine: distance in km between two {lat, lng} points ───────────
@@ -528,7 +535,7 @@
         const circle = L.circle(L.latLng(lat, lng), {
           radius: radiusKm * 1000,
           fill: false,
-          color: '#6366f1',
+          color: '#22d3ee',
           weight: 1,
           opacity: 0.4,
         }).addTo(markerLayer);
@@ -556,21 +563,21 @@
                 '</a>'
               : escHtml(e.title);
             const venueHtml = e.venue_name
-              ? '<div style="font-size:12px;color:#666;margin-top:2px">' +
+              ? '<div style="font-size:12px;color:#8aafc4;margin-top:2px">' +
                 escHtml(e.venue_name) +
                 '</div>'
               : '';
             return (
-              '<div style="padding:6px 0;border-top:1px solid #eee">' +
+              '<div style="padding:6px 0;border-top:1px solid #243445">' +
               '<div style="font-weight:600;font-size:14px;margin-bottom:4px">' +
               titleHtml +
               '</div>' +
-              '<div style="font-size:12px;color:#555;margin-bottom:2px">' +
+              '<div style="font-size:12px;color:#8aafc4;margin-bottom:2px">' +
               escHtml(fmtRange(e.start_time, e.end_time)) +
               '</div>' +
               venueHtml +
               '<span style="display:inline-block;margin-top:6px;padding:2px 8px;' +
-              'border-radius:999px;font-size:11px;font-weight:600;color:#fff;' +
+              'border-radius:999px;font-size:11px;font-weight:600;color:#0a1520;' +
               'background:' +
               escHtml(c) +
               '">' +
@@ -582,14 +589,14 @@
 
           const popupHtml =
             '<div style="font-family:-apple-system,sans-serif;min-width:180px;max-width:260px;' +
-            'max-height:320px;overflow-y:auto">' +
+            'max-height:320px;overflow-y:auto;background:#192534;color:#e8f4fb;padding:4px 8px">' +
             eventItems.join('') +
             '</div>';
 
           L.circleMarker([first.lat, first.lng], {
             radius: 8,
             fillColor: color,
-            color: '#fff',
+            color: '#111a24',
             weight: 1.5,
             opacity: 1,
             fillOpacity: 0.85,
