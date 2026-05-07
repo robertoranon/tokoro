@@ -209,7 +209,7 @@ export class EventCrawler {
     console.log(`\n🚀 Starting crawler with ${urls.length} image(s)/URL(s)\n`);
     if (mode !== 'image') {
       console.log(
-        `Fetcher: ${fetcherType === 'jina' ? 'Jina AI Reader' : 'Playwright + HTML cleaner'}`
+        `Fetcher: ${fetcherType === 'jina' ? 'Jina AI Reader' : `${this.config.browserEngine || 'chrome'} + HTML cleaner`}`
       );
     }
     console.log(`API URL: ${this.config.apiUrl}`);
