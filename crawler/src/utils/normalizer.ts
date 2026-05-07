@@ -172,11 +172,17 @@ export class EventNormalizer {
       return null;
     }
 
-    const address = await extractAddressFromSearchPage(
-      page,
-      venueName,
-      this.config.llm
-    );
+    let address: string;
+    try {
+      address = await extractAddressFromSearchPage(
+        page,
+        venueName,
+        this.config.llm
+      );
+    } catch (err) {
+      console.error('Geocoding fallback: LLM address extraction failed', err);
+      return null;
+    }
     if (!address) {
       console.error('Geocoding fallback: LLM returned no address');
       return null;
