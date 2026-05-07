@@ -1,5 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import yaml from 'js-yaml';
 import {
   EventCrawler,
@@ -122,4 +123,7 @@ async function main() {
   if (failed > 0) process.exit(1);
 }
 
-main().catch(console.error);
+// Only run when executed directly, not when imported as a module
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch(console.error);
+}
