@@ -163,8 +163,8 @@ export class EventNormalizer {
   ): Promise<GeocodingResult | null> {
     if (!venueName || !this.config.llm || !this.config.fetchPage) return null;
 
-    console.log(`Geocoding fallback: searching Google for "${venueName}"`);
-    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(venueName + ' address')}`;
+    console.log(`Geocoding fallback: searching DuckDuckGo for "${venueName}"`);
+    const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(venueName + ' address')}`;
 
     let page: FetchedPage;
     try {
