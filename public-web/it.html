@@ -1481,5 +1481,12 @@
       };
     </script>
     <script src="query.js"></script>
+    <script>
+      (function () {
+        var code = document.getElementById('bm-src').textContent;
+        document.getElementById('tokoro-bookmarklet').href =
+          'javascript:' + encodeURIComponent(code);
+      })();
+    </script>
   </body>
 </html>
