@@ -2763,4 +2763,75 @@ User-Agent: Tokoro-Crawler/1.0
 
 ---
 
+## 11. Scheduler
+
+### 11.1 Overview
+
+The scheduler runs a list of crawl jobs sequentially from a YAML config file. It is designed to be invoked by the system cron (crontab, launchd); the YAML drives what runs, not when.
+
+### 11.2 Config File: `jobs.yaml`
+
+Lives at the root of `crawler/`. Override the path with `--jobs <path>`.
+
+```yaml
+cron: "0 9 * * *"   # informational — paste into your system crontab
+
+jobs:
+  - name: "Blue Note Jazz"
+    urls:
+      - https://bluenotejazz.com/events
+    mode: discover
+    fetcher: jina
+
+  - name: "Local Festival"
+    urls:
+      - https://somefestival.com
+    mode: festival
+    browser: chrome
+    model: claude-3-5-sonnet-20241022
+```
+
+**Top-level fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `cron` | string | no | Cron expression — informational, not parsed by the runner |
+| `jobs` | array | yes | List of crawl jobs |
+
+**Per-job fields:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | string | — | Display name for log output |
+| `urls` | string[] | required | One or more URLs to crawl |
+| `mode` | string | `direct` | `direct` \| `discover` \| `image` \| `festival` \| `pdf` |
+| `fetcher` | string | `playwright` | `playwright` \| `jina` |
+| `browser` | string | env/`chrome` | `chrome` \| `obscura` |
+| `model` | string | env | LLM model name (overrides `.env`) |
+| `date` | string | today | Reference date `YYYY-MM-DD` for LLM extraction |
+| `max_tokens` | number | auto | Output token budget override |
+| `no_jsonld` | boolean | false | Disable JSON-LD extraction |
+| `group_by_day` | boolean | false | Group extracted events into one per calendar day |
+| `pdf_parser` | string | `pdfjs` | `pdfjs` \| `liteparse` |
+| `debug` | boolean | false | Print raw LLM output, skip normalization/publishing |
+| `normalize` | boolean | false | Run normalization in debug mode (no publish) |
+
+### 11.3 Runner Behavior
+
+1. Load `.env`
+2. Read `jobs.yaml` (or `--jobs <path>`)
+3. Validate config — fail fast if `jobs` is absent or any job lacks `urls`
+4. Validate keypair — fail fast if `CRAWLER_PRIVKEY`/`CRAWLER_PUBKEY` not set
+5. For each job (sequentially): log `[N/total] Running "name"`, run `EventCrawler`, log errors and continue on failure
+6. Print summary: `Completed: N succeeded, N failed`; exit with code 1 if any job failed
+
+### 11.4 System Cron Setup
+
+```bash
+# Add to crontab (crontab -e):
+0 9 * * *  cd /path/to/tokoro/crawler && npm run crawl-jobs
+```
+
+---
+
 **END OF SPECIFICATION**

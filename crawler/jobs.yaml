@@ -1,0 +1,17 @@
+# Cron schedule — paste this into your system crontab:
+# 0 9 * * *  cd /path/to/tokoro/crawler && npm run crawl-jobs
+cron: "0 9 * * *"
+
+jobs:
+  - name: "Example: discover mode with Jina"
+    urls:
+      - https://example.com/events
+    mode: discover
+    fetcher: jina
+
+  - name: "Example: festival mode with Chrome"
+    urls:
+      - https://example.com/festival
+    mode: festival
+    fetcher: playwright
+    browser: chrome

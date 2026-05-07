@@ -17,7 +17,9 @@
     "test:ci": "bash tests/ci.sh",
     "test:set-reference": "bash tests/set-reference.sh",
     "test:unit": "tsx tests/test-year-inference.ts",
-    "test:pdf": "tsx tests/test-pdf-fetcher.ts"
+    "test:pdf": "tsx tests/test-pdf-fetcher.ts",
+    "crawl-jobs": "tsx src/scheduler.ts",
+    "test:scheduler": "tsx tests/test-scheduler.ts"
   },
   "keywords": [
     "crawler",
