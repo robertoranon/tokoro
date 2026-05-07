@@ -7,6 +7,8 @@ import {
   isPlaceholderTime,
 } from '../../../shared/utils/timezone.js';
 import * as ed from '@noble/ed25519';
+import { LLMProvider } from '../../../shared/types/llm.js';
+import type { FetchedPage } from '../extractors/html-fetcher.js';
 
 // Configure SHA-512 for Node.js
 if (typeof crypto !== 'undefined' && crypto.subtle) {
@@ -19,6 +21,32 @@ if (typeof crypto !== 'undefined' && crypto.subtle) {
 export interface KeyPair {
   privkey: string; // hex
   pubkey: string; // hex
+}
+
+const SEARCH_RESULT_MAX_CHARS = 4000;
+
+export async function extractAddressFromSearchPage(
+  page: FetchedPage,
+  venueName: string,
+  llm: LLMProvider
+): Promise<string> {
+  const text = page.text.slice(0, SEARCH_RESULT_MAX_CHARS);
+  const response = await llm.complete(
+    [
+      {
+        role: 'system',
+        content:
+          'Extract a geocodable street address for the given venue from the web search results. ' +
+          'Return only the address string. Return an empty string if no address is found.',
+      },
+      {
+        role: 'user',
+        content: `Venue: ${venueName}\n\nSearch results:\n${text}`,
+      },
+    ],
+    { temperature: 0, maxTokens: 200 }
+  );
+  return response.content.trim();
 }
 
 export class EventNormalizer {
