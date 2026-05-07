@@ -21,6 +21,7 @@ import type {
   ExtractTextRequest,
 } from './types';
 import { extractCleanText } from '../../shared/extractors/html-cleaner';
+import { extractJsonLd } from '../../shared/extractors/jsonld-extractor';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -184,7 +185,14 @@ async function handleCrawl(request: Request, env: Env): Promise<Response> {
     };
 
     if (body.html) {
-      response.cleaned_text = extractCleanText(body.html).text;
+      const { text: cleanedText } = extractCleanText(body.html);
+      response.cleaned_text = cleanedText;
+      const jsonldResult = extractJsonLd(body.html, body.url || '');
+      response.debug = {
+        jsonld_events_found: jsonldResult.events.length,
+        jsonld_sufficient: jsonldResult.isSufficient,
+        cleaned_text_length: cleanedText.length,
+      };
     }
 
     if (result.dropped_events && result.dropped_events.length > 0) {

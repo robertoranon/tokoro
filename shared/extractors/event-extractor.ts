@@ -123,7 +123,12 @@ export class EventExtractor {
           : validated;
         // correctEventYear not called: JSON-LD events always have explicit years,
         // and the LLM never populates day_name on this code path.
-        return filtered;
+        if (filtered.length > 0) {
+          return filtered;
+        }
+        console.log(
+          '⚠️  All JSON-LD events were in the past, falling back to LLM extraction'
+        );
       }
     }
 

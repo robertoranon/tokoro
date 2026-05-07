@@ -514,6 +514,13 @@
             body: JSON.stringify(body),
           });
           const result = await resp.json();
+          console.log('[tokoro] crawler-worker response:', {
+            success: result.success,
+            stats: result.stats,
+            events_count: (result.events || []).length,
+            dropped_events: result.dropped_events,
+            debug: result.debug,
+          });
           if (result.cleaned_text) {
             console.log(
               '[tokoro] cleaned text sent to LLM (' +

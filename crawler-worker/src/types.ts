@@ -57,4 +57,9 @@ export interface CrawlResponse {
     venue_name?: string;
   }>;
   cleaned_text?: string;
+  debug?: {
+    jsonld_events_found: number;
+    jsonld_sufficient: boolean;
+    cleaned_text_length: number;
+  };
 }

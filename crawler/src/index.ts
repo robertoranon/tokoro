@@ -40,6 +40,79 @@ async function loadSeedUrls(seedFile: string): Promise<string[]> {
     .filter(line => line && !line.startsWith('#'));
 }
 
+function printUsage() {
+  console.log('\nUsage:');
+  console.log(
+    '  npm run crawl <url1> <url2> ...                      # Crawl specific URLs'
+  );
+  console.log(
+    '  npm run crawl -- --mode direct <url>                 # Direct extraction (no link following)'
+  );
+  console.log(
+    '  npm run crawl -- --mode discover <url>               # Discover & extract (default)'
+  );
+  console.log(
+    '  npm run crawl -- --image <file|url>                  # Extract events from image flyer/poster (shorthand for --mode image)'
+  );
+  console.log(
+    '  npm run crawl -- --mode image <file|url>             # Extract events from image (alternative syntax)'
+  );
+  console.log(
+    '  npm run crawl -- --pdf <file|url>                    # Extract events from PDF (shorthand for --mode pdf)'
+  );
+  console.log(
+    '  npm run crawl -- --mode pdf <file|url>               # Extract events from PDF'
+  );
+  console.log(
+    '  npm run crawl -- --pdf-parser liteparse <file|url>   # Use LiteParse for PDF text extraction (default: pdfjs)'
+  );
+  console.log(
+    '  npm run crawl -- --mode festival <url>                # Festival mode: discover program pages + extract all events'
+  );
+  console.log(
+    '  npm run crawl -- --fetcher jina <url>                # Use Jina AI Reader (faster, no browser)'
+  );
+  console.log(
+    '  npm run crawl -- --fetcher playwright <url>          # Use Playwright + clean HTML (default)'
+  );
+  console.log(
+    '  npm run crawl -- --browser chrome <url>              # Use headless Chrome (default)'
+  );
+  console.log(
+    '  npm run crawl -- --browser obscura <url>             # Use Obscura instead of Chrome (faster + stealth)'
+  );
+  console.log(
+    '  npm run crawl -- --model <model-name> <url>          # Use specific OpenRouter model (overrides .env)'
+  );
+  console.log(
+    '  npm run crawl -- --date <YYYY-MM-DD> <url>           # Use specific reference date for extraction (default: today)'
+  );
+  console.log(
+    '  npm run crawl -- --max-tokens <N> <url>              # Override output token budget (default: auto-scaled from content length)'
+  );
+  console.log(
+    '  npm run crawl -- --debug <url>                       # Debug mode: print raw LLM output, skip normalization/geocoding'
+  );
+  console.log(
+    '  npm run crawl -- --debug --normalize <url>           # Debug mode: run full normalization (geocoding) but skip publishing'
+  );
+  console.log(
+    '  npm run crawl -- --no-jsonld <url>                   # Disable JSON-LD extraction, use LLM only'
+  );
+  console.log(
+    '  npm run crawl -- --group-by-day <url>                # Group extracted events into one per calendar day'
+  );
+  console.log(
+    '  npm run crawl -- --text-file <path>                  # Skip fetching, pass text file directly to LLM (debug prompt testing)'
+  );
+  console.log(
+    '  npm run crawl                                        # Crawl URLs from seeds.txt'
+  );
+  console.log(
+    '  npm run crawl -- --generate-keypair                  # Generate new keypair'
+  );
+}
+
 async function main() {
   const args = process.argv.slice(2);
 
@@ -47,6 +120,12 @@ async function main() {
   if (args.includes('--generate-keypair')) {
     await generateKeypair();
     return;
+  }
+
+  // Help mode
+  if (args.includes('--help') || args.includes('-h')) {
+    printUsage();
+    process.exit(0);
   }
 
   // Load .env
@@ -245,76 +324,7 @@ async function main() {
       console.log(`Loaded ${urls.length} URLs from seeds.txt`);
     } catch (error) {
       console.error('Error: No URLs provided and seeds.txt not found');
-      console.log('\nUsage:');
-      console.log(
-        '  npm run crawl <url1> <url2> ...                      # Crawl specific URLs'
-      );
-      console.log(
-        '  npm run crawl -- --mode direct <url>                 # Direct extraction (no link following)'
-      );
-      console.log(
-        '  npm run crawl -- --mode discover <url>               # Discover & extract (default)'
-      );
-      console.log(
-        '  npm run crawl -- --image <file|url>                  # Extract events from image flyer/poster (shorthand for --mode image)'
-      );
-      console.log(
-        '  npm run crawl -- --mode image <file|url>             # Extract events from image (alternative syntax)'
-      );
-      console.log(
-        '  npm run crawl -- --pdf <file|url>                    # Extract events from PDF (shorthand for --mode pdf)'
-      );
-      console.log(
-        '  npm run crawl -- --mode pdf <file|url>               # Extract events from PDF'
-      );
-      console.log(
-        '  npm run crawl -- --pdf-parser liteparse <file|url>   # Use LiteParse for PDF text extraction (default: pdfjs)'
-      );
-      console.log(
-        '  npm run crawl -- --mode festival <url>                # Festival mode: discover program pages + extract all events'
-      );
-      console.log(
-        '  npm run crawl -- --fetcher jina <url>                # Use Jina AI Reader (faster, no browser)'
-      );
-      console.log(
-        '  npm run crawl -- --fetcher playwright <url>          # Use Playwright + clean HTML (default)'
-      );
-      console.log(
-        '  npm run crawl -- --browser chrome <url>              # Use headless Chrome (default)'
-      );
-      console.log(
-        '  npm run crawl -- --browser obscura <url>             # Use Obscura instead of Chrome (faster + stealth)'
-      );
-      console.log(
-        '  npm run crawl -- --model <model-name> <url>          # Use specific OpenRouter model (overrides .env)'
-      );
-      console.log(
-        '  npm run crawl -- --date <YYYY-MM-DD> <url>           # Use specific reference date for extraction (default: today)'
-      );
-      console.log(
-        '  npm run crawl -- --max-tokens <N> <url>              # Override output token budget (default: auto-scaled from content length)'
-      );
-      console.log(
-        '  npm run crawl -- --debug <url>                       # Debug mode: print raw LLM output, skip normalization/geocoding'
-      );
-      console.log(
-        '  npm run crawl -- --debug --normalize <url>           # Debug mode: run full normalization (geocoding) but skip publishing'
-      );
-      console.log(
-        '  npm run crawl -- --no-jsonld <url>                   # Disable JSON-LD extraction, use LLM only'
-      );
-      console.log(
-        '  npm run crawl -- --group-by-day <url>                # Group extracted events into one per calendar day'
-      );
-      console.log(
-        '  npm run crawl -- --text-file <path>                  # Skip fetching, pass text file directly to LLM (debug prompt testing)'
-      );
-      console.log(
-        '  npm run crawl                                        # Crawl URLs from seeds.txt'
-      );
-      console.log(
-        '  npm run crawl -- --generate-keypair                  # Generate new keypair'
-      );
+      printUsage();
       process.exit(1);
     }
   }
