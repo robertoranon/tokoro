@@ -5,7 +5,7 @@ import type {
   LLMOptions,
   LLMResponse,
 } from '../../shared/types/llm.js';
-import type { FetchedPage } from '../src/extractors/html-fetcher.js';
+import type { FetchedPage } from '../src/types/event.js';
 
 let passed = 0;
 let failed = 0;

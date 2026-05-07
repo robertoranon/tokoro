@@ -183,7 +183,7 @@ export class EventNormalizer {
     }
 
     console.log(`Geocoding fallback: retrying geocoding with "${address}"`);
-    return geocodeAddress(address);
+    return geocodeAddress(address, venueName);
   }
 
   private normalizeTimestamp(time: string | number): string {
