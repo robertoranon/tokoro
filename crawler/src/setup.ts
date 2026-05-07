@@ -21,7 +21,10 @@ export async function loadEnv(): Promise<void> {
       if (trimmed && !trimmed.startsWith('#')) {
         const [key, ...valueParts] = trimmed.split('=');
         if (key && valueParts.length) {
-          process.env[key.trim()] = valueParts.join('=').trim();
+          const k = key.trim();
+          if (!process.env[k]) {
+            process.env[k] = valueParts.join('=').trim();
+          }
         }
       }
     }
@@ -58,7 +61,7 @@ export function loadCrawlerEnv(): CrawlerEnv {
 }
 
 export function buildLLM(modelOverride?: string): LLMProvider {
-  const provider = (process.env.LLM_PROVIDER || 'ollama') as any;
+  const provider = process.env.LLM_PROVIDER || 'ollama';
   const apiKey =
     process.env.OPENROUTER_API_KEY ||
     process.env.OPENAI_API_KEY ||
