@@ -48,8 +48,11 @@ node "${PUBLIC_WEB}/build-bookmarklet.js"
 echo "Copying public-web to temp directory..."
 cp -r "${PUBLIC_WEB}/." "${DEPLOY_DIR}/"
 
+BUILD_VERSION="$(git -C "${REPO_ROOT}" rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+echo "Build version: ${BUILD_VERSION}"
+
 echo "Injecting URLs into temp copy..."
-node "${PUBLIC_WEB}/inject-worker-url.js" "$WORKER_URL" "$CRAWLER_URL" "$RELAY_URL" "${DEPLOY_DIR}"
+node "${PUBLIC_WEB}/inject-worker-url.js" "$WORKER_URL" "$CRAWLER_URL" "$RELAY_URL" "${DEPLOY_DIR}" "${BUILD_VERSION}"
 
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "[dry-run] Would deploy public-web to Cloudflare Pages (project: tokoro-query)"

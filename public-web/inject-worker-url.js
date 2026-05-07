@@ -29,6 +29,7 @@ const workerUrl = process.argv[2];
 const crawlerUrl = process.argv[3];
 const relayUrl = process.argv[4];
 const targetDir = process.argv[5] || __dirname;
+const buildVersion = process.argv[6] || 'dev';
 
 if (!workerUrl) {
   console.error('ERROR: worker URL argument required.');
@@ -39,7 +40,7 @@ if (!workerUrl) {
 }
 
 // map.html has no relay UI and therefore no crawler/bookmarklet placeholders
-const ALL_FILES = ['index.html', 'it.html', 'map.html'].map(f =>
+const ALL_FILES = ['index.html', 'it.html', 'map.html', 'publish.html'].map(f =>
   path.join(targetDir, f)
 );
 const RELAY_FILES = ['index.html', 'it.html'].map(f => path.join(targetDir, f));
@@ -101,6 +102,8 @@ for (const f of ALL_FILES) {
       console.log(`Bookmarklet injected into ${path.basename(f)}`);
     }
   }
+
+  content = content.replace(/__BUILD_VERSION__/g, buildVersion);
 
   fs.writeFileSync(f, content, 'utf8');
 }
