@@ -54,3 +54,72 @@ export function parseJobsConfig(content: string): SchedulerConfig {
   }
   return cfg as unknown as SchedulerConfig;
 }
+
+async function main() {
+  await loadEnv();
+
+  let jobsFile = path.join(process.cwd(), 'jobs.yaml');
+  const jobsIndex = process.argv.indexOf('--jobs');
+  if (jobsIndex !== -1 && process.argv[jobsIndex + 1]) {
+    jobsFile = path.resolve(process.argv[jobsIndex + 1]);
+  }
+
+  let config: SchedulerConfig;
+  try {
+    const content = await fs.readFile(jobsFile, 'utf-8');
+    config = parseJobsConfig(content);
+  } catch (error) {
+    console.error(
+      `Error reading jobs config: ${error instanceof Error ? error.message : error}`
+    );
+    process.exit(1);
+  }
+
+  const env = loadCrawlerEnv();
+  const { jobs } = config;
+
+  console.log(`Running ${jobs.length} job${jobs.length === 1 ? '' : 's'}...`);
+
+  let succeeded = 0;
+  let failed = 0;
+
+  for (let i = 0; i < jobs.length; i++) {
+    const job = jobs[i];
+    const label = job.name ? `"${job.name}"` : `job ${i + 1}`;
+    console.log(`\n[${i + 1}/${jobs.length}] Running ${label}`);
+
+    try {
+      const llm = buildLLM(job.model);
+
+      const crawler = new EventCrawler({
+        llm,
+        keypair: { privkey: env.privkey, pubkey: env.pubkey },
+        apiUrl: env.apiUrl,
+        mode: job.mode ?? 'direct',
+        fetcher: job.fetcher ?? 'playwright',
+        browserEngine: job.browser,
+        jinaKey: env.jinaKey,
+        debug: job.debug,
+        normalize: job.normalize,
+        referenceDate: job.date,
+        useJsonLd: job.no_jsonld ? false : true,
+        maxTokens: job.max_tokens,
+        groupByDay: job.group_by_day,
+        pdfParser: job.pdf_parser,
+      });
+
+      await crawler.crawl(job.urls);
+      succeeded++;
+    } catch (error) {
+      console.error(
+        `  Error: ${error instanceof Error ? error.message : error}`
+      );
+      failed++;
+    }
+  }
+
+  console.log(`\nCompleted: ${succeeded} succeeded, ${failed} failed`);
+  if (failed > 0) process.exit(1);
+}
+
+main().catch(console.error);
