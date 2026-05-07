@@ -875,6 +875,13 @@ async function copyAsText() {
         }),
       });
       const result = await resp.json();
+      console.log('[tokoro] crawler-worker response:', {
+        success: result.success,
+        stats: result.stats,
+        events_count: (result.events || []).length,
+        dropped_events: result.dropped_events,
+        debug: result.debug,
+      });
       if (result.cleaned_text) {
         console.log(
           '[tokoro] cleaned text sent to LLM (' +
@@ -891,6 +898,9 @@ async function copyAsText() {
       previewToken = result.preview_token || null;
       if (!evs.length) {
         const dropped = result.dropped_events;
+        if (dropped && dropped.length) {
+          console.warn('[tokoro] dropped events:', dropped);
+        }
         setSt(
           dropped && dropped.length
             ? LANG.droppedEvents(dropped.length)
