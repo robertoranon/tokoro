@@ -1252,8 +1252,36 @@ async def geocode_address(address: str, venue_name: Optional[str] = None) -> Opt
         result = await try_geocode(venue_name)
         if result: return result
 
+    # 5. Google search fallback (when llm and fetchPage are provided)
+    if llm and fetchPage and venue_name:
+        try:
+            search_url = f"https://www.google.com/search?q={urlencode(venue_name)} address"
+            page = await fetchPage(search_url)
+            page_text = page.text[:4000]  # Truncate to 4000 chars
+            
+            extracted_address = await llm.extract_address(page_text, venue_name)
+            if extracted_address:
+                result = await try_geocode(extracted_address)
+                if result: return result
+        except Exception:
+            pass  # Silently fail if Google search or LLM extraction fails
+
     return None
 ```
+
+**Retry Strategies:**
+
+1. **Full address as-is**: Direct Nominatim lookup of the extracted address
+2. **Address without first segment**: If address contains commas, drop the first part (which might be a venue prefix) and retry
+3. **Venue name + address**: Combine `venue_name` with the address to provide geographic context
+4. **Venue name alone**: Use only the venue name as a last resort with Nominatim
+5. **Google search fallback** (when `llm` and `fetchPage` are provided to the normalizer):
+   - Build a Google search URL: `https://www.google.com/search?q={venueName} address`
+   - Fetch the page using the configured fetcher (Playwright or Jina)
+   - Pass `page.text` (already cleaned) truncated to 4000 chars to the LLM
+   - LLM prompt: extract a geocodable street address for the venue
+   - Retry Nominatim geocoding with the extracted address
+   - If still null, drop the event
 
 **Rate Limiting:**
 
