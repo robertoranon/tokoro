@@ -1252,20 +1252,6 @@ async def geocode_address(address: str, venue_name: Optional[str] = None) -> Opt
         result = await try_geocode(venue_name)
         if result: return result
 
-    # 5. Google search fallback (when llm and fetchPage are provided)
-    if llm and fetchPage and venue_name:
-        try:
-            search_url = f"https://www.google.com/search?q={urlencode(venue_name)} address"
-            page = await fetchPage(search_url)
-            page_text = page.text[:4000]  # Truncate to 4000 chars
-            
-            extracted_address = await llm.extract_address(page_text, venue_name)
-            if extracted_address:
-                result = await try_geocode(extracted_address)
-                if result: return result
-        except Exception:
-            pass  # Silently fail if Google search or LLM extraction fails
-
     return None
 ```
 
