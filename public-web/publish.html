@@ -85,6 +85,7 @@
         font-size: 13px;
         margin-bottom: 10px;
         padding: 6px 0;
+        white-space: pre-wrap;
       }
       #status.err {
         color: #f87171;
@@ -539,13 +540,22 @@
           const evs = result.events || [];
           if (!evs.length) {
             const dropped = result.dropped_events;
-            setSt(
-              dropped && dropped.length
-                ? dropped.length +
-                    ' event(s) found but dropped during normalization.'
-                : 'No events found on this page.',
-              'info'
-            );
+            if (dropped && dropped.length) {
+              const reasons = dropped
+                .map(function (d) {
+                  return (d.title || '(no title)') + ': ' + d.reason;
+                })
+                .join('\n');
+              console.warn('[tokoro] dropped events:', dropped);
+              setSt(
+                dropped.length +
+                  ' event(s) found but dropped during normalization:\n' +
+                  reasons,
+                'info'
+              );
+            } else {
+              setSt('No events found on this page.', 'info');
+            }
             return;
           }
           setSt('Found ' + evs.length + ' event(s). Review below:', 'ok');
