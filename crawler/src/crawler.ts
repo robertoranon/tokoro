@@ -132,6 +132,7 @@ export interface CrawlerConfig {
   fetcher?: FetcherType; // defaults to 'playwright'
   browserEngine?: BrowserEngine; // defaults to 'obscura'
   jinaKey?: string;
+  braveSearchKey?: string;
   debug?: boolean; // if true, output events to console only (skip API publishing)
   normalize?: boolean; // if true (with debug), run full normalization; if false (default with debug), skip geocoding/signing
   referenceDate?: string; // optional reference date for LLM (format: YYYY-MM-DD, defaults to today)
@@ -178,7 +179,7 @@ export class EventCrawler {
     this.normalizer = new EventNormalizer({
       keypair: config.keypair,
       llm: config.llm,
-      fetchPage: url => this.fetcherForUrl(url).fetchPage(url),
+      braveSearchKey: config.braveSearchKey,
     });
     this.publisher = new APIPublisher(config.apiUrl, config.debug, config.llm);
   }

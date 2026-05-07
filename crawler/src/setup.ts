@@ -38,6 +38,7 @@ export interface CrawlerEnv {
   pubkey: string;
   apiUrl: string;
   jinaKey: string | undefined;
+  braveSearchKey: string | undefined;
 }
 
 export function loadCrawlerEnv(): CrawlerEnv {
@@ -57,6 +58,7 @@ export function loadCrawlerEnv(): CrawlerEnv {
     pubkey,
     apiUrl: process.env.TOKORO_API_URL || 'http://localhost:8787',
     jinaKey: process.env.JINA_API_KEY,
+    braveSearchKey: process.env.BRAVE_SEARCH_API_KEY,
   };
 }
 

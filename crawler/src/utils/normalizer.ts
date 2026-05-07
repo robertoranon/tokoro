@@ -57,7 +57,7 @@ export async function extractAddressFromSearchPage(
 export interface NormalizerConfig {
   keypair: KeyPair;
   llm?: LLMProvider;
-  fetchPage?: (url: string) => Promise<FetchedPage>;
+  braveSearchKey?: string;
 }
 
 export class EventNormalizer {
@@ -161,16 +161,37 @@ export class EventNormalizer {
   private async geocodeFromSearch(
     venueName: string | undefined
   ): Promise<GeocodingResult | null> {
-    if (!venueName || !this.config.llm || !this.config.fetchPage) return null;
+    if (!venueName || !this.config.llm || !this.config.braveSearchKey)
+      return null;
 
-    console.log(`Geocoding fallback: searching DuckDuckGo for "${venueName}"`);
-    const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(venueName + ' address')}`;
+    console.log(`Geocoding fallback: searching Brave for "${venueName}"`);
+    const query = encodeURIComponent(venueName + ' address');
+    const searchUrl = `https://api.search.brave.com/res/v1/web/search?q=${query}&count=5`;
 
-    let page: FetchedPage;
+    let searchText: string;
     try {
-      page = await this.config.fetchPage(searchUrl);
+      const response = await fetch(searchUrl, {
+        headers: {
+          Accept: 'application/json',
+          'X-Subscription-Token': this.config.braveSearchKey,
+        },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!response.ok) {
+        console.error(
+          `Geocoding fallback: Brave API returned ${response.status}`
+        );
+        return null;
+      }
+      const data = (await response.json()) as {
+        web?: { results?: { title: string; description?: string }[] };
+      };
+      const results = data.web?.results ?? [];
+      searchText = results
+        .map(r => `${r.title}\n${r.description ?? ''}`)
+        .join('\n\n');
     } catch (err) {
-      console.error('Geocoding fallback: search fetch failed', err);
+      console.error('Geocoding fallback: Brave API request failed', err);
       return null;
     }
 
@@ -185,13 +206,20 @@ export class EventNormalizer {
       );
       await fs.writeFile(
         logPath,
-        `=== GEOCODING SEARCH FALLBACK ===\nVenue: ${venueName}\nURL: ${searchUrl}\n\n=== SEARCH RESULT ===\n${page.text}\n`,
+        `=== GEOCODING SEARCH FALLBACK ===\nVenue: ${venueName}\nQuery: ${venueName} address\n\n=== BRAVE SEARCH RESULTS ===\n${searchText}\n`,
         'utf-8'
       );
       console.log(`📝 Search response logged to: ${logPath}`);
     } catch (err) {
       console.warn('Failed to write geocoding search log:', err);
     }
+
+    const page: FetchedPage = {
+      url: searchUrl,
+      html: '',
+      text: searchText,
+      title: 'Brave Search Results',
+    };
 
     let address: string;
     try {

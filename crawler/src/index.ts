@@ -334,7 +334,7 @@ async function main() {
     process.exit(1);
   }
 
-  const { privkey, pubkey, apiUrl, jinaKey } = loadCrawlerEnv();
+  const { privkey, pubkey, apiUrl, jinaKey, braveSearchKey } = loadCrawlerEnv();
   const llm = buildLLM(model);
 
   // Create crawler
@@ -346,6 +346,7 @@ async function main() {
     fetcher,
     browserEngine,
     jinaKey,
+    braveSearchKey,
     debug,
     normalize,
     referenceDate,
