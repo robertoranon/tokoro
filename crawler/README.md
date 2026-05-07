@@ -13,6 +13,7 @@ LLM-powered semantic crawler for extracting structured event data from web pages
 - **Geocoding**: Automatically geocodes addresses to coordinates using OpenStreetMap
 - **Event Signing**: Signs events with Ed25519 keypairs
 - **API Integration**: Publishes directly to Tokoro API
+- **Scheduler**: Run a list of crawl jobs automatically via system cron using a simple YAML config
 
 ## Future work
 
@@ -234,6 +235,51 @@ npm run crawl -- --mode festival https://www.flowfestival.com
 npm run crawl -- --image path/to/flyer.jpg
 ```
 
+### Scheduled Crawls
+
+Run a fixed list of crawl jobs automatically using your system's cron scheduler (crontab, launchd).
+
+**1. Edit `jobs.yaml`** in the `crawler/` directory:
+
+```yaml
+cron: "0 9 * * *"   # informational — paste this into your crontab
+
+jobs:
+  - name: "Blue Note Jazz"
+    urls:
+      - https://bluenotejazz.com/events
+    mode: discover
+    fetcher: jina
+
+  - name: "Local Festival"
+    urls:
+      - https://somefestival.com
+    mode: festival
+    fetcher: playwright
+    browser: chrome
+    model: claude-3-5-sonnet-20241022
+```
+
+Each job accepts the same options as the CLI (`mode`, `fetcher`, `browser`, `model`, `date`, `max_tokens`, `no_jsonld`, `group_by_day`, `pdf_parser`, `debug`, `normalize`). Only `urls` is required. Jobs run sequentially; a failure in one job is logged and skipped — the rest still run.
+
+**2. Run manually to test:**
+
+```bash
+npm run crawl-jobs
+# or point to a custom config file:
+npm run crawl-jobs -- --jobs /path/to/my-jobs.yaml
+```
+
+**3. Add a crontab entry** (paste the `cron` value from `jobs.yaml`):
+
+```bash
+crontab -e
+# Add:
+0 9 * * *  cd /path/to/tokoro/crawler && npm run crawl-jobs
+```
+
+The process exits with code 1 if any job fails, so cron monitoring tools can alert on failures.
+
 ### Debug Mode
 
 Use debug mode to test extraction without publishing to the API.
@@ -333,7 +379,9 @@ src/
 ├── utils/         # Geocoding, signing, publishing
 ├── types/         # TypeScript types & Zod schemas
 ├── crawler.ts     # Main crawler orchestration
-└── index.ts       # CLI entry point
+├── setup.ts       # Shared env/keypair/LLM setup
+├── index.ts       # CLI entry point (npm run crawl)
+└── scheduler.ts   # Scheduler entry point (npm run crawl-jobs)
 ```
 
 ## Configuration
