@@ -1,5 +1,8 @@
 import { ExtractedEvent, NormalizedEvent } from '../types/event.js';
-import { geocodeAddress } from '../../../shared/utils/geocode.js';
+import {
+  geocodeAddress,
+  GeocodingResult,
+} from '../../../shared/utils/geocode.js';
 import { encode as encodeGeohash } from './geohash.js';
 import {
   lookupTimezone,
@@ -49,8 +52,14 @@ export async function extractAddressFromSearchPage(
   return response.content.trim();
 }
 
+export interface NormalizerConfig {
+  keypair: KeyPair;
+  llm?: LLMProvider;
+  fetchPage?: (url: string) => Promise<FetchedPage>;
+}
+
 export class EventNormalizer {
-  constructor(private keypair: KeyPair) {}
+  constructor(private config: NormalizerConfig) {}
 
   async normalize(event: ExtractedEvent): Promise<NormalizedEvent | null> {
     console.log(`Normalizing event: ${event.title}`);
@@ -69,7 +78,11 @@ export class EventNormalizer {
       }
 
       console.log(`Geocoding address: ${geocodeQuery}`);
-      const geocoded = await geocodeAddress(geocodeQuery, event.venue_name);
+      let geocoded = await geocodeAddress(geocodeQuery, event.venue_name);
+
+      if (!geocoded) {
+        geocoded = await this.geocodeFromSearch(event.venue_name);
+      }
 
       if (!geocoded) {
         console.error('Geocoding failed');
@@ -112,7 +125,7 @@ export class EventNormalizer {
 
     // Create event data for signing
     const eventData = {
-      pubkey: this.keypair.pubkey,
+      pubkey: this.config.keypair.pubkey,
       title: event.title,
       description: event.description || '',
       url: event.url || '',
@@ -131,7 +144,7 @@ export class EventNormalizer {
     const messageHash = await this.hashEventData(eventData);
     const signature = await ed.signAsync(
       this.hexToBytes(messageHash),
-      this.hexToBytes(this.keypair.privkey)
+      this.hexToBytes(this.config.keypair.privkey)
     );
 
     const normalized: NormalizedEvent = {
@@ -141,6 +154,36 @@ export class EventNormalizer {
     if (event.festival_name) normalized.festival_name = event.festival_name;
     if (event.festival_url) normalized.festival_url = event.festival_url;
     return normalized;
+  }
+
+  private async geocodeFromSearch(
+    venueName: string | undefined
+  ): Promise<GeocodingResult | null> {
+    if (!venueName || !this.config.llm || !this.config.fetchPage) return null;
+
+    console.log(`Geocoding fallback: searching Google for "${venueName}"`);
+    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(venueName + ' address')}`;
+
+    let page: FetchedPage;
+    try {
+      page = await this.config.fetchPage(searchUrl);
+    } catch (err) {
+      console.error('Geocoding fallback: search fetch failed', err);
+      return null;
+    }
+
+    const address = await extractAddressFromSearchPage(
+      page,
+      venueName,
+      this.config.llm
+    );
+    if (!address) {
+      console.error('Geocoding fallback: LLM returned no address');
+      return null;
+    }
+
+    console.log(`Geocoding fallback: retrying geocoding with "${address}"`);
+    return geocodeAddress(address);
   }
 
   private normalizeTimestamp(time: string | number): string {
