@@ -96,5 +96,57 @@ jobs:
   assert(config.jobs[1].urls.length === 2, 'second job has two URLs');
 }
 
+console.log('\nInvalid mode:');
+{
+  let threw = false;
+  try {
+    parseJobsConfig(
+      'jobs:\n  - urls:\n      - https://example.com\n    mode: badmode'
+    );
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'throws for invalid mode');
+}
+
+console.log('\nInvalid fetcher:');
+{
+  let threw = false;
+  try {
+    parseJobsConfig(
+      'jobs:\n  - urls:\n      - https://example.com\n    fetcher: badfetcher'
+    );
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'throws for invalid fetcher');
+}
+
+console.log('\nInvalid browser:');
+{
+  let threw = false;
+  try {
+    parseJobsConfig(
+      'jobs:\n  - urls:\n      - https://example.com\n    browser: badbrowser'
+    );
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'throws for invalid browser');
+}
+
+console.log('\nInvalid pdf_parser:');
+{
+  let threw = false;
+  try {
+    parseJobsConfig(
+      'jobs:\n  - urls:\n      - https://example.com\n    pdf_parser: badparser'
+    );
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'throws for invalid pdf_parser');
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

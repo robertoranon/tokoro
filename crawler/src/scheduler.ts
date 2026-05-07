@@ -52,6 +52,43 @@ export function parseJobsConfig(content: string): SchedulerConfig {
         `Invalid jobs.yaml: job ${label} must have a non-empty "urls" array`
       );
     }
+
+    const validModes = ['direct', 'discover', 'image', 'festival', 'pdf'];
+    if (j.mode !== undefined && !validModes.includes(j.mode as string)) {
+      throw new Error(
+        `Invalid jobs.yaml: job ${label} has invalid mode "${j.mode}". Must be: ${validModes.join(', ')}`
+      );
+    }
+
+    const validFetchers = ['playwright', 'jina'];
+    if (
+      j.fetcher !== undefined &&
+      !validFetchers.includes(j.fetcher as string)
+    ) {
+      throw new Error(
+        `Invalid jobs.yaml: job ${label} has invalid fetcher "${j.fetcher}". Must be: ${validFetchers.join(', ')}`
+      );
+    }
+
+    const validBrowsers = ['chrome', 'obscura'];
+    if (
+      j.browser !== undefined &&
+      !validBrowsers.includes(j.browser as string)
+    ) {
+      throw new Error(
+        `Invalid jobs.yaml: job ${label} has invalid browser "${j.browser}". Must be: ${validBrowsers.join(', ')}`
+      );
+    }
+
+    const validPdfParsers = ['pdfjs', 'liteparse'];
+    if (
+      j.pdf_parser !== undefined &&
+      !validPdfParsers.includes(j.pdf_parser as string)
+    ) {
+      throw new Error(
+        `Invalid jobs.yaml: job ${label} has invalid pdf_parser "${j.pdf_parser}". Must be: ${validPdfParsers.join(', ')}`
+      );
+    }
   }
   return cfg as unknown as SchedulerConfig;
 }
@@ -106,7 +143,7 @@ async function main() {
         debug: job.debug,
         normalize: job.normalize,
         referenceDate: job.date,
-        useJsonLd: job.no_jsonld ? false : true,
+        useJsonLd: !job.no_jsonld,
         maxTokens: job.max_tokens,
         groupByDay: job.group_by_day,
         pdfParser: job.pdf_parser,
