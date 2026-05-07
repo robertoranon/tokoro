@@ -10,6 +10,8 @@ import {
   isPlaceholderTime,
 } from '../../../shared/utils/timezone.js';
 import * as ed from '@noble/ed25519';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import type { LLMProvider } from '../../../shared/types/llm.js';
 import type { FetchedPage } from '../types/event.js';
 
@@ -170,6 +172,25 @@ export class EventNormalizer {
     } catch (err) {
       console.error('Geocoding fallback: search fetch failed', err);
       return null;
+    }
+
+    try {
+      const logsDir = path.join(process.cwd(), 'logs');
+      await fs.mkdir(logsDir, { recursive: true });
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const slug = venueName.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40);
+      const logPath = path.join(
+        logsDir,
+        `${timestamp}_geocode_search_${slug}.txt`
+      );
+      await fs.writeFile(
+        logPath,
+        `=== GEOCODING SEARCH FALLBACK ===\nVenue: ${venueName}\nURL: ${searchUrl}\n\n=== SEARCH RESULT ===\n${page.text}\n`,
+        'utf-8'
+      );
+      console.log(`📝 Search response logged to: ${logPath}`);
+    } catch (err) {
+      console.warn('Failed to write geocoding search log:', err);
     }
 
     let address: string;
