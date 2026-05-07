@@ -5,7 +5,11 @@ import { PdfFetcher, type PdfParserType } from './extractors/pdf-fetcher.js';
 import * as path from 'path';
 import { EventExtractor } from './extractors/event-extractor.js';
 import { PageDiscovery } from './extractors/page-discovery.js';
-import { EventNormalizer, KeyPair } from './utils/normalizer.js';
+import {
+  EventNormalizer,
+  KeyPair,
+  NormalizerConfig,
+} from './utils/normalizer.js';
 import { APIPublisher } from './utils/api-publisher.js';
 import { LLMProvider } from '../../shared/types/llm.js';
 import { ExtractedEvent } from './types/event.js';
@@ -175,7 +179,11 @@ export class EventCrawler {
         config.maxTokens ??
         (isFestival ? FESTIVAL_MAX_TOKENS : DEFAULT_MAX_TOKENS),
     });
-    this.normalizer = new EventNormalizer(config.keypair);
+    this.normalizer = new EventNormalizer({
+      keypair: config.keypair,
+      llm: config.llm,
+      fetchPage: url => this.fetcherForUrl(url).fetchPage(url),
+    });
     this.publisher = new APIPublisher(config.apiUrl, config.debug, config.llm);
   }
 
