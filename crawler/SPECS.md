@@ -2763,13 +2763,13 @@ User-Agent: Tokoro-Crawler/1.0
 
 ---
 
-## 11. Scheduler
+## 20. Scheduler
 
-### 11.1 Overview
+### 20.1 Overview
 
 The scheduler runs a list of crawl jobs sequentially from a YAML config file. It is designed to be invoked by the system cron (crontab, launchd); the YAML drives what runs, not when.
 
-### 11.2 Config File: `jobs.yaml`
+### 20.2 Config File: `jobs.yaml`
 
 Lives at the root of `crawler/`. Override the path with `--jobs <path>`.
 
@@ -2816,7 +2816,7 @@ jobs:
 | `debug` | boolean | false | Print raw LLM output, skip normalization/publishing |
 | `normalize` | boolean | false | Run normalization in debug mode (no publish) |
 
-### 11.3 Runner Behavior
+### 20.3 Runner Behavior
 
 1. Load `.env`
 2. Read `jobs.yaml` (or `--jobs <path>`)
@@ -2825,7 +2825,7 @@ jobs:
 5. For each job (sequentially): log `[N/total] Running "name"`, run `EventCrawler`, log errors and continue on failure
 6. Print summary: `Completed: N succeeded, N failed`; exit with code 1 if any job failed
 
-### 11.4 System Cron Setup
+### 20.4 System Cron Setup
 
 ```bash
 # Add to crontab (crontab -e):
