@@ -31,6 +31,7 @@ export interface EventExtractorConfig {
   useJsonLd?: boolean; // Whether to attempt JSON-LD extraction before LLM (default: true)
   maxContentLength?: number; // Max chars of page content to send to LLM (default: DEFAULT_MAX_CONTENT_LENGTH)
   maxTokens?: number; // Max output tokens for LLM event extraction (default: DEFAULT_MAX_TOKENS)
+  debugLog?: string[]; // Optional collector for pipeline log entries (for worker response debug field)
 }
 
 /** Compact single-line error formatter — no stack traces. */
@@ -58,6 +59,7 @@ export class EventExtractor {
   private useJsonLd: boolean;
   private maxContentLength: number;
   private maxTokens: number;
+  private debugLog?: string[];
 
   constructor(config: EventExtractorConfig) {
     this.llm = config.llm;
@@ -68,28 +70,44 @@ export class EventExtractor {
     this.maxContentLength =
       config.maxContentLength ?? DEFAULT_MAX_CONTENT_LENGTH;
     this.maxTokens = config.maxTokens ?? DEFAULT_MAX_TOKENS;
+    this.debugLog = config.debugLog;
+  }
+
+  private log(msg: string): void {
+    console.log(msg);
+    this.debugLog?.push(msg);
   }
 
   async extractEvents(page: FetchedPage): Promise<ExtractedEvent[]> {
-    console.log(`Extracting events from: ${page.title}`);
+    this.log(`Extracting events from: ${page.title} (${page.url})`);
 
     // Get current date for date inference (use referenceDate if provided)
     const todayISO =
       this.referenceDate || new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
 
+    this.log(`Reference date: ${todayISO}`);
+
     // Step 1: Try JSON-LD extraction first (unless disabled)
     let jsonldResult: ReturnType<typeof extractJsonLd>;
     if (this.useJsonLd) {
-      console.log('🔍 Attempting JSON-LD extraction...');
+      this.log('JSON-LD: scanning...');
       jsonldResult = extractJsonLd(page.html, page.url, this.jsonLdParser);
+      this.log(
+        `JSON-LD: found ${jsonldResult.events.length} event(s), sufficient=${jsonldResult.isSufficient}`
+      );
+      for (const e of jsonldResult.events) {
+        this.log(
+          `  JSON-LD event: title="${(e as any).title}" start_time=${(e as any).start_time} address="${(e as any).address}" category=${(e as any).category}`
+        );
+      }
     } else {
-      console.log('ℹ️  JSON-LD extraction disabled');
+      this.log('JSON-LD: disabled');
       jsonldResult = { events: [], isSufficient: false, source: 'jsonld' };
     }
 
     if (jsonldResult.isSufficient && jsonldResult.events.length > 0) {
-      console.log(
-        `✅ JSON-LD extraction sufficient! Found ${jsonldResult.events.length} event(s), skipping LLM extraction`
+      this.log(
+        `JSON-LD sufficient — skipping LLM, validating ${jsonldResult.events.length} event(s)`
       );
 
       // Validate JSON-LD events
@@ -99,46 +117,39 @@ export class EventExtractor {
           const validEvent = ExtractedEventSchema.parse(event);
           validated.push(validEvent);
         } catch (error) {
-          console.error(
-            `  ⚠️  JSON-LD validation error for "${(event as any).title}": ${formatError(error)}`
-          );
+          const msg = `JSON-LD validation error for "${(event as any).title}": ${formatError(error)}`;
+          console.error(msg);
+          this.debugLog?.push(msg);
         }
       }
 
       if (validated.length > 0) {
-        console.log(
-          `Extracted ${validated.length} valid event(s) from JSON-LD`
-        );
+        this.log(`JSON-LD: ${validated.length} valid event(s)`);
         const filtered = this.filterPastEvents
           ? validated.filter(e => {
               const startDateStr = String(e.start_time).slice(0, 10);
               if (startDateStr < todayISO) {
-                console.log(
-                  `⚠ Skipping past event: "${e.title}" (${e.start_time})`
-                );
+                this.log(`Dropped (past): "${e.title}" start=${e.start_time}`);
                 return false;
               }
               return true;
             })
           : validated;
-        // correctEventYear not called: JSON-LD events always have explicit years,
-        // and the LLM never populates day_name on this code path.
         if (filtered.length > 0) {
+          this.log(`JSON-LD path: returning ${filtered.length} event(s)`);
           return filtered;
         }
-        console.log(
-          '⚠️  All JSON-LD events were in the past, falling back to LLM extraction'
-        );
+        this.log('JSON-LD: all events in the past — falling back to LLM');
       }
     }
 
     // Step 2: Fall back to LLM extraction if JSON-LD is insufficient
     if (jsonldResult.events.length > 0) {
-      console.log(
-        `⚠️  JSON-LD extraction incomplete (missing required fields), falling back to LLM extraction with JSON-LD enrichment`
+      this.log(
+        'JSON-LD incomplete (missing address/coords or category) — falling back to LLM with JSON-LD enrichment'
       );
     } else {
-      console.log(`ℹ️  No JSON-LD data found, using LLM extraction`);
+      this.log('No JSON-LD data — using LLM extraction');
     }
 
     // Remove empty lines to reduce whitespace bloat before slicing
@@ -151,6 +162,10 @@ export class EventExtractor {
       0,
       this.maxContentLength
     );
+    this.log(
+      `LLM input: ${contentSlice.length} chars (model=${this.llm.name})`
+    );
+
     const adaptiveMaxTokens = Math.min(
       Math.max(this.maxTokens, contentSlice.length),
       MODEL_MAX_OUTPUT_TOKENS
@@ -176,9 +191,8 @@ export class EventExtractor {
       }
     );
 
-    console.log(
-      `LLM Response (${this.llm.name}):`,
-      response.content.slice(0, 200) + '...'
+    this.log(
+      `LLM response (${response.content.length} chars): ${response.content}`
     );
 
     // Parse and validate the response
@@ -186,9 +200,9 @@ export class EventExtractor {
     try {
       parsed = JSON.parse(response.content);
     } catch (error) {
-      console.error(
-        `❌ Failed to parse LLM response as JSON: ${formatError(error)}`
-      );
+      const msg = `LLM returned malformed JSON: ${formatError(error)}`;
+      console.error(msg);
+      this.debugLog?.push(msg);
       throw new Error(
         `LLM returned malformed JSON (possibly truncated due to token limit). Consider shortening the description or using a model with larger output capacity.`
       );
@@ -199,14 +213,14 @@ export class EventExtractor {
     const events =
       parsed === null ? [] : Array.isArray(parsed) ? parsed : [parsed];
     if (parsed === null) {
-      console.log(`LLM returned null — no events found by LLM`);
-    }
-
-    console.log(`LLM raw events:`);
-    for (const e of events) {
-      console.log(
-        `  - "${e.title}" start=${e.start_time} day_name=${e.day_name ?? '(none)'}`
-      );
+      this.log('LLM returned null — no events found');
+    } else {
+      this.log(`LLM raw events: ${events.length}`);
+      for (const e of events) {
+        this.log(
+          `  LLM event: title="${e.title}" start=${e.start_time} day_name=${e.day_name ?? '(none)'} address="${e.address ?? ''}" category=${e.category}`
+        );
+      }
     }
 
     // Validate each event and optionally merge with JSON-LD data
@@ -214,13 +228,7 @@ export class EventExtractor {
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
       try {
-        // Add the page URL if event URL is missing
-        if (!event.url) {
-          event.url = page.url;
-        }
-
-        // Sanitize null values to undefined for optional fields
-        // Zod's .optional() allows undefined or string, but not null
+        if (!event.url) event.url = page.url;
         if (event.description === null) event.description = undefined;
         if (event.venue_name === null) event.venue_name = undefined;
         if (event.address === null) event.address = undefined;
@@ -231,27 +239,26 @@ export class EventExtractor {
 
         let validEvent = ExtractedEventSchema.parse(event);
 
-        // Merge with JSON-LD data if available (JSON-LD takes precedence for structured fields)
         if (jsonldResult.events.length > 0 && jsonldResult.events[i]) {
-          console.log(`🔄 Merging LLM event with JSON-LD data`);
+          this.log(`Merging LLM event[${i}] with JSON-LD data`);
           validEvent = mergeJsonLdWithLlm(jsonldResult.events[i], validEvent);
         }
 
         validated.push(validEvent);
       } catch (error) {
-        console.error(
-          `  ⚠️  Validation error for "${event.title}": ${formatError(error)}`
-        );
+        const msg = `Schema validation failed for "${event.title}": ${formatError(error)}`;
+        console.error(msg);
+        this.debugLog?.push(msg);
       }
     }
 
-    console.log(`Extracted ${validated.length} valid event(s) from LLM`);
+    this.log(`After validation: ${validated.length} event(s)`);
 
     // Append any JSON-LD events not covered by the LLM (e.g. cut off by content length limit)
     if (jsonldResult.events.length > events.length) {
       const extra = jsonldResult.events.slice(events.length);
-      console.log(
-        `📎 JSON-LD has ${extra.length} extra event(s) not extracted by LLM, appending...`
+      this.log(
+        `JSON-LD supplement: ${extra.length} extra event(s) not in LLM output`
       );
       for (const jsonldEvent of extra) {
         try {
@@ -268,27 +275,30 @@ export class EventExtractor {
           const validEvent = ExtractedEventSchema.parse(eventData);
           validated.push(validEvent);
         } catch (error) {
-          console.error(
-            `  ⚠️  Validation error for extra JSON-LD event "${(jsonldEvent as any).title}": ${formatError(error)}`
-          );
+          const msg = `JSON-LD supplement validation error for "${(jsonldEvent as any).title}": ${formatError(error)}`;
+          console.error(msg);
+          this.debugLog?.push(msg);
         }
       }
-      console.log(
-        `Total after JSON-LD supplement: ${validated.length} event(s)`
-      );
+      this.log(`After JSON-LD supplement: ${validated.length} event(s)`);
     }
 
     // Apply day_name year correction and past-event filter
     const corrected: ExtractedEvent[] = [];
     for (const event of validated) {
       const fixed = correctEventYear(event);
-      if (fixed === null) continue; // dropped by year correction
+      if (fixed === null) {
+        this.log(
+          `Dropped (year correction): "${event.title}" start=${event.start_time} day_name=${event.day_name}`
+        );
+        continue;
+      }
 
       if (this.filterPastEvents) {
         const startDateStr = String(fixed.start_time).slice(0, 10);
         if (startDateStr < todayISO) {
-          console.log(
-            `⚠ Skipping past event: "${fixed.title}" (${fixed.start_time})`
+          this.log(
+            `Dropped (past): "${fixed.title}" start=${fixed.start_time}`
           );
           continue;
         }
@@ -320,25 +330,22 @@ export class EventExtractor {
           // JSON-LD dates are explicit — skip year correction, apply date filter only
           const startDateStr = String(validEvent.start_time).slice(0, 10);
           if (this.filterPastEvents && startDateStr < todayISO) {
-            console.log(
-              `⚠ Skipping past JSON-LD fallback event: "${validEvent.title}" (${validEvent.start_time})`
+            this.log(
+              `Dropped (past, JSON-LD fallback): "${validEvent.title}" start=${validEvent.start_time}`
             );
             continue;
           }
           corrected.push(validEvent);
         } catch (error) {
-          console.error(
-            `  ⚠️  JSON-LD fallback validation error for "${(jsonldEvent as any).title}": ${formatError(error)}`
-          );
+          const msg = `JSON-LD fallback validation error for "${(jsonldEvent as any).title}": ${formatError(error)}`;
+          console.error(msg);
+          this.debugLog?.push(msg);
         }
       }
-      if (corrected.length > 0) {
-        console.log(
-          `✅ JSON-LD fallback produced ${corrected.length} event(s)`
-        );
-      }
+      this.log(`JSON-LD safety-net: ${corrected.length} event(s) recovered`);
     }
 
+    this.log(`Final: ${corrected.length} event(s) returned`);
     return corrected;
   }
 

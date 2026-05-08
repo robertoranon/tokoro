@@ -61,5 +61,6 @@ export interface CrawlResponse {
     jsonld_events_found: number;
     jsonld_sufficient: boolean;
     cleaned_text_length: number;
+    pipeline_log: string[];
   };
 }

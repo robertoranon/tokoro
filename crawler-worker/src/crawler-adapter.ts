@@ -30,6 +30,7 @@ export interface CrawlResult {
   events_extracted: number;
   events: PreparedEvent[];
   dropped_events?: NormalizeFailure[];
+  pipeline_log?: string[];
 }
 
 export class WorkerCrawler {
@@ -38,6 +39,7 @@ export class WorkerCrawler {
   private normalizer: EventNormalizer;
   private logger: CrawlerLogger;
   private llm: LLMProvider;
+  private pipelineLog: string[];
 
   constructor(private config: CrawlerConfig) {
     this.logger = new CrawlerLogger(config.env.CRAWLER_LOGS);
@@ -47,7 +49,8 @@ export class WorkerCrawler {
       model: config.env.LLM_MODEL,
     });
     this.llm = llm;
-    this.extractor = new EventExtractor({ llm });
+    this.pipelineLog = [];
+    this.extractor = new EventExtractor({ llm, debugLog: this.pipelineLog });
     this.discovery = new PageDiscovery(llm);
     this.normalizer = new EventNormalizer();
   }
@@ -209,6 +212,7 @@ export class WorkerCrawler {
       }
 
       if (droppedEvents.length > 0) result.dropped_events = droppedEvents;
+      result.pipeline_log = this.pipelineLog;
       this.logger.info('crawl_complete', 'Crawl complete', result, url);
       await this.logger.flush();
       return result;

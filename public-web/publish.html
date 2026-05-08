@@ -520,8 +520,25 @@
             stats: result.stats,
             events_count: (result.events || []).length,
             dropped_events: result.dropped_events,
-            debug: result.debug,
+            debug: result.debug
+              ? {
+                  jsonld_events_found: result.debug.jsonld_events_found,
+                  jsonld_sufficient: result.debug.jsonld_sufficient,
+                  cleaned_text_length: result.debug.cleaned_text_length,
+                }
+              : undefined,
           });
+          if (
+            result.debug &&
+            result.debug.pipeline_log &&
+            result.debug.pipeline_log.length
+          ) {
+            console.group('[tokoro] pipeline log');
+            result.debug.pipeline_log.forEach(function (line) {
+              console.log(line);
+            });
+            console.groupEnd();
+          }
           if (result.cleaned_text) {
             console.log(
               '[tokoro] cleaned text sent to LLM (' +

@@ -192,12 +192,13 @@ async function handleCrawl(request: Request, env: Env): Promise<Response> {
         jsonld_events_found: jsonldResult.events.length,
         jsonld_sufficient: jsonldResult.isSufficient,
         cleaned_text_length: cleanedText.length,
+        pipeline_log: result.pipeline_log ?? [],
       };
     }
 
-    if (result.dropped_events && result.dropped_events.length > 0) {
-      response.dropped_events = result.dropped_events;
-    }
+    // Always include dropped_events so the client can distinguish
+    // "nothing dropped" (empty array) from "field not populated" (absent).
+    response.dropped_events = result.dropped_events ?? [];
 
     return jsonResponse(response, 200);
   } catch (error) {
