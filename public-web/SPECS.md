@@ -94,55 +94,72 @@ Events sharing the same `festival_url` (≥3 events) are grouped into a festival
 
 ---
 
-## FR-5: Publisher UI (Bookmarklet Relay)
+## FR-5: Publisher UI (`publish.html`)
 
-The page embeds a relay panel (hidden by default, activated via `?relay=1`) that the bookmarklet uses to configure settings, display, and publish extracted events.
+`publish.html` is a standalone publisher page that supports multiple input modes: manual URL/image extraction, bookmarklet relay (via `window.opener` + `postMessage`), and iOS Shortcut handoff (via URL parameters). On startup it checks for active modes in priority order and falls through to manual input if none match (see FR-5.6).
 
-**FR-5.1: Display**
+**FR-5.1: Review UI**
 
-- MUST display extracted events using the same `fmtRange` date formatting as the query view
-- MUST show: title, date/time range, venue name, address, category
+- After extraction, MUST show a review UI listing extracted events with: title, date/time range (`fmtRange`), venue name, address, category
+- Each event card MUST include an editable URL field pre-filled with the event URL, or a Google search URL constructed from title + venue + date when no URL is available
+- MUST show "Publish All" and "Cancel" action buttons below the event list
 
 **FR-5.2: Publish**
 
 - MUST generate an Ed25519 keypair on first use (Web Crypto API) and store it in `localStorage` under `tokoro_keypair` (`{ pubkey, privkeyB64 }`)
-- For each selected event, MUST sign the `PreparedEvent` using the stored private key
-- MUST POST each signed event directly to the API Worker URL stored in `localStorage` under `tokoro_api_url`; falls back to the build-time `API_URL` constant if localStorage value is absent
+- For each event, MUST sign the `PreparedEvent` using the stored private key
+- MUST POST each signed event to the API Worker URL stored in `localStorage` under `tokoro_api_url`
 - MUST treat HTTP 409 (duplicate) as success
 - MUST show success/error feedback
-- MUST clear the event list and hide the actions bar after fully successful publish
+- MUST switch to the result screen after a fully successful publish
 
 **FR-5.3: Settings form**
 
-- MUST show a settings form at the top of the relay popup with five fields: API Key (password), Crawler Worker URL, API Worker URL, Private Key (editable), Public Key (read-only, derived)
+- MUST show a settings form at the top of the page with five fields: API Key (password), Crawler Worker URL, API Worker URL, Private Key (editable), Public Key (read-only, derived)
 - MUST collapse the form behind a "⚙ Settings" link when API Key, Crawler Worker URL, and API Worker URL are all set; MUST expand when any is missing
-- MUST show a "Save Settings" button below the Public Key field; the button MUST be hidden when all three required settings are filled and visible when any is missing
-- MUST persist API Key, Crawler Worker URL, and API Worker URL to `localStorage` (`tokoro_api_key`, `tokoro_worker_url`, `tokoro_api_url`) on every input change
-- MUST pre-fill Crawler Worker URL from `DEFAULT_CRAWLER_URL` constant and API Worker URL from `API_URL` constant on first use if localStorage is empty
+- MUST show a "Save" button; the button MUST be hidden when all three required settings are filled and visible when any is missing
+- MUST persist API Key, Crawler Worker URL, and API Worker URL to `localStorage` (`tokoro_api_key`, `tokoro_worker_url`, `tokoro_api_url`) when the Save button is clicked
 - When the private key field is edited and loses focus, MUST import the PKCS8 key, derive the public key via JWK export, update the public key display, and persist both as `tokoro_keypair` in localStorage
-- MUST auto-retry the buffered crawl when API Key and Crawler Worker URL become set after a failed attempt due to missing settings
 
-**FR-5.4: Keypair notice**
+**FR-5.4: Keypair handling**
 
-- When a new keypair is generated (first use or after reset), MUST show a dismissable amber notice instructing the user to share their public key (visible in Settings) with the DB maintainer
+- When a new keypair is generated (first use or after reset), MUST expand the settings form so the Public Key field is visible, allowing the user to copy it
 - MUST populate the Private Key and Public Key fields from the stored keypair on every open
 
 **FR-5.5: Bookmarklet**
 
-- The bookmarklet MUST be a minimal trigger: preprocess page HTML, open the relay popup, wait for `ready`, send `{ type: 'crawl_data', url, html, title }`
+- The bookmarklet MUST preprocess page HTML before sending: clone the DOM; strip `script` elements (except `type="application/ld+json"`), `style`, `noscript`, `svg`, and empty elements (no text content and no images); truncate the resulting HTML to 400 000 characters
+- The bookmarklet MUST open a popup at `RELAY_URL + '?relay=1'`, then wait up to 20 seconds for a `{ type: 'ready' }` message from that popup before sending page data
+- The bookmarklet MUST send `{ type: 'crawl_data', url, html, title }` to the popup via `postMessage`
 - The bookmarklet MUST NOT write to `localStorage` or show any UI on the visited page
 - The `ready` message MUST contain only `{ type: 'ready' }` — no settings are passed back to the bookmarklet
 - The `crawl_data` message MUST contain only `{ type, url, html, title }` — no credentials
+- `publish.html` detects relay mode by checking `window.opener`; the `?relay=1` parameter in the popup URL is vestigial and not parsed
 
-**FR-5.6: Apple Shortcut handoff**
+**FR-5.6: Startup mode detection**
+
+`publish.html` checks modes in the following priority order on load; the first match wins:
+
+1. **`#events=` hash** — base64-encoded JSON array of already-extracted events; decode and go straight to the review UI
+2. **`?crawl=` query param** — URL-safe base64 payload from iOS Shortcut; decode, clear param via `history.replaceState`, hide input UI, ensure keypair exists, then call `runCrawl({url, html, title, mode: 'direct'}, null)`
+3. **`#crawl=` hash** — legacy URL-safe base64 payload (same format as `?crawl=`); same handling as above; kept for backward compatibility with older Shortcuts
+4. **`window.opener` present** — bookmarklet relay mode: hide input UI, signal `{ type: 'ready' }` to opener after ensuring keypair, then handle incoming `crawl_data` messages
+5. **Default** — manual input mode (FR-5.7)
+
+**FR-5.7: Apple Shortcut handoff**
 
 - Apple Shortcuts cannot use `window.open` + `postMessage` (the action runs in an isolated context with no opener) and the "Run JavaScript on Webpage" action has a tight execution budget that the LLM crawl exceeds
 - The Shortcut script (`shortcut-bookmarklet.src.js`) MUST call `completion(RELAY_URL + '?crawl=' + base64(JSON({url, title, html})))` — no fetch to the crawler from inside the Shortcut
 - The `html` field MUST contain only: (a) `<script type="application/ld+json">` tags verbatim (for server-side structured-data extraction) concatenated with (b) up to 15 000 chars of `document.body.innerText` (for LLM extraction). Sending the full serialised DOM is wasteful because the server strips all tags to plain text anyway, and produces URLs that exceed iOS inter-app URL limits (~70 KB vs ~25 KB worst-case with this approach)
 - The base64 payload MUST use URL-safe encoding: `btoa(unescape(encodeURIComponent(json))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')` — using `?crawl=` as a query parameter (iOS strips URL fragments between apps; query params are always preserved)
 - The Shortcut script MUST NOT contain any API key
-- `publish.html` MUST recognize the `?crawl=` query-param mode: decode the payload, clear the param via `history.replaceState`, hide the input UI, ensure a keypair exists, then invoke the existing `runCrawl({url, html, title, mode: 'direct'}, null)` so the LLM call runs in the browser tab (no Shortcut timeout)
-- `publish.html` MUST also continue to support the legacy `#crawl=` hash mode and the existing `#events=` hash mode (events already extracted and handed off as JSON)
+
+**FR-5.8: Manual input modes**
+
+When opened without an opener or matching URL/hash params, `publish.html` shows a two-tab input UI:
+
+- **URL tab** — user enters a page URL and clicks "Extract Events"; sends `{ url, mode: 'direct' }` to the crawler worker
+- **Image tab** — user uploads an image file and optionally enters a source URL; sends `{ mode: 'image', imageData, imageMimeType, url? }` to the crawler worker with the image encoded as base64
 
 ---
 
