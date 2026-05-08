@@ -236,6 +236,8 @@ export class EventExtractor {
         if (event.lat === null) event.lat = undefined;
         if (event.lng === null) event.lng = undefined;
         if (event.tags === null) event.tags = undefined;
+        if (event.festival_name === null) event.festival_name = undefined;
+        if (event.festival_url === null) event.festival_url = undefined;
 
         let validEvent = ExtractedEventSchema.parse(event);
 
@@ -272,6 +274,10 @@ export class EventExtractor {
           if (eventData.lat === null) eventData.lat = undefined;
           if (eventData.lng === null) eventData.lng = undefined;
           if (eventData.tags === null) eventData.tags = undefined;
+          if (eventData.festival_name === null)
+            eventData.festival_name = undefined;
+          if (eventData.festival_url === null)
+            eventData.festival_url = undefined;
           const validEvent = ExtractedEventSchema.parse(eventData);
           validated.push(validEvent);
         } catch (error) {
@@ -326,6 +332,10 @@ export class EventExtractor {
           if (eventData.lat === null) eventData.lat = undefined;
           if (eventData.lng === null) eventData.lng = undefined;
           if (eventData.tags === null) eventData.tags = undefined;
+          if (eventData.festival_name === null)
+            eventData.festival_name = undefined;
+          if (eventData.festival_url === null)
+            eventData.festival_url = undefined;
           const validEvent = ExtractedEventSchema.parse(eventData);
           // JSON-LD dates are explicit — skip year correction, apply date filter only
           const startDateStr = String(validEvent.start_time).slice(0, 10);
@@ -444,6 +454,8 @@ export class EventExtractor {
         if (event.lng === null) event.lng = undefined;
         if (event.tags === null) event.tags = undefined;
         if (event.url === null) event.url = undefined;
+        if (event.festival_name === null) event.festival_name = undefined;
+        if (event.festival_url === null) event.festival_url = undefined;
 
         const validEvent = ExtractedEventSchema.parse(event);
         validated.push(validEvent);
