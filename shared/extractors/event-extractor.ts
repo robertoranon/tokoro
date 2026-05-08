@@ -194,12 +194,13 @@ export class EventExtractor {
       );
     }
 
-    // Handle null (LLM found nothing), single event, or array of events
+    // Handle null (LLM found nothing), single event, or array of events.
+    // Treat null as empty array so the JSON-LD fallback below can still run.
+    const events =
+      parsed === null ? [] : Array.isArray(parsed) ? parsed : [parsed];
     if (parsed === null) {
-      console.log(`Extracted 0 valid event(s) from LLM`);
-      return [];
+      console.log(`LLM returned null — no events found by LLM`);
     }
-    const events = Array.isArray(parsed) ? parsed : [parsed];
 
     console.log(`LLM raw events:`);
     for (const e of events) {
@@ -294,6 +295,48 @@ export class EventExtractor {
       }
 
       corrected.push(fixed);
+    }
+
+    // Safety-net: if LLM extraction produced 0 results (e.g. misread date,
+    // wrong year, or returned null) but JSON-LD captured the event, emit the
+    // JSON-LD version directly — it has explicit, reliable dates.
+    if (corrected.length === 0 && jsonldResult.events.length > 0) {
+      console.log(
+        `⚠️  LLM yielded 0 events after filtering; retrying with JSON-LD data`
+      );
+      for (const jsonldEvent of jsonldResult.events) {
+        try {
+          const eventData: any = { ...jsonldEvent };
+          if (!eventData.url) eventData.url = page.url;
+          if (!eventData.category) eventData.category = 'other';
+          if (eventData.description === null) eventData.description = undefined;
+          if (eventData.venue_name === null) eventData.venue_name = undefined;
+          if (eventData.address === null) eventData.address = undefined;
+          if (eventData.end_time === null) eventData.end_time = undefined;
+          if (eventData.lat === null) eventData.lat = undefined;
+          if (eventData.lng === null) eventData.lng = undefined;
+          if (eventData.tags === null) eventData.tags = undefined;
+          const validEvent = ExtractedEventSchema.parse(eventData);
+          // JSON-LD dates are explicit — skip year correction, apply date filter only
+          const startDateStr = String(validEvent.start_time).slice(0, 10);
+          if (this.filterPastEvents && startDateStr < todayISO) {
+            console.log(
+              `⚠ Skipping past JSON-LD fallback event: "${validEvent.title}" (${validEvent.start_time})`
+            );
+            continue;
+          }
+          corrected.push(validEvent);
+        } catch (error) {
+          console.error(
+            `  ⚠️  JSON-LD fallback validation error for "${(jsonldEvent as any).title}": ${formatError(error)}`
+          );
+        }
+      }
+      if (corrected.length > 0) {
+        console.log(
+          `✅ JSON-LD fallback produced ${corrected.length} event(s)`
+        );
+      }
     }
 
     return corrected;
