@@ -5,6 +5,9 @@ export interface Env {
   // R2 Bindings (optional)
   CRAWLER_LOGS?: R2Bucket;
 
+  // KV Bindings
+  PREVIEW_CACHE?: KVNamespace;
+
   // Secrets (set via wrangler secret put)
   CRAWLER_API_KEYS: string; // Comma-separated list of allowed API keys
   LLM_API_KEY?: string;

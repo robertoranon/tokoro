@@ -178,6 +178,17 @@ GET /
         "title": "Optional page title",
         "referenceDate": "Optional reference date YYYY-MM-DD"
       }
+    },
+    "POST /preview": {
+      "description": "Store page data temporarily for iOS Shortcut handoff. No auth required. Returns a UUID token valid for 30 minutes.",
+      "body": {
+        "url": "Page URL (required)",
+        "html": "Page HTML or text content (optional)",
+        "title": "Page title (optional)"
+      }
+    },
+    "GET /preview/:token": {
+      "description": "Retrieve previously stored page data by token. No auth required."
     }
   }
 }

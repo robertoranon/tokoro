@@ -140,19 +140,23 @@ Events sharing the same `festival_url` (≥3 events) are grouped into a festival
 
 `publish.html` checks modes in the following priority order on load; the first match wins:
 
-1. **`#events=` hash** — base64-encoded JSON array of already-extracted events; decode and go straight to the review UI
-2. **`?crawl=` query param** — URL-safe base64 payload from iOS Shortcut; decode, clear param via `history.replaceState`, hide input UI, ensure keypair exists, then call `runCrawl({url, html, title, mode: 'direct'}, null)`
-3. **`#crawl=` hash** — legacy URL-safe base64 payload (same format as `?crawl=`); same handling as above; kept for backward compatibility with older Shortcuts
-4. **`window.opener` present** — bookmarklet relay mode: hide input UI, signal `{ type: 'ready' }` to opener after ensuring keypair, then handle incoming `crawl_data` messages
-5. **Default** — manual input mode (FR-5.7)
+1. **`?preview=TOKEN`** — iOS Shortcut handoff: fetch `{url, html, title}` from crawler-worker KV store using the token, then call `runCrawl({url, html, title, mode: 'direct'}, null)`
+2. **`window.opener` present** — bookmarklet relay mode: hide input UI, signal `{ type: 'ready' }` to opener after ensuring keypair, then handle incoming `crawl_data` messages
+3. **Default** — manual input mode (FR-5.7)
 
 **FR-5.7: Apple Shortcut handoff**
 
-- Apple Shortcuts cannot use `window.open` + `postMessage` (the action runs in an isolated context with no opener) and the "Run JavaScript on Webpage" action has a tight execution budget that the LLM crawl exceeds
-- The Shortcut script (`shortcut-bookmarklet.src.js`) MUST call `completion(RELAY_URL + '?crawl=' + base64(JSON({url, title, html})))` — no fetch to the crawler from inside the Shortcut
-- The `html` field MUST contain only: (a) `<script type="application/ld+json">` tags verbatim (for server-side structured-data extraction) concatenated with (b) up to 15 000 chars of `document.body.innerText` (for LLM extraction). Sending the full serialised DOM is wasteful because the server strips all tags to plain text anyway, and produces URLs that exceed iOS inter-app URL limits (~70 KB vs ~25 KB worst-case with this approach)
-- The base64 payload MUST use URL-safe encoding: `btoa(unescape(encodeURIComponent(json))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')` — using `?crawl=` as a query parameter (iOS strips URL fragments between apps; query params are always preserved)
+iOS Shortcuts' "Open URL" action silently strips long query parameter values, making it impossible to pass the HTML payload directly in the URL.
+
+The solution is a two-step relay via the crawler-worker's KV store:
+
+1. The Shortcut script (`shortcut-bookmarklet.src.js`) `fetch()`es `POST /preview` on the crawler-worker with `{url, title, html}` (JSON-LD + up to 15 000 chars of `innerText`). No API key required — the endpoint is unauthenticated.
+2. The crawler-worker stores the payload in `PREVIEW_CACHE` KV with a 30-minute TTL and returns `{token}` (a UUID).
+3. The script calls `completion(RELAY_URL + '?preview=' + token)` — a ~80-char URL that survives iOS's limit.
+4. `publish.html` detects `?preview=TOKEN`, fetches the payload from `GET /preview/:token`, and calls `runCrawl`.
+
 - The Shortcut script MUST NOT contain any API key
+- `__CRAWLER_WORKER_URL__` in the source is replaced by `build-bookmarklet.js` from `config.crawlerWorkerUrl`
 
 **FR-5.8: Manual input modes**
 

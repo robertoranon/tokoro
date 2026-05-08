@@ -724,111 +724,58 @@
       loadSettings();
       updateCfgVisibility();
 
-      // Hash-events mode (highest priority)
-      var handledByHash = (function tryHashEvents() {
-        var hash = window.location.hash;
-        if (!hash.startsWith('#events=')) return false;
-        try {
-          var encoded = hash.slice('#events='.length);
-          var events = JSON.parse(atob(encoded));
-          history.replaceState(
-            null,
-            '',
-            window.location.pathname + window.location.search
-          );
-          setSt('Review events from Shortcut:', 'ok');
-          showReview(events);
-          return true;
-        } catch (e) {
-          console.error('Failed to parse #events hash:', e);
-          return false;
-        }
-      })();
-
-      // Query-crawl mode: Apple Shortcut passes page data as ?crawl= query param.
-      // iOS strips URL fragments when opening URLs between apps, so we use a
-      // query parameter instead. Hash mode (#crawl=) is kept for backward compat.
-      if (!handledByHash) {
-        handledByHash = (function tryQueryCrawl() {
-          var raw = new URLSearchParams(window.location.search).get('crawl');
-          if (!raw) return false;
+      // Preview mode: iOS Shortcut POSTs HTML to /preview on the crawler-worker,
+      // gets a UUID token back, opens ?preview=TOKEN (short URL unaffected by
+      // iOS Shortcuts' URL length limit).
+      var handledByHash = (function tryPreview() {
+          var token = new URLSearchParams(window.location.search).get('preview');
+          if (!token) return false;
           inputUi.style.display = 'none';
-          try {
-            raw = raw.replace(/-/g, '+').replace(/_/g, '/');
-            var pad = raw.length % 4;
-            if (pad) raw += '===='.slice(0, 4 - pad);
-            var payload = JSON.parse(decodeURIComponent(escape(atob(raw))));
-            history.replaceState(null, '', window.location.pathname);
-            loadOrCreateKeypair().then(function (kp) {
-              if (kp.isNew) {
-                cfgPrivKey.value = kp.privkeyB64;
-                cfgPubKey.textContent = kp.pubkey;
-                cfgFields.style.display = 'flex';
-                cfgSave.style.display = 'block';
-                cfgToggle.style.display = 'none';
-              }
-              runCrawl(
-                {
-                  url: payload.url,
-                  html: payload.html,
-                  title: payload.title,
-                  mode: 'direct',
-                },
-                null
-              );
-            });
-            return true;
-          } catch (e) {
-            console.error('Failed to parse ?crawl param:', e);
-            setSt('Could not decode Shortcut data: ' + e.message, 'err');
-            return true;
-          }
-        })();
-      }
-
-      // Hash-crawl mode: legacy fallback for older shortcuts that used #crawl=.
-      if (!handledByHash) {
-        handledByHash = (function tryHashCrawl() {
-          var hash = window.location.hash;
-          if (!hash.startsWith('#crawl=')) return false;
-          inputUi.style.display = 'none';
-          try {
-            var raw = hash
-              .slice('#crawl='.length)
-              .replace(/-/g, '+')
-              .replace(/_/g, '/');
-            var pad = raw.length % 4;
-            if (pad) raw += '===='.slice(0, 4 - pad);
-            var payload = JSON.parse(decodeURIComponent(escape(atob(raw))));
-            history.replaceState(
-              null,
-              '',
-              window.location.pathname + window.location.search
+          history.replaceState(null, '', window.location.pathname);
+          var workerUrl = (localStorage.getItem('tokoro_worker_url') || '')
+            .trim()
+            .replace(/\/$/, '');
+          if (!workerUrl) {
+            cfgFields.style.display = 'flex';
+            cfgSave.style.display = 'block';
+            cfgToggle.style.display = 'none';
+            setSt(
+              'Enter Crawler Worker URL in Settings to load page data.',
+              'err'
             );
-            loadOrCreateKeypair().then(function (kp) {
-              if (kp.isNew) {
-                cfgPrivKey.value = kp.privkeyB64;
-                cfgPubKey.textContent = kp.pubkey;
-                cfgFields.style.display = 'flex';
-                cfgSave.style.display = 'block';
-                cfgToggle.style.display = 'none';
-              }
-              runCrawl(
-                {
-                  url: payload.url,
-                  html: payload.html,
-                  title: payload.title,
-                  mode: 'direct',
-                },
-                null
-              );
-            });
-            return true;
-          } catch (e) {
-            console.error('Failed to parse #crawl hash:', e);
-            setSt('Could not decode Shortcut data: ' + e.message, 'err');
             return true;
           }
+          setSt('Loading page data…', 'info');
+          loadOrCreateKeypair().then(function (kp) {
+            if (kp.isNew) {
+              cfgPrivKey.value = kp.privkeyB64;
+              cfgPubKey.textContent = kp.pubkey;
+              cfgFields.style.display = 'flex';
+              cfgSave.style.display = 'block';
+              cfgToggle.style.display = 'none';
+            }
+            fetch(workerUrl + '/preview/' + token)
+              .then(function (r) {
+                if (!r.ok) throw new Error('Preview expired or not found');
+                return r.json();
+              })
+              .then(function (data) {
+                runCrawl(
+                  {
+                    url: data.url,
+                    html: data.html,
+                    title: data.title,
+                    mode: 'direct',
+                  },
+                  null
+                );
+              })
+              .catch(function (e) {
+                setSt('Failed to load page data: ' + e.message, 'err');
+                inputUi.style.display = '';
+              });
+          });
+          return true;
         })();
       }
 
@@ -866,13 +813,6 @@
           });
         } else {
           // Manual mode (default)
-          setSt(
-            'debug: search=' +
-              (window.location.search || '(empty)') +
-              ' hash=' +
-              (window.location.hash || '(empty)'),
-            'info'
-          );
           loadOrCreateKeypair().then(function (kp) {
             if (kp.isNew) {
               cfgPrivKey.value = kp.privkeyB64;

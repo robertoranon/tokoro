@@ -1,7 +1,7 @@
 (function () {
   var RELAY_URL = '__RELAY_URL__';
+  var WORKER_URL = '__CRAWLER_WORKER_URL__';
 
-  // JSON-LD scripts for structured data extraction server-side
   var jsonLds = Array.from(
     document.querySelectorAll('script[type="application/ld+json"]')
   )
@@ -10,19 +10,29 @@
     })
     .join('\n');
 
-  // Visible text for LLM extraction (server strips tags anyway, so sending
-  // the full HTML DOM is wasteful and pushes the URL past iOS length limits)
   var text = ((document.body && document.body.innerText) || '').trim();
   if (text.length > 15000) text = text.substring(0, 15000);
 
-  var payload = JSON.stringify({
-    url: window.location.href,
-    title: document.title,
-    html: jsonLds + (jsonLds ? '\n' : '') + text,
-  });
-  var encoded = btoa(unescape(encodeURIComponent(payload)))
-    .replace(/\+/g, '-')
-    .replace(/[/]/g, '_')
-    .replace(/=+$/, '');
-  completion(RELAY_URL + '?crawl=' + encoded);
+  fetch(WORKER_URL + '/preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      url: window.location.href,
+      title: document.title,
+      html: jsonLds + (jsonLds ? '\n' : '') + text,
+    }),
+  })
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (result) {
+      if (result.token) {
+        completion(RELAY_URL + '?preview=' + result.token);
+      } else {
+        completion('Error: no token returned');
+      }
+    })
+    .catch(function (err) {
+      completion('Error: ' + err.message);
+    });
 })();

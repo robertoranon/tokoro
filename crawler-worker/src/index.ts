@@ -84,6 +84,15 @@ export default {
         return await handleExtractText(request, env);
       }
 
+      if (request.method === 'POST' && path === '/preview') {
+        return await handlePreviewStore(request, env);
+      }
+
+      const previewMatch = path.match(/^\/preview\/([a-zA-Z0-9-]+)$/);
+      if (request.method === 'GET' && previewMatch) {
+        return await handlePreviewFetch(previewMatch[1], env);
+      }
+
       return jsonResponse({ error: 'Not found' }, 404);
     } catch (error) {
       console.error('Error:', error);
@@ -269,6 +278,43 @@ async function handleExtractText(
   };
   const events = await extractor.extractEvents(page);
   return jsonResponse({ model: llm.name, events });
+}
+
+async function handlePreviewStore(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  if (!env.PREVIEW_CACHE) {
+    return jsonResponse({ error: 'Preview cache not configured' }, 503);
+  }
+  let body: { url?: string; html?: string; title?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: 'Invalid request body' }, 400);
+  }
+  if (!body.url) {
+    return jsonResponse({ error: 'Missing url field' }, 400);
+  }
+  const token = crypto.randomUUID();
+  await env.PREVIEW_CACHE.put(token, JSON.stringify(body), {
+    expirationTtl: 1800,
+  });
+  return jsonResponse({ token });
+}
+
+async function handlePreviewFetch(token: string, env: Env): Promise<Response> {
+  if (!env.PREVIEW_CACHE) {
+    return jsonResponse({ error: 'Preview cache not configured' }, 503);
+  }
+  const data = await env.PREVIEW_CACHE.get(token);
+  if (!data) {
+    return jsonResponse({ error: 'Preview not found or expired' }, 404);
+  }
+  return new Response(data, {
+    status: 200,
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+  });
 }
 
 function jsonResponse(data: any, status: number = 200): Response {
