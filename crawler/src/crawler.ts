@@ -364,7 +364,13 @@ export class EventCrawler {
       console.log(`\n${'='.repeat(60)}`);
       console.log(`✅ Crawl complete!`);
       console.log(`Total events extracted: ${totalEvents}`);
-      console.log(`Total events published: ${totalPublished}`);
+      if (this.config.debug) {
+        console.log(
+          `Total events printed to console (debug mode - not published): ${totalPublished}`
+        );
+      } else {
+        console.log(`Total events published: ${totalPublished}`);
+      }
       console.log(`${'='.repeat(60)}\n`);
     } finally {
       await this.fetcher.close();
