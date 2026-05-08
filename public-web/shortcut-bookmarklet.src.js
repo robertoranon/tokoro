@@ -20,6 +20,9 @@
     title: document.title,
     html: jsonLds + (jsonLds ? '\n' : '') + text,
   });
-  var encoded = btoa(unescape(encodeURIComponent(payload)));
-  completion(RELAY_URL + 'publish.html#crawl=' + encoded);
+  var encoded = btoa(unescape(encodeURIComponent(payload)))
+    .replace(/\+/g, '-')
+    .replace(/[/]/g, '_')
+    .replace(/=+$/, '');
+  completion(RELAY_URL + '?crawl=' + encoded);
 })();

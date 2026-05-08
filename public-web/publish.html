@@ -728,22 +728,66 @@
         }
       })();
 
-      // Hash-crawl mode: page HTML handed off by the Apple Shortcut.
-      // The Shortcut's JS action has a tight execution budget, so the LLM
-      // crawl runs here in the browser instead of inside the Shortcut.
+      // Query-crawl mode: Apple Shortcut passes page data as ?crawl= query param.
+      // iOS strips URL fragments when opening URLs between apps, so we use a
+      // query parameter instead. Hash mode (#crawl=) is kept for backward compat.
+      if (!handledByHash) {
+        handledByHash = (function tryQueryCrawl() {
+          var raw = new URLSearchParams(window.location.search).get('crawl');
+          if (!raw) return false;
+          inputUi.style.display = 'none';
+          try {
+            raw = raw.replace(/-/g, '+').replace(/_/g, '/');
+            var pad = raw.length % 4;
+            if (pad) raw += '===='.slice(0, 4 - pad);
+            var payload = JSON.parse(decodeURIComponent(escape(atob(raw))));
+            history.replaceState(null, '', window.location.pathname);
+            loadOrCreateKeypair().then(function (kp) {
+              if (kp.isNew) {
+                cfgPrivKey.value = kp.privkeyB64;
+                cfgPubKey.textContent = kp.pubkey;
+                cfgFields.style.display = 'flex';
+                cfgSave.style.display = 'block';
+                cfgToggle.style.display = 'none';
+              }
+              runCrawl(
+                {
+                  url: payload.url,
+                  html: payload.html,
+                  title: payload.title,
+                  mode: 'direct',
+                },
+                null
+              );
+            });
+            return true;
+          } catch (e) {
+            console.error('Failed to parse ?crawl param:', e);
+            setSt('Could not decode Shortcut data: ' + e.message, 'err');
+            return true;
+          }
+        })();
+      }
+
+      // Hash-crawl mode: legacy fallback for older shortcuts that used #crawl=.
       if (!handledByHash) {
         handledByHash = (function tryHashCrawl() {
           var hash = window.location.hash;
           if (!hash.startsWith('#crawl=')) return false;
+          inputUi.style.display = 'none';
           try {
-            var encoded = hash.slice('#crawl='.length);
-            var payload = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+            var raw = hash
+              .slice('#crawl='.length)
+              .replace(/-/g, '+')
+              .replace(/_/g, '/');
+            var pad = raw.length % 4;
+            if (pad) raw += '===='.slice(0, 4 - pad);
+            var payload = JSON.parse(decodeURIComponent(escape(atob(raw))));
             history.replaceState(
               null,
               '',
               window.location.pathname + window.location.search
             );
-            inputUi.style.display = 'none';
             loadOrCreateKeypair().then(function (kp) {
               if (kp.isNew) {
                 cfgPrivKey.value = kp.privkeyB64;
@@ -765,7 +809,8 @@
             return true;
           } catch (e) {
             console.error('Failed to parse #crawl hash:', e);
-            return false;
+            setSt('Could not decode Shortcut data: ' + e.message, 'err');
+            return true;
           }
         })();
       }

@@ -137,12 +137,12 @@ The page embeds a relay panel (hidden by default, activated via `?relay=1`) that
 **FR-5.6: Apple Shortcut handoff**
 
 - Apple Shortcuts cannot use `window.open` + `postMessage` (the action runs in an isolated context with no opener) and the "Run JavaScript on Webpage" action has a tight execution budget that the LLM crawl exceeds
-- The Shortcut script (`shortcut-bookmarklet.src.js`) MUST call `completion(RELAY_URL + 'publish.html#crawl=' + base64(JSON({url, title, html})))` — no fetch to the crawler from inside the Shortcut
+- The Shortcut script (`shortcut-bookmarklet.src.js`) MUST call `completion(RELAY_URL + '?crawl=' + base64(JSON({url, title, html})))` — no fetch to the crawler from inside the Shortcut
 - The `html` field MUST contain only: (a) `<script type="application/ld+json">` tags verbatim (for server-side structured-data extraction) concatenated with (b) up to 15 000 chars of `document.body.innerText` (for LLM extraction). Sending the full serialised DOM is wasteful because the server strips all tags to plain text anyway, and produces URLs that exceed iOS inter-app URL limits (~70 KB vs ~25 KB worst-case with this approach)
-- The base64 payload MUST be UTF-8 safe (`btoa(unescape(encodeURIComponent(json)))`)
+- The base64 payload MUST use URL-safe encoding: `btoa(unescape(encodeURIComponent(json))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')` — using `?crawl=` as a query parameter (iOS strips URL fragments between apps; query params are always preserved)
 - The Shortcut script MUST NOT contain any API key
-- `publish.html` MUST recognize the `#crawl=` hash mode: decode the payload, clear the hash via `history.replaceState`, hide the input UI, ensure a keypair exists, then invoke the existing `runCrawl({url, html, title, mode: 'direct'}, null)` so the LLM call runs in the browser tab (no Shortcut timeout)
-- `publish.html` MUST also continue to support the existing `#events=` hash mode (events already extracted and handed off as JSON)
+- `publish.html` MUST recognize the `?crawl=` query-param mode: decode the payload, clear the param via `history.replaceState`, hide the input UI, ensure a keypair exists, then invoke the existing `runCrawl({url, html, title, mode: 'direct'}, null)` so the LLM call runs in the browser tab (no Shortcut timeout)
+- `publish.html` MUST also continue to support the legacy `#crawl=` hash mode and the existing `#events=` hash mode (events already extracted and handed off as JSON)
 
 ---
 
