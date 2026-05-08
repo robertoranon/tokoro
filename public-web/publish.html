@@ -849,6 +849,13 @@
           });
         } else {
           // Manual mode (default)
+          setSt(
+            'debug: search=' +
+              (window.location.search || '(empty)') +
+              ' hash=' +
+              (window.location.hash || '(empty)'),
+            'info'
+          );
           loadOrCreateKeypair().then(function (kp) {
             if (kp.isNew) {
               cfgPrivKey.value = kp.privkeyB64;
