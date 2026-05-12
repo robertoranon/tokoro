@@ -55,6 +55,7 @@ Events are queryable through a simple API. Point it at a location, a radius, and
 | [**Crawler Worker**](crawler-worker/)     | Serverless LLM crawler — extract events (unsigned) from any URL or image          |
 | [**Node.js Crawler**](crawler/)           | Local CLI crawler — Playwright/Jina fetching, direct/discover/festival/image modes |
 | [**Chrome Extension**](chrome-extension/) | One-click crawl from the browser toolbar or right-click menu                      |
+| [**Apple Shortcut**](public-web/)         | iOS Share Sheet integration — extract and publish events from Safari on iPhone    |
 | [**Bookmarklet**](public-web/)            | Same capability in any browser, no extension install needed                       |
 | [**Web Publisher**](web-publisher/)       | Static HTML form for manually composing and publishing events                     |
 | [**Public Web**](public-web/)             | Example event browser — query by location, date, category; embeds the bookmarklet |

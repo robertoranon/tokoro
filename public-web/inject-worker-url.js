@@ -6,18 +6,21 @@
  *   __TOKORO_WORKER_URL__    — API worker URL
  *   __DEFAULT_CRAWLER_URL__  — crawler worker URL
  *   __BOOKMARKLET__          — built bookmarklet code (from bookmarklet.src.js + relay URL)
+ *   __SHORTCUT_URL__         — iCloud link for the Apple Shortcut (or '#' if not configured)
  *
  * This is intentionally separate from build-bookmarklet.js so that running
  * the bookmarklet build locally never clobbers placeholders in source.
  *
  * Usage:
- *   node inject-worker-url.js <worker-url> <crawler-url> <relay-url>
+ *   node inject-worker-url.js <worker-url> <crawler-url> <relay-url> [<target-dir>] [<build-version>] [<shortcut-url>]
  *
  * Example:
  *   node inject-worker-url.js \
  *     https://tokoro-worker.example.workers.dev \
  *     https://tokoro-crawler-worker.example.workers.dev \
- *     https://tokoro-query.pages.dev/
+ *     https://tokoro-query.pages.dev/ \
+ *     . dev \
+ *     https://www.icloud.com/shortcuts/abc123
  */
 
 'use strict';
@@ -30,6 +33,7 @@ const crawlerUrl = process.argv[3];
 const relayUrl = process.argv[4];
 const targetDir = process.argv[5] || __dirname;
 const buildVersion = process.argv[6] || 'dev';
+const shortcutUrl = process.argv[7] || '';
 
 if (!workerUrl) {
   console.error('ERROR: worker URL argument required.');
@@ -101,6 +105,13 @@ for (const f of ALL_FILES) {
       content = afterBm;
       console.log(`Bookmarklet injected into ${path.basename(f)}`);
     }
+  }
+
+  if (RELAY_FILES.includes(f)) {
+    content = content.replace(/__SHORTCUT_URL__/g, shortcutUrl || '#');
+    console.log(
+      `Shortcut URL injected into ${path.basename(f)} (${shortcutUrl || 'none'})`
+    );
   }
 
   content = content.replace(/__BUILD_VERSION__/g, buildVersion);

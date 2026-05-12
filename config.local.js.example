@@ -6,6 +6,7 @@ var TOKORO_CONFIG = {
   crawlerWorkerUrl: 'https://tokoro-crawler-worker.YOUR_SUBDOMAIN.workers.dev',
   crawlerApiKey: 'your-api-key-here',
   relayUrl: 'https://tokoro-query.pages.dev/',
+  shortcutUrl: '', // optional: iCloud link for the Apple Shortcut (share from Shortcuts app → Copy iCloud Link)
 };
 
 // Node.js compatibility

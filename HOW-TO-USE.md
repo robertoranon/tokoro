@@ -376,11 +376,11 @@ The Apple Shortcut lets you publish events directly from Safari's Share Sheet wi
 
 **Setup:**
 
-1. Build the shortcut bookmarklet (requires `config.local.js`):
+1. Build the shortcut script (requires `config.local.js`):
    ```bash
    node public-web/build-bookmarklet.js
    ```
-   This produces `public-web/shortcut-bookmarklet.js`.
+   This produces `public-web/shortcut-bookmarklet.js`, with your Crawler Worker and relay URLs baked in.
 
 2. Open the **Shortcuts** app on your iPhone or iPad.
 3. Tap **+** to create a new shortcut.
@@ -389,7 +389,20 @@ The Apple Shortcut lets you publish events directly from Safari's Share Sheet wi
 6. Tap the shortcut name → enable **Show in Share Sheet**.
 7. Name it **Tokoro** and save.
 
-**Usage:** In Safari on any event page, tap **Share** → find **Tokoro** → tap it. The publish page opens in a new tab pre-loaded with the extracted events, ready to review and publish.
+**Distributing the shortcut to others:**
+
+Once the shortcut works on your device, share it via iCloud so others can install it with one tap:
+
+1. In the Shortcuts app, long-press the shortcut → **Share** → **Copy iCloud Link**.
+2. Add that link to `config.local.js` as `shortcutUrl`:
+   ```js
+   shortcutUrl: 'https://www.icloud.com/shortcuts/YOUR_LINK_ID',
+   ```
+3. Redeploy the public web (`./scripts/deploy-public-web.sh`). The **Add to Shortcuts →** button will appear on the public web page for iOS visitors.
+
+> **Note:** The shortcut script contains your Crawler Worker and relay URLs. If those URLs change, rebuild the script, recreate the shortcut, and share a new iCloud link.
+
+**Usage:** In Safari on any event page, tap **Share** → **Tokoro**. The publish page opens in a new tab pre-loaded with the extracted events, ready to review and publish.
 
 **First time:** Open `https://YOUR_PUBLIC_WEB_URL/publish.html` in Safari, configure your API key and worker URLs in Settings, then tap **Share → Add to Home Screen** to install it as a PWA for quick access.
 

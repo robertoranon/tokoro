@@ -41,6 +41,7 @@ fi
 
 CRAWLER_URL="$(node -e "console.log(require('${REPO_ROOT}/config.local.js').crawlerWorkerUrl || '')")"
 RELAY_URL="$(node -e "console.log(require('${REPO_ROOT}/config.local.js').relayUrl || '')")"
+SHORTCUT_URL="$(node -e "console.log(require('${REPO_ROOT}/config.local.js').shortcutUrl || '')")"
 
 echo "Building bookmarklet..."
 node "${PUBLIC_WEB}/build-bookmarklet.js"
@@ -52,7 +53,7 @@ BUILD_VERSION="$(git -C "${REPO_ROOT}" rev-parse --short HEAD 2>/dev/null || ech
 echo "Build version: ${BUILD_VERSION}"
 
 echo "Injecting URLs into temp copy..."
-node "${PUBLIC_WEB}/inject-worker-url.js" "$WORKER_URL" "$CRAWLER_URL" "$RELAY_URL" "${DEPLOY_DIR}" "${BUILD_VERSION}"
+node "${PUBLIC_WEB}/inject-worker-url.js" "$WORKER_URL" "$CRAWLER_URL" "$RELAY_URL" "${DEPLOY_DIR}" "${BUILD_VERSION}" "$SHORTCUT_URL"
 
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "[dry-run] Would deploy public-web to Cloudflare Pages (project: tokoro-query)"

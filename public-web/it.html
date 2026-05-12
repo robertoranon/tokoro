@@ -1060,7 +1060,7 @@
       <div class="tools-section">
         <div class="section-title">Pubblica eventi</div>
         <div class="tools-grid">
-          <div class="tool-card">
+          <div class="tool-card" data-tool="chrome">
             <h3>🧩 Estensione Chrome</h3>
             <p>
               Installa l'estensione una volta sola, poi clicca sulla sua icona
@@ -1086,7 +1086,7 @@
               estrarre &amp; pubblicare.
             </p>
           </div>
-          <div class="tool-card">
+          <div class="tool-card" data-tool="bookmarklet">
             <h3>⚡ Bookmarklet</h3>
             <p>
               Trascina il pulsante nella barra dei preferiti. Cliccalo su
@@ -1109,15 +1109,16 @@
               basta inserirle una volta sola.
             </p>
           </div>
-          <!-- <div class="tool-card">
+          <div class="tool-card" data-tool="shortcut">
             <h3>📱 Scorciatoia Apple</h3>
             <p>
-              Estrai e pubblica eventi da Safari su iPhone o Mac — senza
-              installare app aggiuntive.
+              Estrai e pubblica eventi da Safari su iPhone — senza installare
+              app aggiuntive.
             </p>
-            <p>
+            <p id="shortcut-link-p">
               <a
-                href="https://www.icloud.com/shortcuts/479d5e735edb43a5b8fc1243d069c909"
+                id="shortcut-install-link"
+                href="__SHORTCUT_URL__"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="ext-link"
@@ -1125,13 +1126,12 @@
               >
             </p>
             <p class="note">
-              <strong>iPhone:</strong> Pulsante Condividi → Tokoro.<br />
-              <strong>Mac:</strong> Avvia dalla barra dei menu o dall'app
-              Scorciatoie.<br />
+              Tocca <strong>Condividi</strong> → <strong>Tokoro</strong> su
+              qualsiasi pagina di eventi.<br />
               Richiede: Impostazioni → Scorciatoie → Consenti JavaScript nelle
               scorciatoie.
             </p>
-          </div> -->
+          </div>
         </div>
       </div>
     </main>
@@ -1224,6 +1224,31 @@
         var code = document.getElementById('bm-src').textContent;
         document.getElementById('tokoro-bookmarklet').href =
           'javascript:' + encodeURIComponent(code);
+
+        // Hide shortcut install link if no URL was configured at deploy time
+        var shortcutLink = document.getElementById('shortcut-install-link');
+        if (shortcutLink && shortcutLink.getAttribute('href') === '#') {
+          document.getElementById('shortcut-link-p').style.display = 'none';
+        }
+
+        // Show only the tool card relevant to the current browser/platform
+        var ua = navigator.userAgent;
+        var isIOS = /iPhone|iPad|iPod/.test(ua);
+        var isChromeDesktop =
+          !isIOS &&
+          /Chrome\//.test(ua) &&
+          !/Edg\/|OPR\//.test(ua) &&
+          !/Android/.test(ua);
+        var show = isIOS
+          ? 'shortcut'
+          : isChromeDesktop
+            ? 'chrome'
+            : 'bookmarklet';
+        document
+          .querySelectorAll('.tool-card[data-tool]')
+          .forEach(function (el) {
+            if (el.dataset.tool !== show) el.style.display = 'none';
+          });
       })();
     </script>
     <div
