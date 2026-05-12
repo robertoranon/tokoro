@@ -1252,7 +1252,7 @@
           document.getElementById('shortcut-link-p').style.display = 'none';
         }
 
-        // Show only the tool card relevant to the current browser/platform
+        // Show only the tool card(s) relevant to the current browser/platform
         var ua = navigator.userAgent;
         var isIOS = /iPhone|iPad|iPod/.test(ua);
         var isChromeDesktop =
@@ -1261,14 +1261,14 @@
           !/Edg\/|OPR\//.test(ua) &&
           !/Android/.test(ua);
         var show = isIOS
-          ? 'shortcut'
+          ? ['shortcut']
           : isChromeDesktop
-            ? 'chrome'
-            : 'bookmarklet';
+            ? ['chrome', 'bookmarklet']
+            : ['bookmarklet'];
         document
           .querySelectorAll('.tool-card[data-tool]')
           .forEach(function (el) {
-            if (el.dataset.tool !== show) el.style.display = 'none';
+            if (show.indexOf(el.dataset.tool) === -1) el.style.display = 'none';
           });
       })();
     </script>
