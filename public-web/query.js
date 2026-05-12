@@ -191,7 +191,7 @@ async function listEvents() {
       document.getElementById('eventsList').innerHTML = useColumns
         ? renderMagazine(fromTime, toTime, grouped, festivalItems)
         : `<div class="events-list">${renderItems(allItems, fromTime, toTime)}</div>`;
-      resultsSection.style.display = '';
+      resultsSection.style.display = 'block';
     } else {
       _loadedEvents = [];
       const fmt = t =>
