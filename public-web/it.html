@@ -801,8 +801,26 @@
         .search-card {
           padding: 20px 16px;
         }
+        .site-header {
+          display: flex;
+          flex-direction: column;
+        }
         .header-inner {
-          padding: 20px 16px 16px;
+          order: 1;
+          padding: 16px 16px 12px;
+        }
+        .experimental-badge {
+          position: static;
+          order: 2;
+          margin: 0 16px 10px;
+          text-align: left;
+          align-self: flex-start;
+        }
+        .lang-selector {
+          position: static;
+          order: 3;
+          padding: 0 16px 14px;
+          justify-content: flex-start;
         }
         .main {
           padding: 20px 16px 48px;
