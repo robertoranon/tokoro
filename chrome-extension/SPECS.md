@@ -20,7 +20,7 @@ A Chrome browser extension that extracts event information from web pages and im
 **FR-1.2: Worker URL Configuration**
 
 - MUST provide an input field for the crawler-worker base URL
-- MUST have default value: `https://happenings-crawler-worker.YOUR_SUBDOMAIN.workers.dev`
+- MUST have default value: `https://tokoro-crawler-worker.YOUR_SUBDOMAIN.workers.dev`
 - MUST store the worker URL persistently using `chrome.storage.sync`
 - MUST validate that worker URL is not empty before allowing crawl operations
 - MUST auto-save settings when input changes
@@ -28,7 +28,7 @@ A Chrome browser extension that extracts event information from web pages and im
 **FR-1.3: API Worker URL Configuration**
 
 - MUST provide an input field for the API worker base URL (`apiUrl`)
-- MUST have placeholder: `https://happenings-worker.YOUR_SUBDOMAIN.workers.dev`
+- MUST have placeholder: `https://tokoro-worker.YOUR_SUBDOMAIN.workers.dev`
 - MUST store the API worker URL persistently using `chrome.storage.sync`
 - MUST validate that API worker URL is not empty before allowing publish operations
 - MUST auto-save settings when input changes
@@ -876,7 +876,7 @@ This extension depends on two APIs:
 
 ### Host Permissions
 
-- `https://happenings-crawler-worker.YOUR_SUBDOMAIN.workers.dev/*`: Allow requests to default crawler-worker
+- `https://tokoro-crawler-worker.YOUR_SUBDOMAIN.workers.dev/*`: Allow requests to default crawler-worker
 - SHOULD support wildcard for custom worker URLs (requires dynamic permissions)
 
 ## Appendix: File Structure

@@ -91,7 +91,7 @@ https://<worker-name>.<account-subdomain>.workers.dev
 Example:
 
 ```
-https://happenings-crawler-worker.YOUR_SUBDOMAIN.workers.dev
+https://tokoro-crawler-worker.YOUR_SUBDOMAIN.workers.dev
 ```
 
 ### 3.2 Authentication
@@ -735,7 +735,7 @@ Optional R2 bucket for log storage:
 ```toml
 # [[r2_buckets]]
 # binding = "CRAWLER_LOGS"
-# bucket_name = "happenings-crawler-logs"
+# bucket_name = "tokoro-crawler-logs"
 ```
 
 ---

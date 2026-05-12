@@ -3,7 +3,7 @@
 Finding out what's on near you is weirdly broken: events are scattered across dozens of sites, buried in social feeds, or locked behind logins. There's no common layer you can just query.
 This is my attempt to build one — open source, self-hosted, LLM-powered.
 
-Live demo of my instance: [**https://happenings-query.pages.dev/**](https://happenings-query.pages.dev/).
+Live demo of my instance: [**https://tokoro-query.pages.dev/**](https://tokoro-query.pages.dev/).
 
 If you want to test event extraction tools, contact me for an API key.
 
