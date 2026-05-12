@@ -172,10 +172,22 @@ async function listEvents() {
       );
       document.getElementById('resultsMeta').textContent =
         `${fmt(fromTime)} – ${fmt(toTime)} · ${LANG.within} ${radius} km`;
-      const useColumns = !category;
+      const isMobile = window.innerWidth <= 640;
+      const useColumns = !category && !isMobile;
       const { festivalItems, remainingEvents } = groupFestivals(data.events);
       const grouped = groupEvents(remainingEvents);
-      const allItems = [...festivalItems, ...grouped];
+      const sortedGrouped = isMobile
+        ? grouped
+            .slice()
+            .sort((a, b) =>
+              a.event.start_time < b.event.start_time
+                ? -1
+                : a.event.start_time > b.event.start_time
+                  ? 1
+                  : 0
+            )
+        : grouped;
+      const allItems = [...festivalItems, ...sortedGrouped];
       document.getElementById('eventsList').innerHTML = useColumns
         ? renderMagazine(fromTime, toTime, grouped, festivalItems)
         : `<div class="events-list">${renderItems(allItems, fromTime, toTime)}</div>`;
