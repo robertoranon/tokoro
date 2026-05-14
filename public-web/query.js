@@ -91,7 +91,8 @@ async function listEvents() {
   const feedback = document.getElementById('searchFeedback');
   const resultsSection = document.getElementById('resultsSection');
 
-  resultsSection.style.display = 'none';
+  resultsSection.hidden = true;
+  document.getElementById('shareButtons').hidden = true;
   resultDiv.innerHTML = '';
 
   if (address) {
@@ -191,7 +192,8 @@ async function listEvents() {
       document.getElementById('eventsList').innerHTML = useColumns
         ? renderMagazine(fromTime, toTime, grouped, festivalItems)
         : `<div class="events-list">${renderItems(allItems, fromTime, toTime)}</div>`;
-      resultsSection.style.display = 'block';
+      resultsSection.hidden = false;
+      document.getElementById('shareButtons').hidden = false;
     } else {
       _loadedEvents = [];
       const fmt = t =>

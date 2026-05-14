@@ -323,7 +323,12 @@
         font-family: 'Figtree', sans-serif;
         font-size: 13.5px;
         font-weight: 600;
-        transition: all 0.15s;
+        transition:
+          border-color 0.15s,
+          color 0.15s,
+          background-color 0.15s,
+          box-shadow 0.15s,
+          transform 0.15s;
         white-space: nowrap;
         line-height: 1.4;
       }
@@ -1043,13 +1048,13 @@
       </div>
 
       <!-- Results -->
-      <div id="resultsSection" style="display: none">
+      <div id="resultsSection" hidden>
         <div class="results-header">
           <div>
             <div class="results-title" id="resultsTitle"></div>
             <div class="results-meta" id="resultsMeta"></div>
           </div>
-          <div class="share-buttons">
+          <div class="share-buttons" id="shareButtons" hidden>
             <button class="btn btn-ghost" id="copyLinkBtn" onclick="shareUrl()">
               🔗 Copia link
             </button>
