@@ -77,4 +77,4 @@ Events are queryable through a simple API. Point it at a location, a radius, and
 
 ## License
 
-[MIT](LICENSE)
+[Mozilla](LICENSE)
