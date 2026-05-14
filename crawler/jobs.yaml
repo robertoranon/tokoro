@@ -3,15 +3,14 @@
 cron: "0 9 * * *"
 
 jobs:
-  - name: "Example: discover mode with Jina"
+  - name: "Eventi Le Serre: "
     urls:
-      - https://example.com/events
+      - https://leserre.co/en/calendario-eventi/
     mode: discover
-    fetcher: jina
-
-  - name: "Example: festival mode with Chrome"
-    urls:
-      - https://example.com/festival
-    mode: festival
     fetcher: playwright
-    browser: chrome
+
+  - name: "Kino Siska"
+    urls:
+      - https://www.kinosiska.si/en/dogodek/
+    mode: direct
+    fetcher: playwright
