@@ -92,7 +92,6 @@ async function listEvents() {
   const resultsSection = document.getElementById('resultsSection');
 
   resultsSection.hidden = true;
-  document.getElementById('shareButtons').hidden = true;
   resultDiv.innerHTML = '';
 
   if (address) {
@@ -193,7 +192,6 @@ async function listEvents() {
         ? renderMagazine(fromTime, toTime, grouped, festivalItems)
         : `<div class="events-list">${renderItems(allItems, fromTime, toTime)}</div>`;
       resultsSection.hidden = false;
-      document.getElementById('shareButtons').hidden = false;
     } else {
       _loadedEvents = [];
       const fmt = t =>
