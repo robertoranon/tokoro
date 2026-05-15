@@ -95,3 +95,5 @@ docs/superpowers
 worker/users.txt
 **/.claude
 .superpowers
+
+crawler/jobs.yaml
