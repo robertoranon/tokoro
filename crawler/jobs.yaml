@@ -14,3 +14,22 @@ jobs:
       - https://www.kinosiska.si/en/dogodek/
     mode: direct
     fetcher: playwright
+
+  - name: "CSS Udine"
+    urls:
+      - https://www.cssudine.it/
+    mode: direct
+    fetcher: playwright
+
+  - name: "Capitol Pordenone"
+    urls:
+      - https://capitolpordenone.com/programmazione/
+    mode: direct
+    fetcher: playwright
+
+
+
+    
+
+
+    
