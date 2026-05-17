@@ -45,7 +45,12 @@ function catColor(cat) {
       const loc = e.venue_name || `${e.lat.toFixed(3)}, ${e.lng.toFixed(3)}`;
       const lastPill = document.getElementById('lastEventPill');
       lastPill.style.display = '';
-      lastPill.textContent = LANG.latestEvent(e.title, loc);
+      const label = LANG.latestEvent(e.title, loc);
+      if (e.url) {
+        lastPill.innerHTML = `<a href="${e.url}" target="_blank" rel="noopener">${label}</a>`;
+      } else {
+        lastPill.textContent = label;
+      }
     }
   } catch (_) {
     document.getElementById('eventCountPill').textContent = LANG.discoverEvents;
