@@ -216,6 +216,11 @@ export function duplicateCandidateCells(geohash6: string): string[] {
   return [geohash6, ...neighbors(geohash6)];
 }
 
+/** Returns true when start_time is T00:00:00 — the sentinel for "time unknown". */
+export function isMidnightSentinel(startTime: string): boolean {
+  return startTime.endsWith('T00:00:00');
+}
+
 // Format a Date object as local time in ISO 8601 format (YYYY-MM-DDTHH:MM:SS)
 // without timezone conversion
 function formatLocalDateTime(date: Date): string {
