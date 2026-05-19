@@ -237,6 +237,24 @@ export function dedupSqlWindow(startTime: string): {
   };
 }
 
+/** Returns true if the two start times should be compared for duplication.
+ *  Replaces the 1-hour window with a same-date check when either time is a sentinel. */
+export function passesTimeFilter(
+  newStartTime: string,
+  candidateStartTime: string
+): boolean {
+  if (
+    isMidnightSentinel(newStartTime) ||
+    isMidnightSentinel(candidateStartTime)
+  ) {
+    return newStartTime.slice(0, 10) === candidateStartTime.slice(0, 10);
+  }
+  const diffMs = Math.abs(
+    new Date(newStartTime).getTime() - new Date(candidateStartTime).getTime()
+  );
+  return diffMs <= DEDUP_TIME_WINDOW_MS;
+}
+
 // Format a Date object as local time in ISO 8601 format (YYYY-MM-DDTHH:MM:SS)
 // without timezone conversion
 function formatLocalDateTime(date: Date): string {

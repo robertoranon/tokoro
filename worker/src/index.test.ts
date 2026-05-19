@@ -8,6 +8,7 @@ import {
   duplicateCandidateCells,
   isMidnightSentinel,
   dedupSqlWindow,
+  passesTimeFilter,
 } from './index';
 import { isDuplicate } from '../../shared/llm/duplicate-check';
 import { encode as geohashEncode, neighbors } from './geohash';
@@ -443,5 +444,54 @@ describe('dedupSqlWindow', () => {
     const { from, to } = dedupSqlWindow('2026-05-17T01:00:00');
     expect(from).toBe('2026-05-16T23:00:00');
     expect(to).toBe('2026-05-17T03:00:00');
+  });
+});
+
+describe('passesTimeFilter', () => {
+  // Sentinel cases
+  it('passes when new event is sentinel and candidate is same date', () => {
+    expect(passesTimeFilter('2026-05-17T00:00:00', '2026-05-17T22:00:00')).toBe(
+      true
+    );
+  });
+
+  it('passes when candidate is sentinel and new event is same date', () => {
+    expect(passesTimeFilter('2026-05-17T22:00:00', '2026-05-17T00:00:00')).toBe(
+      true
+    );
+  });
+
+  it('passes when both are sentinels on same date', () => {
+    expect(passesTimeFilter('2026-05-17T00:00:00', '2026-05-17T00:00:00')).toBe(
+      true
+    );
+  });
+
+  it('rejects when either is sentinel but dates differ', () => {
+    expect(passesTimeFilter('2026-05-17T00:00:00', '2026-05-18T22:00:00')).toBe(
+      false
+    );
+    expect(passesTimeFilter('2026-05-17T22:00:00', '2026-05-18T00:00:00')).toBe(
+      false
+    );
+  });
+
+  // Normal (non-sentinel) cases — 1-hour window
+  it('passes when both are within 1 hour', () => {
+    expect(passesTimeFilter('2026-05-17T22:00:00', '2026-05-17T22:30:00')).toBe(
+      true
+    );
+    expect(passesTimeFilter('2026-05-17T22:00:00', '2026-05-17T21:00:00')).toBe(
+      true
+    );
+  });
+
+  it('rejects when both non-sentinel and differ by more than 1 hour', () => {
+    expect(passesTimeFilter('2026-05-17T22:00:00', '2026-05-17T20:59:00')).toBe(
+      false
+    );
+    expect(passesTimeFilter('2026-05-17T22:00:00', '2026-05-17T23:01:00')).toBe(
+      false
+    );
   });
 });
