@@ -770,12 +770,8 @@ async function handlePostEvent(request: Request, env: Env): Promise<Response> {
   // Check for duplicate events in the same area and time window.
   // Query events in the geohash6 cell AND its 8 neighbors to avoid missing
   // duplicates whose coordinates land just across a cell boundary.
-  const eventTime = new Date(event.start_time);
-  const twoHoursBefore = formatLocalDateTime(
-    new Date(eventTime.getTime() - DEDUP_SQL_BUFFER_MS)
-  );
-  const twoHoursAfter = formatLocalDateTime(
-    new Date(eventTime.getTime() + DEDUP_SQL_BUFFER_MS)
+  const { from: twoHoursBefore, to: twoHoursAfter } = dedupSqlWindow(
+    event.start_time
   );
 
   const candidateCells = duplicateCandidateCells(geohash6);
@@ -812,11 +808,8 @@ async function handlePostEvent(request: Request, env: Env): Promise<Response> {
       );
       if (distanceKm > DEDUP_DISTANCE_KM) continue;
 
-      const timeDiffMs = Math.abs(
-        new Date(event.start_time).getTime() -
-          new Date(row.start_time as string).getTime()
-      );
-      if (timeDiffMs > DEDUP_TIME_WINDOW_MS) continue;
+      if (!passesTimeFilter(event.start_time, row.start_time as string))
+        continue;
 
       const dup = await isDuplicate(
         { title: event.title, description: event.description },
