@@ -7,6 +7,7 @@ import {
   makeBackupPayload,
   duplicateCandidateCells,
   isMidnightSentinel,
+  dedupSqlWindow,
 } from './index';
 import { isDuplicate } from '../../shared/llm/duplicate-check';
 import { encode as geohashEncode, neighbors } from './geohash';
@@ -422,5 +423,25 @@ describe('isMidnightSentinel', () => {
     expect(isMidnightSentinel('2026-05-17T22:00:00')).toBe(false);
     expect(isMidnightSentinel('2026-05-17T00:01:00')).toBe(false);
     expect(isMidnightSentinel('2026-05-17T12:00:00')).toBe(false);
+  });
+});
+
+describe('dedupSqlWindow', () => {
+  it('returns full calendar day when new event is midnight sentinel', () => {
+    const { from, to } = dedupSqlWindow('2026-05-17T00:00:00');
+    expect(from).toBe('2026-05-17T00:00:00');
+    expect(to).toBe('2026-05-17T23:59:59');
+  });
+
+  it('returns ±2-hour buffer for non-sentinel start times', () => {
+    const { from, to } = dedupSqlWindow('2026-05-17T22:00:00');
+    expect(from).toBe('2026-05-17T20:00:00');
+    expect(to).toBe('2026-05-18T00:00:00');
+  });
+
+  it('buffer for midnight-adjacent time does not use sentinel path', () => {
+    const { from, to } = dedupSqlWindow('2026-05-17T01:00:00');
+    expect(from).toBe('2026-05-16T23:00:00');
+    expect(to).toBe('2026-05-17T03:00:00');
   });
 });

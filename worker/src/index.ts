@@ -221,6 +221,22 @@ export function isMidnightSentinel(startTime: string): boolean {
   return startTime.endsWith('T00:00:00');
 }
 
+/** Returns the SQL time-window bounds for the duplicate candidate search. */
+export function dedupSqlWindow(startTime: string): {
+  from: string;
+  to: string;
+} {
+  if (isMidnightSentinel(startTime)) {
+    const date = startTime.slice(0, 10);
+    return { from: `${date}T00:00:00`, to: `${date}T23:59:59` };
+  }
+  const t = new Date(startTime).getTime();
+  return {
+    from: formatLocalDateTime(new Date(t - DEDUP_SQL_BUFFER_MS)),
+    to: formatLocalDateTime(new Date(t + DEDUP_SQL_BUFFER_MS)),
+  };
+}
+
 // Format a Date object as local time in ISO 8601 format (YYYY-MM-DDTHH:MM:SS)
 // without timezone conversion
 function formatLocalDateTime(date: Date): string {
