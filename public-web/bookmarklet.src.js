@@ -42,7 +42,7 @@
   var popup = window.open(
     RELAY_URL + '?relay=1',
     'tokoro_relay',
-    'width=440,height=680,resizable=yes,scrollbars=yes'
+    'width=380,height=480,resizable=yes,scrollbars=yes'
   );
   if (!popup) {
     alert('Tokoro: popup blocked. Please allow popups for this page.');
