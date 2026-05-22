@@ -14,6 +14,7 @@ import { validateApiKey, unauthorizedResponse } from './auth';
 import { WorkerCrawler } from './crawler-adapter';
 import { createLLMProvider } from '../../shared/llm/factory';
 import { EventExtractor } from './event-extractor';
+import { handleTelegram } from './telegram';
 import type {
   Env,
   CrawlRequest,
@@ -72,6 +73,10 @@ export default {
                 referenceDate: 'Optional reference date YYYY-MM-DD',
               },
             },
+            'POST /telegram': {
+              description:
+                'Telegram webhook endpoint. Register via setWebhook with your bot token.',
+            },
           },
         });
       }
@@ -91,6 +96,10 @@ export default {
       const previewMatch = path.match(/^\/preview\/([a-zA-Z0-9-]+)$/);
       if (request.method === 'GET' && previewMatch) {
         return await handlePreviewFetch(previewMatch[1], env);
+      }
+
+      if (request.method === 'POST' && path === '/telegram') {
+        return await handleTelegram(request, env);
       }
 
       return jsonResponse({ error: 'Not found' }, 404);
