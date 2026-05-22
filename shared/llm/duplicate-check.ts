@@ -1,9 +1,29 @@
 import { LLMProvider } from '../types/llm';
-import { LEVENSHTEIN_FAST_PATH, LEVENSHTEIN_FALLBACK, LLM_PROBABILITY_THRESHOLD } from '../dedup-config';
+import {
+  LEVENSHTEIN_FAST_PATH,
+  LEVENSHTEIN_FALLBACK,
+  LLM_PROBABILITY_THRESHOLD,
+  COMMON_PREFIX_RATIO,
+} from '../dedup-config';
 
 interface EventSummary {
   title: string;
   description?: string;
+}
+
+/** Optional geo+time context passed to the LLM so it can factor in proximity. */
+export interface DedupContext {
+  distanceKm: number;
+  timeDeltaMinutes: number;
+}
+
+/** Ratio of shared leading characters to the shorter title's length. */
+function commonPrefixRatio(a: string, b: string): number {
+  const s1 = a.toLowerCase();
+  const s2 = b.toLowerCase();
+  let i = 0;
+  while (i < s1.length && i < s2.length && s1[i] === s2[i]) i++;
+  return i / Math.min(s1.length, s2.length);
 }
 
 function levenshteinSimilarity(a: string, b: string): number {
@@ -29,8 +49,20 @@ function levenshteinSimilarity(a: string, b: string): number {
   return 1 - matrix[len1][len2] / Math.max(len1, len2);
 }
 
-function buildPrompt(a: EventSummary, b: EventSummary): string {
-  return `Two events are described below. They may be in different languages.
+function buildPrompt(
+  a: EventSummary,
+  b: EventSummary,
+  ctx?: DedupContext
+): string {
+  const contextLine = ctx
+    ? `\nAdditional context: these two events are ${
+        ctx.distanceKm < 0.01
+          ? 'at the same location'
+          : `${Math.round(ctx.distanceKm * 1000)} metres apart`
+      } and their start times differ by ${Math.round(ctx.timeDeltaMinutes)} minutes.\n`
+    : '';
+
+  return `Two events are described below.${contextLine} They may be in different languages.
 Return ONLY a JSON object: {"probability": <float 0-1>}
 where 1.0 means certainly the same real-world event, 0.0 means certainly different.
 
@@ -48,30 +80,39 @@ Event B:
  *
  * Pipeline:
  *   1. Levenshtein fast path: title similarity >= LEVENSHTEIN_FAST_PATH → true immediately (no LLM call).
- *   2. LLM check (if llm provided): probability >= LLM_PROBABILITY_THRESHOLD → true.
- *   3. If no LLM provided, falls back to Levenshtein >= LEVENSHTEIN_FALLBACK.
- *   4. Any LLM error → false (fail open, let the event through).
+ *   2. LLM check (if llm provided): passes geo+time context so the model knows the events
+ *      are already co-located and concurrent; probability >= LLM_PROBABILITY_THRESHOLD → true.
+ *   3. If no LLM provided, falls back to Levenshtein >= LEVENSHTEIN_FALLBACK OR a common-prefix
+ *      ratio check (catches "Main Title - Subtitle A" vs "Main Title - Subtitle B" patterns).
+ *   4. Any LLM error → structural fallback (same as no-LLM path).
  */
 export async function isDuplicate(
   a: EventSummary,
   b: EventSummary,
-  llm?: LLMProvider
+  llm?: LLMProvider,
+  ctx?: DedupContext
 ): Promise<boolean> {
   const sim = levenshteinSimilarity(a.title, b.title);
 
   if (sim >= LEVENSHTEIN_FAST_PATH) return true;
 
-  if (!llm) return sim >= LEVENSHTEIN_FALLBACK;
+  const structuralMatch =
+    sim >= LEVENSHTEIN_FALLBACK ||
+    commonPrefixRatio(a.title, b.title) >= COMMON_PREFIX_RATIO;
+
+  if (!llm) return structuralMatch;
 
   try {
     const response = await llm.complete(
-      [{ role: 'user', content: buildPrompt(a, b) }],
+      [{ role: 'user', content: buildPrompt(a, b, ctx) }],
       { responseFormat: 'json', maxTokens: 50, temperature: 0 }
     );
     const parsed = JSON.parse(response.content);
-    const probability = typeof parsed.probability === 'number' ? parsed.probability : 0;
+    const probability =
+      typeof parsed.probability === 'number' ? parsed.probability : 0;
     return probability >= LLM_PROBABILITY_THRESHOLD;
   } catch {
-    return false;
+    // LLM failed — fall back to structural checks instead of fully failing open
+    return structuralMatch;
   }
 }

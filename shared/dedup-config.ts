@@ -29,5 +29,12 @@ export const LEVENSHTEIN_FAST_PATH = 0.9;
 /** Title Levenshtein similarity threshold used when no LLM is available. */
 export const LEVENSHTEIN_FALLBACK = 0.8;
 
+/**
+ * Common-prefix ratio threshold (prefix length / shorter title length) used as
+ * an additional check in the no-LLM fallback.  Catches "Main Title - Subtitle A"
+ * vs "Main Title - Subtitle B" patterns that Levenshtein scores too low.
+ */
+export const COMMON_PREFIX_RATIO = 0.45;
+
 /** LLM probability at or above which two events are considered duplicates. */
 export const LLM_PROBABILITY_THRESHOLD = 0.7;

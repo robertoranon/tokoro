@@ -370,12 +370,51 @@ describe('isDuplicate', () => {
       { title: 'Jazz Festive', description: '' }
     );
     expect(similar).toBe(true);
+  });
 
-    const different = await isDuplicate(
+  it('catches same main title with different subtitle via common-prefix check (no LLM)', async () => {
+    // "Rolling Stones @ Metropolitan" shares 100% of the shorter title as prefix
+    const withVenue = await isDuplicate(
       { title: 'Rolling Stones', description: '' },
       { title: 'Rolling Stones @ Metropolitan', description: '' }
     );
-    expect(different).toBe(false); // without LLM, Levenshtein < 0.8
+    expect(withVenue).toBe(true);
+
+    // Real-world case: same festival, different subtitle extracted by LLM
+    const shagoo = await isDuplicate(
+      { title: 'Shagoo Shagoo - Festa di Apertura', description: '' },
+      {
+        title: 'Shagoo Shagoo - Music Festival Bucolico Indipendente',
+        description: '',
+      }
+    );
+    expect(shagoo).toBe(true); // common prefix "shagoo shagoo - " = 48.5% of shorter title
+
+    // Genuinely different events starting with different words should not match
+    const different = await isDuplicate(
+      { title: 'Jazz Night', description: '' },
+      { title: 'Rock Concert', description: '' }
+    );
+    expect(different).toBe(false);
+  });
+
+  it('falls back to structural checks (not fully open) on LLM error', async () => {
+    const llm: LLMProvider = {
+      name: 'mock',
+      complete: async () => {
+        throw new Error('timeout');
+      },
+    };
+    // Same main title — should still be caught despite LLM failure
+    const result = await isDuplicate(
+      { title: 'Shagoo Shagoo - Festa di Apertura', description: '' },
+      {
+        title: 'Shagoo Shagoo - Music Festival Bucolico Indipendente',
+        description: '',
+      },
+      llm
+    );
+    expect(result).toBe(true);
   });
 });
 

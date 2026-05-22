@@ -4,7 +4,7 @@ import {
   verifyAdminSignature,
 } from './crypto';
 import { encode as geohashEncode, neighbors } from './geohash';
-import { isDuplicate } from '../../shared/llm/duplicate-check';
+import { isDuplicate, DedupContext } from '../../shared/llm/duplicate-check';
 import { createLLMProvider } from '../../shared/llm/factory';
 import {
   DEDUP_DISTANCE_KM,
@@ -809,13 +809,21 @@ async function handlePostEvent(request: Request, env: Env): Promise<Response> {
       if (!passesTimeFilter(event.start_time, row.start_time as string))
         continue;
 
+      const timeDeltaMinutes =
+        Math.abs(
+          new Date(event.start_time).getTime() -
+            new Date(row.start_time as string).getTime()
+        ) / 60000;
+      const dedupCtx: DedupContext = { distanceKm, timeDeltaMinutes };
+
       const dup = await isDuplicate(
         { title: event.title, description: event.description },
         {
           title: row.title as string,
           description: (row.description as string) || '',
         },
-        llm
+        llm,
+        dedupCtx
       );
 
       if (dup) {

@@ -282,19 +282,21 @@ Before inserting a new event, the worker queries for candidate events in the sam
 
 **Stage 1 — Fast gates (no LLM call):**
 
-1. **Location gate**: haversine distance > 100 meters → not a duplicate (skip to next candidate)
+1. **Location gate**: haversine distance > 500 metres → not a duplicate (skip to next candidate)
 2. **Time gate**: `|start_time delta|` > 1 hour → not a duplicate (skip to next candidate)
 3. **Levenshtein fast path**: title similarity ≥ 0.9 → **DUPLICATE** (return immediately, no LLM call needed)
 
 **Stage 2 — LLM check (if `LLM_API_KEY` is configured):**
 
-4. Call the configured LLM with the title and description of both events. The prompt notes that the events may be in different languages. The LLM returns a JSON response of the form `{"probability": <float>}`.
+4. Call the configured LLM with the title, description, **and geo+time context** (distance in metres, start-time delta in minutes). Providing this context is critical: the LLM must know the events are already co-located and concurrent so it can properly weigh title differences (e.g. same festival name with different subtitles). The LLM returns a JSON response of the form `{"probability": <float>}`.
    - Probability ≥ 0.7 → **DUPLICATE**
-   - Any LLM error (network failure, malformed response, etc.) → **not a duplicate** (fail open)
+   - Any LLM error (network failure, malformed response, etc.) → fall through to structural fallback
 
-**Fallback (if `LLM_API_KEY` is not configured):**
+**Fallback (if `LLM_API_KEY` is not configured, or on LLM error):**
 
-5. Fall back to Levenshtein ≥ 0.8 → **DUPLICATE** (legacy behavior)
+5. **Structural match** — flag as DUPLICATE if either:
+   - Levenshtein similarity ≥ 0.8, **or**
+   - Common-prefix ratio ≥ 0.45 (prefix length / shorter-title length). Catches "Name - Subtitle A" vs "Name - Subtitle B" patterns that score low on Levenshtein.
 
 **Algorithm:**
 
@@ -302,7 +304,7 @@ Before inserting a new event, the worker queries for candidate events in the sam
 def are_events_similar(event1, event2, llm_provider=None) -> bool:
     # Stage 1a: Location gate
     distance_km = haversine_distance(event1.lat, event1.lng, event2.lat, event2.lng)
-    if distance_km > 0.1:
+    if distance_km > 0.5:
         return False
 
     # Stage 1b: Time gate
@@ -315,16 +317,22 @@ def are_events_similar(event1, event2, llm_provider=None) -> bool:
     if similarity >= 0.9:
         return True
 
-    # Stage 2: LLM check
+    # Structural match used as fallback (no LLM, or on LLM error)
+    prefix_ratio = common_prefix_ratio(event1.title, event2.title)
+    structural_match = similarity >= 0.8 or prefix_ratio >= 0.45
+
+    # Stage 2: LLM check — include geo+time context so the model knows
+    # these events are already co-located and concurrent
     if llm_provider is not None:
         try:
-            result = llm_provider.check_duplicate(event1, event2)
+            time_delta_minutes = time_diff_seconds / 60
+            result = llm_provider.check_duplicate(event1, event2,
+                context={"distance_km": distance_km, "time_delta_minutes": time_delta_minutes})
             return result["probability"] >= 0.7
         except Exception:
-            return False  # fail open on any LLM error
+            return structural_match  # fall back to structural checks on error
 
-    # Fallback: no LLM configured — use relaxed Levenshtein threshold
-    return similarity >= 0.8
+    return structural_match
 ```
 
 ### 5.2 String Similarity (Levenshtein Distance)
@@ -367,7 +375,29 @@ def levenshtein_distance(s1: str, s2: str) -> int:
     return matrix[len1][len2]
 ```
 
-### 5.3 Duplicate Check Query
+### 5.3 Common-Prefix Ratio
+
+```python
+def common_prefix_ratio(a: str, b: str) -> float:
+    """
+    Returns the length of the shared leading prefix divided by the shorter
+    string's length (both lowercased).  Catches "Main Title - Subtitle A" vs
+    "Main Title - Subtitle B" patterns that Levenshtein scores poorly because
+    the suffixes differ entirely.
+
+    Example: "Shagoo Shagoo - Festa di Apertura" vs
+             "Shagoo Shagoo - Music Festival Bucolico Indipendente"
+      → common prefix "shagoo shagoo - " = 16 chars
+      → shorter title = 33 chars → ratio = 0.485 ≥ 0.45 → structural match
+    """
+    s1, s2 = a.lower(), b.lower()
+    i = 0
+    while i < len(s1) and i < len(s2) and s1[i] == s2[i]:
+        i += 1
+    return i / min(len(s1), len(s2)) if min(len(s1), len(s2)) > 0 else 0.0
+```
+
+### 5.5 Duplicate Check Query
 
 Before inserting an event, query the geohash6 cell of the new event **and its 8 neighbors** (9 cells total). This avoids missing duplicates whose coordinates land just across a cell boundary.
 
@@ -394,7 +424,7 @@ Then apply `are_events_similar()` to each result.
 }
 ```
 
-### 5.4 Environment Variables and Secrets
+### 5.6 Environment Variables and Secrets
 
 **Allowlist:**
 
@@ -406,7 +436,7 @@ Then apply `are_events_similar()` to each result.
 
 | Variable | Description | Default |
 |---|---|---|
-| `LLM_API_KEY` | API key for the LLM provider. If not set, LLM duplicate detection is disabled and the Levenshtein ≥ 0.8 fallback is used. Set via `wrangler secret put LLM_API_KEY`. | — |
+| `LLM_API_KEY` | API key for the LLM provider. If not set, LLM duplicate detection is disabled and the structural fallback (Levenshtein ≥ 0.8 or common-prefix ratio ≥ 0.45) is used. Set via `wrangler secret put LLM_API_KEY`. | — |
 | `LLM_PROVIDER` | LLM provider name: `openai`, `anthropic`, or `openrouter`. Set via `wrangler secret put LLM_PROVIDER`. | `openrouter` |
 | `LLM_MODEL` | Optional model override. If not set, the provider's default model is used. Set via `wrangler secret put LLM_MODEL`. | — |
 
