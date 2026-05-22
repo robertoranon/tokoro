@@ -457,15 +457,20 @@ async function handleUrl(
 ): Promise<void> {
   await tg.sendMessage(chatId, '🔍 Crawling…');
 
-  const crawler = new WorkerCrawler({ env, mode: 'discover' });
-  const result = await crawler.crawl(url);
+  try {
+    const crawler = new WorkerCrawler({ env, mode: 'discover' });
+    const result = await crawler.crawl(url);
 
-  if (result.events.length === 0) {
-    await tg.sendMessage(chatId, 'No events found.');
-    return;
+    if (result.events.length === 0) {
+      await tg.sendMessage(chatId, 'No events found.');
+      return;
+    }
+
+    await sendEventSummary(chatId, result.events, env, tg);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    await tg.sendMessage(chatId, `❌ ${escapeHtml(msg)}`);
   }
-
-  await sendEventSummary(chatId, result.events, env, tg);
 }
 
 async function handlePhoto(
@@ -477,30 +482,35 @@ async function handlePhoto(
 ): Promise<void> {
   await tg.sendMessage(chatId, '🔍 Processing image…');
 
-  // Use the largest available photo variant
-  const largest = photos.reduce((best, p) =>
-    (p.file_size ?? 0) > (best.file_size ?? 0) ? p : best
-  );
+  try {
+    // Use the largest available photo variant
+    const largest = photos.reduce((best, p) =>
+      (p.file_size ?? 0) > (best.file_size ?? 0) ? p : best
+    );
 
-  const { data: imageData, mimeType: detectedMime } = await tg.downloadPhoto(
-    largest.file_id
-  );
-  const resolvedMime = mimeType || detectedMime;
+    const { data: imageData, mimeType: detectedMime } = await tg.downloadPhoto(
+      largest.file_id
+    );
+    const resolvedMime = mimeType || detectedMime;
 
-  const crawler = new WorkerCrawler({
-    env,
-    mode: 'image',
-    imageData,
-    imageMimeType: resolvedMime,
-  });
-  const result = await crawler.crawl(undefined);
+    const crawler = new WorkerCrawler({
+      env,
+      mode: 'image',
+      imageData,
+      imageMimeType: resolvedMime,
+    });
+    const result = await crawler.crawl(undefined);
 
-  if (result.events.length === 0) {
-    await tg.sendMessage(chatId, 'No events found in image.');
-    return;
+    if (result.events.length === 0) {
+      await tg.sendMessage(chatId, 'No events found in image.');
+      return;
+    }
+
+    await sendEventSummary(chatId, result.events, env, tg);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    await tg.sendMessage(chatId, `❌ ${escapeHtml(msg)}`);
   }
-
-  await sendEventSummary(chatId, result.events, env, tg);
 }
 
 async function handleMessage(
