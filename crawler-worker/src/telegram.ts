@@ -210,3 +210,137 @@ function parseCallback(raw: string): CallbackData | null {
   }
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// Telegram API client
+// ---------------------------------------------------------------------------
+
+class TelegramClient {
+  private baseUrl: string;
+  private fileBaseUrl: string;
+
+  constructor(private token: string) {
+    this.baseUrl = `https://api.telegram.org/bot${token}`;
+    this.fileBaseUrl = `https://api.telegram.org/file/bot${token}`;
+  }
+
+  async sendMessage(
+    chatId: number,
+    text: string,
+    inlineKeyboard?: Array<Array<{ text: string; callback_data: string }>>
+  ): Promise<TelegramMessage> {
+    const body: Record<string, unknown> = {
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+    };
+    if (inlineKeyboard) {
+      body.reply_markup = { inline_keyboard: inlineKeyboard };
+    }
+    const res = await fetch(`${this.baseUrl}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = (await res.json()) as { result: TelegramMessage };
+    return data.result;
+  }
+
+  async editMessage(
+    chatId: number,
+    messageId: number,
+    text: string,
+    inlineKeyboard?: Array<Array<{ text: string; callback_data: string }>>
+  ): Promise<void> {
+    const body: Record<string, unknown> = {
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      parse_mode: 'HTML',
+    };
+    if (inlineKeyboard) {
+      body.reply_markup = { inline_keyboard: inlineKeyboard };
+    }
+    await fetch(`${this.baseUrl}/editMessageText`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async answerCallback(callbackQueryId: string, text?: string): Promise<void> {
+    await fetch(`${this.baseUrl}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: callbackQueryId, text }),
+    });
+  }
+
+  /**
+   * Downloads a photo by file_id and returns it as base64 string + mime type.
+   * Uses the largest available size variant.
+   */
+  async downloadPhoto(
+    fileId: string
+  ): Promise<{ data: string; mimeType: string }> {
+    const res = await fetch(`${this.baseUrl}/getFile?file_id=${fileId}`);
+    const json = (await res.json()) as { result: { file_path: string } };
+    const filePath = json.result.file_path;
+
+    const fileRes = await fetch(`${this.fileBaseUrl}/${filePath}`);
+    const buffer = await fileRes.arrayBuffer();
+
+    // Base64-encode without stack overflow on large buffers
+    const uint8 = new Uint8Array(buffer);
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < uint8.length; i += chunkSize) {
+      binary += String.fromCharCode(...uint8.subarray(i, i + chunkSize));
+    }
+    const base64 = btoa(binary);
+
+    const ext = filePath.split('.').pop()?.toLowerCase();
+    const mimeType =
+      ext === 'png'
+        ? 'image/png'
+        : ext === 'gif'
+          ? 'image/gif'
+          : ext === 'webp'
+            ? 'image/webp'
+            : 'image/jpeg';
+
+    return { data: base64, mimeType };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// KV state — pending events
+// ---------------------------------------------------------------------------
+
+const KV_TTL_SECONDS = 1800; // 30 minutes
+
+async function storePendingEvents(
+  kv: KVNamespace,
+  kvKey: string,
+  events: PreparedEvent[]
+): Promise<void> {
+  await kv.put(kvKey, JSON.stringify(events), {
+    expirationTtl: KV_TTL_SECONDS,
+  });
+}
+
+async function loadPendingEvents(
+  kv: KVNamespace,
+  kvKey: string
+): Promise<PreparedEvent[] | null> {
+  const raw = await kv.get(kvKey);
+  if (!raw) return null;
+  return JSON.parse(raw) as PreparedEvent[];
+}
+
+async function deletePendingEvents(
+  kv: KVNamespace,
+  kvKey: string
+): Promise<void> {
+  await kv.delete(kvKey);
+}
