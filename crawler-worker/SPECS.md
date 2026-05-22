@@ -189,6 +189,9 @@ GET /
     },
     "GET /preview/:token": {
       "description": "Retrieve previously stored page data by token. No auth required."
+    },
+    "POST /telegram": {
+      "description": "Telegram bot webhook. Register with Telegram via setWebhook after deploying."
     }
   }
 }
@@ -294,6 +297,60 @@ Events in the response are `PreparedEvent` objects (geocoded, normalised, unsign
   }
   ```
   Note: Geocoding failures are no longer fatal — they result in individual events being added to `dropped_events` rather than aborting the entire crawl.
+
+### 3.6 POST /telegram (Telegram Bot Webhook)
+
+**Setup (one-time):**
+
+1. Create a bot via Telegram @BotFather and copy the token.
+2. Set secrets on the crawler-worker:
+   ```bash
+   wrangler secret put TELEGRAM_BOT_TOKEN
+   wrangler secret put BOT_PRIVKEY   # Ed25519 private key, hex
+   wrangler secret put BOT_PUBKEY    # Ed25519 public key, hex
+   wrangler secret put API_WORKER_URL # e.g. https://tokoro-worker.xyz.workers.dev
+   ```
+3. Register the webhook after deploying:
+   ```bash
+   curl "https://api.telegram.org/bot{TOKEN}/setWebhook?url=https://{worker-host}/telegram"
+   ```
+
+**Supported message types:**
+
+| Input | Behaviour |
+|---|---|
+| Text containing a URL | Crawls in `discover` mode |
+| Photo message | Downloads largest variant, crawls in `image` mode |
+| Image document | Same as photo |
+| Anything else | Replies with usage hint |
+
+**Confirmation flow:**
+
+1. Bot sends a numbered event summary with two inline buttons: **✅ Publish all** and **📋 Choose one by one**.
+2. **Publish all**: signs and publishes all events immediately, edits the summary message with the tally.
+3. **Choose one by one**: sends each event as a detail card with **✅ Publish** / **❌ Skip** buttons; sends a completion message after the last event.
+
+**Bot identity:** all published events are attributed to `BOT_PUBKEY`. Generate the keypair once:
+
+```bash
+node --input-type=module -e "
+import { getPublicKeyAsync } from '@noble/ed25519';
+const hex = b => [...b].map(x => x.toString(16).padStart(2,'0')).join('');
+const privkey = crypto.getRandomValues(new Uint8Array(32));
+const pubkey = await getPublicKeyAsync(privkey);
+console.log('BOT_PRIVKEY=' + hex(privkey));
+console.log('BOT_PUBKEY=' + hex(pubkey));
+"
+```
+
+**Environment variables:**
+
+| Variable | Required | Description |
+|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | Yes | From @BotFather |
+| `BOT_PRIVKEY` | Yes | Ed25519 private key hex |
+| `BOT_PUBKEY` | Yes | Ed25519 public key hex |
+| `API_WORKER_URL` | Yes | Base URL of Tokoro API worker |
 
 ---
 
