@@ -38,7 +38,7 @@ interface TelegramUpdate {
 
 interface TelegramMessage {
   message_id: number;
-  chat: { id: number };
+  chat: { id: number; type: 'private' | 'group' | 'supergroup' | 'channel' };
   text?: string;
   photo?: TelegramPhotoSize[];
   document?: { file_id: string; mime_type?: string };
@@ -544,6 +544,9 @@ async function handleMessage(
       return;
     }
   }
+
+  // In group chats, silently ignore messages that aren't URLs or images
+  if (message.chat.type !== 'private') return;
 
   await tg.sendMessage(
     chatId,
