@@ -344,3 +344,162 @@ async function deletePendingEvents(
 ): Promise<void> {
   await kv.delete(kvKey);
 }
+
+// ---------------------------------------------------------------------------
+// Publishing
+// ---------------------------------------------------------------------------
+
+/**
+ * Signs a PreparedEvent with the bot keypair and POSTs it to the API worker.
+ * Returns the published event ID on success, throws on failure.
+ */
+async function publishEvent(event: PreparedEvent, env: Env): Promise<string> {
+  const pubkey = env.BOT_PUBKEY!;
+  const signature = await signEvent(event, pubkey, env.BOT_PRIVKEY!);
+
+  const body = {
+    ...event,
+    pubkey,
+    signature,
+  };
+
+  const res = await fetch(`${env.API_WORKER_URL}/events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = (await res.json()) as { error?: string; message?: string };
+    throw new Error(err.message || err.error || `HTTP ${res.status}`);
+  }
+
+  const result = (await res.json()) as { id: string };
+  return result.id;
+}
+
+// ---------------------------------------------------------------------------
+// Shared: send summary + store pending events
+// ---------------------------------------------------------------------------
+
+async function sendEventSummary(
+  chatId: number,
+  events: PreparedEvent[],
+  env: Env,
+  tg: TelegramClient
+): Promise<void> {
+  const text = formatEventSummary(events);
+  const sent = await tg.sendMessage(chatId, text);
+  const kvKey = buildKvKey(chatId, sent.message_id);
+
+  await storePendingEvents(env.PREVIEW_CACHE!, kvKey, events);
+
+  await tg.editMessage(chatId, sent.message_id, text, [
+    [
+      {
+        text: '✅ Publish all',
+        callback_data: encodeCallback({ type: 'pub_all', kvKey }),
+      },
+      {
+        text: '📋 Choose one by one',
+        callback_data: encodeCallback({ type: 'choose', kvKey }),
+      },
+    ],
+  ]);
+}
+
+// ---------------------------------------------------------------------------
+// Message handlers
+// ---------------------------------------------------------------------------
+
+async function handleUrl(
+  chatId: number,
+  url: string,
+  env: Env,
+  tg: TelegramClient
+): Promise<void> {
+  await tg.sendMessage(chatId, '🔍 Crawling…');
+
+  const crawler = new WorkerCrawler({ env, mode: 'discover' });
+  const result = await crawler.crawl(url);
+
+  if (result.events.length === 0) {
+    await tg.sendMessage(chatId, 'No events found.');
+    return;
+  }
+
+  await sendEventSummary(chatId, result.events, env, tg);
+}
+
+async function handlePhoto(
+  chatId: number,
+  photos: TelegramPhotoSize[],
+  mimeType: string,
+  env: Env,
+  tg: TelegramClient
+): Promise<void> {
+  await tg.sendMessage(chatId, '🔍 Processing image…');
+
+  // Use the largest available photo variant
+  const largest = photos.reduce((best, p) =>
+    (p.file_size ?? 0) > (best.file_size ?? 0) ? p : best
+  );
+
+  const { data: imageData, mimeType: detectedMime } = await tg.downloadPhoto(
+    largest.file_id
+  );
+  const resolvedMime = mimeType || detectedMime;
+
+  const crawler = new WorkerCrawler({
+    env,
+    mode: 'image',
+    imageData,
+    imageMimeType: resolvedMime,
+  });
+  const result = await crawler.crawl(undefined);
+
+  if (result.events.length === 0) {
+    await tg.sendMessage(chatId, 'No events found in image.');
+    return;
+  }
+
+  await sendEventSummary(chatId, result.events, env, tg);
+}
+
+async function handleMessage(
+  message: TelegramMessage,
+  env: Env,
+  tg: TelegramClient
+): Promise<void> {
+  const chatId = message.chat.id;
+
+  // Photo message
+  if (message.photo && message.photo.length > 0) {
+    await handlePhoto(chatId, message.photo, 'image/jpeg', env, tg);
+    return;
+  }
+
+  // Image document
+  if (message.document?.mime_type?.startsWith('image/')) {
+    // Wrap the document as a single-element photo array for reuse
+    const pseudo: TelegramPhotoSize[] = [
+      { file_id: message.document.file_id, width: 0, height: 0 },
+    ];
+    await handlePhoto(chatId, pseudo, message.document.mime_type, env, tg);
+    return;
+  }
+
+  // Text with URL
+  if (message.text) {
+    const urlMatch = message.text.match(/https?:\/\/\S+/);
+    if (urlMatch) {
+      await handleUrl(chatId, urlMatch[0], env, tg);
+      return;
+    }
+  }
+
+  await tg.sendMessage(
+    chatId,
+    "Send me a URL or an image and I'll extract events from it."
+  );
+}
