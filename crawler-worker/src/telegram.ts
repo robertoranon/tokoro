@@ -503,3 +503,238 @@ async function handleMessage(
     "Send me a URL or an image and I'll extract events from it."
   );
 }
+
+// ---------------------------------------------------------------------------
+// Confirmation callbacks
+// ---------------------------------------------------------------------------
+
+async function handlePublishAll(
+  chatId: number,
+  messageId: number,
+  kvKey: string,
+  callbackId: string,
+  env: Env,
+  tg: TelegramClient
+): Promise<void> {
+  await tg.answerCallback(callbackId);
+
+  const events = await loadPendingEvents(env.PREVIEW_CACHE!, kvKey);
+  if (!events) {
+    await tg.sendMessage(
+      chatId,
+      'Session expired. Send the URL or image again.'
+    );
+    return;
+  }
+
+  let published = 0;
+  let failed = 0;
+  for (const event of events) {
+    try {
+      await publishEvent(event, env);
+      published++;
+    } catch {
+      failed++;
+    }
+  }
+
+  await deletePendingEvents(env.PREVIEW_CACHE!, kvKey);
+
+  const parts = [
+    `✅ Published ${published} event${published !== 1 ? 's' : ''}.`,
+  ];
+  if (failed > 0) parts.push(`❌ ${failed} failed.`);
+  await tg.editMessage(chatId, messageId, parts.join(' '));
+}
+
+async function sendEventCard(
+  chatId: number,
+  events: PreparedEvent[],
+  index: number,
+  kvKey: string,
+  tg: TelegramClient
+): Promise<void> {
+  const text = formatEventDetail(events[index], index, events.length);
+  await tg.sendMessage(chatId, text, [
+    [
+      {
+        text: '✅ Publish',
+        callback_data: encodeCallback({
+          type: 'event',
+          kvKey,
+          index,
+          action: 'publish',
+        }),
+      },
+      {
+        text: '❌ Skip',
+        callback_data: encodeCallback({
+          type: 'event',
+          kvKey,
+          index,
+          action: 'skip',
+        }),
+      },
+    ],
+  ]);
+}
+
+async function handleChooseByOne(
+  chatId: number,
+  kvKey: string,
+  callbackId: string,
+  env: Env,
+  tg: TelegramClient
+): Promise<void> {
+  await tg.answerCallback(callbackId);
+
+  const events = await loadPendingEvents(env.PREVIEW_CACHE!, kvKey);
+  if (!events) {
+    await tg.sendMessage(
+      chatId,
+      'Session expired. Send the URL or image again.'
+    );
+    return;
+  }
+
+  await sendEventCard(chatId, events, 0, kvKey, tg);
+}
+
+async function handleEventDecision(
+  chatId: number,
+  messageId: number,
+  kvKey: string,
+  index: number,
+  action: 'publish' | 'skip',
+  callbackId: string,
+  env: Env,
+  tg: TelegramClient
+): Promise<void> {
+  await tg.answerCallback(
+    callbackId,
+    action === 'publish' ? '✅ Publishing…' : '❌ Skipped'
+  );
+
+  const events = await loadPendingEvents(env.PREVIEW_CACHE!, kvKey);
+  if (!events) {
+    await tg.sendMessage(
+      chatId,
+      'Session expired. Send the URL or image again.'
+    );
+    return;
+  }
+
+  // Mark result on the card
+  const resultText =
+    action === 'publish'
+      ? `${formatEventDetail(events[index], index, events.length)}\n\n<i>✅ Published</i>`
+      : `${formatEventDetail(events[index], index, events.length)}\n\n<i>❌ Skipped</i>`;
+  await tg.editMessage(chatId, messageId, resultText);
+
+  if (action === 'publish') {
+    try {
+      await publishEvent(events[index], env);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await tg.sendMessage(chatId, `❌ Failed to publish: ${msg}`);
+    }
+  }
+
+  const next = index + 1;
+  if (next < events.length) {
+    await sendEventCard(chatId, events, next, kvKey, tg);
+  } else {
+    await deletePendingEvents(env.PREVIEW_CACHE!, kvKey);
+    await tg.sendMessage(chatId, 'Done! That was the last event.');
+  }
+}
+
+async function handleCallbackQuery(
+  query: TelegramCallbackQuery,
+  env: Env,
+  tg: TelegramClient
+): Promise<void> {
+  if (!query.data || !query.message) return;
+
+  const chatId = query.message.chat.id;
+  const messageId = query.message.message_id;
+  const parsed = parseCallback(query.data);
+
+  if (!parsed) {
+    await tg.answerCallback(query.id, 'Unknown action');
+    return;
+  }
+
+  switch (parsed.type) {
+    case 'pub_all':
+      await handlePublishAll(
+        chatId,
+        messageId,
+        parsed.kvKey,
+        query.id,
+        env,
+        tg
+      );
+      break;
+    case 'choose':
+      await handleChooseByOne(chatId, parsed.kvKey, query.id, env, tg);
+      break;
+    case 'event':
+      await handleEventDecision(
+        chatId,
+        messageId,
+        parsed.kvKey,
+        parsed.index,
+        parsed.action,
+        query.id,
+        env,
+        tg
+      );
+      break;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Main entry point
+// ---------------------------------------------------------------------------
+
+export async function handleTelegram(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  if (!env.TELEGRAM_BOT_TOKEN) {
+    return new Response('Telegram bot not configured', { status: 503 });
+  }
+  if (!env.PREVIEW_CACHE) {
+    return new Response('PREVIEW_CACHE KV not bound', { status: 503 });
+  }
+  if (!env.BOT_PRIVKEY || !env.BOT_PUBKEY) {
+    return new Response('Bot keypair not configured', { status: 503 });
+  }
+  if (!env.API_WORKER_URL) {
+    return new Response('API_WORKER_URL not configured', { status: 503 });
+  }
+
+  const tg = new TelegramClient(env.TELEGRAM_BOT_TOKEN);
+
+  let update: TelegramUpdate;
+  try {
+    update = await request.json();
+  } catch {
+    return new Response('Invalid JSON', { status: 400 });
+  }
+
+  try {
+    if (update.message) {
+      await handleMessage(update.message, env, tg);
+    } else if (update.callback_query) {
+      await handleCallbackQuery(update.callback_query, env, tg);
+    }
+  } catch (err) {
+    console.error('Telegram handler error:', err);
+    // Swallow errors — Telegram retries on non-200, so always return 200
+    // to avoid duplicate processing
+  }
+
+  return new Response('OK', { status: 200 });
+}
