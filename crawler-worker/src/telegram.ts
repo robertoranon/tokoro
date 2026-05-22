@@ -624,20 +624,19 @@ async function handleEventDecision(
     return;
   }
 
-  // Mark result on the card
-  const resultText =
-    action === 'publish'
-      ? `${formatEventDetail(events[index], index, events.length)}\n\n<i>✅ Published</i>`
-      : `${formatEventDetail(events[index], index, events.length)}\n\n<i>❌ Skipped</i>`;
-  await tg.editMessage(chatId, messageId, resultText);
-
   if (action === 'publish') {
     try {
       await publishEvent(events[index], env);
+      const publishedText = `${formatEventDetail(events[index], index, events.length)}\n\n<i>✅ Published</i>`;
+      await tg.editMessage(chatId, messageId, publishedText);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      await tg.sendMessage(chatId, `❌ Failed to publish: ${msg}`);
+      const failedText = `${formatEventDetail(events[index], index, events.length)}\n\n<i>❌ Failed: ${escapeHtml(msg)}</i>`;
+      await tg.editMessage(chatId, messageId, failedText);
     }
+  } else {
+    const skippedText = `${formatEventDetail(events[index], index, events.length)}\n\n<i>❌ Skipped</i>`;
+    await tg.editMessage(chatId, messageId, skippedText);
   }
 
   const next = index + 1;
@@ -702,17 +701,15 @@ export async function handleTelegram(
   request: Request,
   env: Env
 ): Promise<Response> {
-  if (!env.TELEGRAM_BOT_TOKEN) {
-    return new Response('Telegram bot not configured', { status: 503 });
-  }
-  if (!env.PREVIEW_CACHE) {
-    return new Response('PREVIEW_CACHE KV not bound', { status: 503 });
-  }
-  if (!env.BOT_PRIVKEY || !env.BOT_PUBKEY) {
-    return new Response('Bot keypair not configured', { status: 503 });
-  }
-  if (!env.API_WORKER_URL) {
-    return new Response('API_WORKER_URL not configured', { status: 503 });
+  if (
+    !env.TELEGRAM_BOT_TOKEN ||
+    !env.PREVIEW_CACHE ||
+    !env.BOT_PRIVKEY ||
+    !env.BOT_PUBKEY ||
+    !env.API_WORKER_URL
+  ) {
+    console.error('Telegram bot: missing required configuration');
+    return new Response('OK', { status: 200 });
   }
 
   const tg = new TelegramClient(env.TELEGRAM_BOT_TOKEN);
