@@ -23,3 +23,9 @@ LLM_API_KEY=your_llm_api_key_here
 # Optional: Jina AI Reader API Key (improves rate limits)
 # Get a free API key at https://jina.ai/reader
 # JINA_API_KEY=jina_key
+
+# Telegram Bot (optional — only needed if using the bot)
+# TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+# BOT_PRIVKEY=your_bot_ed25519_privkey_hex
+# BOT_PUBKEY=your_bot_ed25519_pubkey_hex
+# API_WORKER_URL=https://tokoro-worker.your-account.workers.dev

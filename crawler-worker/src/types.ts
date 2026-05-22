@@ -9,11 +9,17 @@ export interface Env {
   PREVIEW_CACHE?: KVNamespace;
 
   // Secrets (set via wrangler secret put)
-  CRAWLER_API_KEYS: string; // Comma-separated list of allowed API keys
+  CRAWLER_API_KEYS: string;
   LLM_API_KEY?: string;
   LLM_PROVIDER?: string;
   LLM_MODEL?: string;
   JINA_API_KEY?: string;
+
+  // Telegram bot secrets
+  TELEGRAM_BOT_TOKEN?: string;
+  BOT_PRIVKEY?: string; // Ed25519 private key, hex-encoded
+  BOT_PUBKEY?: string; // Ed25519 public key, hex-encoded
+  API_WORKER_URL?: string; // Base URL of Tokoro API worker (no trailing slash)
 }
 
 /**
