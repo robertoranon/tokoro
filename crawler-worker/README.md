@@ -425,6 +425,73 @@ curl -s -X POST https://tokoro-crawler-worker.<subdomain>.workers.dev/crawl \
   )" | jq .
 ```
 
+---
+
+### `POST /telegram`
+
+Telegram bot webhook. Accepts URL messages and image messages, crawls them via the existing pipeline, and lets you confirm before publishing. Events are signed with the bot's own Ed25519 keypair and published directly to the API worker via a Service Binding.
+
+**This endpoint is not called directly** — it receives webhook updates sent by Telegram after you register it with `setWebhook`.
+
+**Supported message types:**
+
+| Input | Behaviour |
+|---|---|
+| Text message containing a URL | Crawls in `discover` mode |
+| Photo message | Downloads largest size, crawls in `image` mode |
+| Image document | Same as photo |
+| Anything else | Replies with usage hint |
+
+**Confirmation flow:**
+
+1. Bot sends a numbered summary of extracted events with two buttons: **✅ Publish all** and **📋 Choose one by one**.
+2. **Publish all**: signs and publishes every event immediately, then updates the message with a tally.
+3. **Choose one by one**: sends each event as a detail card with **✅ Publish** / **❌ Skip** buttons, then sends a completion message.
+
+**Setup (one-time):**
+
+1. Create a bot via Telegram @BotFather and copy the token.
+
+2. Generate a keypair for the bot (run from this directory):
+
+   ```bash
+   node --input-type=module -e "
+   import { getPublicKeyAsync } from '@noble/ed25519';
+   const hex = b => [...b].map(x => x.toString(16).padStart(2,'0')).join('');
+   const privkey = crypto.getRandomValues(new Uint8Array(32));
+   const pubkey = await getPublicKeyAsync(privkey);
+   console.log('BOT_PRIVKEY=' + hex(privkey));
+   console.log('BOT_PUBKEY=' + hex(pubkey));
+   "
+   ```
+
+3. Set secrets:
+
+   ```bash
+   wrangler secret put TELEGRAM_BOT_TOKEN
+   wrangler secret put BOT_PRIVKEY
+   wrangler secret put BOT_PUBKEY
+   ```
+
+4. Add the Service Binding to `wrangler.toml` (required — Workers cannot call other Workers via `workers.dev` URLs):
+
+   ```toml
+   [[services]]
+   binding = "API_WORKER"
+   service = "tokoro-worker"
+   ```
+
+5. Deploy and register the webhook:
+
+   ```bash
+   npm run deploy
+   curl "https://api.telegram.org/bot{TOKEN}/setWebhook?url=https://tokoro-crawler-worker.{subdomain}.workers.dev/telegram"
+   ```
+
+**Bot identity:** all events the bot publishes appear under `BOT_PUBKEY` in the Tokoro API. The keypair is permanent — keep `BOT_PRIVKEY` safe and back it up.
+
+---
+
 ## Authentication
 
 The Worker uses API key authentication via the `Authorization` header:

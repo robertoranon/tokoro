@@ -354,27 +354,64 @@ async function deletePendingEvents(
  * Returns the published event ID on success, throws on failure.
  */
 async function publishEvent(event: PreparedEvent, env: Env): Promise<string> {
+  console.log(
+    `[publishEvent] signing "${event.title}" with pubkey ${env.BOT_PUBKEY?.slice(0, 8)}...`
+  );
   const pubkey = env.BOT_PUBKEY!;
-  const signature = await signEvent(event, pubkey, env.BOT_PRIVKEY!);
 
-  const body = {
-    ...event,
-    pubkey,
-    signature,
-  };
+  let signature: string;
+  try {
+    signature = await signEvent(event, pubkey, env.BOT_PRIVKEY!);
+    console.log(
+      `[publishEvent] signed ok, posting to ${env.API_WORKER_URL}/events`
+    );
+  } catch (err) {
+    console.error(`[publishEvent] signEvent failed:`, err);
+    throw err;
+  }
 
-  const res = await fetch(`${env.API_WORKER_URL}/events`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const body = { ...event, pubkey, signature };
+
+  let res: Response;
+  try {
+    // Use service binding when available (required for Worker-to-Worker calls);
+    // fall back to URL-based fetch for local dev
+    if (env.API_WORKER) {
+      res = await env.API_WORKER.fetch(
+        new Request('https://worker/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      );
+    } else {
+      res = await fetch(`${env.API_WORKER_URL}/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    }
+    console.log(`[publishEvent] API responded ${res.status}`);
+  } catch (err) {
+    console.error(`[publishEvent] fetch failed:`, err);
+    throw err;
+  }
 
   if (!res.ok) {
-    const err = (await res.json()) as { error?: string; message?: string };
-    throw new Error(err.message || err.error || `HTTP ${res.status}`);
+    const raw = await res.text();
+    let msg: string;
+    try {
+      const err = JSON.parse(raw) as { error?: string; message?: string };
+      msg = err.message || err.error || `HTTP ${res.status}`;
+    } catch {
+      msg = `HTTP ${res.status}: ${raw.slice(0, 200)}`;
+    }
+    console.error(`[publishEvent] API rejected "${event.title}": ${msg}`);
+    throw new Error(msg);
   }
 
   const result = (await res.json()) as { id: string };
+  console.log(`[publishEvent] published ok, id=${result.id}`);
   return result.id;
 }
 
@@ -720,6 +757,16 @@ export async function handleTelegram(
   } catch {
     return new Response('Invalid JSON', { status: 400 });
   }
+
+  console.log(
+    '[telegram] update type:',
+    update.message
+      ? 'message'
+      : update.callback_query
+        ? 'callback_query'
+        : 'other',
+    JSON.stringify(update).slice(0, 200)
+  );
 
   try {
     if (update.message) {

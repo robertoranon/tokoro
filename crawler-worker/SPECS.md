@@ -754,6 +754,8 @@ See `../crawler/SPECS.md` section 10 for detailed provider specifications.
 
 ### 10.1 Secrets (Set via `wrangler secret put`)
 
+**Core secrets:**
+
 | Secret             | Required | Description                                              |
 | ------------------ | -------- | -------------------------------------------------------- |
 | `CRAWLER_API_KEYS` | Yes      | Comma-separated list of allowed API keys                 |
@@ -762,7 +764,16 @@ See `../crawler/SPECS.md` section 10 for detailed provider specifications.
 | `LLM_MODEL`        | No       | Model identifier (default: provider-specific)            |
 | `JINA_API_KEY`     | No       | Jina AI Reader API key (optional, increases rate limits) |
 
-> **Note:** `CRAWLER_PRIVKEY` and `CRAWLER_PUBKEY` are no longer used by the crawler worker. Event signing is done client-side. Only the standalone Node.js crawler CLI (`crawler/`) still needs a keypair.
+**Telegram bot secrets (only required when using the `/telegram` endpoint):**
+
+| Secret                | Required | Description                                                  |
+| --------------------- | -------- | ------------------------------------------------------------ |
+| `TELEGRAM_BOT_TOKEN`  | Yes      | Bot token from @BotFather                                    |
+| `BOT_PRIVKEY`         | Yes      | Ed25519 private key hex — bot's signing identity             |
+| `BOT_PUBKEY`          | Yes      | Ed25519 public key hex — bot's Tokoro identity               |
+| `API_WORKER_URL`      | No       | API worker URL (fallback for local dev; production uses the service binding) |
+
+> **Note:** `CRAWLER_PRIVKEY` and `CRAWLER_PUBKEY` are no longer used by the crawler worker. Event signing is done client-side. The Telegram bot uses its own `BOT_PRIVKEY`/`BOT_PUBKEY` keypair. Only the standalone Node.js crawler CLI (`crawler/`) still needs a keypair.
 
 **Setting Secrets:**
 
@@ -781,11 +792,26 @@ wrangler secret put LLM_PROVIDER
 # Optional: Set Jina API key for higher rate limits
 wrangler secret put JINA_API_KEY
 # Enter: jina_...
+
+# Telegram bot (optional)
+wrangler secret put TELEGRAM_BOT_TOKEN
+wrangler secret put BOT_PRIVKEY
+wrangler secret put BOT_PUBKEY
 ```
 
 ### 10.2 Wrangler Configuration
 
-No `[vars]`, `[[services]]`, or `[[kv_namespaces]]` bindings are required. The crawler worker is self-contained — it does not connect to the API worker.
+The crawler worker requires a `[[services]]` binding to the API worker so the Telegram bot can publish events via direct Worker-to-Worker calls (the `workers.dev` URL cannot be used from within another Worker):
+
+```toml
+[[kv_namespaces]]
+binding = "PREVIEW_CACHE"
+id = "<your-kv-namespace-id>"
+
+[[services]]
+binding = "API_WORKER"
+service = "tokoro-worker"
+```
 
 Optional R2 bucket for log storage:
 

@@ -8,6 +8,9 @@ export interface Env {
   // KV Bindings
   PREVIEW_CACHE?: KVNamespace;
 
+  // Service Bindings
+  API_WORKER?: Fetcher;
+
   // Secrets (set via wrangler secret put)
   CRAWLER_API_KEYS: string;
   LLM_API_KEY?: string;
