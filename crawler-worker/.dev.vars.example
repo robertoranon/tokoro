@@ -29,3 +29,8 @@ LLM_API_KEY=your_llm_api_key_here
 # BOT_PRIVKEY=your_bot_ed25519_privkey_hex
 # BOT_PUBKEY=your_bot_ed25519_pubkey_hex
 # API_WORKER_URL=https://tokoro-worker.your-account.workers.dev
+
+# WhatsApp Bot (optional — only needed if using the /whatsapp endpoint)
+# WHATSAPP_TOKEN=your_meta_system_user_token
+# WHATSAPP_PHONE_ID=your_phone_number_id
+# WHATSAPP_VERIFY_TOKEN=any_secret_string_you_choose

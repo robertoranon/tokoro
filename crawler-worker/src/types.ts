@@ -23,6 +23,11 @@ export interface Env {
   BOT_PRIVKEY?: string; // Ed25519 private key, hex-encoded
   BOT_PUBKEY?: string; // Ed25519 public key, hex-encoded
   API_WORKER_URL?: string; // Base URL of Tokoro API worker (no trailing slash)
+
+  // WhatsApp bot secrets (optional — only needed when using /whatsapp endpoint)
+  WHATSAPP_TOKEN?: string; // Permanent system user token from Meta Business
+  WHATSAPP_PHONE_ID?: string; // Numeric phone number ID from Meta dashboard
+  WHATSAPP_VERIFY_TOKEN?: string; // Secret string used to verify the webhook with Meta
 }
 
 /**
