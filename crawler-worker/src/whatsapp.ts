@@ -99,7 +99,7 @@ class WhatsAppClient {
           type: 'button',
           body: { text: bodyText.slice(0, 1024) },
           action: {
-            buttons: buttons.map(b => ({
+            buttons: buttons.slice(0, 3).map(b => ({
               type: 'reply',
               reply: { id: b.id, title: b.title.slice(0, 20) },
             })),
@@ -121,9 +121,15 @@ class WhatsAppClient {
     const metaRes = await fetch(`${this.baseUrl}/${mediaId}`, {
       headers: this.authHeader(),
     });
+    if (!metaRes.ok) {
+      throw new Error(`Media metadata fetch failed: HTTP ${metaRes.status}`);
+    }
     const meta = (await metaRes.json()) as { url: string; mime_type?: string };
 
     const fileRes = await fetch(meta.url, { headers: this.authHeader() });
+    if (!fileRes.ok) {
+      throw new Error(`Media download failed: HTTP ${fileRes.status}`);
+    }
     const buffer = await fileRes.arrayBuffer();
 
     const uint8 = new Uint8Array(buffer);
@@ -475,7 +481,8 @@ export async function handleWhatsApp(
     !env.WHATSAPP_VERIFY_TOKEN ||
     !env.PREVIEW_CACHE ||
     !env.BOT_PRIVKEY ||
-    !env.BOT_PUBKEY
+    !env.BOT_PUBKEY ||
+    (!env.API_WORKER && !env.API_WORKER_URL)
   ) {
     console.error('WhatsApp bot: missing required configuration');
     return new Response('OK', { status: 200 });
@@ -488,6 +495,8 @@ export async function handleWhatsApp(
     return new Response('Invalid JSON', { status: 400 });
   }
 
+  // TODO: verify X-Hub-Signature-256 HMAC using the Meta app secret to prevent
+  // forged webhook calls. Requires adding a WHATSAPP_APP_SECRET env var.
   console.log(
     '[whatsapp] webhook received:',
     JSON.stringify(payload).slice(0, 200)
