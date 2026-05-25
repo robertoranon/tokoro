@@ -10,9 +10,7 @@ import { Env } from './types';
 import { PreparedEvent } from './event-types';
 import { WorkerCrawler } from './crawler-adapter';
 import {
-  signEvent,
   publishEvent,
-  KV_TTL_SECONDS,
   storePendingEvents,
   loadPendingEvents,
   deletePendingEvents,
