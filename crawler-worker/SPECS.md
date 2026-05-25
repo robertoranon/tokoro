@@ -352,6 +352,56 @@ console.log('BOT_PUBKEY=' + hex(pubkey));
 | `BOT_PUBKEY` | Yes | Ed25519 public key hex |
 | `API_WORKER_URL` | Yes | Base URL of Tokoro API worker |
 
+### 3.7 GET /whatsapp and POST /whatsapp (WhatsApp Bot Webhook)
+
+**Setup (one-time):**
+
+1. Create a Meta App (type: Business) at developers.facebook.com.
+2. Add the WhatsApp product and register a dedicated phone number.
+3. Generate a permanent system user token with `whatsapp_business_messaging` permission.
+4. Set secrets on the crawler-worker:
+   ```bash
+   wrangler secret put WHATSAPP_TOKEN       # Meta system user token
+   wrangler secret put WHATSAPP_PHONE_ID    # Numeric phone number ID from dashboard
+   wrangler secret put WHATSAPP_VERIFY_TOKEN # Any secret string you choose
+   wrangler secret put BOT_PRIVKEY          # Ed25519 private key (shared with Telegram bot)
+   wrangler secret put BOT_PUBKEY           # Ed25519 public key (shared with Telegram bot)
+   ```
+5. Deploy the crawler-worker.
+6. In the Meta dashboard, configure the webhook:
+   - URL: `https://{crawler-worker-host}/whatsapp`
+   - Verify token: your chosen `WHATSAPP_VERIFY_TOKEN` value
+   - Subscribed fields: `messages`
+
+**Supported message types:**
+
+| Input | Behaviour |
+|---|---|
+| Text containing a URL | Crawls in `discover` mode |
+| Image message | Downloads via Media API, crawls in `image` mode |
+| Interactive button press | Handles confirmation flow |
+| Anything else | Silently ignored |
+
+**Confirmation flow:**
+
+1. Bot sends a numbered event summary with two reply buttons: **Publish all** and **Choose one by one**.
+2. **Publish all**: signs and publishes all events immediately, then reports the tally.
+3. **Choose one by one**: sends each event as a detail card with **✅ Publish** / **❌ Skip** buttons; reports completion after the last event.
+
+Pending events are stored in `PREVIEW_CACHE` KV under key `wa:{senderPhone}:{uuid}` with a 30-minute TTL.
+
+**Bot identity:** all published events are attributed to `BOT_PUBKEY` — the same keypair used by the Telegram bot.
+
+**Environment variables:**
+
+| Variable | Required | Description |
+|---|---|---|
+| `WHATSAPP_TOKEN` | Yes | Permanent system user token from Meta Business |
+| `WHATSAPP_PHONE_ID` | Yes | Numeric phone number ID from the Meta dashboard |
+| `WHATSAPP_VERIFY_TOKEN` | Yes | Secret string used to verify webhook ownership with Meta |
+| `BOT_PRIVKEY` | Yes | Ed25519 private key hex (shared with Telegram bot) |
+| `BOT_PUBKEY` | Yes | Ed25519 public key hex (shared with Telegram bot) |
+
 ---
 
 ## 4. Crawler Modes

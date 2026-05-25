@@ -15,6 +15,7 @@ import { WorkerCrawler } from './crawler-adapter';
 import { createLLMProvider } from '../../shared/llm/factory';
 import { EventExtractor } from './event-extractor';
 import { handleTelegram } from './telegram';
+import { handleWhatsAppVerification, handleWhatsApp } from './whatsapp';
 import type {
   Env,
   CrawlRequest,
@@ -77,6 +78,14 @@ export default {
               description:
                 'Telegram webhook endpoint. Register via setWebhook with your bot token.',
             },
+            'GET /whatsapp': {
+              description:
+                'WhatsApp webhook verification endpoint (used once during Meta dashboard setup).',
+            },
+            'POST /whatsapp': {
+              description:
+                'WhatsApp bot webhook. Register in the Meta developer dashboard after deploying.',
+            },
           },
         });
       }
@@ -100,6 +109,14 @@ export default {
 
       if (request.method === 'POST' && path === '/telegram') {
         return await handleTelegram(request, env);
+      }
+
+      if (request.method === 'GET' && path === '/whatsapp') {
+        return handleWhatsAppVerification(request, env);
+      }
+
+      if (request.method === 'POST' && path === '/whatsapp') {
+        return await handleWhatsApp(request, env);
       }
 
       return jsonResponse({ error: 'Not found' }, 404);
