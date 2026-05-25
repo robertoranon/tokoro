@@ -192,6 +192,12 @@ GET /
     },
     "POST /telegram": {
       "description": "Telegram bot webhook. Register with Telegram via setWebhook after deploying."
+    },
+    "GET /whatsapp": {
+      "description": "WhatsApp webhook verification endpoint (used once during Meta dashboard setup)."
+    },
+    "POST /whatsapp": {
+      "description": "WhatsApp bot webhook. Register in the Meta developer dashboard after deploying."
     }
   }
 }
@@ -401,6 +407,7 @@ Pending events are stored in `PREVIEW_CACHE` KV under key `wa:{senderPhone}:{uui
 | `WHATSAPP_VERIFY_TOKEN` | Yes | Secret string used to verify webhook ownership with Meta |
 | `BOT_PRIVKEY` | Yes | Ed25519 private key hex (shared with Telegram bot) |
 | `BOT_PUBKEY` | Yes | Ed25519 public key hex (shared with Telegram bot) |
+| `API_WORKER_URL` | Yes* | Base URL of the Tokoro API worker (not needed if `API_WORKER` service binding is configured) |
 
 ---
 
@@ -822,6 +829,14 @@ See `../crawler/SPECS.md` section 10 for detailed provider specifications.
 | `BOT_PRIVKEY`         | Yes      | Ed25519 private key hex — bot's signing identity             |
 | `BOT_PUBKEY`          | Yes      | Ed25519 public key hex — bot's Tokoro identity               |
 | `API_WORKER_URL`      | No       | API worker URL (fallback for local dev; production uses the service binding) |
+
+**WhatsApp bot secrets (only required when using the `/whatsapp` endpoint):**
+
+| Variable | Required | Description |
+|---|---|---|
+| `WHATSAPP_TOKEN` | Yes | Permanent system user token from Meta Business (`whatsapp_business_messaging` permission) |
+| `WHATSAPP_PHONE_ID` | Yes | Numeric phone number ID from the Meta dashboard |
+| `WHATSAPP_VERIFY_TOKEN` | Yes | Secret string you choose; Meta sends it back to verify webhook ownership |
 
 > **Note:** `CRAWLER_PRIVKEY` and `CRAWLER_PUBKEY` are no longer used by the crawler worker. Event signing is done client-side. The Telegram bot uses its own `BOT_PRIVKEY`/`BOT_PUBKEY` keypair. Only the standalone Node.js crawler CLI (`crawler/`) still needs a keypair.
 
