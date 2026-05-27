@@ -56,7 +56,7 @@ Events are queryable through a simple API. Point it at a location, a radius, and
 | [**Chrome Extension**](chrome-extension/) | One-click crawl from the browser toolbar or right-click menu                      |
 | [**Apple Shortcut**](public-web/)         | iOS Share Sheet integration — extract and publish events from Safari on iPhone    |
 | [**Bookmarklet**](public-web/)            | Same capability in any browser, no extension install needed                       |
-| [**Telegram Bot**](crawler-worker/)       | Send a URL or image to a Telegram bot — it crawls, extracts, and lets you publish with one tap |
+| [**Telegram Bot**](crawler-worker/)       | Send a URL or image to extract and publish events; query the calendar with `/events in Milan next weekend` |
 | [**Web Publisher**](web-publisher/)       | Static HTML form for manually composing and publishing events                     |
 | [**Public Web**](public-web/)             | Example event browser — query by location, date, category; embeds the bookmarklet |
 | [**Admin Panel**](admin/)                 | Static HTML moderation UI — browse and delete events with admin key auth          |

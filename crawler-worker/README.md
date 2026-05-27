@@ -9,6 +9,7 @@ A Cloudflare Worker that extracts structured event data from URLs and images, re
   - `direct`: Extract events directly from the provided URL
   - `discover`: Find individual event pages and extract from each
   - `image`: Extract events from an image (e.g. a poster or flyer)
+- **Telegram Bot**: dual-purpose bot — crawl & publish URLs/images, or query the event calendar in natural language (`/events in Milan next weekend`)
 - **Worker-native**: Runs on Cloudflare's edge network (zero infrastructure)
 - **Hybrid Event Extraction**: Two-stage extraction process (JSON-LD + LLM)
 - **Geocoding**: Automatically resolves addresses to coordinates
@@ -433,14 +434,15 @@ Telegram bot webhook. Accepts URL messages and image messages, crawls them via t
 
 **This endpoint is not called directly** — it receives webhook updates sent by Telegram after you register it with `setWebhook`.
 
-**Supported message types:**
+The bot has two distinct capabilities:
+
+#### Crawl & publish (URL or image)
 
 | Input | Behaviour |
 |---|---|
 | Text message containing a URL | Crawls in `discover` mode |
 | Photo message | Downloads largest size, crawls in `image` mode |
 | Image document | Same as photo |
-| Anything else | Replies with usage hint |
 
 **Confirmation flow:**
 
@@ -448,9 +450,27 @@ Telegram bot webhook. Accepts URL messages and image messages, crawls them via t
 2. **Publish all**: signs and publishes every event immediately, then updates the message with a tally.
 3. **Choose one by one**: sends each event as a detail card with **✅ Publish** / **❌ Skip** buttons, then sends a completion message.
 
+#### Event discovery (`/events`)
+
+Query the Tokoro calendar in natural language:
+
+| Context | Trigger |
+|---|---|
+| DM | `/events <query>` |
+| Group chat | `@botname events <query>` |
+
+Example queries:
+```
+/events in Milan next weekend
+/events a Udine questo weekend, raggio 50km
+/events near Berlin, music, radius 100km
+```
+
+The bot parses the query with the LLM, geocodes the location, queries the API, and returns the top 5 results with inline filter buttons (by category, by day) and pagination. Responses are returned in the language of the query (en, it, fr, de, es, pt).
+
 **Setup (one-time):**
 
-1. Create a bot via Telegram @BotFather and copy the token.
+1. Create a bot via Telegram @BotFather and copy the token. To use the bot in group chats, disable Group Privacy in @BotFather settings (`/setprivacy → Disable`).
 
 2. Generate a keypair for the bot (run from this directory):
 
@@ -471,6 +491,7 @@ Telegram bot webhook. Accepts URL messages and image messages, crawls them via t
    wrangler secret put TELEGRAM_BOT_TOKEN
    wrangler secret put BOT_PRIVKEY
    wrangler secret put BOT_PUBKEY
+   wrangler secret put TELEGRAM_BOT_USERNAME   # bot username without @, needed for group queries
    ```
 
 4. Add the Service Binding to `wrangler.toml` (required — Workers cannot call other Workers via `workers.dev` URLs):
