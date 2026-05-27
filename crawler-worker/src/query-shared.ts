@@ -352,7 +352,8 @@ export async function fetchEvents(
   }
 
   if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return (await res.json()) as ApiEvent[];
+  const data = (await res.json()) as { events: ApiEvent[] } | ApiEvent[];
+  return Array.isArray(data) ? data : (data.events ?? []);
 }
 
 // ---------------------------------------------------------------------------
