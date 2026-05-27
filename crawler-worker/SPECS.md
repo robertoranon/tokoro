@@ -411,6 +411,67 @@ Pending events are stored in `PREVIEW_CACHE` KV under key `wa:{senderPhone}:{uui
 
 ---
 
+### 3.8 Event Discovery via Telegram Bot (`/events`)
+
+Users query the event database in natural language via the Telegram bot.
+
+**Triggers:**
+
+| Context | Trigger |
+|---|---|
+| DM (private chat) | `/events <query>` or `/events@botusername <query>` |
+| Group chat | `@botusername events <query>` |
+| DM with no query text | Returns usage hint |
+
+**Query parsing:**
+
+The bot calls the configured LLM to extract structured parameters from the natural language query text. The LLM also detects the query language (BCP 47) so all bot responses are returned in that language (six languages covered: en, it, fr, de, es, pt).
+
+Extracted parameters:
+
+| Field | Default |
+|---|---|
+| location | required — geocoded via Nominatim |
+| date_from | now |
+| date_to | end of next Sunday (23:59:59) |
+| radius_km | 20 |
+| category | null |
+| tags | [] |
+
+**Response:** Top 5 events from the `/events` API query, with an inline keyboard:
+- Category filter buttons (up to 3 most frequent categories in results)
+- Day filter buttons (📅 Sat / 📅 Sun) when results span a weekend
+- ▼ Show more button when total results > 5
+
+Pagination and filter state are stored in `PREVIEW_CACHE` KV under `tq:{8-char-id}` (30-min TTL). Callback data format:
+- `qm:{offset}:tq:{id}` — show more
+- `qfc:{category}:tq:{id}` — category filter
+- `qfd:{sat|sun}:tq:{id}` — day filter
+
+**Required env vars (in addition to existing Telegram bot vars):**
+
+| Var | Required | Notes |
+|---|---|---|
+| `TELEGRAM_BOT_USERNAME` | For group queries | Bot username without `@` |
+| `LLM_API_KEY` | Yes | For NL query parsing |
+| `LLM_PROVIDER` | Yes | e.g. `openrouter` |
+| `LLM_MODEL` | No | Uses provider default |
+
+**Error handling:**
+
+| Situation | Response |
+|---|---|
+| Empty query | Usage hint with example |
+| LLM parsing fails | Usage hint |
+| Location not found | Geocoding error message |
+| No events found | No-results message |
+| API worker error | Generic error message |
+| Expired KV key (button press) | Query-expired message |
+
+All error messages are returned in the detected language where a translation is available, otherwise English.
+
+---
+
 ## 4. Crawler Modes
 
 ### 4.1 Direct Mode (`mode: "direct"`)
