@@ -20,6 +20,7 @@ export interface Env {
 
   // Telegram bot secrets
   TELEGRAM_BOT_TOKEN?: string;
+  TELEGRAM_BOT_USERNAME?: string; // bot username without @, required for group chat queries
   BOT_PRIVKEY?: string; // Ed25519 private key, hex-encoded
   BOT_PUBKEY?: string; // Ed25519 public key, hex-encoded
   API_WORKER_URL?: string; // Base URL of Tokoro API worker (no trailing slash)
