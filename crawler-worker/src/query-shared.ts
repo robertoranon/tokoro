@@ -233,12 +233,6 @@ export async function parseEventQuery(
   env: Env,
   now: Date
 ): Promise<ParseQueryResult> {
-  const llm = createLLMProvider({
-    provider: env.LLM_PROVIDER,
-    apiKey: env.LLM_API_KEY!,
-    model: env.LLM_MODEL,
-  });
-
   const DAYS = [
     'Sunday',
     'Monday',
@@ -272,6 +266,11 @@ Valid categories: music, arts, sports, food, community, education, tech, other`;
 
   let raw: RawLLMQuery;
   try {
+    const llm = createLLMProvider({
+      provider: env.LLM_PROVIDER,
+      apiKey: env.LLM_API_KEY!,
+      model: env.LLM_MODEL,
+    });
     const resp = await llm.complete(
       [
         { role: 'system', content: systemPrompt },
@@ -280,7 +279,8 @@ Valid categories: music, arts, sports, food, community, education, tech, other`;
       { temperature: 0, maxTokens: 300, responseFormat: 'json' }
     );
     raw = JSON.parse(resp.content) as RawLLMQuery;
-  } catch {
+  } catch (err) {
+    console.error('[parseEventQuery] LLM/parse error:', err);
     return { ok: false, error: 'parse_failed', language: 'en' };
   }
 

@@ -367,7 +367,15 @@ async function handleEventsQuery(
     return;
   }
 
-  const kvKey = await storeQuery(env.PREVIEW_CACHE!, query);
+  let kvKey: string;
+  try {
+    kvKey = await storeQuery(env.PREVIEW_CACHE!, query);
+  } catch (err) {
+    console.error('[handleEventsQuery] storeQuery failed:', err);
+    await tg.sendMessage(chatId, t(query.language, 'api_error'));
+    return;
+  }
+
   const { text, keyboard } = formatResults(allEvents, query, 0, kvKey);
   await tg.sendMessage(chatId, text, keyboard);
 }
