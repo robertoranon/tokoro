@@ -15,6 +15,16 @@ import {
   loadPendingEvents,
   deletePendingEvents,
 } from './bot-shared';
+import {
+  parseEventQuery,
+  fetchEvents,
+  formatResults,
+  storeQuery,
+  loadQuery,
+  t,
+  type ParsedQuery,
+  type ApiEvent,
+} from './query-shared';
 
 // ---------------------------------------------------------------------------
 // Telegram API types (subset used by this bot)
@@ -26,12 +36,19 @@ interface TelegramUpdate {
   callback_query?: TelegramCallbackQuery;
 }
 
+interface TelegramMessageEntity {
+  type: string;
+  offset: number;
+  length: number;
+}
+
 interface TelegramMessage {
   message_id: number;
   chat: { id: number; type: 'private' | 'group' | 'supergroup' | 'channel' };
   text?: string;
   photo?: TelegramPhotoSize[];
   document?: { file_id: string; mime_type?: string };
+  entities?: TelegramMessageEntity[];
 }
 
 interface TelegramPhotoSize {
@@ -103,7 +120,10 @@ function buildKvKey(chatId: number, messageId: number): string {
 type CallbackData =
   | { type: 'pub_all'; kvKey: string }
   | { type: 'choose'; kvKey: string }
-  | { type: 'event'; kvKey: string; index: number; action: 'publish' | 'skip' };
+  | { type: 'event'; kvKey: string; index: number; action: 'publish' | 'skip' }
+  | { type: 'qm'; offset: number; kvKey: string }
+  | { type: 'qfc'; category: string; kvKey: string }
+  | { type: 'qfd'; day: 'sat' | 'sun'; kvKey: string };
 
 function encodeCallback(data: CallbackData): string {
   switch (data.type) {
@@ -113,6 +133,12 @@ function encodeCallback(data: CallbackData): string {
       return `choose:${data.kvKey}`;
     case 'event':
       return `event:${data.kvKey}:${data.index}:${data.action}`;
+    case 'qm':
+      return `qm:${data.offset}:${data.kvKey}`;
+    case 'qfc':
+      return `qfc:${data.category}:${data.kvKey}`;
+    case 'qfd':
+      return `qfd:${data.day}:${data.kvKey}`;
   }
 }
 
@@ -135,6 +161,32 @@ function parseCallback(raw: string): CallbackData | null {
     if (isNaN(index) || (action !== 'publish' && action !== 'skip'))
       return null;
     return { type: 'event', kvKey, index, action };
+  }
+  // qm:{offset}:tq:{8-char-id}
+  if (raw.startsWith('qm:')) {
+    const parts = raw.split(':');
+    if (parts.length < 4) return null;
+    const offset = parseInt(parts[1], 10);
+    if (isNaN(offset)) return null;
+    return { type: 'qm', offset, kvKey: `${parts[2]}:${parts[3]}` };
+  }
+  // qfc:{category}:tq:{8-char-id}
+  if (raw.startsWith('qfc:')) {
+    const parts = raw.split(':');
+    if (parts.length < 4) return null;
+    return {
+      type: 'qfc',
+      category: parts[1],
+      kvKey: `${parts[2]}:${parts[3]}`,
+    };
+  }
+  // qfd:{sat|sun}:tq:{8-char-id}
+  if (raw.startsWith('qfd:')) {
+    const parts = raw.split(':');
+    if (parts.length < 4) return null;
+    const day = parts[1];
+    if (day !== 'sat' && day !== 'sun') return null;
+    return { type: 'qfd', day, kvKey: `${parts[2]}:${parts[3]}` };
   }
   return null;
 }
@@ -275,6 +327,92 @@ async function sendEventSummary(
 // Message handlers
 // ---------------------------------------------------------------------------
 
+async function handleEventsQuery(
+  chatId: number,
+  queryText: string,
+  env: Env,
+  tg: TelegramClient
+): Promise<void> {
+  if (!queryText.trim()) {
+    await tg.sendMessage(chatId, t('en', 'usage_hint'));
+    return;
+  }
+
+  const result = await parseEventQuery(queryText, env, new Date());
+
+  if (!result.ok) {
+    const msg =
+      result.error === 'geocode_failed'
+        ? t(result.language, 'geocode_error')
+        : t('en', 'usage_hint');
+    await tg.sendMessage(chatId, msg);
+    return;
+  }
+
+  const { query } = result;
+
+  let allEvents: ApiEvent[];
+  try {
+    allEvents = await fetchEvents(query, env);
+  } catch {
+    await tg.sendMessage(chatId, t(query.language, 'api_error'));
+    return;
+  }
+
+  if (allEvents.length === 0) {
+    await tg.sendMessage(
+      chatId,
+      t(query.language, 'no_events', { location: query.locationName })
+    );
+    return;
+  }
+
+  const kvKey = await storeQuery(env.PREVIEW_CACHE!, query);
+  const { text, keyboard } = formatResults(allEvents, query, 0, kvKey);
+  await tg.sendMessage(chatId, text, keyboard);
+}
+
+async function handleQueryCallback(
+  chatId: number,
+  messageId: number,
+  callbackId: string,
+  parsed: Extract<CallbackData, { type: 'qm' | 'qfc' | 'qfd' }>,
+  env: Env,
+  tg: TelegramClient
+): Promise<void> {
+  await tg.answerCallback(callbackId);
+
+  const baseQuery = await loadQuery(env.PREVIEW_CACHE!, parsed.kvKey);
+  if (!baseQuery) {
+    await tg.sendMessage(chatId, t('en', 'query_expired'));
+    return;
+  }
+
+  let allEvents: ApiEvent[];
+  try {
+    allEvents = await fetchEvents(baseQuery, env);
+  } catch {
+    await tg.sendMessage(chatId, t(baseQuery.language, 'api_error'));
+    return;
+  }
+
+  let query: ParsedQuery;
+  let offset = 0;
+
+  if (parsed.type === 'qm') {
+    query = baseQuery;
+    offset = parsed.offset;
+  } else if (parsed.type === 'qfc') {
+    query = { ...baseQuery, category: parsed.category, dayFilter: undefined };
+  } else {
+    query = { ...baseQuery, dayFilter: parsed.day, category: undefined };
+  }
+
+  const kvKey = await storeQuery(env.PREVIEW_CACHE!, query);
+  const { text, keyboard } = formatResults(allEvents, query, offset, kvKey);
+  await tg.editMessage(chatId, messageId, text, keyboard);
+}
+
 async function handleUrl(
   chatId: number,
   url: string,
@@ -371,7 +509,35 @@ async function handleMessage(
     }
   }
 
-  // In group chats, silently ignore messages that aren't URLs or images
+  // /events command in private chat
+  if (
+    message.chat.type === 'private' &&
+    message.text?.match(/^\/events(@\S+)?\s*/i)
+  ) {
+    const queryText = message.text.replace(/^\/events(@\S+)?\s*/i, '').trim();
+    await handleEventsQuery(chatId, queryText, env, tg);
+    return;
+  }
+
+  // @mention events trigger in group/supergroup chats
+  if (
+    (message.chat.type === 'group' || message.chat.type === 'supergroup') &&
+    message.text &&
+    env.TELEGRAM_BOT_USERNAME
+  ) {
+    const mentionRe = new RegExp(
+      `^@${env.TELEGRAM_BOT_USERNAME}\\s+events\\s*`,
+      'i'
+    );
+    if (mentionRe.test(message.text)) {
+      const queryText = message.text.replace(mentionRe, '').trim();
+      await handleEventsQuery(chatId, queryText, env, tg);
+      return;
+    }
+    return;
+  }
+
+  // In non-private chats without a matching trigger, stay silent
   if (message.chat.type !== 'private') return;
 
   await tg.sendMessage(
@@ -565,6 +731,11 @@ async function handleCallbackQuery(
         env,
         tg
       );
+      break;
+    case 'qm':
+    case 'qfc':
+    case 'qfd':
+      await handleQueryCallback(chatId, messageId, query.id, parsed, env, tg);
       break;
   }
 }
