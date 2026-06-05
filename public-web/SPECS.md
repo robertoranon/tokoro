@@ -205,7 +205,7 @@ A full-viewport map-first page for discovering events spatially.
 
 **FR-6.5: Shareable URL**
 
-- MUST serialise `lat`, `lng`, `radius`, `from`, `to`, `category`, `q` to URL query parameters via `history.replaceState` after each search
+- MUST serialise `lat`, `lng`, `radius`, `from`, `to`, `category` to URL query parameters via `history.replaceState` after each search
 - On load, MUST read these parameters and auto-run the query if `lat`/`lng` are present
 
 **FR-6.6: Navigation**
