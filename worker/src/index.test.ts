@@ -9,6 +9,7 @@ import {
   isMidnightSentinel,
   dedupSqlWindow,
   passesTimeFilter,
+  buildTextFilter,
 } from './index';
 import { isDuplicate } from '../../shared/llm/duplicate-check';
 import { encode as geohashEncode, neighbors } from './geohash';
@@ -532,5 +533,32 @@ describe('passesTimeFilter', () => {
     expect(passesTimeFilter('2026-05-17T22:00:00', '2026-05-17T23:01:00')).toBe(
       false
     );
+  });
+});
+
+describe('buildTextFilter', () => {
+  it('returns empty sql and params when q is empty', () => {
+    expect(buildTextFilter('')).toEqual({ sql: '', params: [] });
+  });
+
+  it('returns empty sql and params when q is whitespace', () => {
+    expect(buildTextFilter('  ')).toEqual({ sql: '', params: [] });
+  });
+
+  it('returns LIKE clause and three %q% params when q is non-empty', () => {
+    const result = buildTextFilter('jazz');
+    expect(result.sql).toBe(
+      ' AND (title LIKE ? OR description LIKE ? OR tags LIKE ?)'
+    );
+    expect(result.params).toEqual(['%jazz%', '%jazz%', '%jazz%']);
+  });
+
+  it('preserves internal spaces in q', () => {
+    const result = buildTextFilter('outdoor market');
+    expect(result.params).toEqual([
+      '%outdoor market%',
+      '%outdoor market%',
+      '%outdoor market%',
+    ]);
   });
 });

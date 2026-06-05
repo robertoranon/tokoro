@@ -267,6 +267,15 @@ function formatLocalDateTime(date: Date): string {
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
 }
 
+export function buildTextFilter(q: string): { sql: string; params: string[] } {
+  const trimmed = q.trim();
+  if (!trimmed) return { sql: '', params: [] };
+  return {
+    sql: ' AND (title LIKE ? OR description LIKE ? OR tags LIKE ?)',
+    params: [`%${trimmed}%`, `%${trimmed}%`, `%${trimmed}%`],
+  };
+}
+
 export function makeBackupKey(date: Date): string {
   const yyyy = date.getUTCFullYear();
   const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -510,6 +519,8 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
     ? festivalUrl.replace(/\/$/, '')
     : '';
   const pubkeyFilter = url.searchParams.get('pubkey') || '';
+  const q = url.searchParams.get('q') || '';
+  const textFilter = buildTextFilter(q);
 
   const hasGeo = !isNaN(lat) && !isNaN(lng);
 
@@ -533,6 +544,10 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
       allParams.push(category);
     }
 
+    if (textFilter.sql) {
+      allQuery += textFilter.sql;
+      allParams.push(...textFilter.params);
+    }
     allQuery += ' ORDER BY start_time ASC LIMIT 100 OFFSET ?';
     allParams.push(offset);
 
@@ -570,6 +585,10 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
       pubkeyParams.push(category);
     }
 
+    if (textFilter.sql) {
+      pubkeyQuery += textFilter.sql;
+      pubkeyParams.push(...textFilter.params);
+    }
     pubkeyQuery += ' ORDER BY start_time ASC LIMIT 100';
 
     const pubkeyResult = await env.DB.prepare(pubkeyQuery)
@@ -671,6 +690,10 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
     params.push(pubkeyFilter);
   }
 
+  if (textFilter.sql) {
+    query += textFilter.sql;
+    params.push(...textFilter.params);
+  }
   query += ' ORDER BY start_time ASC LIMIT 100';
 
   const result = await env.DB.prepare(query)
