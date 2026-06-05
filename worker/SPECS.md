@@ -558,6 +558,7 @@ GET /events?lat=45.464&lng=9.189&radius=10&from=2026-03-06T00:00:00&to=2026-03-1
 | `to`           | No       | string | now + 7 days         | ISO 8601 end time                    |
 | `category`     | No       | string | —                    | Filter by category                   |
 | `festival_url` | No       | string | —                    | Filter by festival (returns all events linked to this festival URL) |
+| `q`            | No       | string | —                    | Keyword; filters to events whose title, description, or tags contain the value (case-insensitive substring match); absent or empty means no text filter |
 | `pubkey`       | No       | string | —                    | Filter by author public key (64 hex chars) |
 | `format`       | No       | string | —                    | `ical` to return iCal feed instead of JSON |
 | `window`       | No       | string | —                    | Rolling time window, e.g. `30d`, `7d`; sets `from=now`, `to=now+window`; overrides `from`/`to` when both present; defaults to `30d` when `format=ical` |
