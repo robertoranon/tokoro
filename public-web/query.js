@@ -158,11 +158,14 @@ async function listEvents() {
 
     let url = `${API_URL}/events?lat=${lat}&lng=${lng}&radius=${radius}&from=${fromTime}&to=${toTime}`;
     if (category) url += `&category=${category}`;
+    const kwEl = document.getElementById('queryKeyword');
+    const q = kwEl ? kwEl.value.trim() : '';
+    if (q) url += `&q=${encodeURIComponent(q)}`;
 
     const response = await fetch(url);
     const data = await response.json();
     feedback.innerHTML = '';
-    _loadedMeta = { lat, lng, radius, category, fromTime, toTime, preset };
+    _loadedMeta = { lat, lng, radius, category, q, fromTime, toTime, preset };
 
     if (data.events && data.events.length > 0) {
       _loadedEvents = data.events;
@@ -575,6 +578,7 @@ function buildShareUrl() {
   params.set('lng', _loadedMeta.lng);
   params.set('radius', _loadedMeta.radius);
   if (_loadedMeta.category) params.set('category', _loadedMeta.category);
+  if (_loadedMeta.q) params.set('q', _loadedMeta.q);
   if (_loadedMeta.preset && _loadedMeta.preset !== 'custom') {
     params.set('days', _loadedMeta.preset);
   } else {
@@ -676,6 +680,10 @@ async function copyAsText() {
     document.getElementById('queryRadius').value = params.get('radius');
   if (params.has('category'))
     document.getElementById('queryCategory').value = params.get('category');
+  if (params.has('q')) {
+    const kw = document.getElementById('queryKeyword');
+    if (kw) kw.value = params.get('q');
+  }
   if (params.has('days')) {
     document.getElementById('timeRangePreset').value = params.get('days');
   } else if (params.has('from') && params.has('to')) {
