@@ -27,6 +27,12 @@ jobs:
     mode: direct
     fetcher: playwright
 
+  - name: "La prima estate festival"
+    urls:
+      - https://laprimaestate.it/
+    mode: discover
+    fetcher: playwright
+
 
 
     
