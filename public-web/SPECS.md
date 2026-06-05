@@ -15,6 +15,7 @@ A static single-page application for querying and browsing Tokoro events. No bui
 **FR-1.2: Query Parameters**
 
 - MUST support filtering by: radius (km), category, time range (from/to)
+- MUST support filtering by keyword (`q`): matches events whose title, description, or tags contain the value as a substring; empty value disables the filter
 - MUST default to a configurable location and 100 km radius
 - MUST provide preset time-range shortcuts (today, next 7 days, next 30 days, etc.)
 
@@ -204,7 +205,7 @@ A full-viewport map-first page for discovering events spatially.
 
 **FR-6.5: Shareable URL**
 
-- MUST serialise `lat`, `lng`, `radius`, `from`, `to`, `category` to URL query parameters via `history.replaceState` after each search
+- MUST serialise `lat`, `lng`, `radius`, `from`, `to`, `category`, `q` to URL query parameters via `history.replaceState` after each search
 - On load, MUST read these parameters and auto-run the query if `lat`/`lng` are present
 
 **FR-6.6: Navigation**
