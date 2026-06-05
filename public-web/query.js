@@ -629,7 +629,7 @@ async function shareUrl() {
 
 async function copyAsText() {
   if (!_loadedEvents.length) return;
-  const { radius, category, fromTime, toTime } = _loadedMeta;
+  const { radius, category, q, fromTime, toTime } = _loadedMeta;
   const fmt = t =>
     new Date(t).toLocaleDateString(LANG.locale, {
       day: 'numeric',
@@ -640,6 +640,7 @@ async function copyAsText() {
   let text = LANG.copyTextTitle(_loadedEvents.length) + '\n';
   text += `${fmt(fromTime)} – ${fmt(toTime)} · ${LANG.within} ${radius} km`;
   if (category) text += ` · ${category}`;
+  if (q) text += ` · "${q}"`;
   text += `\n\n${sep}\n\n`;
   _loadedEvents.forEach(e => {
     text += `${e.title.toUpperCase()}\n`;
