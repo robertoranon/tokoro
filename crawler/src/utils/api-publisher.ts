@@ -2,6 +2,14 @@ import { NormalizedEvent } from '../types/event.js';
 import { isDuplicate } from '../../../shared/llm/duplicate-check.js';
 import type { LLMProvider } from '../../../shared/types/llm.js';
 
+export type PublishOutcome = 'published' | 'duplicate' | 'failed';
+
+export interface PublishResult {
+  published: number;
+  duplicate: number;
+  failed: number;
+}
+
 export class APIPublisher {
   constructor(
     private apiUrl: string,
@@ -33,7 +41,7 @@ export class APIPublisher {
     }
   }
 
-  async publishEvent(event: NormalizedEvent): Promise<boolean> {
+  async publishEvent(event: NormalizedEvent): Promise<PublishOutcome> {
     // Debug mode: output to console only, skip API call
     if (this.debug) {
       console.log('\n' + '='.repeat(80));
@@ -41,7 +49,7 @@ export class APIPublisher {
       console.log('='.repeat(80));
       console.log(JSON.stringify(event, null, 2));
       console.log('='.repeat(80) + '\n');
-      return true;
+      return 'published';
     }
 
     // Pre-publish duplicate check (skipped in debug mode and when no LLM configured)
@@ -61,7 +69,7 @@ export class APIPublisher {
           console.log(
             `⊘ Skipped duplicate (pre-check): ${event.title} (existing: ${candidate.id})`
           );
-          return true;
+          return 'duplicate';
         }
       }
     }
@@ -81,35 +89,32 @@ export class APIPublisher {
       if (!response.ok) {
         const error = await response.json();
 
-        // Handle duplicate events (409 Conflict) as a success case
         if (response.status === 409) {
           console.log(
             `⊘ Skipped duplicate: ${event.title} (already exists as ${error.existing_event_id})`
           );
-          return true; // Count as success - event already exists
+          return 'duplicate';
         }
 
         console.error(`API error (${response.status}):`, error);
-        return false;
+        return 'failed';
       }
 
       const result = (await response.json()) as { id: string };
       console.log(`✓ Published: ${event.title} (ID: ${result.id})`);
-      return true;
+      return 'published';
     } catch (error) {
       console.error('Failed to publish event:', error);
-      return false;
+      return 'failed';
     }
   }
 
-  async publishMultiple(events: NormalizedEvent[]): Promise<number> {
-    let successCount = 0;
+  async publishMultiple(events: NormalizedEvent[]): Promise<PublishResult> {
+    const result: PublishResult = { published: 0, duplicate: 0, failed: 0 };
 
     for (const event of events) {
-      const success = await this.publishEvent(event);
-      if (success) {
-        successCount++;
-      }
+      const outcome = await this.publishEvent(event);
+      result[outcome]++;
 
       // Rate limiting: wait a bit between requests (skip in debug mode)
       if (!this.debug) {
@@ -119,13 +124,13 @@ export class APIPublisher {
 
     if (this.debug) {
       console.log(
-        `\n[DEBUG] Extracted ${successCount}/${events.length} events successfully (not published to API)`
+        `\n[DEBUG] Extracted ${result.published}/${events.length} events successfully (not published to API)`
       );
     } else {
       console.log(
-        `\nPublished ${successCount}/${events.length} events successfully`
+        `\nPublished ${result.published}/${events.length} events (${result.duplicate} duplicates skipped, ${result.failed} failed)`
       );
     }
-    return successCount;
+    return result;
   }
 }

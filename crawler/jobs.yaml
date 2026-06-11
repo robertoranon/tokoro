@@ -1,6 +1,6 @@
 # Cron schedule — paste this into your system crontab:
 # 0 9 * * *  cd /path/to/tokoro/crawler && npm run crawl-jobs
-cron: "0 9 * * *"
+cron: "0 10 * * 1"
 
 jobs:
   - name: "Eventi Le Serre: "

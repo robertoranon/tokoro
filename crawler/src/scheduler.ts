@@ -8,6 +8,7 @@ import {
   FetcherType,
   BrowserEngine,
   PdfParserType,
+  CrawlResult,
 } from './crawler.js';
 import { loadEnv, loadCrawlerEnv, buildLLM } from './setup.js';
 
@@ -93,7 +94,23 @@ export function parseJobsConfig(content: string): SchedulerConfig {
   return cfg as unknown as SchedulerConfig;
 }
 
+interface JobRunRecord {
+  name: string;
+  status: 'ok' | 'failed';
+  published: number;
+  duplicate: number;
+  failed: number;
+}
+
+async function appendRunLog(logsDir: string, record: object): Promise<void> {
+  await fs.mkdir(logsDir, { recursive: true });
+  const logPath = path.join(logsDir, 'runs.jsonl');
+  await fs.appendFile(logPath, JSON.stringify(record) + '\n', 'utf-8');
+}
+
 async function main() {
+  const startedAt = new Date();
+
   await loadEnv();
 
   let jobsFile = path.join(process.cwd(), 'jobs.yaml');
@@ -120,6 +137,8 @@ async function main() {
 
   let succeeded = 0;
   let failed = 0;
+  const jobRecords: JobRunRecord[] = [];
+  const totals: CrawlResult = { published: 0, duplicate: 0, failed: 0 };
 
   const defaultBrowserEngine =
     (process.env.BROWSER_ENGINE as BrowserEngine) || 'chrome';
@@ -128,6 +147,9 @@ async function main() {
     const job = jobs[i];
     const label = job.name ? `"${job.name}"` : `job ${i + 1}`;
     console.log(`\n[${i + 1}/${jobs.length}] Running ${label}`);
+
+    let jobResult: CrawlResult = { published: 0, duplicate: 0, failed: 0 };
+    let jobStatus: 'ok' | 'failed' = 'ok';
 
     try {
       const llm = buildLLM(job.model);
@@ -149,17 +171,57 @@ async function main() {
         pdfParser: job.pdf_parser,
       });
 
-      await crawler.crawl(job.urls);
+      jobResult = await crawler.crawl(job.urls);
       succeeded++;
     } catch (error) {
       console.error(
         `  Error: ${error instanceof Error ? error.message : error}`
       );
       failed++;
+      jobStatus = 'failed';
     }
+
+    jobRecords.push({
+      name: job.name ?? `job ${i + 1}`,
+      status: jobStatus,
+      published: jobResult.published,
+      duplicate: jobResult.duplicate,
+      failed: jobResult.failed,
+    });
+    totals.published += jobResult.published;
+    totals.duplicate += jobResult.duplicate;
+    totals.failed += jobResult.failed;
   }
 
+  const finishedAt = new Date();
+  const durationS =
+    Math.round(((finishedAt.getTime() - startedAt.getTime()) / 1000) * 10) / 10;
+  const status = failed === 0 ? 'ok' : succeeded === 0 ? 'failed' : 'partial';
+
   console.log(`\nCompleted: ${succeeded} succeeded, ${failed} failed`);
+  console.log(
+    `Events: ${totals.published} published, ${totals.duplicate} duplicates skipped, ${totals.failed} failed`
+  );
+
+  const logsDir = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '..',
+    'logs'
+  );
+  await appendRunLog(logsDir, {
+    started_at: startedAt.toISOString(),
+    finished_at: finishedAt.toISOString(),
+    duration_s: durationS,
+    jobs_total: jobs.length,
+    succeeded,
+    failed,
+    status,
+    events_published: totals.published,
+    events_duplicate: totals.duplicate,
+    events_failed: totals.failed,
+    jobs: jobRecords,
+  });
+
   if (failed > 0) process.exit(1);
 }
 

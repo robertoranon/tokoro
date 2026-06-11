@@ -6,7 +6,13 @@ import * as path from 'path';
 import { EventExtractor } from './extractors/event-extractor.js';
 import { PageDiscovery } from './extractors/page-discovery.js';
 import { EventNormalizer, KeyPair } from './utils/normalizer.js';
-import { APIPublisher } from './utils/api-publisher.js';
+import { APIPublisher, PublishResult } from './utils/api-publisher.js';
+
+export interface CrawlResult {
+  published: number;
+  duplicate: number;
+  failed: number;
+}
 import { LLMProvider } from '../../shared/types/llm.js';
 import { ExtractedEvent } from './types/event.js';
 import {
@@ -16,6 +22,12 @@ import {
   FESTIVAL_MAX_TOKENS,
   PAGE_DISCOVERY_MAX_TOKENS,
 } from '../../shared/extractors/extraction-limits.js';
+
+function accumulateResult(totals: CrawlResult, result: PublishResult): void {
+  totals.published += result.published;
+  totals.duplicate += result.duplicate;
+  totals.failed += result.failed;
+}
 
 /**
  * Group events into per-calendar-day buckets.
@@ -198,7 +210,7 @@ export class EventCrawler {
     return this.fetcher;
   }
 
-  async crawl(urls: string[]): Promise<void> {
+  async crawl(urls: string[]): Promise<CrawlResult> {
     const mode = this.config.mode || 'direct';
     const fetcherType = this.config.fetcher || 'playwright';
 
@@ -240,11 +252,12 @@ export class EventCrawler {
       return this.crawlFestival(urls);
     }
 
+    const totals: CrawlResult = { published: 0, duplicate: 0, failed: 0 };
+
     try {
       await this.fetcher.initialize();
 
       let totalEvents = 0;
-      let totalPublished = 0;
 
       for (const seedUrl of urls) {
         console.log(`\n${'='.repeat(60)}`);
@@ -321,9 +334,10 @@ export class EventCrawler {
                     if (normalized) normalizedEvents.push(normalized);
                   }
                   if (normalizedEvents.length > 0) {
-                    const published =
-                      await this.publisher.publishMultiple(normalizedEvents);
-                    totalPublished += published;
+                    accumulateResult(
+                      totals,
+                      await this.publisher.publishMultiple(normalizedEvents)
+                    );
                   }
                 }
               }
@@ -350,9 +364,10 @@ export class EventCrawler {
                 if (normalized) normalizedEvents.push(normalized);
               }
               if (normalizedEvents.length > 0) {
-                const published =
-                  await this.publisher.publishMultiple(normalizedEvents);
-                totalPublished += published;
+                accumulateResult(
+                  totals,
+                  await this.publisher.publishMultiple(normalizedEvents)
+                );
               }
             }
           }
@@ -366,15 +381,17 @@ export class EventCrawler {
       console.log(`Total events extracted: ${totalEvents}`);
       if (this.config.debug) {
         console.log(
-          `Total events printed to console (debug mode - not published): ${totalPublished}`
+          `Total events printed to console (debug mode - not published): ${totals.published}`
         );
       } else {
-        console.log(`Total events published: ${totalPublished}`);
+        console.log(`Total events published: ${totals.published}`);
       }
       console.log(`${'='.repeat(60)}\n`);
     } finally {
       await this.fetcher.close();
     }
+
+    return totals;
   }
 
   /**
@@ -429,15 +446,15 @@ export class EventCrawler {
     console.log(`${'='.repeat(60)}\n`);
   }
 
-  private async crawlFestival(urls: string[]): Promise<void> {
+  private async crawlFestival(urls: string[]): Promise<CrawlResult> {
     console.log(
       `\n🎪 Festival mode: discovering listing pages and extracting all events\n`
     );
 
+    const totals: CrawlResult = { published: 0, duplicate: 0, failed: 0 };
+
     try {
       await this.fetcher.initialize();
-
-      let totalPublished = 0;
 
       for (const seedUrl of urls) {
         console.log(`\n${'='.repeat(60)}`);
@@ -549,9 +566,10 @@ export class EventCrawler {
             }
 
             if (normalizedEvents.length > 0) {
-              const published =
-                await this.publisher.publishMultiple(normalizedEvents);
-              totalPublished += published;
+              accumulateResult(
+                totals,
+                await this.publisher.publishMultiple(normalizedEvents)
+              );
             }
           }
         } catch (error) {
@@ -561,11 +579,13 @@ export class EventCrawler {
 
       console.log(`\n${'='.repeat(60)}`);
       console.log(`✅ Festival crawl complete!`);
-      console.log(`Total events published: ${totalPublished}`);
+      console.log(`Total events published: ${totals.published}`);
       console.log(`${'='.repeat(60)}\n`);
     } finally {
       await this.fetcher.close();
     }
+
+    return totals;
   }
 
   /**
@@ -667,9 +687,9 @@ Return JSON: {"remove": [], "reasons": {}}`;
   /**
    * Crawl images to extract events from flyers/posters
    */
-  private async crawlImages(imagePaths: string[]): Promise<void> {
+  private async crawlImages(imagePaths: string[]): Promise<CrawlResult> {
     let totalEvents = 0;
-    let totalPublished = 0;
+    const totals: CrawlResult = { published: 0, duplicate: 0, failed: 0 };
 
     for (const imagePath of imagePaths) {
       console.log(`\n${'='.repeat(60)}`);
@@ -708,9 +728,10 @@ Return JSON: {"remove": [], "reasons": {}}`;
             if (normalized) normalizedEvents.push(normalized);
           }
           if (normalizedEvents.length > 0) {
-            const published =
-              await this.publisher.publishMultiple(normalizedEvents);
-            totalPublished += published;
+            accumulateResult(
+              totals,
+              await this.publisher.publishMultiple(normalizedEvents)
+            );
           }
         }
       } catch (error) {
@@ -721,8 +742,10 @@ Return JSON: {"remove": [], "reasons": {}}`;
     console.log(`\n${'='.repeat(60)}`);
     console.log(`✅ Image extraction complete!`);
     console.log(`Total events extracted: ${totalEvents}`);
-    console.log(`Total events published: ${totalPublished}`);
+    console.log(`Total events published: ${totals.published}`);
     console.log(`${'='.repeat(60)}\n`);
+
+    return totals;
   }
 
   /**
@@ -730,9 +753,9 @@ Return JSON: {"remove": [], "reasons": {}}`;
    * Routes to text extractor if PDF has enough text, otherwise renders pages
    * as images for the vision LLM.
    */
-  private async crawlPdfs(sources: string[]): Promise<void> {
+  private async crawlPdfs(sources: string[]): Promise<CrawlResult> {
     let totalEvents = 0;
-    let totalPublished = 0;
+    const totals: CrawlResult = { published: 0, duplicate: 0, failed: 0 };
 
     for (const source of sources) {
       console.log(`\n${'='.repeat(60)}`);
@@ -804,9 +827,10 @@ Return JSON: {"remove": [], "reasons": {}}`;
           }
 
           if (normalizedEvents.length > 0) {
-            const published =
-              await this.publisher.publishMultiple(normalizedEvents);
-            totalPublished += published;
+            accumulateResult(
+              totals,
+              await this.publisher.publishMultiple(normalizedEvents)
+            );
           }
         }
       } catch (error) {
@@ -817,7 +841,9 @@ Return JSON: {"remove": [], "reasons": {}}`;
     console.log(`\n${'='.repeat(60)}`);
     console.log(`✅ PDF extraction complete!`);
     console.log(`Total events extracted: ${totalEvents}`);
-    console.log(`Total events published: ${totalPublished}`);
+    console.log(`Total events published: ${totals.published}`);
     console.log(`${'='.repeat(60)}\n`);
+
+    return totals;
   }
 }
