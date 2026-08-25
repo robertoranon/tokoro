@@ -1,0 +1,38 @@
+{
+  "nodes": [
+    {
+      "id": "public_web_map",
+      "label": "map.html \u2014 Map View",
+      "file_type": "code",
+      "source_file": "public-web/map.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "public_web_map",
+      "target": "public_web_specs_fr6_map_view",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/map.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_map",
+      "target": "worker_specs_geospatial_query_algorithm",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "public-web/map.html",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

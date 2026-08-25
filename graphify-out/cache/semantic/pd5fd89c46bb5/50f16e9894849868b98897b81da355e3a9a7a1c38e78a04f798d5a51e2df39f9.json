@@ -1,0 +1,295 @@
+{
+  "nodes": [
+    {
+      "id": "how_to_use_setup_guide",
+      "label": "How to Set Up and Use Tokoro (setup guide)",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_required_components",
+      "label": "Required components table (Worker, Crawler Worker, Public Web)",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_local_config_file",
+      "label": "config.local.js single source of truth for URLs/keys",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_install_wrangler",
+      "label": "Install and authenticate Wrangler CLI",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_deploy_api_worker",
+      "label": "Deploy the API Worker (D1, R2, LLM secrets)",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_deploy_crawler_worker",
+      "label": "Deploy the Crawler Worker (KV, secrets)",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_key_management",
+      "label": "Key management overview (curator + admin keys)",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_curator_keys",
+      "label": "Curator keys: per-tool Ed25519 keypair generation",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_admin_key",
+      "label": "Admin key: moderation keypair via admin/admin.html",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_verify_setup",
+      "label": "Verify the setup (health check, register identity, publish)",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_chrome_extension_install",
+      "label": "Install Chrome Extension client tool",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_apple_shortcut",
+      "label": "Apple Shortcut setup (Safari Share Sheet)",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_bookmarklet",
+      "label": "Bookmarklet build & install via public-web",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_web_publisher",
+      "label": "Web Publisher manual composing (optional)",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_public_web_interface",
+      "label": "Public Web interface deployment (optional)",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_nodejs_crawler_local",
+      "label": "Run the Node.js Crawler locally (optional)",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_debugging",
+      "label": "Debugging via wrangler tail",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "how_to_use_troubleshooting",
+      "label": "Troubleshooting common errors",
+      "file_type": "document",
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "how_to_use_nodejs_crawler_local",
+      "target": "crawler_readme_overview",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "how_to_use_admin_key",
+      "target": "admin_admin_settings_modal",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "how_to_use_chrome_extension_install",
+      "target": "chrome_extension_readme_overview",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "how_to_use_deploy_crawler_worker",
+      "target": "crawler_worker_readme_overview",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "how_to_use_deploy_api_worker",
+      "target": "api_reference_overview",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "how_to_use_bookmarklet",
+      "target": "chrome_extension_readme_two_step_workflow",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "how_to_use_apple_shortcut",
+      "target": "crawler_worker_specs_crawl_endpoint",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "how_to_use_required_components",
+      "target": "readme_components_diagram",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "how_to_use_troubleshooting",
+      "target": "crawler_worker_specs_llm_provider_config",
+      "relation": "conceptually_related_to",
+      "confidence": "AMBIGUOUS",
+      "confidence_score": 0.2,
+      "source_file": "HOW-TO-USE.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

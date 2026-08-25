@@ -1,0 +1,206 @@
+{
+  "nodes": [
+    {
+      "id": "public_web_readme",
+      "label": "Tokoro Public Web Query Interface README",
+      "file_type": "document",
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "public_web_readme_deploy_script",
+      "label": "scripts/deploy-public-web.sh deploy flow",
+      "file_type": "concept",
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "public_web_readme_build_bookmarklet",
+      "label": "build-bookmarklet.js / inject-worker-url.js build process",
+      "file_type": "concept",
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "public_web_readme_signing_js",
+      "label": "signing.js shared signing utilities",
+      "file_type": "concept",
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "public_web_signing_loadorcreatekeypair",
+      "label": "loadOrCreateKeypair()",
+      "file_type": "concept",
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "public_web_signing_signevent",
+      "label": "signEvent(preparedEvent, keypair)",
+      "file_type": "concept",
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "public_web_signing_bytestohex",
+      "label": "bytesToHex(bytes)",
+      "file_type": "concept",
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "public_web_readme_mobile_publishing",
+      "label": "Mobile Publishing (publish.html) entry modes",
+      "file_type": "concept",
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "public_web_readme_shortcut_bookmarklet",
+      "label": "shortcut-bookmarklet.js Apple Shortcut build artifact",
+      "file_type": "concept",
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "public_web_readme",
+      "target": "public_web_readme_deploy_script",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_readme",
+      "target": "public_web_readme_build_bookmarklet",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_readme",
+      "target": "public_web_readme_signing_js",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_readme",
+      "target": "public_web_readme_mobile_publishing",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_readme",
+      "target": "public_web_readme_shortcut_bookmarklet",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_readme_signing_js",
+      "target": "public_web_signing_loadorcreatekeypair",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_readme_signing_js",
+      "target": "public_web_signing_signevent",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_readme_signing_js",
+      "target": "public_web_signing_bytestohex",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_readme_mobile_publishing",
+      "target": "public_web_specs_fr5_publisher_ui",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_readme_shortcut_bookmarklet",
+      "target": "public_web_specs_fr5_7_shortcut_handoff",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "public-web/README.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

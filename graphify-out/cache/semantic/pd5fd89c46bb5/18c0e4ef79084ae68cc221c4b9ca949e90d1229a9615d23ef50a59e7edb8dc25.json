@@ -1,0 +1,17 @@
+{
+  "nodes": [
+    {
+      "id": "crawler_tests_cleaned_pages_abetone_fixture",
+      "label": "abetone.txt: cleaned Instagram post text (abetonemusicbar, Sp46 gig)",
+      "file_type": "document",
+      "source_file": "crawler/tests/cleaned-pages/abetone.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [],
+  "hyperedges": []
+}

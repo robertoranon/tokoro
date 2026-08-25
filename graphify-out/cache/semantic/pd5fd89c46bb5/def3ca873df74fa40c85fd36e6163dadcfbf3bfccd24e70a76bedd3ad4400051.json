@@ -1,0 +1,17 @@
+{
+  "nodes": [
+    {
+      "id": "crawler_tests_fixtures_nick_cave_tour_fixture",
+      "label": "Nick Cave Tour Dates listing page fixture",
+      "file_type": "document",
+      "source_file": "crawler/tests/fixtures/nick-cave-tour.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [],
+  "hyperedges": []
+}

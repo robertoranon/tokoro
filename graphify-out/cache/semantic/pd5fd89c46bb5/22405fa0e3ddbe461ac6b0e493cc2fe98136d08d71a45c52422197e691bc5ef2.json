@@ -1,0 +1,79 @@
+{
+  "nodes": [
+    {
+      "id": "crawler_tests_readme_overview",
+      "label": "Crawler test suite README overview",
+      "file_type": "document",
+      "source_file": "crawler/tests/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_tests_readme_db_benchmark",
+      "label": "DB benchmark tool (db-benchmark.ts, playwright vs jina recall)",
+      "file_type": "document",
+      "source_file": "crawler/tests/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_tests_readme_capture_fixture",
+      "label": "Fixture capture workflow (test:capture, captureDate)",
+      "file_type": "document",
+      "source_file": "crawler/tests/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "crawler_tests_readme_overview",
+      "target": "crawler_tests_fixtures_fareast_2026_events_fixture",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "crawler/tests/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "crawler_tests_readme_capture_fixture",
+      "target": "crawler_tests_fixtures_nick_cave_tour_fixture",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "crawler/tests/README.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "tokoro_crawler_test_fixture_pool",
+      "label": "Crawler extraction test fixtures (event pages and images)",
+      "nodes": [
+        "crawler_tests_readme_overview",
+        "crawler_tests_cleaned_pages_abetone_fixture",
+        "crawler_tests_fixtures_alcatraz_autechre_event_fixture",
+        "crawler_tests_fixtures_alcatraz_fat_freddys_drop_event_fixture",
+        "crawler_tests_fixtures_fareast_2026_events_fixture",
+        "crawler_tests_fixtures_ig_quod_fixture",
+        "crawler_tests_fixtures_naon_event_fixture",
+        "crawler_tests_fixtures_nick_cave_tour_fixture"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "crawler/tests/README.md"
+    }
+  ]
+}

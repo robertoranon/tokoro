@@ -1,0 +1,211 @@
+{
+  "nodes": [
+    {
+      "id": "crawler_worker_specs_overview",
+      "label": "Crawler Worker Technical Specification overview",
+      "file_type": "rationale",
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "The Crawler Worker is intentionally a pure extraction service with no signing capability and no keypair (except dedicated bot keypairs). Keeping signing client-side minimizes custodial risk of user private keys."
+    },
+    {
+      "id": "crawler_worker_specs_crawl_endpoint",
+      "label": "POST /crawl (full spec: request/response contract)",
+      "file_type": "document",
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_worker_specs_telegram_webhook",
+      "label": "POST /telegram webhook (bot crawl + publish flow)",
+      "file_type": "document",
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_worker_specs_whatsapp_webhook",
+      "label": "GET/POST /whatsapp webhook (bot crawl + publish flow)",
+      "file_type": "document",
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_worker_specs_event_discovery_nl_query",
+      "label": "Telegram /events natural-language query discovery",
+      "file_type": "document",
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_worker_specs_direct_mode",
+      "label": "Direct mode (crawler-worker)",
+      "file_type": "document",
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_worker_specs_discover_mode",
+      "label": "Discover mode (crawler-worker)",
+      "file_type": "document",
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_worker_specs_image_mode",
+      "label": "Image mode (crawler-worker)",
+      "file_type": "document",
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_worker_specs_content_fetching",
+      "label": "Content fetching strategies (extension HTML preferred, Jina fallback)",
+      "file_type": "document",
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_worker_specs_normalizefailure",
+      "label": "NormalizeFailure type & dropped_events handling",
+      "file_type": "rationale",
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Per-event normalization failures (e.g. geocoding failure) are captured in dropped_events rather than aborting the whole crawl, so partial successes are still returned to the client instead of an all-or-nothing failure."
+    },
+    {
+      "id": "crawler_worker_specs_llm_provider_config",
+      "label": "LLM provider configuration (openai/anthropic/openrouter; no Ollama)",
+      "file_type": "document",
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_worker_specs_environment_config",
+      "label": "Environment secrets & wrangler.toml service binding",
+      "file_type": "document",
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "crawler_worker_readme_jsonld_extraction",
+      "target": "crawler_specs_jsonld_extraction",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "crawler_worker_specs_direct_mode",
+      "target": "crawler_specs_direct_mode",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "crawler_worker_specs_discover_mode",
+      "target": "crawler_specs_discover_mode",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "crawler_worker_specs_image_mode",
+      "target": "crawler_specs_image_mode",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "crawler_worker_specs_content_fetching",
+      "target": "crawler_specs_html_fetching_jina",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "crawler_worker_specs_normalizefailure",
+      "target": "crawler_specs_geocoding",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "crawler_worker_specs_overview",
+      "target": "crawler_specs_event_signing",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "crawler-worker/SPECS.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

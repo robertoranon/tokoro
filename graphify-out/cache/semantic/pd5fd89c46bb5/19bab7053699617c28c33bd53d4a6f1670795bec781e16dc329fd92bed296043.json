@@ -1,0 +1,119 @@
+{
+  "nodes": [
+    {
+      "id": "public_web_publish",
+      "label": "publish.html \u2014 Mobile Publisher",
+      "file_type": "code",
+      "source_file": "public-web/publish.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "public_web_publish_preview_mode",
+      "label": "?preview=TOKEN handoff (tryPreview)",
+      "file_type": "code",
+      "source_file": "public-web/publish.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "public_web_publish",
+      "target": "public_web_specs_fr5_publisher_ui",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/publish.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_publish_preview_mode",
+      "target": "public_web_specs_fr5_7_shortcut_handoff",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/publish.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_publish",
+      "target": "public_web_publish_preview_mode",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/publish.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_publish",
+      "target": "public_web_signing_loadorcreatekeypair",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/publish.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_publish",
+      "target": "public_web_signing_signevent",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/publish.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_signing_signevent",
+      "target": "worker_specs_canonical_event_signing",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "public-web/publish.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_publish",
+      "target": "worker_specs_canonical_event_signing",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "public-web/publish.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_publish",
+      "target": "worker_specs_api_endpoints",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "public-web/publish.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_publish",
+      "target": "web_publisher_index",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "public-web/publish.html",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

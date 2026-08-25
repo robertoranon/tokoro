@@ -1,0 +1,240 @@
+{
+  "nodes": [
+    {
+      "id": "$graphify-root$_shared_package_json",
+      "label": "package.json",
+      "file_type": "code",
+      "source_file": "shared/package.json",
+      "source_location": "L1"
+    },
+    {
+      "id": "$graphify-root$_shared_package_name",
+      "label": "name",
+      "file_type": "code",
+      "source_file": "shared/package.json",
+      "source_location": "L2"
+    },
+    {
+      "id": "$graphify-root$_shared_package_version",
+      "label": "version",
+      "file_type": "code",
+      "source_file": "shared/package.json",
+      "source_location": "L3"
+    },
+    {
+      "id": "$graphify-root$_shared_package_type",
+      "label": "type",
+      "file_type": "code",
+      "source_file": "shared/package.json",
+      "source_location": "L4"
+    },
+    {
+      "id": "$graphify-root$_shared_package_exports",
+      "label": "exports",
+      "file_type": "code",
+      "source_file": "shared/package.json",
+      "source_location": "L5"
+    },
+    {
+      "id": "$graphify-root$_shared_package_exports_extractors",
+      "label": "./extractors/*",
+      "file_type": "code",
+      "source_file": "shared/package.json",
+      "source_location": "L6"
+    },
+    {
+      "id": "$graphify-root$_shared_package_exports_types",
+      "label": "./types/*",
+      "file_type": "code",
+      "source_file": "shared/package.json",
+      "source_location": "L7"
+    },
+    {
+      "id": "$graphify-root$_shared_package_exports_llm",
+      "label": "./llm/*",
+      "file_type": "code",
+      "source_file": "shared/package.json",
+      "source_location": "L8"
+    },
+    {
+      "id": "$graphify-root$_shared_package_dependencies",
+      "label": "dependencies",
+      "file_type": "code",
+      "source_file": "shared/package.json",
+      "source_location": "L10"
+    },
+    {
+      "id": "$graphify-root$_shared_package_dependencies_zod",
+      "label": "zod",
+      "file_type": "code",
+      "source_file": "shared/package.json",
+      "source_location": "L11"
+    },
+    {
+      "id": "zod",
+      "label": "zod",
+      "file_type": "concept",
+      "source_file": "shared/package.json",
+      "source_location": "L11"
+    },
+    {
+      "id": "$graphify-root$_shared_package_dependencies_anthropic_ai_sdk",
+      "label": "@anthropic-ai/sdk",
+      "file_type": "code",
+      "source_file": "shared/package.json",
+      "source_location": "L12"
+    },
+    {
+      "id": "anthropic_ai_sdk",
+      "label": "@anthropic-ai/sdk",
+      "file_type": "concept",
+      "source_file": "shared/package.json",
+      "source_location": "L12"
+    },
+    {
+      "id": "$graphify-root$_shared_package_dependencies_openai",
+      "label": "openai",
+      "file_type": "code",
+      "source_file": "shared/package.json",
+      "source_location": "L13"
+    },
+    {
+      "id": "openai",
+      "label": "openai",
+      "file_type": "concept",
+      "source_file": "shared/package.json",
+      "source_location": "L13"
+    }
+  ],
+  "edges": [
+    {
+      "source": "$graphify-root$_shared_package_json",
+      "target": "$graphify-root$_shared_package_name",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "shared/package.json",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "$graphify-root$_shared_package_json",
+      "target": "$graphify-root$_shared_package_version",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "shared/package.json",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "$graphify-root$_shared_package_json",
+      "target": "$graphify-root$_shared_package_type",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "shared/package.json",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "$graphify-root$_shared_package_json",
+      "target": "$graphify-root$_shared_package_exports",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "shared/package.json",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "$graphify-root$_shared_package_exports",
+      "target": "$graphify-root$_shared_package_exports_extractors",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "shared/package.json",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "$graphify-root$_shared_package_exports",
+      "target": "$graphify-root$_shared_package_exports_types",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "shared/package.json",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "$graphify-root$_shared_package_exports",
+      "target": "$graphify-root$_shared_package_exports_llm",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "shared/package.json",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "$graphify-root$_shared_package_json",
+      "target": "$graphify-root$_shared_package_dependencies",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "shared/package.json",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "$graphify-root$_shared_package_dependencies",
+      "target": "$graphify-root$_shared_package_dependencies_zod",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "shared/package.json",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "$graphify-root$_shared_package_dependencies_zod",
+      "target": "zod",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "shared/package.json",
+      "source_location": "L11",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "$graphify-root$_shared_package_dependencies",
+      "target": "$graphify-root$_shared_package_dependencies_anthropic_ai_sdk",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "shared/package.json",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "$graphify-root$_shared_package_dependencies_anthropic_ai_sdk",
+      "target": "anthropic_ai_sdk",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "shared/package.json",
+      "source_location": "L12",
+      "weight": 1.0,
+      "context": "import"
+    },
+    {
+      "source": "$graphify-root$_shared_package_dependencies",
+      "target": "$graphify-root$_shared_package_dependencies_openai",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "shared/package.json",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "$graphify-root$_shared_package_dependencies_openai",
+      "target": "openai",
+      "relation": "imports",
+      "confidence": "EXTRACTED",
+      "source_file": "shared/package.json",
+      "source_location": "L13",
+      "weight": 1.0,
+      "context": "import"
+    }
+  ]
+}

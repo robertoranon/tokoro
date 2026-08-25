@@ -97,3 +97,7 @@ worker/users.txt
 .superpowers
 
 crawler/jobs.yaml
+
+# graphify - machine-specific paths, regenerated automatically
+graphify-out/.graphify_python
+graphify-out/.graphify_root

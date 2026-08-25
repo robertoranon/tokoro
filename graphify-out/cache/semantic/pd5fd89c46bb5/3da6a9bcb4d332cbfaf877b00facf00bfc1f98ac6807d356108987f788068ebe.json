@@ -1,0 +1,400 @@
+{
+  "nodes": [
+    {
+      "id": "docs_overall_structure",
+      "label": "Overall Structure \u2014 Getting Started Outline",
+      "file_type": "document",
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_overall_structure_signing_events_ed25519",
+      "label": "Diving Deeper topic: Signing events with Ed25519",
+      "file_type": "concept",
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_overall_structure_local_timestamps",
+      "label": "Diving Deeper topic: Working with local timestamps",
+      "file_type": "concept",
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_overall_structure_controlling_who_can_publish",
+      "label": "Diving Deeper topic: Controlling who can publish",
+      "file_type": "concept",
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_overall_structure_standalone_crawler",
+      "label": "Diving Deeper topic: Running the standalone crawler",
+      "file_type": "concept",
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_overall_structure_crawl_modes_fetchers_engines",
+      "label": "Diving Deeper topic: Crawl modes, fetchers, browser engines",
+      "file_type": "concept",
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_overall_structure_llm_provider_selection",
+      "label": "Diving Deeper topic: Selecting/configuring an LLM provider",
+      "file_type": "concept",
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_overall_structure_debugging_extraction_geocoding",
+      "label": "Diving Deeper topic: Debugging extraction & geocoding failures",
+      "file_type": "concept",
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_overall_structure_telegram_whatsapp_bots",
+      "label": "Diving Deeper topic: Telegram and WhatsApp bots",
+      "file_type": "concept",
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_overall_structure_social_layer",
+      "label": "Diving Deeper topic: Social layer (stars, follows, discovery)",
+      "file_type": "concept",
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_overall_structure_ios_shortcut_publishing",
+      "label": "Diving Deeper topic: Publishing via iOS Shortcut",
+      "file_type": "concept",
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_overall_structure_expiring_events_duplicates",
+      "label": "Diving Deeper topic: Expiring past events & managing duplicates",
+      "file_type": "concept",
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_overall_structure_chrome_extension_topic",
+      "label": "Diving Deeper topic: Installing and using the Chrome extension",
+      "file_type": "concept",
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "docs_overall_structure",
+      "target": "docs_diving_deeper_tracing_an_event",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure",
+      "target": "docs_overall_structure_signing_events_ed25519",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure",
+      "target": "docs_overall_structure_local_timestamps",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure",
+      "target": "docs_overall_structure_controlling_who_can_publish",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure",
+      "target": "docs_overall_structure_standalone_crawler",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure",
+      "target": "docs_overall_structure_crawl_modes_fetchers_engines",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure",
+      "target": "docs_overall_structure_llm_provider_selection",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure",
+      "target": "docs_overall_structure_debugging_extraction_geocoding",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure",
+      "target": "docs_overall_structure_telegram_whatsapp_bots",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure",
+      "target": "docs_overall_structure_social_layer",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure",
+      "target": "docs_overall_structure_ios_shortcut_publishing",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure",
+      "target": "docs_overall_structure_expiring_events_duplicates",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure",
+      "target": "docs_overall_structure_chrome_extension_topic",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure_signing_events_ed25519",
+      "target": "worker_specs_canonical_event_signing",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure_signing_events_ed25519",
+      "target": "docs_diving_deeper_tracing_an_event_canonical_json_key_order",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure_local_timestamps",
+      "target": "worker_specs_timestamp_format_convention",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure_controlling_who_can_publish",
+      "target": "worker_specs_blocklist_allowlist",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure_expiring_events_duplicates",
+      "target": "worker_specs_cron_expiration",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure_expiring_events_duplicates",
+      "target": "worker_specs_duplicate_event_detection",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure_ios_shortcut_publishing",
+      "target": "public_web_specs_fr5_7_shortcut_handoff",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure_ios_shortcut_publishing",
+      "target": "public_web_publish_preview_mode",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure_chrome_extension_topic",
+      "target": "public_web_privacy_policy",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure_social_layer",
+      "target": "docs_ideas_stars_ui",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure_social_layer",
+      "target": "docs_ideas_follows_ui",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_overall_structure_social_layer",
+      "target": "docs_ideas_discover_view",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "docs/overall-structure.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

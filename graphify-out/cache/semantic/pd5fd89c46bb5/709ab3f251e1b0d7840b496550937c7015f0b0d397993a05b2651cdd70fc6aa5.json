@@ -1,0 +1,17 @@
+{
+  "nodes": [
+    {
+      "id": "crawler_tests_fixtures_massimo_silverio_rivolta_image",
+      "label": "Event poster: MESSA, Massimo Silverio, Blak Saagan +6 @ CS Rivolta, Venezia - Sab 14 Marzo 2026",
+      "file_type": "image",
+      "source_file": "crawler/tests/fixtures/massimo-silverio-rivolta.jpeg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [],
+  "hyperedges": []
+}

@@ -1,0 +1,84 @@
+{
+  "nodes": [
+    {
+      "id": "chrome_extension_readme_overview",
+      "label": "Chrome extension README overview",
+      "file_type": "document",
+      "source_file": "chrome-extension/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_readme_two_step_workflow",
+      "label": "Two-step workflow: extract then sign+publish",
+      "file_type": "document",
+      "source_file": "chrome-extension/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_readme_jsonld_extraction",
+      "label": "Stage 1: JSON-LD extraction (README)",
+      "file_type": "document",
+      "source_file": "chrome-extension/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_readme_llm_extraction_fallback",
+      "label": "Stage 2: LLM extraction fallback (README)",
+      "file_type": "document",
+      "source_file": "chrome-extension/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_readme_merge_strategy",
+      "label": "Stage 3: merge JSON-LD + LLM results",
+      "file_type": "document",
+      "source_file": "chrome-extension/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_readme_permissions",
+      "label": "Chrome permissions rationale (activeTab, scripting, storage, contextMenus, notifications, host_permissions)",
+      "file_type": "rationale",
+      "source_file": "chrome-extension/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Each permission is scoped to a single user-initiated action (popup open, right-click) and a single host, avoiding <all_urls> to minimize the extension's footprint under Chrome MV3 review."
+    }
+  ],
+  "edges": [
+    {
+      "source": "chrome_extension_readme_jsonld_extraction",
+      "target": "crawler_worker_readme_jsonld_extraction",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "chrome-extension/README.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

@@ -1,0 +1,68 @@
+{
+  "nodes": [
+    {
+      "id": "public_web_it",
+      "label": "it.html \u2014 Public Web Query Interface (IT)",
+      "file_type": "code",
+      "source_file": "public-web/it.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "public_web_it",
+      "target": "public_web_specs_fr1_event_query",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/it.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_it",
+      "target": "public_web_specs_fr2_date_formatting",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/it.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_it",
+      "target": "public_web_specs_fr3_repeating_grouping",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/it.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_it",
+      "target": "public_web_specs_fr4_festival_grouping",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "public-web/it.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "public_web_it",
+      "target": "public_web_index",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "public-web/it.html",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

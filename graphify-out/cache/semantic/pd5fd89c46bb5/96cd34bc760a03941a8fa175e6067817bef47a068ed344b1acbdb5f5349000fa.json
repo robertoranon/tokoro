@@ -1,0 +1,186 @@
+{
+  "nodes": [
+    {
+      "id": "chrome_extension_specs_overview",
+      "label": "Chrome Extension Specification (document overview)",
+      "file_type": "document",
+      "source_file": "chrome-extension/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_specs_fr1_user_settings",
+      "label": "FR-1: User Settings Management",
+      "file_type": "document",
+      "source_file": "chrome-extension/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_specs_fr3_content_extraction",
+      "label": "FR-3: Content Extraction (rendered HTML capture)",
+      "file_type": "document",
+      "source_file": "chrome-extension/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_specs_fr4_event_preview_workflow",
+      "label": "FR-4: Event Preview Workflow",
+      "file_type": "document",
+      "source_file": "chrome-extension/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_specs_fr5_event_caching",
+      "label": "FR-5: Event Caching (chrome.storage.local)",
+      "file_type": "document",
+      "source_file": "chrome-extension/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_specs_fr6_publishing_workflow",
+      "label": "FR-6: Event Publishing Workflow (sign + POST /events)",
+      "file_type": "document",
+      "source_file": "chrome-extension/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_specs_fr8_context_menu_integration",
+      "label": "FR-8: Context Menu Integration (page crawl)",
+      "file_type": "document",
+      "source_file": "chrome-extension/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_specs_fr9_image_extraction",
+      "label": "FR-9: Image Extraction (context menu)",
+      "file_type": "document",
+      "source_file": "chrome-extension/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_specs_fr11_background_service_worker",
+      "label": "FR-11: Background Service Worker",
+      "file_type": "document",
+      "source_file": "chrome-extension/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_specs_preparedevent",
+      "label": "PreparedEvent data structure (from crawler-worker)",
+      "file_type": "document",
+      "source_file": "chrome-extension/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_specs_signedevent",
+      "label": "SignedEvent data structure (posted to API worker)",
+      "file_type": "document",
+      "source_file": "chrome-extension/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_specs_manifest_v3",
+      "label": "Chrome Manifest V3 migration requirements",
+      "file_type": "document",
+      "source_file": "chrome-extension/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "chrome_extension_specs_main_world_content_script",
+      "label": "MAIN world content script for element-based image extraction",
+      "file_type": "rationale",
+      "source_file": "chrome-extension/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "MAIN world execution is required so chrome.scripting.executeScript can read variables set by the content script (e.g. right-click position, used to find images hidden behind DOM overlays like Instagram). Trade-off: the content script can be affected by page scripts, but ISOLATED world cannot share variables with executeScript."
+    }
+  ],
+  "edges": [
+    {
+      "source": "chrome_extension_specs_preparedevent",
+      "target": "crawler_worker_specs_crawl_endpoint",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "chrome-extension/SPECS.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "chrome_extension_specs_signedevent",
+      "target": "api_reference_events_endpoints",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "chrome-extension/SPECS.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "tokoro_extract_sign_publish_pipeline",
+      "label": "Extract (crawler-worker) -> sign+publish (client) pipeline",
+      "nodes": [
+        "crawler_worker_specs_crawl_endpoint",
+        "chrome_extension_specs_preparedevent",
+        "chrome_extension_specs_fr6_publishing_workflow",
+        "chrome_extension_specs_signedevent"
+      ],
+      "relation": "form",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "chrome-extension/SPECS.md"
+    }
+  ]
+}

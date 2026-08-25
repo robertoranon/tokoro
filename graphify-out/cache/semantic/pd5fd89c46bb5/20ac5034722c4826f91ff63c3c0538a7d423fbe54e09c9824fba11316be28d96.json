@@ -1,0 +1,116 @@
+{
+  "nodes": [
+    {
+      "id": "api_reference_overview",
+      "label": "API Reference (document overview)",
+      "file_type": "document",
+      "source_file": "API_REFERENCE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_reference_events_endpoints",
+      "label": "API Worker Events endpoints (GET/POST/PUT/DELETE /events)",
+      "file_type": "document",
+      "source_file": "API_REFERENCE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_reference_stars_endpoints",
+      "label": "API Worker Stars endpoints",
+      "file_type": "document",
+      "source_file": "API_REFERENCE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_reference_follows_endpoints",
+      "label": "API Worker Follows endpoints",
+      "file_type": "document",
+      "source_file": "API_REFERENCE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_reference_discovery_endpoints",
+      "label": "API Worker Discovery/Feed endpoints",
+      "file_type": "document",
+      "source_file": "API_REFERENCE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_reference_ical_feeds",
+      "label": "iCal feed support (format=ical, window=30d)",
+      "file_type": "document",
+      "source_file": "API_REFERENCE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_reference_crawl_endpoint",
+      "label": "Crawler Worker POST /crawl (API reference summary)",
+      "file_type": "document",
+      "source_file": "API_REFERENCE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_reference_authentication",
+      "label": "Ed25519 write authentication + ALLOWED_PUBKEYS",
+      "file_type": "document",
+      "source_file": "API_REFERENCE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_reference_data_model",
+      "label": "events table SQL schema (API reference copy)",
+      "file_type": "document",
+      "source_file": "API_REFERENCE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_reference_timestamp_convention",
+      "label": "Timestamp convention: ISO 8601 local time, no TZ",
+      "file_type": "document",
+      "source_file": "API_REFERENCE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [],
+  "hyperedges": []
+}

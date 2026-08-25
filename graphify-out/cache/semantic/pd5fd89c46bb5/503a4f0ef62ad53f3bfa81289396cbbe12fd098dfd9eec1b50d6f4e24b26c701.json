@@ -1,0 +1,17 @@
+{
+  "nodes": [
+    {
+      "id": "crawler_tests_fixtures_yazz_scena_sonica_image",
+      "label": "Aquavitae Concert Poster: Yazz Ahmed & Band",
+      "file_type": "image",
+      "source_file": "crawler/tests/fixtures/yazz-scena-sonica.jpg",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [],
+  "hyperedges": []
+}

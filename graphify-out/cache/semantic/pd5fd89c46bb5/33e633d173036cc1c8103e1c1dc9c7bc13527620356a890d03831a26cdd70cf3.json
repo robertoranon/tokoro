@@ -1,0 +1,101 @@
+{
+  "nodes": [
+    {
+      "id": "web_publisher_index",
+      "label": "web-publisher/index.html \u2014 Event Publisher (legacy manual form)",
+      "file_type": "code",
+      "source_file": "web-publisher/index.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "web_publisher_index_generatekeypair",
+      "label": "generateKeypair()",
+      "file_type": "code",
+      "source_file": "web-publisher/index.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "web_publisher_index_handlesubmit",
+      "label": "handleSubmit(e)",
+      "file_type": "code",
+      "source_file": "web-publisher/index.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "web_publisher_index_hasheventdata",
+      "label": "hashEventData(eventData)",
+      "file_type": "code",
+      "source_file": "web-publisher/index.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "web_publisher_index",
+      "target": "web_publisher_index_generatekeypair",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "web-publisher/index.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "web_publisher_index",
+      "target": "web_publisher_index_handlesubmit",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "web-publisher/index.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "web_publisher_index_handlesubmit",
+      "target": "web_publisher_index_hasheventdata",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "web-publisher/index.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "web_publisher_index_hasheventdata",
+      "target": "worker_specs_canonical_event_signing",
+      "relation": "shares_data_with",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "web-publisher/index.html",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "web_publisher_index",
+      "target": "worker_specs_timestamp_format_convention",
+      "relation": "conceptually_related_to",
+      "confidence": "AMBIGUOUS",
+      "confidence_score": 0.25,
+      "source_file": "web-publisher/index.html",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

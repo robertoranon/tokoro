@@ -1,0 +1,357 @@
+{
+  "nodes": [
+    {
+      "id": "crawler_specs_overview",
+      "label": "Event Crawler Technical Specification overview",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_extractedevent",
+      "label": "ExtractedEvent data schema (raw LLM output)",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_normalizedevent",
+      "label": "NormalizedEvent data schema (signed, ready for API)",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_event_categories",
+      "label": "Predefined event categories enum",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_direct_mode",
+      "label": "Direct mode algorithm (crawler SPECS)",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_discover_mode",
+      "label": "Discover mode algorithm (crawler SPECS)",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_image_mode",
+      "label": "Image mode algorithm (crawler SPECS)",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_festival_mode",
+      "label": "Festival mode algorithm (listing pages + dedup)",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_per_day_grouping",
+      "label": "Per-day grouping (--group-by-day) algorithm",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_pdf_mode",
+      "label": "PDF mode algorithm (text vs image-render routing)",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_html_fetching_playwright",
+      "label": "Playwright fetcher algorithm (main frame + iframes)",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_html_fetching_jina",
+      "label": "Jina AI Reader fetcher algorithm",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_html_text_cleaning",
+      "label": "DOM-based HTML text cleaning (linkedom)",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_image_content_loading",
+      "label": "Image content loading (file/URL to base64)",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_pdf_content_loading",
+      "label": "PDF content loading (pdfjs-dist, text threshold)",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_page_discovery",
+      "label": "Page discovery (link extraction + LLM filtering)",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_jsonld_extraction",
+      "label": "JSON-LD event extraction algorithm",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_llm_extraction",
+      "label": "LLM event extraction (system prompt + parsing)",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_date_inference",
+      "label": "Date inference logic (year hints, day-name validation)",
+      "file_type": "rationale",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "LLMs often can't reliably infer the year from partial dates; cross-validating the extracted day_name against the actual weekday of the candidate date (current year, +1, -1) catches off-by-one-year errors. Events with no valid year match, or whose only valid match is in the past, are dropped rather than published wrong."
+    },
+    {
+      "id": "crawler_specs_end_time_estimation",
+      "label": "End time estimation policy (never guessed)",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_image_based_extraction",
+      "label": "Image-based (vision) event extraction",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_geocoding",
+      "label": "Geocoding via Nominatim with fallback cascade",
+      "file_type": "rationale",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "A cascading fallback (full address -> drop possible venue prefix -> venue+address -> venue alone -> LLM-assisted Google-search address lookup) maximizes geocode success given inconsistent address quality across scraped pages, while a module-level timestamp enforces Nominatim's 1 req/sec rate limit."
+    },
+    {
+      "id": "crawler_specs_timestamp_normalization",
+      "label": "Timestamp normalization (strip TZ, no UTC conversion)",
+      "file_type": "rationale",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Must NOT route through Date.toISOString() or UTC-converting datetime formatting, since that would shift the wall-clock time; the timezone suffix is stripped (not converted) so venue-local time is preserved. A post-geocoding timezone-aware fallback fills in placeholder times using the venue's IANA timezone when JSON-LD supplied a real UTC datetime."
+    },
+    {
+      "id": "crawler_specs_event_signing",
+      "label": "Ed25519 event signing (canonical JSON + SHA-256)",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_api_publishing",
+      "label": "API publishing (POST /events, batch loop)",
+      "file_type": "document",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "crawler_specs_duplicate_check",
+      "label": "Pre-publish duplicate check (Levenshtein + LLM probability)",
+      "file_type": "rationale",
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Checking nearby existing events (\u00b11h, 0.1km) via title-similarity plus an LLM duplicate-probability call before publishing avoids relying solely on the API's 409 response; if the LLM check errors, it fails open (treated as not-duplicate) so the worker's own dedup logic remains the final authority."
+    }
+  ],
+  "edges": [
+    {
+      "source": "crawler_specs_jsonld_extraction",
+      "target": "crawler_tests_fixtures_alcatraz_autechre_event_fixture",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "crawler_specs_jsonld_extraction",
+      "target": "crawler_tests_fixtures_alcatraz_fat_freddys_drop_event_fixture",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "crawler_specs_jsonld_extraction",
+      "target": "crawler_tests_fixtures_naon_event_fixture",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "crawler_specs_llm_extraction",
+      "target": "crawler_tests_cleaned_pages_abetone_fixture",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "crawler_specs_llm_extraction",
+      "target": "crawler_tests_fixtures_ig_quod_fixture",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "crawler_specs_date_inference",
+      "target": "crawler_tests_cleaned_pages_abetone_fixture",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "crawler/SPECS.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": []
+}

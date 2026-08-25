@@ -1,0 +1,1217 @@
+{
+  "API_REFERENCE.md": {
+    "size": 5942,
+    "mtime_ns": 1778759001970977071,
+    "indexed_at_ns": 1787672794505071000,
+    "word_count": 733,
+    "hashes": {
+      "api_reference.md": "20ac5034722c4826f91ff63c3c0538a7d423fbe54e09c9824fba11316be28d96"
+    }
+  },
+  "CLAUDE.md": {
+    "size": 6303,
+    "mtime_ns": 1787672561279244372,
+    "indexed_at_ns": 1787672794505371000,
+    "word_count": 864,
+    "hashes": {
+      "claude.md": "a4b4c20ff45d82ffe8e3ede9f92b9080c6b5f71d1ea4b46f8057dd3a39fa42f5"
+    }
+  },
+  "HOW-TO-USE.md": {
+    "size": 20346,
+    "mtime_ns": 1778759138452909488,
+    "indexed_at_ns": 1787672794505489000,
+    "word_count": 2808,
+    "hashes": {
+      "how-to-use.md": "50f16e9894849868b98897b81da355e3a9a7a1c38e78a04f798d5a51e2df39f9"
+    }
+  },
+  "README.md": {
+    "size": 6620,
+    "mtime_ns": 1779898968751256859,
+    "indexed_at_ns": 1787672794505604000,
+    "word_count": 726,
+    "hashes": {
+      "readme.md": "259b045618a28164838338848617938be4e360c58acb4e66aacd3690f60dee94"
+    }
+  },
+  "admin/admin.html": {
+    "size": 22852,
+    "mtime_ns": 1778759138454232823,
+    "indexed_at_ns": 1787672794505715000,
+    "word_count": 1971,
+    "hashes": {
+      "admin/admin.html": "a82425039dcaf7a9f0a95576b732785fce5a12d8446d7c8de6f32b1c9cd1e94a"
+    }
+  },
+  "chrome-extension/README.md": {
+    "size": 13464,
+    "mtime_ns": 1778759138454662198,
+    "indexed_at_ns": 1787672794505834000,
+    "word_count": 1977,
+    "hashes": {
+      "chrome-extension/readme.md": "e7630dbf0047eef00aecfa729413794347b841835370725b250bc970ccf43e23"
+    }
+  },
+  "chrome-extension/SPECS.md": {
+    "size": 39288,
+    "mtime_ns": 1778759138455203949,
+    "indexed_at_ns": 1787672794505958000,
+    "word_count": 5640,
+    "hashes": {
+      "chrome-extension/specs.md": "96cd34bc760a03941a8fa175e6067817bef47a068ed344b1acbdb5f5349000fa"
+    }
+  },
+  "chrome-extension/background.js": {
+    "size": 16117,
+    "mtime_ns": 1778759001973796824,
+    "indexed_at_ns": 1787672746101205000,
+    "word_count": 1616
+  },
+  "chrome-extension/content-script.js": {
+    "size": 897,
+    "mtime_ns": 1778759001973913950,
+    "indexed_at_ns": 1787672746101917000,
+    "word_count": 104
+  },
+  "chrome-extension/icon128.png": {
+    "size": 454,
+    "mtime_ns": 1778759001974024491,
+    "indexed_at_ns": 1787672794510425000,
+    "word_count": 24,
+    "hashes": {
+      "chrome-extension/icon128.png": "8fcd1ac6b1f95605634d2d03b94fa553f6249e2b08df8a379f33357020040304"
+    }
+  },
+  "chrome-extension/icon16.png": {
+    "size": 138,
+    "mtime_ns": 1778759001974133158,
+    "indexed_at_ns": 1787672794510535000,
+    "word_count": 12,
+    "hashes": {
+      "chrome-extension/icon16.png": "04c88bc5d29baf4aaf2161e4deb8367599a798b0634ade402ed00f27b66aa76a"
+    }
+  },
+  "chrome-extension/icon48.png": {
+    "size": 221,
+    "mtime_ns": 1778759001974232325,
+    "indexed_at_ns": 1787672794510646000,
+    "word_count": 16,
+    "hashes": {
+      "chrome-extension/icon48.png": "3e02ee93954523a82ba871326906804098904fe0cb2ddb1abe68c6cca9920353"
+    }
+  },
+  "chrome-extension/manifest.json": {
+    "size": 889,
+    "mtime_ns": 1778759001974353200,
+    "indexed_at_ns": 1787672778650513000,
+    "word_count": 79,
+    "hashes": {
+      "chrome-extension/manifest.json": "29ade78eb3871039502c99cab1917e85f8068a9cbcb501e1308ad6828865d74a"
+    }
+  },
+  "chrome-extension/package.json": {
+    "size": 3,
+    "mtime_ns": 1778759001974562867,
+    "indexed_at_ns": 1787672778651277000,
+    "word_count": 1,
+    "hashes": {
+      "chrome-extension/package.json": "3df3874459ed75584532800ec6fd8e15975f74aa34ec2aff2dd5fd5056668590"
+    }
+  },
+  "chrome-extension/popup.html": {
+    "size": 6548,
+    "mtime_ns": 1778759138455612241,
+    "indexed_at_ns": 1787672794506084000,
+    "word_count": 542,
+    "hashes": {
+      "chrome-extension/popup.html": "0202052f28216f9d17a58f3f909743809dca10c6b07c05ab5a1645582d43c364"
+    }
+  },
+  "chrome-extension/popup.js": {
+    "size": 31813,
+    "mtime_ns": 1778759001974863576,
+    "indexed_at_ns": 1787672746106536000,
+    "word_count": 3174
+  },
+  "crawler-worker/README.md": {
+    "size": 17724,
+    "mtime_ns": 1779898997845570488,
+    "indexed_at_ns": 1787672794506189000,
+    "word_count": 2405,
+    "hashes": {
+      "crawler-worker/readme.md": "8589ee62b1584f78ea5de2e09a2c06d755a37540248bcb4d4c0b7ea13ce5d93b"
+    }
+  },
+  "crawler-worker/SPECS.md": {
+    "size": 51742,
+    "mtime_ns": 1779897070740759121,
+    "indexed_at_ns": 1787672794506302000,
+    "word_count": 6808,
+    "hashes": {
+      "crawler-worker/specs.md": "f9df09d4a71e6541017f33351e6e8fe2d1df174560c4eba159e5abab8cb3f97b"
+    }
+  },
+  "crawler-worker/package.json": {
+    "size": 708,
+    "mtime_ns": 1778759138457723285,
+    "indexed_at_ns": 1787672778651517000,
+    "word_count": 66,
+    "hashes": {
+      "crawler-worker/package.json": "178e74953b832e4bca599b22e97009e7d9f04ebf143c43d0f7b1d00544fc1aac"
+    }
+  },
+  "crawler-worker/src/auth.ts": {
+    "size": 1859,
+    "mtime_ns": 1778759138458124035,
+    "indexed_at_ns": 1787672746112245000,
+    "word_count": 216
+  },
+  "crawler-worker/src/bot-shared.ts": {
+    "size": 4652,
+    "mtime_ns": 1779717553631097195,
+    "indexed_at_ns": 1787672746112933000,
+    "word_count": 538
+  },
+  "crawler-worker/src/crawler-adapter.ts": {
+    "size": 10026,
+    "mtime_ns": 1778759138458555744,
+    "indexed_at_ns": 1787672746113634000,
+    "word_count": 860
+  },
+  "crawler-worker/src/event-extractor.ts": {
+    "size": 172,
+    "mtime_ns": 1772963518840091944,
+    "indexed_at_ns": 1787672746114441000,
+    "word_count": 19
+  },
+  "crawler-worker/src/event-normalizer.ts": {
+    "size": 3426,
+    "mtime_ns": 1778759138458893286,
+    "indexed_at_ns": 1787672746115122000,
+    "word_count": 312
+  },
+  "crawler-worker/src/event-types.ts": {
+    "size": 157,
+    "mtime_ns": 1778759001976425869,
+    "indexed_at_ns": 1787672746115834000,
+    "word_count": 14
+  },
+  "crawler-worker/src/geohash.ts": {
+    "size": 856,
+    "mtime_ns": 1778759138459292245,
+    "indexed_at_ns": 1787672746116544000,
+    "word_count": 150
+  },
+  "crawler-worker/src/index.ts": {
+    "size": 10262,
+    "mtime_ns": 1779718148283494167,
+    "indexed_at_ns": 1787672746117254000,
+    "word_count": 1093
+  },
+  "crawler-worker/src/jsonld-extractor.ts": {
+    "size": 224,
+    "mtime_ns": 1778759138460136788,
+    "indexed_at_ns": 1787672746117995000,
+    "word_count": 23
+  },
+  "crawler-worker/src/logger.ts": {
+    "size": 3992,
+    "mtime_ns": 1778759138460480080,
+    "indexed_at_ns": 1787672746118641000,
+    "word_count": 453
+  },
+  "crawler-worker/src/page-discovery.ts": {
+    "size": 4329,
+    "mtime_ns": 1778759138460877455,
+    "indexed_at_ns": 1787672746119355000,
+    "word_count": 472
+  },
+  "crawler-worker/src/query-shared.ts": {
+    "size": 14436,
+    "mtime_ns": 1779898502586656271,
+    "indexed_at_ns": 1787672746120049000,
+    "word_count": 1590
+  },
+  "crawler-worker/src/readability-extractor.ts": {
+    "size": 2424,
+    "mtime_ns": 1772789757111193419,
+    "indexed_at_ns": 1787672746120812000,
+    "word_count": 275
+  },
+  "crawler-worker/src/telegram.ts": {
+    "size": 22195,
+    "mtime_ns": 1779898236791575024,
+    "indexed_at_ns": 1787672746121602000,
+    "word_count": 2308
+  },
+  "crawler-worker/src/types.ts": {
+    "size": 2155,
+    "mtime_ns": 1779896819911548106,
+    "indexed_at_ns": 1787672746122401000,
+    "word_count": 258
+  },
+  "crawler-worker/src/whatsapp.ts": {
+    "size": 15887,
+    "mtime_ns": 1779718063462621201,
+    "indexed_at_ns": 1787672746123094000,
+    "word_count": 1762
+  },
+  "crawler-worker/tsconfig.json": {
+    "size": 500,
+    "mtime_ns": 1772802402815065622,
+    "indexed_at_ns": 1787672778651751000,
+    "word_count": 38,
+    "hashes": {
+      "crawler-worker/tsconfig.json": "f025af993eb149c8446e8fcdf1282e478ce8872410c42d368f0233401e1553d8"
+    }
+  },
+  "crawler/README.md": {
+    "size": 17753,
+    "mtime_ns": 1778759138462419790,
+    "indexed_at_ns": 1787672794506431000,
+    "word_count": 2387,
+    "hashes": {
+      "crawler/readme.md": "4ac4671c9237fb77c0fcc5daccab0158b43780ffd03cb48cf4fd65e944327cbd"
+    }
+  },
+  "crawler/SPECS.md": {
+    "size": 100299,
+    "mtime_ns": 1778759138463269291,
+    "indexed_at_ns": 1787672794506540000,
+    "word_count": 13315,
+    "hashes": {
+      "crawler/specs.md": "729fb40843aa51d348417ef805e16a70f4ee3b197a7419c704530483ec8ad902"
+    }
+  },
+  "crawler/jobs.example.yaml": {
+    "size": 428,
+    "mtime_ns": 1778842309547450774,
+    "indexed_at_ns": 1787672794506703000,
+    "word_count": 59,
+    "hashes": {
+      "crawler/jobs.example.yaml": "a3df9035732430032bfebba38aa5fa8a3da36e2713c29b73f7091aac11e95191"
+    }
+  },
+  "crawler/jobs.yaml": {
+    "size": 779,
+    "mtime_ns": 1781035700254752054,
+    "indexed_at_ns": 1787672794506805000,
+    "word_count": 88,
+    "hashes": {
+      "crawler/jobs.yaml": "34da21f62a5046cf54f38996087607703817ae7a33e2123a0c1d978148a9bbf1"
+    }
+  },
+  "crawler/package.json": {
+    "size": 1529,
+    "mtime_ns": 1778759138464529667,
+    "indexed_at_ns": 1787672778651932000,
+    "word_count": 118,
+    "hashes": {
+      "crawler/package.json": "80149b1fb980badfa6186e2af38d7c4961a5a2c3a3684153b35cfea887637318"
+    }
+  },
+  "crawler/seeds.txt": {
+    "size": 380,
+    "mtime_ns": 1778759138464832334,
+    "indexed_at_ns": 1787672794506911000,
+    "word_count": 61,
+    "hashes": {
+      "crawler/seeds.txt": "dd2eb8b7e915ed72535a8a115548bb8b634fb0068870c138a345e2cbb00f29d9"
+    }
+  },
+  "crawler/src/crawler.ts": {
+    "size": 29605,
+    "mtime_ns": 1781035662135397544,
+    "indexed_at_ns": 1787672746133615000,
+    "word_count": 2769
+  },
+  "crawler/src/extractors/event-extractor.ts": {
+    "size": 3990,
+    "mtime_ns": 1778759138465568918,
+    "indexed_at_ns": 1787672746134575000,
+    "word_count": 408
+  },
+  "crawler/src/extractors/html-fetcher.ts": {
+    "size": 5472,
+    "mtime_ns": 1778759138465880794,
+    "indexed_at_ns": 1787672746135518000,
+    "word_count": 617
+  },
+  "crawler/src/extractors/image-fetcher.ts": {
+    "size": 2670,
+    "mtime_ns": 1778759138466146169,
+    "indexed_at_ns": 1787672746136305000,
+    "word_count": 298
+  },
+  "crawler/src/extractors/jina-fetcher.ts": {
+    "size": 3878,
+    "mtime_ns": 1778759138466419086,
+    "indexed_at_ns": 1787672746137078000,
+    "word_count": 432
+  },
+  "crawler/src/extractors/jsonld-extractor.ts": {
+    "size": 932,
+    "mtime_ns": 1778759138466729920,
+    "indexed_at_ns": 1787672746137879000,
+    "word_count": 102
+  },
+  "crawler/src/extractors/page-discovery.ts": {
+    "size": 8275,
+    "mtime_ns": 1778759138467152670,
+    "indexed_at_ns": 1787672746138655000,
+    "word_count": 864
+  },
+  "crawler/src/extractors/pdf-fetcher.ts": {
+    "size": 5577,
+    "mtime_ns": 1778759138467496629,
+    "indexed_at_ns": 1787672746139465000,
+    "word_count": 605
+  },
+  "crawler/src/index.ts": {
+    "size": 11570,
+    "mtime_ns": 1778759138467869921,
+    "indexed_at_ns": 1787672746140195000,
+    "word_count": 1447
+  },
+  "crawler/src/scheduler.ts": {
+    "size": 6761,
+    "mtime_ns": 1781158972146112372,
+    "indexed_at_ns": 1787672746140930000,
+    "word_count": 752
+  },
+  "crawler/src/setup.ts": {
+    "size": 2427,
+    "mtime_ns": 1778759138468540963,
+    "indexed_at_ns": 1787672746141641000,
+    "word_count": 252
+  },
+  "crawler/src/types/event.ts": {
+    "size": 194,
+    "mtime_ns": 1778759138468983714,
+    "indexed_at_ns": 1787672746142528000,
+    "word_count": 19
+  },
+  "crawler/src/utils/api-publisher.ts": {
+    "size": 4222,
+    "mtime_ns": 1781035568926426500,
+    "indexed_at_ns": 1787672746143305000,
+    "word_count": 430
+  },
+  "crawler/src/utils/geohash.ts": {
+    "size": 856,
+    "mtime_ns": 1778759138469578131,
+    "indexed_at_ns": 1787672746144151000,
+    "word_count": 150
+  },
+  "crawler/src/utils/normalizer.ts": {
+    "size": 8738,
+    "mtime_ns": 1778759138469919715,
+    "indexed_at_ns": 1787672746144959000,
+    "word_count": 878
+  },
+  "crawler/tests/README.md": {
+    "size": 16698,
+    "mtime_ns": 1778759138470589757,
+    "indexed_at_ns": 1787672794507015000,
+    "word_count": 2074,
+    "hashes": {
+      "crawler/tests/readme.md": "22405fa0e3ddbe461ac6b0e493cc2fe98136d08d71a45c52422197e691bc5ef2"
+    }
+  },
+  "crawler/tests/capture-fixture.ts": {
+    "size": 12521,
+    "mtime_ns": 1778759138470965133,
+    "indexed_at_ns": 1787672746147666000,
+    "word_count": 1230
+  },
+  "crawler/tests/ci.sh": {
+    "size": 651,
+    "mtime_ns": 1778759138471297675,
+    "indexed_at_ns": 1787672778652139000,
+    "word_count": 92,
+    "hashes": {
+      "crawler/tests/ci.sh": "2273a0b52ed0a020f78addeeb33393a8c403d73a370c89bccb68fb95af5d7192"
+    }
+  },
+  "crawler/tests/cleaned-pages/abetone.txt": {
+    "size": 3150,
+    "mtime_ns": 1778759138471673592,
+    "indexed_at_ns": 1787672794507136000,
+    "word_count": 299,
+    "hashes": {
+      "crawler/tests/cleaned-pages/abetone.txt": "18c0e4ef79084ae68cc221c4b9ca949e90d1229a9615d23ef50a59e7edb8dc25"
+    }
+  },
+  "crawler/tests/compare.ts": {
+    "size": 7702,
+    "mtime_ns": 1778759138472009092,
+    "indexed_at_ns": 1787672746150272000,
+    "word_count": 839
+  },
+  "crawler/tests/db-benchmark.ts": {
+    "size": 21192,
+    "mtime_ns": 1778759138472359176,
+    "indexed_at_ns": 1787672746151005000,
+    "word_count": 2066
+  },
+  "crawler/tests/evaluator.ts": {
+    "size": 15775,
+    "mtime_ns": 1778759138472694051,
+    "indexed_at_ns": 1787672746151798000,
+    "word_count": 1763
+  },
+  "crawler/tests/fixtures/alcatraz-autechre-event.html": {
+    "size": 943599,
+    "mtime_ns": 1778759138476987222,
+    "indexed_at_ns": 1787672794507245000,
+    "word_count": 10286,
+    "hashes": {
+      "crawler/tests/fixtures/alcatraz-autechre-event.html": "92efbfbd5a37a0dc83e4354e03014f0627b27a8cdd7dfd84508ae1bfcb34f72b"
+    }
+  },
+  "crawler/tests/fixtures/alcatraz-autechre-event.metadata.json": {
+    "size": 909,
+    "mtime_ns": 1778759138477329473,
+    "indexed_at_ns": 1787672778652342000,
+    "word_count": 90,
+    "hashes": {
+      "crawler/tests/fixtures/alcatraz-autechre-event.metadata.json": "1106d35272dcb6ed82906ac1098bddb49e7e40db7d07db12f0f1e7f868d0eb7e"
+    }
+  },
+  "crawler/tests/fixtures/alcatraz-fat-freddys-drop-event.html": {
+    "size": 947837,
+    "mtime_ns": 1778759138481526144,
+    "indexed_at_ns": 1787672794507719000,
+    "word_count": 10611,
+    "hashes": {
+      "crawler/tests/fixtures/alcatraz-fat-freddys-drop-event.html": "f4e8fe8d09dd0c89fd6c0cdf56c3669049b2e32aefa76a08d961b7452f3928c5"
+    }
+  },
+  "crawler/tests/fixtures/alcatraz-fat-freddys-drop-event.metadata.json": {
+    "size": 1143,
+    "mtime_ns": 1778759138481930394,
+    "indexed_at_ns": 1787672778652537000,
+    "word_count": 127,
+    "hashes": {
+      "crawler/tests/fixtures/alcatraz-fat-freddys-drop-event.metadata.json": "4c36a0440ae11dbfc910bf0f2e582e2a0ee191cb78b77300ab39ed615ea20ff7"
+    }
+  },
+  "crawler/tests/fixtures/fareast-2026-events.html": {
+    "size": 355733,
+    "mtime_ns": 1778759138483911980,
+    "indexed_at_ns": 1787672794508148000,
+    "word_count": 20847,
+    "hashes": {
+      "crawler/tests/fixtures/fareast-2026-events.html": "7998b46f7275addff1b7b0edee67d8ca034753cfd9d4ade537240234e7d52c7d"
+    }
+  },
+  "crawler/tests/fixtures/fareast-2026-events.metadata.json": {
+    "size": 11624,
+    "mtime_ns": 1778759138484406939,
+    "indexed_at_ns": 1787672778652950000,
+    "word_count": 1020,
+    "hashes": {
+      "crawler/tests/fixtures/fareast-2026-events.metadata.json": "e942e21873123bc14a1d9c903f067d77f9203701d14660a62348771e195a0f91"
+    }
+  },
+  "crawler/tests/fixtures/ig-quod.txt": {
+    "size": 1949,
+    "mtime_ns": 1778759138484674397,
+    "indexed_at_ns": 1787672794508381000,
+    "word_count": 238,
+    "hashes": {
+      "crawler/tests/fixtures/ig-quod.txt": "61dd61e400c196c08966cbc28455c244f0da4749095d450e74d5c758372b4cf7"
+    }
+  },
+  "crawler/tests/fixtures/massimo-silverio-rivolta.jpeg": {
+    "size": 925927,
+    "mtime_ns": 1778759138488908610,
+    "indexed_at_ns": 1787672794510751000,
+    "word_count": 32479,
+    "hashes": {
+      "crawler/tests/fixtures/massimo-silverio-rivolta.jpeg": "709ab3f251e1b0d7840b496550937c7015f0b0d397993a05b2651cdd70fc6aa5"
+    }
+  },
+  "crawler/tests/fixtures/massimo-silverio-rivolta.metadata.json": {
+    "size": 914,
+    "mtime_ns": 1778759138489230236,
+    "indexed_at_ns": 1787672778653190000,
+    "word_count": 86,
+    "hashes": {
+      "crawler/tests/fixtures/massimo-silverio-rivolta.metadata.json": "53508cf2d64481899fb447c0418bc0618d488423eff106fbb00e53bd33ed78a3"
+    }
+  },
+  "crawler/tests/fixtures/naon-event.html": {
+    "size": 110388,
+    "mtime_ns": 1778759138489730153,
+    "indexed_at_ns": 1787672794508489000,
+    "word_count": 5172,
+    "hashes": {
+      "crawler/tests/fixtures/naon-event.html": "07fe3b652667bdf50c4ffd36be82d442c44aaaa49c114e7dcf71601413d89e48"
+    }
+  },
+  "crawler/tests/fixtures/naon-event.metadata.json": {
+    "size": 1002,
+    "mtime_ns": 1778759138491008946,
+    "indexed_at_ns": 1787672778653409000,
+    "word_count": 94,
+    "hashes": {
+      "crawler/tests/fixtures/naon-event.metadata.json": "ee8f65dae626d4ec794dce54f29b1ad4654634721c9dbdf8a3084f436eeeaaf4"
+    }
+  },
+  "crawler/tests/fixtures/nick-cave-tour.html": {
+    "size": 319894,
+    "mtime_ns": 1778759138492012239,
+    "indexed_at_ns": 1787672794508637000,
+    "word_count": 14507,
+    "hashes": {
+      "crawler/tests/fixtures/nick-cave-tour.html": "def3ca873df74fa40c85fd36e6163dadcfbf3bfccd24e70a76bedd3ad4400051"
+    }
+  },
+  "crawler/tests/fixtures/nick-cave-tour.metadata.json": {
+    "size": 13201,
+    "mtime_ns": 1778759138492355197,
+    "indexed_at_ns": 1787672778653617000,
+    "word_count": 1365,
+    "hashes": {
+      "crawler/tests/fixtures/nick-cave-tour.metadata.json": "c53781bbcd62b6de4a0518421727d6a659587ca93a09adb19c6d9925f5726543"
+    }
+  },
+  "crawler/tests/fixtures/ultraboot-berlin.jpeg": {
+    "size": 1501568,
+    "mtime_ns": 1778759138497316911,
+    "indexed_at_ns": 1787672794511183000,
+    "word_count": 53414,
+    "hashes": {
+      "crawler/tests/fixtures/ultraboot-berlin.jpeg": "167ce16af724f2b1b528f03f1e2ece106cf0b088b25fc62102df4f7f6caf8f1c"
+    }
+  },
+  "crawler/tests/fixtures/ultraboot-berlin.metadata.json": {
+    "size": 1243,
+    "mtime_ns": 1778759138497655870,
+    "indexed_at_ns": 1787672778654040000,
+    "word_count": 104,
+    "hashes": {
+      "crawler/tests/fixtures/ultraboot-berlin.metadata.json": "b75f3a158466dfc34b283b50201b99522d4b713440d378cf7bce39de187b0739"
+    }
+  },
+  "crawler/tests/fixtures/yazz-scena-sonica.jpg": {
+    "size": 683461,
+    "mtime_ns": 1778759138501410165,
+    "indexed_at_ns": 1787672794511824000,
+    "word_count": 23444,
+    "hashes": {
+      "crawler/tests/fixtures/yazz-scena-sonica.jpg": "503a4f0ef62ad53f3bfa81289396cbbe12fd098dfd9eec1b50d6f4e24b26c701"
+    }
+  },
+  "crawler/tests/fixtures/yazz-scena-sonica.metadata.json": {
+    "size": 717,
+    "mtime_ns": 1778759138501751457,
+    "indexed_at_ns": 1787672778654258000,
+    "word_count": 47,
+    "hashes": {
+      "crawler/tests/fixtures/yazz-scena-sonica.metadata.json": "eb3da886d4f4df630e2d46b652ca0556af5dcb712536beeeaea072ad1c79461b"
+    }
+  },
+  "crawler/tests/human-review.ts": {
+    "size": 6973,
+    "mtime_ns": 1778759138502026749,
+    "indexed_at_ns": 1787672746197509000,
+    "word_count": 664
+  },
+  "crawler/tests/report.ts": {
+    "size": 8844,
+    "mtime_ns": 1778759138502291166,
+    "indexed_at_ns": 1787672746198225000,
+    "word_count": 905
+  },
+  "crawler/tests/set-reference.sh": {
+    "size": 526,
+    "mtime_ns": 1778759138502547208,
+    "indexed_at_ns": 1787672778654434000,
+    "word_count": 69,
+    "hashes": {
+      "crawler/tests/set-reference.sh": "bdc3ca5ae39fc70e8e982798ec7c652caee40e6f49916de3e2ca344c5667e0bc"
+    }
+  },
+  "crawler/tests/snapshots/reference.json": {
+    "size": 33446,
+    "mtime_ns": 1778759138502858542,
+    "indexed_at_ns": 1787672778654607000,
+    "word_count": 2911,
+    "hashes": {
+      "crawler/tests/snapshots/reference.json": "2113a73035494a9b78ffa3654b153d8e4a045561c8e523ef60b70d7b06167919"
+    }
+  },
+  "crawler/tests/test-dedup.ts": {
+    "size": 4525,
+    "mtime_ns": 1778759138503158251,
+    "indexed_at_ns": 1787672746247796000,
+    "word_count": 454
+  },
+  "crawler/tests/test-geocode-fallback.ts": {
+    "size": 2717,
+    "mtime_ns": 1778759138503416584,
+    "indexed_at_ns": 1787672746248670000,
+    "word_count": 316
+  },
+  "crawler/tests/test-group-by-day.ts": {
+    "size": 5333,
+    "mtime_ns": 1778759138503671376,
+    "indexed_at_ns": 1787672746249353000,
+    "word_count": 593
+  },
+  "crawler/tests/test-pdf-fetcher.ts": {
+    "size": 1383,
+    "mtime_ns": 1778759138503891834,
+    "indexed_at_ns": 1787672746250069000,
+    "word_count": 153
+  },
+  "crawler/tests/test-runner.ts": {
+    "size": 22443,
+    "mtime_ns": 1778759138504153335,
+    "indexed_at_ns": 1787672746250753000,
+    "word_count": 2089
+  },
+  "crawler/tests/test-scheduler.ts": {
+    "size": 3364,
+    "mtime_ns": 1778759138504406793,
+    "indexed_at_ns": 1787672746251534000,
+    "word_count": 405
+  },
+  "crawler/tests/test-year-inference.ts": {
+    "size": 3393,
+    "mtime_ns": 1778759138504693210,
+    "indexed_at_ns": 1787672746252215000,
+    "word_count": 375
+  },
+  "crawler/tests/types.ts": {
+    "size": 3054,
+    "mtime_ns": 1778759138504962586,
+    "indexed_at_ns": 1787672746252941000,
+    "word_count": 341
+  },
+  "crawler/tsconfig.json": {
+    "size": 493,
+    "mtime_ns": 1778759138505252669,
+    "indexed_at_ns": 1787672778654808000,
+    "word_count": 39,
+    "hashes": {
+      "crawler/tsconfig.json": "28f1e2fc481a93a147ed588cecdc17b8ca6387793cec00455d12fe61f7b758c2"
+    }
+  },
+  "docs/design/2026-05-07-dark-theme-design.md": {
+    "size": 4958,
+    "mtime_ns": 1778759138505621420,
+    "indexed_at_ns": 1787672794508849000,
+    "word_count": 780,
+    "hashes": {
+      "docs/design/2026-05-07-dark-theme-design.md": "3aad37f3e17e25b90fe0cea472f6f6fa7849a7b1b003014917a81eeab87e11c6"
+    }
+  },
+  "docs/diving-deeper/tracing-an-event.md": {
+    "size": 12124,
+    "mtime_ns": 1781034052455193569,
+    "indexed_at_ns": 1787672794508957000,
+    "word_count": 1795,
+    "hashes": {
+      "docs/diving-deeper/tracing-an-event.md": "28c1fb4509acb256217b5e390b4ae84412f2d276c31c60be1079bf8c4e77de8b"
+    }
+  },
+  "docs/ideas.md": {
+    "size": 3731,
+    "mtime_ns": 1779036203643616891,
+    "indexed_at_ns": 1787672794509073000,
+    "word_count": 581,
+    "hashes": {
+      "docs/ideas.md": "7fb50b8c13879b5d308f336776e4c6a8ae55f67cade114122dc1b87d0709681c"
+    }
+  },
+  "docs/overall-structure.md": {
+    "size": 8660,
+    "mtime_ns": 1781025614798640594,
+    "indexed_at_ns": 1787672794509176000,
+    "word_count": 1297,
+    "hashes": {
+      "docs/overall-structure.md": "3da6a9bcb4d332cbfaf877b00facf00bfc1f98ac6807d356108987f788068ebe"
+    }
+  },
+  "package.json": {
+    "size": 187,
+    "mtime_ns": 1778759138506142920,
+    "indexed_at_ns": 1787672778654953000,
+    "word_count": 17,
+    "hashes": {
+      "package.json": "c05c9c5fcb63611921853a7a15a00994e74382ec0073a98eb6a915840283e62d"
+    }
+  },
+  "public-web/README.md": {
+    "size": 7233,
+    "mtime_ns": 1778759138506539254,
+    "indexed_at_ns": 1787672794509288000,
+    "word_count": 1009,
+    "hashes": {
+      "public-web/readme.md": "e32ae9e8469d9b2bf0d39e4aba9bac4484267bf5d7e2edc9d21e06c04e9cae50"
+    }
+  },
+  "public-web/SPECS.md": {
+    "size": 11628,
+    "mtime_ns": 1780678417613584090,
+    "indexed_at_ns": 1787672794509390000,
+    "word_count": 1780,
+    "hashes": {
+      "public-web/specs.md": "d15a5d6437e1084bc904902bcac0bdb849033e63d5fc1e9b2738bda3e0e9ef87"
+    }
+  },
+  "public-web/bookmarklet.src.js": {
+    "size": 1704,
+    "mtime_ns": 1779345510309625654,
+    "indexed_at_ns": 1787672746261381000,
+    "word_count": 160
+  },
+  "public-web/build-bookmarklet.js": {
+    "size": 3078,
+    "mtime_ns": 1778759138507478130,
+    "indexed_at_ns": 1787672746262008000,
+    "word_count": 298
+  },
+  "public-web/group-events.js": {
+    "size": 3079,
+    "mtime_ns": 1773942501299627304,
+    "indexed_at_ns": 1787672746262754000,
+    "word_count": 410
+  },
+  "public-web/icon-192.png": {
+    "size": 454,
+    "mtime_ns": 1778759138507643380,
+    "indexed_at_ns": 1787672794512158000,
+    "word_count": 24,
+    "hashes": {
+      "public-web/icon-192.png": "d8f94ee7f39efcb6fd2a97dd1aec900b41a3bd812432b04ed906b8cd5956007b"
+    }
+  },
+  "public-web/index.html": {
+    "size": 36822,
+    "mtime_ns": 1780677863628713176,
+    "indexed_at_ns": 1787672794509498000,
+    "word_count": 3001,
+    "hashes": {
+      "public-web/index.html": "8a7e529c191404f3a2c265bf9c2767c91a558a227a2d79096f2caa7362b7d9bb"
+    }
+  },
+  "public-web/inject-worker-url.js": {
+    "size": 3806,
+    "mtime_ns": 1778759138508102631,
+    "indexed_at_ns": 1787672746265051000,
+    "word_count": 398
+  },
+  "public-web/it.html": {
+    "size": 36937,
+    "mtime_ns": 1780677893488555653,
+    "indexed_at_ns": 1787672794509617000,
+    "word_count": 2985,
+    "hashes": {
+      "public-web/it.html": "56d590bf47cf7228c59a3a37416c7802910fd2d1a098621640f532af305255f4"
+    }
+  },
+  "public-web/map.html": {
+    "size": 23759,
+    "mtime_ns": 1778759138508638215,
+    "indexed_at_ns": 1787672794509732000,
+    "word_count": 1827,
+    "hashes": {
+      "public-web/map.html": "e18d7db920eed313927df823748f58b17b0e51339e067a8ca528b6ac9fa3c09b"
+    }
+  },
+  "public-web/privacy-policy.html": {
+    "size": 4167,
+    "mtime_ns": 1778759138509004965,
+    "indexed_at_ns": 1787672794509839000,
+    "word_count": 426,
+    "hashes": {
+      "public-web/privacy-policy.html": "82ab0ee8a7c46846c19ee3bd84ecbb316b8b15665151ccaca1acb51c590cbc8b"
+    }
+  },
+  "public-web/publish.html": {
+    "size": 27622,
+    "mtime_ns": 1778759138509149382,
+    "indexed_at_ns": 1787672794509949000,
+    "word_count": 2097,
+    "hashes": {
+      "public-web/publish.html": "19bab7053699617c28c33bd53d4a6f1670795bec781e16dc329fd92bed296043"
+    }
+  },
+  "public-web/publish.manifest.json": {
+    "size": 259,
+    "mtime_ns": 1778759138509384007,
+    "indexed_at_ns": 1787672778655114000,
+    "word_count": 24,
+    "hashes": {
+      "public-web/publish.manifest.json": "c1df2d605833ea52d752bcc772d8fcefeb8749c49d2783f88a20e4eed6ec1888"
+    }
+  },
+  "public-web/query.js": {
+    "size": 25901,
+    "mtime_ns": 1780678030640711665,
+    "indexed_at_ns": 1787672746269905000,
+    "word_count": 2337
+  },
+  "public-web/shared.js": {
+    "size": 4644,
+    "mtime_ns": 1778759050929009795,
+    "indexed_at_ns": 1787672746270732000,
+    "word_count": 673
+  },
+  "public-web/shortcut-bookmarklet.src.js": {
+    "size": 1000,
+    "mtime_ns": 1778759138509806507,
+    "indexed_at_ns": 1787672746271793000,
+    "word_count": 104
+  },
+  "public-web/signing.js": {
+    "size": 2271,
+    "mtime_ns": 1778759138510018841,
+    "indexed_at_ns": 1787672746272400000,
+    "word_count": 218
+  },
+  "public-web/tests/group-events.test.mjs": {
+    "size": 10350,
+    "mtime_ns": 1778759001979560206,
+    "indexed_at_ns": 1787672746273124000,
+    "word_count": 949
+  },
+  "public-web/tests/shared.test.mjs": {
+    "size": 4047,
+    "mtime_ns": 1778759050929317962,
+    "indexed_at_ns": 1787672746273893000,
+    "word_count": 265
+  },
+  "public-web/tests/signing.test.mjs": {
+    "size": 3824,
+    "mtime_ns": 1778759138510265133,
+    "indexed_at_ns": 1787672746274604000,
+    "word_count": 319
+  },
+  "scripts/backup-local.sh": {
+    "size": 465,
+    "mtime_ns": 1778759138510557800,
+    "indexed_at_ns": 1787672778655275000,
+    "word_count": 51,
+    "hashes": {
+      "scripts/backup-local.sh": "40267e05453b46ad768cbab9f4bdc77227661b3fc80d5fe62effd3c34717c308"
+    }
+  },
+  "scripts/crawl-image.sh": {
+    "size": 2473,
+    "mtime_ns": 1778759138510824759,
+    "indexed_at_ns": 1787672778655424000,
+    "word_count": 307,
+    "hashes": {
+      "scripts/crawl-image.sh": "2ed4bfd393efbf2474fe12e67d54aab5b852273c5f3c8ef41250c116a083f20d"
+    }
+  },
+  "scripts/crawl-page.sh": {
+    "size": 2392,
+    "mtime_ns": 1778759138511068134,
+    "indexed_at_ns": 1787672778655575000,
+    "word_count": 323,
+    "hashes": {
+      "scripts/crawl-page.sh": "b144a8e35ad216848f23fd718ca48ad8ccb07d6bebf3d41afb5d7e77a3125982"
+    }
+  },
+  "scripts/deploy-public-web.sh": {
+    "size": 2143,
+    "mtime_ns": 1778759138511352884,
+    "indexed_at_ns": 1787672778655723000,
+    "word_count": 232,
+    "hashes": {
+      "scripts/deploy-public-web.sh": "7ddcb5f5dade7af048c0b0555c97e14edc37dc209970fac16fb6e43a24bf0423"
+    }
+  },
+  "scripts/install-hooks.sh": {
+    "size": 3713,
+    "mtime_ns": 1778759001980378415,
+    "indexed_at_ns": 1787672778655878000,
+    "word_count": 444,
+    "hashes": {
+      "scripts/install-hooks.sh": "cfa67cd8c5cfb0f3f02d251ae63a4bb1849c66e4308b6b6175e7ed75cbf91022"
+    }
+  },
+  "scripts/push-force.sh": {
+    "size": 162,
+    "mtime_ns": 1778759001980480248,
+    "indexed_at_ns": 1787672778656029000,
+    "word_count": 21,
+    "hashes": {
+      "scripts/push-force.sh": "59ada8d2b8e52645c29bea18c37f9ad8a0f856e70b614b493f082e5da4b4a32b"
+    }
+  },
+  "scripts/release-extension-developer.sh": {
+    "size": 835,
+    "mtime_ns": 1778759001980601248,
+    "indexed_at_ns": 1787672778656237000,
+    "word_count": 88,
+    "hashes": {
+      "scripts/release-extension-developer.sh": "8354c2d2637e377cacb3128b0f31fd43e2bb368b17604a63466bb9fd9a9e5748"
+    }
+  },
+  "scripts/release-extension-webstore.sh": {
+    "size": 1353,
+    "mtime_ns": 1778759001980727082,
+    "indexed_at_ns": 1787672778656417000,
+    "word_count": 154,
+    "hashes": {
+      "scripts/release-extension-webstore.sh": "5813e0b2786275fc2c567c3385229e1e787a1891e54c19428f82c5d809c81c14"
+    }
+  },
+  "scripts/restore-from-backup.sh": {
+    "size": 1630,
+    "mtime_ns": 1778759138511570718,
+    "indexed_at_ns": 1787672778656588000,
+    "word_count": 225,
+    "hashes": {
+      "scripts/restore-from-backup.sh": "28b388b927d8a9171c43de5c1747e2a24479747fc0fdce0e21c3bfe8c6522bd2"
+    }
+  },
+  "scripts/setup.sh": {
+    "size": 1412,
+    "mtime_ns": 1778759138511764135,
+    "indexed_at_ns": 1787672778656761000,
+    "word_count": 162,
+    "hashes": {
+      "scripts/setup.sh": "4b3a2bdb520b862e9e380e49bd939913409d985d5719f406c9ef13bd627aaccc"
+    }
+  },
+  "shared/dedup-config.ts": {
+    "size": 1680,
+    "mtime_ns": 1779474740138578444,
+    "indexed_at_ns": 1787672746282390000,
+    "word_count": 261
+  },
+  "shared/extractors/event-extractor.ts": {
+    "size": 17330,
+    "mtime_ns": 1778759138512031177,
+    "indexed_at_ns": 1787672746283163000,
+    "word_count": 1733
+  },
+  "shared/extractors/extraction-limits.ts": {
+    "size": 2006,
+    "mtime_ns": 1778759138512306135,
+    "indexed_at_ns": 1787672746283943000,
+    "word_count": 281
+  },
+  "shared/extractors/extraction-prompt.ts": {
+    "size": 14539,
+    "mtime_ns": 1774798400548080444,
+    "indexed_at_ns": 1787672746284812000,
+    "word_count": 2260
+  },
+  "shared/extractors/html-cleaner.ts": {
+    "size": 2700,
+    "mtime_ns": 1773680743846040368,
+    "indexed_at_ns": 1787672746285616000,
+    "word_count": 313
+  },
+  "shared/extractors/jsonld-extractor.ts": {
+    "size": 3200,
+    "mtime_ns": 1773401353332550406,
+    "indexed_at_ns": 1787672746286374000,
+    "word_count": 344
+  },
+  "shared/extractors/jsonld-helpers.ts": {
+    "size": 9126,
+    "mtime_ns": 1774720690133967757,
+    "indexed_at_ns": 1787672746287058000,
+    "word_count": 1014
+  },
+  "shared/extractors/year-inference.ts": {
+    "size": 3040,
+    "mtime_ns": 1774794734125500321,
+    "indexed_at_ns": 1787672746287799000,
+    "word_count": 383
+  },
+  "shared/llm/anthropic.ts": {
+    "size": 2655,
+    "mtime_ns": 1774692384590586305,
+    "indexed_at_ns": 1787672746288490000,
+    "word_count": 261
+  },
+  "shared/llm/duplicate-check.ts": {
+    "size": 3803,
+    "mtime_ns": 1779475203954048577,
+    "indexed_at_ns": 1787672746289237000,
+    "word_count": 538
+  },
+  "shared/llm/factory.ts": {
+    "size": 1516,
+    "mtime_ns": 1774703862852467537,
+    "indexed_at_ns": 1787672746289974000,
+    "word_count": 155
+  },
+  "shared/llm/ollama.ts": {
+    "size": 1555,
+    "mtime_ns": 1774703653768820643,
+    "indexed_at_ns": 1787672746290701000,
+    "word_count": 163
+  },
+  "shared/llm/openai.ts": {
+    "size": 2439,
+    "mtime_ns": 1775161657884949327,
+    "indexed_at_ns": 1787672746291438000,
+    "word_count": 235
+  },
+  "shared/package.json": {
+    "size": 295,
+    "mtime_ns": 1778759138512791344,
+    "indexed_at_ns": 1787672778656943000,
+    "word_count": 26,
+    "hashes": {
+      "shared/package.json": "f59de3b32de67538c9207e31dec9a9b407c025adec4ca09657c4d7c8ddd02e62"
+    }
+  },
+  "shared/types/event.ts": {
+    "size": 2891,
+    "mtime_ns": 1778759001981466583,
+    "indexed_at_ns": 1787672746292909000,
+    "word_count": 320
+  },
+  "shared/types/llm.ts": {
+    "size": 1208,
+    "mtime_ns": 1772963333454449654,
+    "indexed_at_ns": 1787672746293626000,
+    "word_count": 150
+  },
+  "shared/utils/geocode.ts": {
+    "size": 2699,
+    "mtime_ns": 1775810891236127257,
+    "indexed_at_ns": 1787672746294345000,
+    "word_count": 310
+  },
+  "shared/utils/timezone.ts": {
+    "size": 2117,
+    "mtime_ns": 1773401797768143654,
+    "indexed_at_ns": 1787672746295058000,
+    "word_count": 258
+  },
+  "web-publisher/index.html": {
+    "size": 19155,
+    "mtime_ns": 1778759138513049844,
+    "indexed_at_ns": 1787672794510082000,
+    "word_count": 1434,
+    "hashes": {
+      "web-publisher/index.html": "33e633d173036cc1c8103e1c1dc9c7bc13527620356a890d03831a26cdd70cf3"
+    }
+  },
+  "worker/README.md": {
+    "size": 13174,
+    "mtime_ns": 1778759138514292596,
+    "indexed_at_ns": 1787672794510197000,
+    "word_count": 1769,
+    "hashes": {
+      "worker/readme.md": "4e880d4f25ae4422626eab21d1f97fc2b3a5302efdccb931cd410a7e7eeb836a"
+    }
+  },
+  "worker/SPECS.md": {
+    "size": 41334,
+    "mtime_ns": 1780676585125033290,
+    "indexed_at_ns": 1787672794510303000,
+    "word_count": 5745,
+    "hashes": {
+      "worker/specs.md": "f8377815701c4a4c39d37a0ae73019598d831654e1a7453f79e3ecdf9bb844bb"
+    }
+  },
+  "worker/migrations/0001_create_events_table.sql": {
+    "size": 841,
+    "mtime_ns": 1772633095243037462,
+    "indexed_at_ns": 1787672778657111000,
+    "word_count": 123,
+    "hashes": {
+      "worker/migrations/0001_create_events_table.sql": "254d590ac6b8f1ba2d49045591e3f39f5048d4107f837d6c630b429bd52ca7f9"
+    }
+  },
+  "worker/migrations/0002_add_address_field.sql": {
+    "size": 81,
+    "mtime_ns": 1772395336672076702,
+    "indexed_at_ns": 1787672778657197000,
+    "word_count": 14,
+    "hashes": {
+      "worker/migrations/0002_add_address_field.sql": "11fb025d2f142a11bca6d305e4635748e2aa299bcabca5f10233d7e4aa4bad64"
+    }
+  },
+  "worker/migrations/0003_convert_timestamps_to_text.sql": {
+    "size": 2219,
+    "mtime_ns": 1772633109031080127,
+    "indexed_at_ns": 1787672778657278000,
+    "word_count": 312,
+    "hashes": {
+      "worker/migrations/0003_convert_timestamps_to_text.sql": "b789cfe3ddd3d86661b3480bea8ce8cb3e7f6b6bc3f3921141c6defa2c9b24c1"
+    }
+  },
+  "worker/migrations/0004_add_festival_fields.sql": {
+    "size": 246,
+    "mtime_ns": 1773918234763596654,
+    "indexed_at_ns": 1787672778657365000,
+    "word_count": 32,
+    "hashes": {
+      "worker/migrations/0004_add_festival_fields.sql": "aa6f16b2ed0c6a4f8c37a78c7e087c3a56295461e1fdb35823df7be02a21a339"
+    }
+  },
+  "worker/migrations/0005_add_blocklist.sql": {
+    "size": 153,
+    "mtime_ns": 1774426857108668208,
+    "indexed_at_ns": 1787672778657451000,
+    "word_count": 24,
+    "hashes": {
+      "worker/migrations/0005_add_blocklist.sql": "09ca965f3bd637e4f03bb8e682f7fe6a2b8a92c79be6e1f7e8f118b3035d95f3"
+    }
+  },
+  "worker/package.json": {
+    "size": 1279,
+    "mtime_ns": 1778759138515366305,
+    "indexed_at_ns": 1787672778657525000,
+    "word_count": 133,
+    "hashes": {
+      "worker/package.json": "17107e5d83a7bbd3ad188f41070ed6e79d04be735c6f0fbb0a1fac87b59935e5"
+    }
+  },
+  "worker/scripts/check-duplicate.ts": {
+    "size": 10468,
+    "mtime_ns": 1778759138515656972,
+    "indexed_at_ns": 1787672746303389000,
+    "word_count": 1157
+  },
+  "worker/src/crypto.ts": {
+    "size": 3242,
+    "mtime_ns": 1774426857109369278,
+    "indexed_at_ns": 1787672746304149000,
+    "word_count": 379
+  },
+  "worker/src/geohash.ts": {
+    "size": 2826,
+    "mtime_ns": 1772393112247086048,
+    "indexed_at_ns": 1787672746304881000,
+    "word_count": 389
+  },
+  "worker/src/index.test.ts": {
+    "size": 18226,
+    "mtime_ns": 1780669278801651766,
+    "indexed_at_ns": 1787672746305572000,
+    "word_count": 1980
+  },
+  "worker/src/index.ts": {
+    "size": 33038,
+    "mtime_ns": 1780669448334760392,
+    "indexed_at_ns": 1787672746306380000,
+    "word_count": 3794
+  },
+  "worker/tsconfig.json": {
+    "size": 429,
+    "mtime_ns": 1772392336330413938,
+    "indexed_at_ns": 1787672778657599000,
+    "word_count": 31,
+    "hashes": {
+      "worker/tsconfig.json": "9467306065720718dfcbc11a190360e44d6cabae04b8ddc99c3691991483aa46"
+    }
+  }
+}

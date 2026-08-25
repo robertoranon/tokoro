@@ -102,3 +102,13 @@ Users generate Ed25519 keypairs locally on device (no signup, no auth backend). 
 ### Geospatial Query Strategy
 
 Events are tagged with geohash strings at two precisions (5 and 6). Queries filter by geohash prefix to retrieve events in geographic cells, with final bounding-box filtering in the Worker for precise radius. This avoids client-side filtering and leverages SQLite indexes efficiently.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
