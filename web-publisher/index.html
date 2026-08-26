@@ -543,12 +543,15 @@
         submitBtn.textContent = 'Publishing...';
 
         try {
-          const startDate = new Date(
-            document.getElementById('start_date').value
-          );
-          const endDate = document.getElementById('end_date').value
-            ? new Date(document.getElementById('end_date').value)
-            : null;
+          // <input type="datetime-local"> already yields "YYYY-MM-DDTHH:MM"
+          // with no timezone - that's exactly the venue-local convention the
+          // API expects, so use it as-is (just pad seconds) rather than
+          // routing through Date/epoch, which would apply the browser's
+          // timezone and violate the "local time at the venue" format.
+          const startTimeRaw = document.getElementById('start_date').value;
+          const endTimeRaw = document.getElementById('end_date').value;
+          const toIsoLocal = value =>
+            value.length === 16 ? `${value}:00` : value;
 
           const event = {
             pubkey: keypair.pubkey,
@@ -559,11 +562,11 @@
             address: document.getElementById('address').value || '',
             lat: selectedLocation.lat,
             lng: selectedLocation.lng,
-            start_time: Math.floor(startDate.getTime() / 1000),
-            end_time: endDate ? Math.floor(endDate.getTime() / 1000) : null,
+            start_time: toIsoLocal(startTimeRaw),
+            end_time: endTimeRaw ? toIsoLocal(endTimeRaw) : null,
             category: document.getElementById('category').value,
             tags: eventTags,
-            created_at: Math.floor(Date.now() / 1000),
+            created_at: new Date().toISOString().slice(0, 19),
           };
 
           // Sign the event
