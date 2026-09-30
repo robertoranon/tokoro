@@ -22,6 +22,8 @@ export type DatedDraft = FestivalEntryDraft & {
   end_time: string;
 };
 
+const RADAR_CATEGORIES: string[] = ['music', 'art', 'theater', 'other'];
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
 
 /** First 10 chars are a real calendar date (rejects 2026-02-31, 2026-13-45). */
@@ -77,8 +79,17 @@ export function parseFestivalEntry(
   raw: unknown,
   pageUrl: string
 ): FestivalEntryDraft | null {
-  const candidate = Array.isArray(raw) ? raw[0] : raw;
+  let candidate = Array.isArray(raw) ? raw[0] : raw;
   if (!candidate || typeof candidate !== 'object') return null;
+
+  // Unwrap a single-key wrapper such as {"festival": {...}}.
+  const keys = Object.keys(candidate);
+  if (keys.length === 1 && !(keys[0] in FestivalEntryDraftSchema.shape)) {
+    const inner = (candidate as Record<string, unknown>)[keys[0]];
+    if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
+      candidate = inner;
+    }
+  }
 
   // LLMs return null / '' for "unknown"; the schema wants the key absent.
   const cleaned: Record<string, unknown> = Object.fromEntries(
@@ -87,6 +98,12 @@ export function parseFestivalEntry(
     )
   );
   sanitizeOptionalFields(cleaned);
+  if (
+    cleaned.category !== undefined &&
+    !RADAR_CATEGORIES.includes(cleaned.category as string)
+  ) {
+    cleaned.category = 'other';
+  }
   if (!cleaned.url) cleaned.url = pageUrl;
 
   const parsed = FestivalEntryDraftSchema.safeParse(cleaned);

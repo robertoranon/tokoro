@@ -250,11 +250,35 @@ console.log('\n=== parseFestivalEntry ===\n');
     'missing title → null'
   );
   assert(
+    parseFestivalEntry({ title: 'Bad', category: 'weird' }, 'https://x.example')
+      ?.category === 'other',
+    'unknown category → entry kept with category other'
+  );
+  assert(
+    parseFestivalEntry({ title: 'F', category: 'food' }, 'https://x.example')
+      ?.category === 'other',
+    'food → other'
+  );
+  assert(
+    parseFestivalEntry({ title: 'F', category: 'music' }, 'https://x.example')
+      ?.category === 'music',
+    'music stays music'
+  );
+  assert(
+    parseFestivalEntry({ title: 'F' }, 'https://x.example')?.category ===
+      'other',
+    'missing category → other'
+  );
+  assert(
     parseFestivalEntry(
-      { title: 'Bad', category: 'weird' },
+      { festival: { title: 'Wrapped', category: 'art' } },
       'https://x.example'
-    ) === null,
-    'invalid category → null'
+    )?.title === 'Wrapped',
+    'single-key wrapper object is unwrapped'
+  );
+  assert(
+    parseFestivalEntry({ title: 'X' }, 'https://x.example')?.title === 'X',
+    'single-key that is a known field is not unwrapped'
   );
 }
 
@@ -621,14 +645,22 @@ console.log('\n=== review fixes: sanitizing / real dates / finalize ===\n');
   assert(f.festival_name === 'F', 'empty festival_name falls back to title');
 }
 
-function fakeLLM(
-  reply: string | (() => string)
-): LLMProvider & { calls: number } {
-  const llm: LLMProvider & { calls: number } = {
+type FakeLLM = LLMProvider & {
+  calls: number;
+  messages: { role: string; content: string }[][];
+  options: any[];
+};
+
+function fakeLLM(reply: string | (() => string)): FakeLLM {
+  const llm: FakeLLM = {
     name: 'fake',
     calls: 0,
-    async complete() {
+    messages: [],
+    options: [],
+    async complete(messages: any, options?: any) {
       llm.calls++;
+      llm.messages.push(messages);
+      llm.options.push(options);
       return {
         content: typeof reply === 'function' ? reply() : reply,
         model: 'fake',
@@ -672,6 +704,27 @@ console.log('\n=== FestivalEntryExtractor ===\n');
     'day_name is consumed by year validation'
   );
 
+  assert(good.calls === 1, 'exactly one LLM call per extract');
+  assert(
+    good.messages[0][0].role === 'system' &&
+      good.messages[0][0].content.includes('exactly ONE record'),
+    'system message is the festival-entry prompt'
+  );
+  assert(
+    good.options[0]?.responseFormat === 'json',
+    'requests json response format'
+  );
+
+  const emptyLlm = fakeLLM('null');
+  const emptyRes = await new FestivalEntryExtractor({ llm: emptyLlm }).extract({
+    ...page,
+    text: '\n  \n\n',
+  });
+  assert(
+    emptyRes === null && emptyLlm.calls === 0,
+    'empty page text → null without calling the LLM'
+  );
+
   const nothing = await new FestivalEntryExtractor({
     llm: fakeLLM('null'),
   }).extract(page);
@@ -705,6 +758,13 @@ console.log('\n=== PageDiscovery.discoverFestivalInfoPages ===\n');
   assert(
     urls.join() === 'https://f.example/info,https://f.example/tickets/',
     'returns absolute, de-duplicated (trailing-slash-insensitive) urls and skips unparseable ones'
+  );
+  const sent = llm.messages[0].find(m => m.role === 'user')?.content ?? '';
+  assert(
+    sent.includes('/info') &&
+      !sent.includes('facebook.com') &&
+      !sent.includes('#top'),
+    'link filter: social and anchor links are not sent to the LLM'
   );
   const none = await new PageDiscovery(
     fakeLLM('{"infoUrls":[]}')

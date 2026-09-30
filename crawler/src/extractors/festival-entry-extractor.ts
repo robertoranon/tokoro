@@ -34,6 +34,8 @@ export class FestivalEntryExtractor {
       .join('\n')
       .slice(0, DEFAULT_MAX_CONTENT_LENGTH);
 
+    if (!content.trim()) return null;
+
     const response = await this.config.llm.complete(
       [
         { role: 'system', content: getFestivalEntryPrompt() },
