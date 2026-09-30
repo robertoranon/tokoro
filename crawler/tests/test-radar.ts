@@ -27,7 +27,16 @@ import {
   normalizeFestivalUrl,
   activeFestivals,
 } from '../src/radar/festivals-config.js';
-import { findStaleFestivals, type RunRecord } from '../src/utils/run-log.js';
+import * as fsp from 'fs/promises';
+import * as os from 'os';
+import * as nodePath from 'path';
+import {
+  findStaleFestivals,
+  appendRunLog,
+  readRunRecords,
+  STALE_WINDOW,
+  type RunRecord,
+} from '../src/utils/run-log.js';
 import { tallyOutcomes } from '../src/radar.js';
 
 let passed = 0;
@@ -1181,6 +1190,76 @@ console.log('\n=== findStaleFestivals ===\n');
     findStaleFestivals(newlyAdded, ['https://new.example'], 4).length === 0,
     'a newly added festival is not flagged until it has N runs of its own'
   );
+}
+
+console.log('\n=== findStaleFestivals window uses newest runs ===\n');
+{
+  const u = 'https://x.example';
+  const runsOf = (outcomes: string[]): RunRecord[] =>
+    outcomes.map(o => ({ kind: 'radar', entries: [{ url: u, outcome: o }] }));
+  assert(
+    findStaleFestivals(
+      runsOf(['dead', 'dead', 'updated', 'dead', 'dead', 'dead']).map(r => r),
+      [u],
+      4
+    ).length === 0,
+    'healthy outcome inside the last 4 of 6 → not stale'
+  );
+  assert(
+    findStaleFestivals(
+      runsOf(['updated', 'dead', 'dead', 'dead', 'dead']),
+      [u],
+      4
+    ).length === 1,
+    'healthy outcome older than the last 4 → stale'
+  );
+  assert(
+    findStaleFestivals(runsOf(['failed', 'failed', 'failed', 'failed']), [u])
+      .length === 1,
+    'four failed runs → stale (default window)'
+  );
+  assert(STALE_WINDOW === 4, 'STALE_WINDOW is 4');
+}
+
+console.log('\n=== appendRunLog / readRunRecords ===\n');
+{
+  const dir = await fsp.mkdtemp(nodePath.join(os.tmpdir(), 'runlog-'));
+  try {
+    await appendRunLog(dir, { kind: 'radar', n: 1 });
+    await appendRunLog(dir, { kind: 'jobs', n: 2 });
+    const recs = await readRunRecords(dir);
+    assert(
+      recs.length === 2 && recs[0].n === 1 && recs[1].n === 2,
+      'appended records read back in order'
+    );
+
+    const dir2 = await fsp.mkdtemp(nodePath.join(os.tmpdir(), 'runlog-'));
+    try {
+      await fsp.writeFile(
+        nodePath.join(dir2, 'runs.jsonl'),
+        '{"kind":"radar","n":7}\nnot json{\n\n'
+      );
+      const r2 = await readRunRecords(dir2);
+      assert(
+        r2.length === 1 && r2[0].n === 7,
+        'garbage and blank lines are skipped'
+      );
+    } finally {
+      await fsp.rm(dir2, { recursive: true, force: true });
+    }
+
+    const dir3 = await fsp.mkdtemp(nodePath.join(os.tmpdir(), 'runlog-'));
+    try {
+      assert(
+        (await readRunRecords(dir3)).length === 0,
+        'missing runs.jsonl → []'
+      );
+    } finally {
+      await fsp.rm(dir3, { recursive: true, force: true });
+    }
+  } finally {
+    await fsp.rm(dir, { recursive: true, force: true });
+  }
 }
 
 // --- add new test sections above this line ---

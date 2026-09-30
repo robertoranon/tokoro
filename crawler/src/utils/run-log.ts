@@ -48,6 +48,9 @@ export async function readRunRecords(logsDir: string): Promise<RunRecord[]> {
   return records;
 }
 
+/** Number of recent radar runs examined by the stale-source report. */
+export const STALE_WINDOW = 4;
+
 const HEALTHY = new Set(['published', 'updated', 'unchanged']);
 
 /**
@@ -58,7 +61,7 @@ const HEALTHY = new Set(['published', 'updated', 'unchanged']);
 export function findStaleFestivals(
   records: RunRecord[],
   activeUrls: string[],
-  window = 4
+  window = STALE_WINDOW
 ): string[] {
   const radarRuns = records.filter(r => r.kind === 'radar');
   return activeUrls.filter(url => {

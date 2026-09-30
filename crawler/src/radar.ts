@@ -17,6 +17,7 @@ import {
   defaultLogsDir,
   readRunRecords,
   findStaleFestivals,
+  STALE_WINDOW,
 } from './utils/run-log.js';
 
 export interface RadarCounters {
@@ -63,6 +64,10 @@ async function main() {
 
   const env = loadCrawlerEnv();
   const active = activeFestivals(config);
+  if (active.length === 0) {
+    console.warn(`No active festivals in ${festivalsFile} — nothing to do`);
+    process.exit(0);
+  }
   console.log(
     `Radar: ${active.length} active festival(s), ${config.festivals.length - active.length} paused${debug ? ' (DEBUG: nothing is published)' : ''}`
   );
@@ -140,7 +145,7 @@ async function main() {
     );
     if (stale.length > 0) {
       console.log(
-        `\nNo published/updated/unchanged result in the last 4 runs (dead source, or between editions):`
+        `\nNo published/updated/unchanged result in the last ${STALE_WINDOW} runs (dead source, or between editions):`
       );
       for (const url of stale) console.log(`  - ${url}`);
     }
