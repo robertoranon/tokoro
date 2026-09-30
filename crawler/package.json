@@ -20,7 +20,9 @@
     "test:pdf": "tsx tests/test-pdf-fetcher.ts",
     "crawl-jobs": "tsx src/scheduler.ts",
     "test:scheduler": "tsx tests/test-scheduler.ts",
-    "test:radar": "tsx tests/test-radar.ts"
+    "test:radar": "tsx tests/test-radar.ts",
+    "radar": "tsx src/radar.ts",
+    "smoke:radar": "tsx tests/smoke-radar-publisher.ts"
   },
   "keywords": [
     "crawler",

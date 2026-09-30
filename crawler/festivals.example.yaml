@@ -1,0 +1,22 @@
+# Radar watchlist — one entry per festival homepage.
+# Copy to festivals.yaml and edit. Crawl weekly:
+#   0 10 * * 1  cd /path/to/tokoro/crawler && npm run radar
+#
+# Try a single run without publishing anything:
+#   npm run radar -- --debug
+# Use a different file:
+#   npm run radar -- --festivals /path/to/other.yaml
+
+defaults:
+  fetcher: playwright # optional; per-festival override allowed (playwright | jina)
+
+festivals:
+  - url: https://www.terraforma.example # canonical homepage; becomes the entry's festival_url
+    name: Terraforma # optional, for logs
+    status: active # active (default) | paused — paused entries are skipped, not deleted
+    added: 2026-07-22 # optional bookkeeping (YYYY-MM-DD)
+    notes: "forest setting, electronic/experimental" # curator notes; never sent to the LLM or API
+
+  - url: https://www.jazzemagosto.example
+    name: Jazz em Agosto
+    fetcher: jina # per-festival overrides: fetcher, browser (chrome | obscura), model

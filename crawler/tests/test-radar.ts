@@ -27,6 +27,8 @@ import {
   normalizeFestivalUrl,
   activeFestivals,
 } from '../src/radar/festivals-config.js';
+import { findStaleFestivals, type RunRecord } from '../src/utils/run-log.js';
+import { tallyOutcomes } from '../src/radar.js';
 
 let passed = 0;
 let failed = 0;
@@ -1100,6 +1102,85 @@ console.log('\n=== RadarPublisher ===\n');
     );
     assert(outcome === 'failed', 'network error → failed, never throws');
   }
+}
+
+console.log('\n=== tallyOutcomes ===\n');
+{
+  const t = tallyOutcomes([
+    { url: 'a', outcome: 'published' },
+    { url: 'b', outcome: 'updated' },
+    { url: 'c', outcome: 'updated' },
+    { url: 'd', outcome: 'unchanged' },
+    { url: 'e', outcome: 'skipped_no_dates' },
+    { url: 'f', outcome: 'failed' },
+  ]);
+  assert(
+    t.published === 1 &&
+      t.updated === 2 &&
+      t.unchanged === 1 &&
+      t.skipped_no_dates === 1 &&
+      t.failed === 1,
+    'counts each outcome'
+  );
+  assert(tallyOutcomes([]).failed === 0, 'empty list → zeros');
+}
+
+console.log('\n=== findStaleFestivals ===\n');
+{
+  const radarRun = (entries: Record<string, string>): RunRecord => ({
+    kind: 'radar',
+    entries: Object.entries(entries).map(([url, outcome]) => ({
+      url,
+      outcome,
+    })),
+  });
+  const jobsRun: RunRecord = { started_at: 'x' }; // legacy record without `kind`
+
+  const dead = {
+    'https://dead.example': 'skipped_no_dates',
+    'https://ok.example': 'unchanged',
+  };
+  const runs = [
+    radarRun(dead),
+    radarRun(dead),
+    radarRun(dead),
+    radarRun(dead),
+    jobsRun,
+  ];
+  const stale = findStaleFestivals(
+    runs,
+    ['https://dead.example', 'https://ok.example'],
+    4
+  );
+  assert(
+    stale.length === 1 && stale[0] === 'https://dead.example',
+    'flags a festival with no healthy outcome in the last 4 runs; ignores non-radar records'
+  );
+  assert(
+    findStaleFestivals(runs.slice(0, 3), ['https://dead.example'], 4).length ===
+      0,
+    'needs at least N runs of history before flagging'
+  );
+  const recovered = [
+    radarRun({ 'https://dead.example': 'updated' }),
+    radarRun(dead),
+    radarRun(dead),
+    radarRun(dead),
+  ];
+  assert(
+    findStaleFestivals(recovered, ['https://dead.example'], 4).length === 0,
+    'one healthy outcome in the window clears it'
+  );
+  const newlyAdded = [
+    radarRun({ 'https://new.example': 'failed' }),
+    radarRun({ 'https://ok.example': 'unchanged' }),
+    radarRun({ 'https://ok.example': 'unchanged' }),
+    radarRun({ 'https://ok.example': 'unchanged' }),
+  ];
+  assert(
+    findStaleFestivals(newlyAdded, ['https://new.example'], 4).length === 0,
+    'a newly added festival is not flagged until it has N runs of its own'
+  );
 }
 
 // --- add new test sections above this line ---

@@ -11,6 +11,7 @@ import {
   CrawlResult,
 } from './crawler.js';
 import { loadEnv, loadCrawlerEnv, buildLLM } from './setup.js';
+import { appendRunLog, defaultLogsDir } from './utils/run-log.js';
 
 export interface SchedulerJob {
   name?: string;
@@ -109,12 +110,6 @@ interface JobRunRecord {
   failed: number;
 }
 
-async function appendRunLog(logsDir: string, record: object): Promise<void> {
-  await fs.mkdir(logsDir, { recursive: true });
-  const logPath = path.join(logsDir, 'runs.jsonl');
-  await fs.appendFile(logPath, JSON.stringify(record) + '\n', 'utf-8');
-}
-
 async function main() {
   const startedAt = new Date();
 
@@ -210,12 +205,8 @@ async function main() {
     `Events: ${totals.published} published, ${totals.duplicate} duplicates skipped, ${totals.failed} failed`
   );
 
-  const logsDir = path.join(
-    path.dirname(fileURLToPath(import.meta.url)),
-    '..',
-    'logs'
-  );
-  await appendRunLog(logsDir, {
+  await appendRunLog(defaultLogsDir(), {
+    kind: 'jobs',
     started_at: startedAt.toISOString(),
     finished_at: finishedAt.toISOString(),
     duration_s: durationS,
