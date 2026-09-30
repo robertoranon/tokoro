@@ -292,6 +292,38 @@ export function buildHasFestivalFilter(hasFestival: string): string {
     : '';
 }
 
+export type PutValidation =
+  | { ok: true }
+  | { ok: false; status: number; error: string };
+
+// Field checks for PUT /events/:id that need no I/O.
+// Ownership (403) is checked before created_at (400): an attacker probing with
+// a foreign pubkey learns nothing about the stored created_at.
+export function validatePutRequest(
+  incoming: Partial<Event>,
+  existing: { pubkey: string; created_at: string }
+): PutValidation {
+  if (
+    !incoming.pubkey ||
+    !incoming.signature ||
+    !incoming.title ||
+    incoming.lat == null ||
+    incoming.lng == null ||
+    !incoming.start_time ||
+    !incoming.category ||
+    !incoming.created_at
+  ) {
+    return { ok: false, status: 400, error: 'Missing required fields' };
+  }
+  if (incoming.pubkey !== existing.pubkey) {
+    return { ok: false, status: 403, error: 'Unauthorized' };
+  }
+  if (incoming.created_at !== existing.created_at) {
+    return { ok: false, status: 400, error: 'created_at mismatch' };
+  }
+  return { ok: true };
+}
+
 export function makeBackupKey(date: Date): string {
   const yyyy = date.getUTCFullYear();
   const mm = String(date.getUTCMonth() + 1).padStart(2, '0');

@@ -12,6 +12,7 @@ import {
   buildTextFilter,
   buildFestivalUrlFilter,
   buildHasFestivalFilter,
+  validatePutRequest,
 } from './index';
 import { isDuplicate } from '../../shared/llm/duplicate-check';
 import { encode as geohashEncode, neighbors } from './geohash';
@@ -597,5 +598,57 @@ describe('buildHasFestivalFilter', () => {
     expect(buildHasFestivalFilter('')).toBe('');
     expect(buildHasFestivalFilter('0')).toBe('');
     expect(buildHasFestivalFilter('true')).toBe('');
+  });
+});
+
+describe('validatePutRequest', () => {
+  const existing = {
+    pubkey: 'a'.repeat(64),
+    created_at: '2026-07-01T10:00:00',
+  };
+  const validBody = {
+    pubkey: 'a'.repeat(64),
+    signature: 'b'.repeat(128),
+    title: 'Terraforma 2026',
+    lat: 45.6,
+    lng: 8.8,
+    start_time: '2026-09-04T00:00:00',
+    end_time: '2026-09-06T23:59:59',
+    category: 'music',
+    created_at: '2026-07-01T10:00:00',
+  };
+
+  it('accepts a valid update', () => {
+    expect(validatePutRequest(validBody, existing)).toEqual({ ok: true });
+  });
+
+  it('rejects missing required fields with 400', () => {
+    const { title, ...noTitle } = validBody;
+    expect(validatePutRequest(noTitle, existing)).toEqual({
+      ok: false,
+      status: 400,
+      error: 'Missing required fields',
+    });
+  });
+
+  it('accepts lat/lng of 0 (equator/meridian is not a missing field)', () => {
+    expect(
+      validatePutRequest({ ...validBody, lat: 0, lng: 0 }, existing)
+    ).toEqual({ ok: true });
+  });
+
+  it('rejects a pubkey that does not own the event with 403', () => {
+    expect(
+      validatePutRequest({ ...validBody, pubkey: 'c'.repeat(64) }, existing)
+    ).toEqual({ ok: false, status: 403, error: 'Unauthorized' });
+  });
+
+  it('rejects a changed created_at with 400', () => {
+    expect(
+      validatePutRequest(
+        { ...validBody, created_at: '2026-07-02T10:00:00' },
+        existing
+      )
+    ).toEqual({ ok: false, status: 400, error: 'created_at mismatch' });
   });
 });
