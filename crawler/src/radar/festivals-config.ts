@@ -41,13 +41,27 @@ function pick<T extends string>(
   label: string,
   field: string
 ): T | undefined {
-  if (value === undefined || value === null) return undefined;
+  if (value === undefined) return undefined;
   if (!valid.includes(value as T)) {
     throw new Error(
       `Invalid festivals.yaml: ${label} has invalid ${field} "${value}". Must be: ${valid.join(', ')}`
     );
   }
   return value as T;
+}
+
+function optionalString(
+  value: unknown,
+  label: string,
+  field: string
+): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string') {
+    throw new Error(
+      `Invalid festivals.yaml: ${label} has invalid ${field}: expected a string`
+    );
+  }
+  return value;
 }
 
 // js-yaml parses an unquoted `2026-07-22` into a Date.
@@ -62,6 +76,7 @@ export function parseFestivalsConfig(content: string): FestivalsConfig {
     throw new Error('Invalid festivals.yaml: expected a YAML object at root');
   }
   const cfg = raw as Record<string, unknown>;
+  if (cfg.festivals === null) return { festivals: [] };
   if (!Array.isArray(cfg.festivals)) {
     throw new Error('Invalid festivals.yaml: "festivals" must be an array');
   }
@@ -82,8 +97,7 @@ export function parseFestivalsConfig(content: string): FestivalsConfig {
     'defaults',
     'browser'
   );
-  const defaultModel =
-    typeof defaults.model === 'string' ? defaults.model : undefined;
+  const defaultModel = optionalString(defaults.model, 'defaults', 'model');
 
   const seen = new Set<string>();
   const festivals = cfg.festivals.map((item, i): FestivalEntryConfig => {
@@ -93,7 +107,8 @@ export function parseFestivalsConfig(content: string): FestivalsConfig {
       );
     }
     const f = item as Record<string, unknown>;
-    const label = typeof f.name === 'string' ? `"${f.name}"` : `entry ${i + 1}`;
+    const name = optionalString(f.name, `entry ${i + 1}`, 'name');
+    const label = name ? `"${name}"` : `entry ${i + 1}`;
 
     if (typeof f.url !== 'string' || !f.url) {
       throw new Error(`Invalid festivals.yaml: ${label} must have a "url"`);
@@ -101,9 +116,10 @@ export function parseFestivalsConfig(content: string): FestivalsConfig {
     let url: string;
     try {
       url = normalizeFestivalUrl(f.url);
-    } catch {
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
       throw new Error(
-        `Invalid festivals.yaml: ${label} has an invalid url "${f.url}"`
+        `Invalid festivals.yaml: ${label} has an invalid url "${f.url}" (${reason})`
       );
     }
     if (seen.has(url)) {
@@ -113,15 +129,15 @@ export function parseFestivalsConfig(content: string): FestivalsConfig {
 
     return {
       url,
-      name: typeof f.name === 'string' ? f.name : undefined,
+      name,
       status: pick(f.status, VALID_STATUSES, label, 'status') ?? 'active',
       added: dateString(f.added),
-      notes: typeof f.notes === 'string' ? f.notes : undefined,
+      notes: optionalString(f.notes, label, 'notes'),
       fetcher:
         pick(f.fetcher, VALID_FETCHERS, label, 'fetcher') ?? defaultFetcher,
       browser:
         pick(f.browser, VALID_BROWSERS, label, 'browser') ?? defaultBrowser,
-      model: typeof f.model === 'string' ? f.model : defaultModel,
+      model: optionalString(f.model, label, 'model') ?? defaultModel,
     };
   });
 

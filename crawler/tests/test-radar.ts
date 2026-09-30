@@ -143,6 +143,61 @@ festivals:
   );
 }
 
+console.log('\n=== parseFestivalsConfig strictness ===\n');
+{
+  const one = (extra: string) =>
+    parseFestivalsConfig('festivals:\n  - url: https://a.example\n' + extra);
+  assert(
+    throws(() => one('    name: 5')),
+    'non-string name throws'
+  );
+  assert(
+    throws(() => one('    notes: 5')),
+    'non-string notes throws'
+  );
+  assert(
+    throws(() => one('    model: 5')),
+    'non-string model throws'
+  );
+  assert(
+    throws(() => parseFestivalsConfig('defaults:\n  model: 5\nfestivals: []')),
+    'non-string defaults.model throws'
+  );
+  assert(
+    throws(() => one('    status: null')),
+    'null status throws'
+  );
+  assert(
+    one('').festivals[0].status === 'active',
+    'absent status defaults to active'
+  );
+  assert(
+    parseFestivalsConfig('festivals:').festivals.length === 0,
+    'null festivals is an empty list'
+  );
+  assert(
+    throws(() => parseFestivalsConfig('festivals: notalist')),
+    'string festivals throws'
+  );
+  assert(
+    throws(() => parseFestivalsConfig('festivals:\n  a: 1')),
+    'object festivals throws'
+  );
+  assert(
+    parseFestivalsConfig('festivals:\n  - url: https://Upper.Example/x/')
+      .festivals[0].url === 'https://upper.example/x',
+    'config entry url is normalized to lowercase host'
+  );
+  let msg = '';
+  try {
+    one('').festivals.length;
+    parseFestivalsConfig('festivals:\n  - url: ftp://a.example');
+  } catch (e) {
+    msg = (e as Error).message;
+  }
+  assert(msg.includes('Unsupported protocol'), 'bad url error includes reason');
+}
+
 // --- add new test sections above this line ---
 
 console.log(`\n${passed} passed, ${failed} failed`);
