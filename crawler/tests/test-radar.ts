@@ -11,6 +11,9 @@ import {
   type FestivalEntryDraft,
 } from '../src/radar/festival-entry.js';
 import type { FetchedPage } from '../src/types/event.js';
+import { FestivalEntryExtractor } from '../src/extractors/festival-entry-extractor.js';
+import { PageDiscovery } from '../src/extractors/page-discovery.js';
+import type { LLMProvider } from '../../shared/types/llm.js';
 import {
   parseFestivalsConfig,
   normalizeFestivalUrl,
@@ -616,6 +619,101 @@ console.log('\n=== review fixes: sanitizing / real dates / finalize ===\n');
     'tags trimmed, empties dropped, deduped'
   );
   assert(f.festival_name === 'F', 'empty festival_name falls back to title');
+}
+
+function fakeLLM(
+  reply: string | (() => string)
+): LLMProvider & { calls: number } {
+  const llm: LLMProvider & { calls: number } = {
+    name: 'fake',
+    calls: 0,
+    async complete() {
+      llm.calls++;
+      return {
+        content: typeof reply === 'function' ? reply() : reply,
+        model: 'fake',
+      };
+    },
+  };
+  return llm;
+}
+
+console.log('\n=== FestivalEntryExtractor ===\n');
+{
+  const page: FetchedPage = {
+    url: 'https://terra.example',
+    html: '',
+    text: 'Terraforma 2026\n\n\n18-21 June, Villa Arconati',
+    title: 'Terraforma',
+  };
+  const good = fakeLLM(
+    JSON.stringify({
+      title: 'Terraforma 2026',
+      festival_name: 'Terraforma',
+      start_time: '2026-06-18T10:00:00',
+      end_time: '2026-06-21T18:00:00',
+      day_name: 'Thursday',
+      category: 'music',
+      tags: ['electronic'],
+    })
+  );
+  const draft = await new FestivalEntryExtractor({
+    llm: good,
+    referenceDate: '2026-04-01',
+  }).extract(page);
+  assert(draft?.title === 'Terraforma 2026', 'returns the parsed draft');
+  assert(
+    draft?.start_time === '2026-06-18T00:00:00' &&
+      draft?.end_time === '2026-06-21T23:59:59',
+    'applies the radar date convention'
+  );
+  assert(
+    !('day_name' in (draft ?? {})),
+    'day_name is consumed by year validation'
+  );
+
+  const nothing = await new FestivalEntryExtractor({
+    llm: fakeLLM('null'),
+  }).extract(page);
+  assert(nothing === null, 'LLM null → null');
+
+  let threw = false;
+  try {
+    await new FestivalEntryExtractor({ llm: fakeLLM('{oops') }).extract(page);
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'malformed JSON throws (caller counts the entry as failed)');
+}
+
+console.log('\n=== PageDiscovery.discoverFestivalInfoPages ===\n');
+{
+  const html = `<html><body>
+    <a href="/info">Info</a><a href="/tickets/">Tickets</a>
+    <a href="https://facebook.com/x">FB</a><a href="#top">top</a>
+    <a href="/info/">Info again</a><a href="/artists/x">Artist</a>
+  </body></html>`;
+  const llm = fakeLLM(
+    JSON.stringify({
+      infoUrls: ['/info', '/tickets/', '/info/', 'http://[bad'],
+    })
+  );
+  const urls = await new PageDiscovery(llm).discoverFestivalInfoPages(
+    html,
+    'https://f.example'
+  );
+  assert(
+    urls.join() === 'https://f.example/info,https://f.example/tickets/',
+    'returns absolute, de-duplicated (trailing-slash-insensitive) urls and skips unparseable ones'
+  );
+  const none = await new PageDiscovery(
+    fakeLLM('{"infoUrls":[]}')
+  ).discoverFestivalInfoPages('<html></html>', 'https://f.example');
+  assert(none.length === 0, 'no links → empty list');
+  const broken = await new PageDiscovery(
+    fakeLLM('not json')
+  ).discoverFestivalInfoPages(html, 'https://f.example');
+  assert(broken.length === 0, 'LLM failure → empty list (never throws)');
 }
 
 // --- add new test sections above this line ---

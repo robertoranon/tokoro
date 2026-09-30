@@ -66,6 +66,25 @@ const FestivalListingsSchema = z.object({
   listingUrls: z.array(z.string()),
 });
 
+const FESTIVAL_INFO_PROMPT = `You are an expert at analyzing festival websites and identifying pages that state WHEN and WHERE the upcoming edition takes place.
+
+Given a list of links from a festival homepage, pick at most 2 links most likely to contain the dates and location of the upcoming edition (e.g. /info, /practical, /tickets, /about, /edition-2026, /festival).
+
+Rules:
+- Prefer pages about the festival itself: info, edition, tickets, about, practical information
+- Do NOT include individual artist pages, news/blog posts, shops, press pages, or external social media links
+- Return the URLs exactly as provided (they may be relative paths)
+- If nothing looks useful, return an empty array
+
+Return ONLY a valid JSON object with this structure:
+{
+  "infoUrls": ["/info", "/tickets"]
+}`;
+
+const FestivalInfoPagesSchema = z.object({
+  infoUrls: z.array(z.string()),
+});
+
 export class PageDiscovery {
   constructor(private llm: LLMProvider) {}
 
@@ -247,6 +266,73 @@ export class PageDiscovery {
       return absoluteUrls;
     } catch (error) {
       console.error('Error discovering festival listing pages:', error);
+      return [];
+    }
+  }
+
+  async discoverFestivalInfoPages(
+    html: string,
+    baseUrl: string
+  ): Promise<string[]> {
+    try {
+      console.log(`Discovering festival info pages from ${baseUrl}...`);
+
+      const dom = new JSDOM(html, {
+        url: baseUrl,
+        virtualConsole: silentConsole,
+      });
+      const hrefs = Array.from(
+        new Set(
+          Array.from(dom.window.document.querySelectorAll('a[href]'))
+            .map((a: Element) => a.getAttribute('href'))
+            .filter((href): href is string => {
+              if (!href) return false;
+              if (/^(#|mailto:|tel:|javascript:)/.test(href)) return false;
+              return !/(facebook|instagram|twitter|youtube)\.com/.test(href);
+            })
+        )
+      );
+
+      if (hrefs.length === 0) return [];
+
+      const response = await this.llm.complete(
+        [
+          { role: 'system', content: FESTIVAL_INFO_PROMPT },
+          {
+            role: 'user',
+            content: `Base URL: ${baseUrl}\n\nLinks found on page:\n${hrefs.slice(0, 200).join('\n')}`,
+          },
+        ],
+        {
+          temperature: 0.1,
+          maxTokens: FESTIVAL_LISTING_MAX_TOKENS,
+          responseFormat: 'json',
+        }
+      );
+
+      const validated = FestivalInfoPagesSchema.parse(
+        JSON.parse(response.content)
+      );
+
+      const seen = new Set<string>();
+      const absoluteUrls: string[] = [];
+      for (const url of validated.infoUrls) {
+        let absolute: string;
+        try {
+          absolute = new URL(url, baseUrl).href;
+        } catch {
+          continue;
+        }
+        const key = absolute.replace(/\/$/, '');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        absoluteUrls.push(absolute);
+      }
+
+      console.log(`Found ${absoluteUrls.length} festival info page(s)`);
+      return absoluteUrls;
+    } catch (error) {
+      console.error('Error discovering festival info pages:', error);
       return [];
     }
   }
