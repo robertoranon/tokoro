@@ -211,7 +211,9 @@ async function main() {
   );
   console.log(`    Within threshold: ${withinDistance ? 'YES' : 'NO'}`);
   if (!withinDistance) {
-    console.log('\nResult: NOT DUPLICATE — events are more than 100 m apart.');
+    console.log(
+      `\nResult: NOT DUPLICATE — events are more than ${DEDUP_DISTANCE_KM * 1000} m apart.`
+    );
     return;
   }
 
@@ -280,7 +282,8 @@ async function main() {
   const dup = await isDuplicate(
     { title: a.title, description: a.description ?? undefined },
     { title: b.title, description: b.description ?? undefined },
-    llm
+    llm,
+    { distanceKm: distKm, timeDeltaMinutes: timeDiffMin }
   );
 
   console.log(`    isDuplicate result: ${dup}`);

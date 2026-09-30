@@ -110,9 +110,16 @@ export async function isDuplicate(
     const parsed = JSON.parse(response.content);
     const probability =
       typeof parsed.probability === 'number' ? parsed.probability : 0;
+    console.log(`Dedup LLM: p=${probability} for "${a.title}" vs "${b.title}"`);
     return probability >= LLM_PROBABILITY_THRESHOLD;
-  } catch {
-    // LLM failed — fall back to structural checks instead of fully failing open
+  } catch (err) {
+    // LLM failed — fall back to structural checks instead of fully failing open.
+    // Logged loudly: a silent failure here (e.g. an expired API key) disables
+    // semantic dedup without any other visible symptom.
+    console.error(
+      `Dedup LLM call failed, using structural fallback (${structuralMatch}) for "${a.title}" vs "${b.title}":`,
+      (err as Error).message
+    );
     return structuralMatch;
   }
 }
