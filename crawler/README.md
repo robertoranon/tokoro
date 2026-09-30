@@ -4,6 +4,7 @@ LLM-powered semantic crawler for extracting structured event data from web pages
 
 ## Features
 
+- **Festival Entry Mode / Radar**: One date-range entry per festival homepage (name, dates, place, short description, link), published or updated weekly from a curated `festivals.yaml` watchlist
 - **Festival Mode**: Crawl entire festival programs — discovers all listing/schedule pages and stamps every event with festival metadata
 - **Two-Phase Discovery**: Automatically discovers individual event pages from venue homepages
 - **Multiple Fetcher Options**: Choose between Playwright (JS rendering) or Jina AI Reader (fast, lightweight)
@@ -212,6 +213,19 @@ After collection, a deduplication LLM call removes two classes of noise:
 - **Semantic duplicates**: the same event extracted twice under slightly different names (e.g. "Sunday" vs "Family Sunday")
 
 Legitimate parallel events (different stages or acts running at the same time) are preserved.
+
+#### Festival Entry Mode and the radar watchlist
+
+- **Best for**: keeping a "planning radar" of festivals — one entry per festival for the festival as a whole, not its program
+- **Process**: Fetch homepage → LLM extracts one entry (dates from an info page if the homepage has none) → look up the existing entry → publish, update (`PUT`) or leave unchanged
+- **Usage (single URL)**: `npm run crawl -- --mode festival-entry <url>` (add `--debug` to print the extracted entry instead of publishing; no API call is made)
+- **Usage (watchlist)**: `cp festivals.example.yaml festivals.yaml`, list your festivals, then `npm run radar` (`npm run radar -- --debug` tries it without publishing anything and writes no run log)
+- **Validation**: `festivals.yaml` is validated up front; any error (bad URL, duplicate URL, wrong field type, unknown `status`) exits 1 before anything is crawled. No active festivals: warning, exit 0
+- **Outcomes** per festival: `published`, `updated`, `unchanged`, `skipped_no_dates` (no dates announced, or the edition already ended), `failed`. The run exits 1 if any festival failed
+- **Staleness report**: each run appends to `logs/runs.jsonl` and prints active festivals with no `published`/`updated`/`unchanged` result in their last 4 runs (dead source, or between editions)
+- **Safety**: an existing entry is only ever updated if it looks like a radar entry (tagged `festival` with an end date), so program events from Festival Mode under the same `festival_url` are never overwritten
+- **Scheduling**: `0 10 * * 1  cd /path/to/tokoro/crawler && npm run radar`
+- **Tests**: `npm run test:radar` (offline); `npm run smoke:radar` (needs `wrangler dev`)
 
 #### 4. Image Mode
 

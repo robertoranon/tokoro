@@ -33,6 +33,7 @@ This specification is implementation-agnostic and provides sufficient detail to 
 ┌──────────────────────────────────────────────────────┐
 │              Crawler Core                            │
 │  - Mode: direct | discover | image | festival | pdf  │
+│          | festival-entry                            │
 │  - Fetcher: playwright | jina (web modes only)       │
 │  - Browser: chrome | obscura (playwright only)       │
 └──────┬───────────────────────────────────────────────┘
@@ -358,6 +359,71 @@ for each source (file path or URL):
 ```
 
 **Routing:** `PdfFetcher.loadPdf` applies a text-density threshold (≥ 200 non-whitespace chars). If met, it returns `type: 'text'`; otherwise it renders pages as PNG images and returns `type: 'images'`.
+
+### 4.7 Festival Entry Mode (`mode: 'festival-entry'`)
+
+Produces **one radar entry per festival homepage**: the festival as a whole (name, date range, place, short description, link), not its program. See the festival radar design doc.
+
+**Algorithm (per URL):**
+
+1. Fetch the homepage. One LLM call extracts a single draft (festival name with year, `festival_name` without year, first/last day, principal venue/address, description, tags, `category` ∈ `music | art | theater | other`). JSON-LD is not used. A page with no text returns no draft without calling the LLM.
+2. **Lenient parsing.** A malformed _optional_ field (bad `url`, out-of-range `lat`/`lng`, non-list `tags`) is dropped instead of rejecting the entry; an unknown `category` becomes `other`; a single-key wrapper such as `{"festival": {...}}` is unwrapped. Only a missing title (or similar required field) yields no draft.
+3. Year validation via `day_name` (same rules as section 7.4). An unresolvable day name strips the dates but keeps the rest.
+4. Dates are forced to the radar convention: first day `T00:00:00`, last day `T23:59:59`. A draft counts as _dated_ only if both are present, real calendar dates (`2026-02-31` is rejected), and `end >= start`.
+5. If the draft is not dated: ask the LLM for up to 2 info/edition/tickets links on the homepage, fetch them in order, and merge (**fill missing fields only, never overwrite; dates travel as a pair**) until dates are found. A failing info page is skipped, not fatal.
+6. Still no dates → outcome `skipped_no_dates`. An edition whose `end_time` date is before today is also `skipped_no_dates` (the past-event rule applies to the **end** date, so a festival running now stays).
+7. `festival_url` is set to the watchlist URL in canonical form (scheme + host + path, no query/hash/trailing slash — the API matches `festival_url` exactly). `tags` are trimmed, lowercased, deduplicated and gain `"festival"`; `festival_name` has any trailing year removed (falls back to the title when empty); `url` defaults to the homepage.
+8. Publish-or-update (below). In `--debug` mode this step is replaced by printing the entry (see limitation d).
+
+**Publish-or-update.** Re-crawling must update, not duplicate:
+
+1. `GET /events?pubkey=<crawler>&festival_url=<url>&from=1970-01-01T00:00:00&to=2999-12-31T23:59:59` — the explicit window is required: the pubkey-only path defaults to _now → +7 days_. A non-array response is an error.
+2. **Match:** among returned entries that _look like radar entries_ (tags contain `"festival"` **and** `end_time` set), the one whose `start_time` is closest to the new one, within 240 days. The radar-entry guard matters because festival-mode program events share the crawler's pubkey and `festival_url`; a next-year edition (~365 days) never matches.
+3. No match → `POST` → `published`. Match that differs → `PUT /events/:id`, re-signed with the stored `created_at` (immutable and signed) → `updated`. Otherwise no API write → `unchanged`.
+4. **Differs** compares title, description, url, venue_name, address, lat/lng, start/end time, category, tags (order-insensitive) and festival_name; `null` equals `''` (the worker stores empty as null); coordinates within 0.0005° (~50 m) are equal (geocoder jitter).
+5. `PUT` 404 → falls back to `POST`. `PUT`/`POST` 401/403 → `failed`, logged as a signing/identity bug. `POST` 409 (duplicate of an event that is not this crawler's radar entry) → `failed`. A network error → `failed`.
+6. The LLM pre-publish duplicate check is **not** used for radar entries.
+
+**Outcomes:** `published | updated | unchanged | skipped_no_dates | failed`. Via `--mode festival-entry` / `jobs.yaml` they map onto the usual counters (`published`+`updated` → published, `unchanged` → duplicate, `failed` → failed; skips count nowhere).
+
+**Debug mode.** `--debug` prints the extracted entry and performs **no API lookup and no write**; with `--normalize` the entry is also geocoded and signed before printing.
+
+**Known limitations:**
+
+- (a) The lookup returns at most 100 events per `festival_url` + pubkey (the worker's `LIMIT`). A festival with more than 100 program events under the same key could hide its radar entry and cause a duplicate `POST`. Currently ~20 events per festival.
+- (b) With the Jina fetcher, info-page link discovery depends on a second raw-HTML fetch of the homepage, which can be empty for JS-built navigation.
+- (c) An ended edition is reported as `skipped_no_dates`, so it appears in the staleness report (section 4.8) between editions.
+- (d) In debug mode an extracted entry is reported as `published` although nothing is published.
+
+### 4.8 Radar Watchlist Runner (`npm run radar`)
+
+Entry point `src/radar.ts`, structured like `src/scheduler.ts`. Reads `festivals.yaml` (`--festivals <path>` to override; example: `festivals.example.yaml`):
+
+| Field                           | Required | Description                                                                                                        |
+| ------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| `url`                           | yes      | Canonical festival homepage; normalized, becomes `festival_url`. Duplicates (after normalization) are an error     |
+| `name`                          | no       | Display name for logs (must be a string)                                                                           |
+| `status`                        | no       | `active` (default) or `paused` (skipped, not deleted). `null` or any other value is an error                       |
+| `added`                         | no       | `YYYY-MM-DD`, bookkeeping (YAML dates are converted back to strings)                                               |
+| `notes`                         | no       | Curator notes (must be a string); never sent to the LLM or API                                                     |
+| `fetcher` / `browser` / `model` | no       | Per-festival overrides; `defaults:` at the top level supplies fallbacks. A non-string `model` is an error          |
+
+An empty `festivals:` key is an empty list.
+
+**Behavior:**
+
+- Validate the file first and exit 1 on any error, before crawling. Errors name the offending entry; a bad URL error includes the reason.
+- Zero active festivals: print a warning, exit 0, write **no** run log.
+- Run each `active` entry sequentially through `festival-entry` mode; a failing entry logs and continues; exit 1 if any entry failed.
+- `--debug` runs the full extraction (with normalization) but publishes nothing. It prints a summary stating that nothing was published and writes **no** run log and **no** staleness report.
+
+**Run log.** Appends one record to `logs/runs.jsonl`: `kind: "radar"`, timing, `entries_total`, `status`, the five counters, and `entries: [{url, outcome}]`. The `jobs.yaml` scheduler's records gain `kind: "jobs"`; readers must tolerate records without `kind`.
+
+**Staleness report.** After each (non-debug) run the runner prints active festivals whose last 4 radar runs (`STALE_WINDOW`, that included them) had no `published`/`updated`/`unchanged` outcome — dead sources, but also festivals between editions. A festival needs 4 runs of its own history before it can be flagged.
+
+Scheduling is a plain crontab line: `0 10 * * 1  cd /path/to/tokoro/crawler && npm run radar`.
+
+**Known limitations:** the same as section 4.7 (a)–(d); in particular (c) means an ended edition shows up in the staleness report until the next edition is announced, and (d) means the `--debug` summary counts extracted entries, not published ones.
 
 ---
 
@@ -1891,7 +1957,7 @@ interface CrawlerConfig {
   apiUrl: string; // e.g., "https://worker.tokoro.dev" or "http://localhost:8787"
 
   // Crawler mode
-  mode?: 'direct' | 'discover' | 'image' | 'festival' | 'pdf'; // Default: 'direct'
+  mode?: 'direct' | 'discover' | 'image' | 'festival' | 'pdf' | 'festival-entry'; // Default: 'direct'
 
   // Fetcher type
   fetcher?: 'playwright' | 'jina'; // Default: 'playwright'
@@ -1949,7 +2015,7 @@ crawler [options] --image <image-path1> [image-path2] ...
 **Options:**
 
 ```
---mode <direct|discover|image|festival|pdf>  Crawler mode (default: discover)
+--mode <direct|discover|image|festival|pdf|festival-entry>  Crawler mode (default: discover)
 --image                         Shorthand for --mode image (extract from images)
 --pdf                           Shorthand for --mode pdf (extract from PDFs)
 --fetcher <playwright|jina>     HTML fetcher (default: playwright) - not used in image mode
@@ -2030,6 +2096,9 @@ npm run crawl -- --pdf --llm anthropic --model claude-3-5-sonnet-20241022 --debu
 
 # Alternative: explicit --mode pdf
 npm run crawl -- --mode pdf tests/fixtures/schedule.pdf
+
+# Festival entry: one radar entry (name, dates, place) per festival homepage
+npm run crawl -- --mode festival-entry https://www.terraforma.example
 ```
 
 **Image Mode Requirements:**
@@ -2426,6 +2495,11 @@ Total events published: 10
 - Geocode 10 addresses in quick succession
 - Verify 1-second delay between requests
 - Verify all geocoding succeeds
+
+### 14.8 Festival Entry / Radar Tests
+
+- Unit tests in `tests/test-radar.ts` (`npm run test:radar`, offline): watchlist parsing, radar entry helpers, extractor, publish-or-update logic, run log and staleness report
+- End-to-end `tests/smoke-radar-publisher.ts` (`npm run smoke:radar`, needs `wrangler dev`)
 
 ---
 
