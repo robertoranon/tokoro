@@ -1,21 +1,15 @@
 {
   "API_REFERENCE.md": {
-    "size": 5942,
-    "mtime_ns": 1778759001970977071,
-    "indexed_at_ns": 1787672794505071000,
-    "word_count": 733,
-    "hashes": {
-      "api_reference.md": "20ac5034722c4826f91ff63c3c0538a7d423fbe54e09c9824fba11316be28d96"
-    }
+    "size": 6022,
+    "mtime_ns": 1790776962605785919,
+    "indexed_at_ns": 1790777017822508000,
+    "word_count": 740
   },
   "CLAUDE.md": {
-    "size": 6303,
-    "mtime_ns": 1787672561279244372,
-    "indexed_at_ns": 1787672794505371000,
-    "word_count": 864,
-    "hashes": {
-      "claude.md": "a4b4c20ff45d82ffe8e3ede9f92b9080c6b5f71d1ea4b46f8057dd3a39fa42f5"
-    }
+    "size": 6351,
+    "mtime_ns": 1790776962606038919,
+    "indexed_at_ns": 1790777017823223000,
+    "word_count": 869
   },
   "HOW-TO-USE.md": {
     "size": 20346,
@@ -756,13 +750,10 @@
     }
   },
   "public-web/SPECS.md": {
-    "size": 11628,
-    "mtime_ns": 1780678417613584090,
-    "indexed_at_ns": 1787672794509390000,
-    "word_count": 1780,
-    "hashes": {
-      "public-web/specs.md": "d15a5d6437e1084bc904902bcac0bdb849033e63d5fc1e9b2738bda3e0e9ef87"
-    }
+    "size": 12280,
+    "mtime_ns": 1790760403990806979,
+    "indexed_at_ns": 1790761406683198000,
+    "word_count": 1886
   },
   "public-web/bookmarklet.src.js": {
     "size": 1704,
@@ -834,13 +825,10 @@
     }
   },
   "public-web/publish.html": {
-    "size": 27622,
-    "mtime_ns": 1778759138509149382,
-    "indexed_at_ns": 1787672794509949000,
-    "word_count": 2097,
-    "hashes": {
-      "public-web/publish.html": "19bab7053699617c28c33bd53d4a6f1670795bec781e16dc329fd92bed296043"
-    }
+    "size": 31061,
+    "mtime_ns": 1790760357210375621,
+    "indexed_at_ns": 1790760404605508000,
+    "word_count": 2357
   },
   "public-web/publish.manifest.json": {
     "size": 259,
@@ -1038,10 +1026,10 @@
     "word_count": 261
   },
   "shared/llm/duplicate-check.ts": {
-    "size": 3803,
-    "mtime_ns": 1779475203954048577,
-    "indexed_at_ns": 1787672746289237000,
-    "word_count": 538
+    "size": 4195,
+    "mtime_ns": 1790761642000608830,
+    "indexed_at_ns": 1790777017998879000,
+    "word_count": 584
   },
   "shared/llm/factory.ts": {
     "size": 1516,
@@ -1095,13 +1083,10 @@
     "word_count": 258
   },
   "web-publisher/index.html": {
-    "size": 19155,
-    "mtime_ns": 1778759138513049844,
-    "indexed_at_ns": 1787672794510082000,
-    "word_count": 1434,
-    "hashes": {
-      "web-publisher/index.html": "33e633d173036cc1c8103e1c1dc9c7bc13527620356a890d03831a26cdd70cf3"
-    }
+    "size": 19493,
+    "mtime_ns": 1787690533640761032,
+    "indexed_at_ns": 1790760404628630000,
+    "word_count": 1483
   },
   "worker/README.md": {
     "size": 13174,
@@ -1113,13 +1098,10 @@
     }
   },
   "worker/SPECS.md": {
-    "size": 41334,
-    "mtime_ns": 1780676585125033290,
-    "indexed_at_ns": 1787672794510303000,
-    "word_count": 5745,
-    "hashes": {
-      "worker/specs.md": "f8377815701c4a4c39d37a0ae73019598d831654e1a7453f79e3ecdf9bb844bb"
-    }
+    "size": 43532,
+    "mtime_ns": 1790776962606344928,
+    "indexed_at_ns": 1790777018007582000,
+    "word_count": 6051
   },
   "worker/migrations/0001_create_events_table.sql": {
     "size": 841,
@@ -1176,10 +1158,10 @@
     }
   },
   "worker/scripts/check-duplicate.ts": {
-    "size": 10468,
-    "mtime_ns": 1778759138515656972,
-    "indexed_at_ns": 1787672746303389000,
-    "word_count": 1157
+    "size": 10563,
+    "mtime_ns": 1790761376972835774,
+    "indexed_at_ns": 1790761406718654000,
+    "word_count": 1167
   },
   "worker/src/crypto.ts": {
     "size": 3242,
@@ -1194,16 +1176,16 @@
     "word_count": 389
   },
   "worker/src/index.test.ts": {
-    "size": 18226,
-    "mtime_ns": 1780669278801651766,
-    "indexed_at_ns": 1787672746305572000,
-    "word_count": 1980
+    "size": 20924,
+    "mtime_ns": 1790776962606767956,
+    "indexed_at_ns": 1790777018015116000,
+    "word_count": 2258
   },
   "worker/src/index.ts": {
-    "size": 33038,
-    "mtime_ns": 1780669448334760392,
-    "indexed_at_ns": 1787672746306380000,
-    "word_count": 3794
+    "size": 37751,
+    "mtime_ns": 1790776962607191276,
+    "indexed_at_ns": 1790777018015869000,
+    "word_count": 4347
   },
   "worker/tsconfig.json": {
     "size": 429,
@@ -1213,5 +1195,11 @@
     "hashes": {
       "worker/tsconfig.json": "9467306065720718dfcbc11a190360e44d6cabae04b8ddc99c3691991483aa46"
     }
+  },
+  "worker/scripts/smoke-put.ts": {
+    "size": 6470,
+    "mtime_ns": 1790776962606475699,
+    "indexed_at_ns": 1790777018012978000,
+    "word_count": 718
   }
 }
