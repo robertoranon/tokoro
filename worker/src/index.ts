@@ -424,6 +424,8 @@ export default {
                 from: 'Start time ISO 8601 YYYY-MM-DDTHH:MM:SS (default: now)',
                 to: 'End time ISO 8601 YYYY-MM-DDTHH:MM:SS (default: now + 7 days)',
                 category: 'Filter by category (optional)',
+                has_festival:
+                  'Set to 1 to return only festival entries (optional)',
               },
               example:
                 '/events?lat=45.464&lng=9.189&radius=100&from=2026-03-04T00:00:00&to=2026-06-04T00:00:00',
@@ -446,6 +448,11 @@ export default {
                 tags: 'Array of tags',
                 created_at: 'Creation time (ISO 8601, required)',
               },
+            },
+            'PUT /events/:id': {
+              description:
+                'Edit an own event (requires re-signed Ed25519 signature; created_at is immutable)',
+              body: 'Same shape as POST /events',
             },
             'DELETE /events/:id': {
               description: 'Delete an event (requires Ed25519 signature)',

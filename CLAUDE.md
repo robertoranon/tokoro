@@ -30,7 +30,7 @@ API Endpoints:
 
 **Events**
 
-- `GET /events?lat=&lng=&radius=&from=&to=&category=&tags=&festival_url=` - Query events (max 100 results; `festival_url` filters to a specific festival)
+- `GET /events?lat=&lng=&radius=&from=&to=&category=&tags=&festival_url=` - Query events (max 100 results; `festival_url` filters to a specific festival; `has_festival=1` returns only festival entries)
 - `POST /events` - Publish signed event
 - `PUT /events/:id` - Edit own event (new signature required)
 - `DELETE /events/:id` - Delete own event (signature required)

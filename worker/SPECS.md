@@ -558,6 +558,7 @@ GET /events?lat=45.464&lng=9.189&radius=10&from=2026-03-06T00:00:00&to=2026-03-1
 | `to`           | No       | string | now + 7 days         | ISO 8601 end time                    |
 | `category`     | No       | string | —                    | Filter by category                   |
 | `festival_url` | No       | string | —                    | Filter by festival (returns all events linked to this festival URL) |
+| `has_festival` | No       | string | —                    | `1` restricts results to events with a non-empty `festival_url` (radar entries). Any other value is ignored. |
 | `q`            | No       | string | —                    | Keyword; filters to events whose title, description, or tags contain the value (case-insensitive substring match); absent or empty means no text filter |
 | `pubkey`       | No       | string | —                    | Filter by author public key (64 hex chars) |
 | `format`       | No       | string | —                    | `ical` to return iCal feed instead of JSON |
@@ -569,6 +570,8 @@ GET /events?lat=45.464&lng=9.189&radius=10&from=2026-03-06T00:00:00&to=2026-03-1
 - When neither `lat`/`lng` nor `pubkey` is provided, the endpoint returns all events (admin/browse use case) with pagination via `offset`, up to 100 results per page, ordered by `start_time ASC`. Optional `from`, `to`, and `category` filters apply.
 - When `pubkey` is provided **without** `lat`/`lng`, all events by that author are returned (no geo filtering), ordered by `start_time ASC`, up to 100 results.
 - `pubkey` can be combined with geo params (`lat`/`lng`/`radius`) and time/category filters.
+- `festival_url` and `has_festival` compose with every path (geo, pubkey-only, and no-geo browse) and with all other filters (AND semantics). The `pubkey` + `festival_url` combination is the radar crawler's update lookup.
+- `has_festival` needs no dedicated index at radar scale (hundreds of rows); `idx_festival_url` already covers `festival_url` lookups. If `has_festival` ever slows, the remedy is a partial index: `CREATE INDEX idx_festival_time ON events (festival_url, start_time) WHERE festival_url IS NOT NULL`.
 
 **Time overlap semantics:** Returns all events that overlap with the `[from, to]` window. Specifically:
 - Events with an `end_time`: included if `start_time <= to` AND `end_time >= from`
@@ -749,7 +752,28 @@ DELETE /events/<event_id>
 - `403 Forbidden`: Unauthorized (event doesn't belong to this pubkey, or pubkey is blocklisted)
 - `404 Not Found`: Event not found
 
-### 7.7 GET /admin/blocklist (List Blocklisted Pubkeys)
+### 7.7 PUT /events/:id (Edit Own Event)
+
+**Request:** same JSON body as `POST /events` — the full event including `pubkey`, `signature`, and `created_at`. The signature is computed over the same canonical event data as POST (section 3.2), so editing requires re-signing.
+
+**Verification order:**
+
+1. Event lookup by `:id` → `404 Not Found` if absent.
+2. Field validation (same required fields as POST, plus `created_at`) → `400`.
+3. `body.pubkey` must equal the stored event's `pubkey` → `403 Forbidden` otherwise. No admin bypass (admin edit is not a feature; admin delete exists).
+4. `body.created_at` must equal the stored `created_at` → `400` (`created_at` is immutable and signed; a mismatch means the client signed the wrong canonical data).
+5. Blocklist and allowlist checks, as on POST → `403`.
+6. Ed25519 signature verification → `401 Unauthorized`.
+
+**Behavior:** all mutable columns are updated (`signature`, `title`, `description`, `url`, `venue_name`, `address`, `lat`, `lng`, `geohash5`/`geohash6` recomputed, `start_time`, `end_time`, `category`, `tags`, `festival_name`, `festival_url`); `updated_at` is set server-side to the current time. `id` and `created_at` never change. **No duplicate detection runs on PUT** — the event already exists and is being edited by its owner.
+
+**Success Response (200):**
+
+```json
+{ "id": "<event id>", "message": "Event updated successfully" }
+```
+
+### 7.8 GET /admin/blocklist (List Blocklisted Pubkeys)
 
 **Request:**
 ```
@@ -771,7 +795,7 @@ Unauthenticated. Returns the full blocklist.
 ]
 ```
 
-### 7.8 POST /admin/blocklist (Add Pubkey to Blocklist)
+### 7.9 POST /admin/blocklist (Add Pubkey to Blocklist)
 
 **Request:**
 
@@ -805,7 +829,7 @@ POST /admin/blocklist
 - `403 Forbidden`: `pubkey` is not `ADMIN_PUBKEY`
 - `503 Service Unavailable`: `ADMIN_PUBKEY` secret not configured
 
-### 7.9 DELETE /admin/blocklist/:pubkey (Remove Pubkey from Blocklist)
+### 7.10 DELETE /admin/blocklist/:pubkey (Remove Pubkey from Blocklist)
 
 **Request:**
 
@@ -1090,6 +1114,7 @@ The 2-day grace period ensures events that have just ended remain visible briefl
 - [x] GET /stats
 - [x] GET /events (geospatial, pubkey, no-geo paginated, iCal format)
 - [x] POST /events (create with duplicate detection)
+- [x] PUT /events/:id (edit own event; ownership + created_at immutability enforced)
 - [x] DELETE /events/:id (delete; admin bypass if pubkey === ADMIN_PUBKEY)
 - [x] GET /admin/blocklist
 - [x] POST /admin/blocklist

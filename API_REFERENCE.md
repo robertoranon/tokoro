@@ -6,10 +6,10 @@
 
 | Method   | Endpoint                                                            | Description                                 |
 | -------- | ------------------------------------------------------------------- | ------------------------------------------- |
-| `GET`    | `/events?lat=&lng=&radius=&from=&to=&category=&tags=&festival_url=` | Query events (max 100; all params optional) |
+| `GET`    | `/events?lat=&lng=&radius=&from=&to=&category=&tags=&festival_url=&has_festival=1` | Query events (max 100; all params optional; `has_festival=1` returns only festival entries) |
 | `GET`    | `/events?…&format=ical`                                             | Same query, returned as an iCal (.ics) feed |
 | `POST`   | `/events`                                                           | Publish a signed event                      |
-| `PUT`    | `/events/:id`                                                       | Edit an event (new signature required)      |
+| `PUT`    | `/events/:id`                                                       | Edit own event (re-signed; `created_at` immutable; no dedup) |
 | `DELETE` | `/events/:id`                                                       | Delete an event (signature required)        |
 
 ### Stars
