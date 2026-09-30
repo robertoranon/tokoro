@@ -530,10 +530,12 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
   }
 
   const category = url.searchParams.get('category') || '';
-  const festivalUrl = url.searchParams.get('festival_url') || '';
-  const normalizedFestivalUrl = festivalUrl
-    ? festivalUrl.replace(/\/$/, '')
-    : '';
+  const festivalFilter = buildFestivalUrlFilter(
+    url.searchParams.get('festival_url') || ''
+  );
+  const hasFestivalFilter = buildHasFestivalFilter(
+    url.searchParams.get('has_festival') || ''
+  );
   const pubkeyFilter = url.searchParams.get('pubkey') || '';
   const q = url.searchParams.get('q') || '';
   const textFilter = buildTextFilter(q);
@@ -564,6 +566,11 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
       allQuery += textFilter.sql;
       allParams.push(...textFilter.params);
     }
+    if (festivalFilter.sql) {
+      allQuery += festivalFilter.sql;
+      allParams.push(...festivalFilter.params);
+    }
+    allQuery += hasFestivalFilter;
     allQuery += ' ORDER BY start_time ASC LIMIT 100 OFFSET ?';
     allParams.push(offset);
 
@@ -605,6 +612,11 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
       pubkeyQuery += textFilter.sql;
       pubkeyParams.push(...textFilter.params);
     }
+    if (festivalFilter.sql) {
+      pubkeyQuery += festivalFilter.sql;
+      pubkeyParams.push(...festivalFilter.params);
+    }
+    pubkeyQuery += hasFestivalFilter;
     pubkeyQuery += ' ORDER BY start_time ASC LIMIT 100';
 
     const pubkeyResult = await env.DB.prepare(pubkeyQuery)
@@ -696,10 +708,11 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
     params.push(category);
   }
 
-  if (normalizedFestivalUrl) {
-    query += ' AND festival_url = ?';
-    params.push(normalizedFestivalUrl);
+  if (festivalFilter.sql) {
+    query += festivalFilter.sql;
+    params.push(...festivalFilter.params);
   }
+  query += hasFestivalFilter;
 
   if (pubkeyFilter) {
     query += ' AND pubkey = ?';
