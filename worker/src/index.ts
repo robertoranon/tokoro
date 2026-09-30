@@ -56,7 +56,7 @@ interface DbEventRow {
 // CORS headers for all responses
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
@@ -471,6 +471,12 @@ export default {
       // Route: POST /events
       if (request.method === 'POST' && path === '/events') {
         return await handlePostEvent(request, env);
+      }
+
+      // Route: PUT /events/:id
+      if (request.method === 'PUT' && path.startsWith('/events/')) {
+        const eventId = path.split('/')[2];
+        return await handlePutEvent(request, env, eventId);
       }
 
       // Route: DELETE /events/:id
@@ -984,6 +990,89 @@ async function handlePostEvent(request: Request, env: Env): Promise<Response> {
     { id: eventId, message: 'Event created successfully' },
     201
   );
+}
+
+async function handlePutEvent(
+  request: Request,
+  env: Env,
+  eventId: string
+): Promise<Response> {
+  const event: Event = await request.json();
+
+  const existing = await env.DB.prepare(
+    'SELECT pubkey, created_at FROM events WHERE id = ?'
+  )
+    .bind(eventId)
+    .first<{ pubkey: string; created_at: string }>();
+
+  if (!existing) {
+    return jsonResponse({ error: 'Event not found' }, 404);
+  }
+
+  const check = validatePutRequest(event, existing);
+  if (!check.ok) {
+    return jsonResponse({ error: check.error }, check.status);
+  }
+
+  if (await isBlocklisted(env, event.pubkey)) {
+    return jsonResponse({ error: 'Forbidden' }, 403);
+  }
+
+  if (env.ALLOWED_PUBKEYS) {
+    const allowed = env.ALLOWED_PUBKEYS.split(',')
+      .map(k => k.trim().toLowerCase())
+      .filter(Boolean);
+    if (!allowed.includes(event.pubkey.toLowerCase())) {
+      return jsonResponse(
+        { error: 'Forbidden', message: 'Public key not in allowlist' },
+        403
+      );
+    }
+  }
+
+  const isValid = await verifyEventSignature(event);
+  if (!isValid) {
+    return jsonResponse({ error: 'Invalid signature' }, 401);
+  }
+
+  // No duplicate detection on PUT: the event exists and its owner is editing it.
+  const geohash5 = geohashEncode(event.lat, event.lng, 5);
+  const geohash6 = geohashEncode(event.lat, event.lng, 6);
+  const updatedAt = formatLocalDateTime(new Date());
+
+  await env.DB.prepare(
+    `
+		UPDATE events SET
+			signature = ?, title = ?, description = ?, url = ?, venue_name = ?,
+			address = ?, lat = ?, lng = ?, geohash5 = ?, geohash6 = ?,
+			start_time = ?, end_time = ?, category = ?, tags = ?,
+			festival_name = ?, festival_url = ?, updated_at = ?
+		WHERE id = ?
+	`
+  )
+    .bind(
+      event.signature,
+      event.title,
+      event.description || null,
+      event.url || null,
+      event.venue_name || null,
+      event.address || null,
+      event.lat,
+      event.lng,
+      geohash5,
+      geohash6,
+      event.start_time,
+      event.end_time || null,
+      event.category,
+      JSON.stringify(event.tags || []),
+      event.festival_name || null,
+      event.festival_url || null,
+      updatedAt,
+      eventId
+    )
+    .run();
+
+  return jsonResponse({ id: eventId, message: 'Event updated successfully' });
 }
 
 async function handleDeleteEvent(
