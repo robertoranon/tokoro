@@ -63,7 +63,10 @@ export interface NormalizerConfig {
 export class EventNormalizer {
   constructor(private config: NormalizerConfig) {}
 
-  async normalize(event: ExtractedEvent): Promise<NormalizedEvent | null> {
+  async normalize(
+    event: ExtractedEvent,
+    options?: { createdAt?: string }
+  ): Promise<NormalizedEvent | null> {
     console.log(`Normalizing event: ${event.title}`);
 
     // Geocode if coordinates missing
@@ -123,7 +126,10 @@ export class EventNormalizer {
       }
     }
 
-    const created_at = new Date().toISOString().slice(0, 19); // "YYYY-MM-DDTHH:MM:SS"
+    // An update (PUT) must re-sign with the stored created_at: it is part of
+    // the signed data and immutable on the worker.
+    const created_at =
+      options?.createdAt ?? new Date().toISOString().slice(0, 19); // "YYYY-MM-DDTHH:MM:SS"
 
     // Create event data for signing
     const eventData = {

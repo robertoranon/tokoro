@@ -1,4 +1,12 @@
 import {
+  matchEdition,
+  differs,
+  RadarPublisher,
+  type ExistingEntry,
+} from '../src/radar/radar-publisher.js';
+import { EventNormalizer } from '../src/utils/normalizer.js';
+import type { NormalizedEvent } from '../src/types/event.js';
+import {
   parseFestivalEntry,
   hasDates,
   normalizeRadarDates,
@@ -774,6 +782,324 @@ console.log('\n=== PageDiscovery.discoverFestivalInfoPages ===\n');
     fakeLLM('not json')
   ).discoverFestivalInfoPages(html, 'https://f.example');
   assert(broken.length === 0, 'LLM failure → empty list (never throws)');
+}
+
+console.log('\n=== EventNormalizer createdAt option ===\n');
+{
+  const normalizer = new EventNormalizer({
+    keypair: { privkey: '11'.repeat(32), pubkey: '22'.repeat(32) },
+  });
+  const event = {
+    title: 'Terraforma 2026',
+    lat: 45.5,
+    lng: 9.1,
+    start_time: '2026-06-18T00:00:00',
+    end_time: '2026-06-21T23:59:59',
+    category: 'music' as const,
+  };
+  const fixed = await normalizer.normalize(event, {
+    createdAt: '2026-01-02T03:04:05',
+  });
+  assert(
+    fixed?.created_at === '2026-01-02T03:04:05',
+    'createdAt option is used verbatim'
+  );
+  const fresh = await normalizer.normalize(event);
+  assert(
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(fresh?.created_at ?? ''),
+    'default created_at is still generated'
+  );
+  assert(
+    fixed?.signature !== fresh?.signature,
+    'signature depends on created_at'
+  );
+}
+
+console.log('\n=== matchEdition ===\n');
+{
+  const entry = (over: Partial<ExistingEntry>): ExistingEntry => ({
+    id: 'id',
+    title: 'Terraforma 2026',
+    lat: 45.5,
+    lng: 9.1,
+    start_time: '2026-06-18T00:00:00',
+    end_time: '2026-06-21T23:59:59',
+    category: 'music',
+    tags: ['festival'],
+    created_at: '2026-01-01T00:00:00',
+    ...over,
+  });
+
+  assert(
+    matchEdition([], '2026-06-18T00:00:00') === undefined,
+    'empty list → no match'
+  );
+  assert(
+    matchEdition([entry({ id: 'a' })], '2026-06-25T00:00:00')?.id === 'a',
+    'shifted dates within the window still match (same edition)'
+  );
+  assert(
+    matchEdition([entry({ id: 'a' })], '2027-06-17T00:00:00') === undefined,
+    'a next-year edition (~365 days) does not match'
+  );
+  assert(
+    matchEdition(
+      [
+        entry({ id: 'far', start_time: '2026-03-01T00:00:00' }),
+        entry({ id: 'near' }),
+      ],
+      '2026-06-20T00:00:00'
+    )?.id === 'near',
+    'the closest start_time wins'
+  );
+  // Collision guard: festival-mode program events share festival_url and pubkey.
+  const concert = entry({ id: 'concert', tags: [], end_time: null });
+  assert(
+    matchEdition([concert], '2026-06-18T00:00:00') === undefined,
+    'program events (no end_time, no festival tag) are never matched'
+  );
+  assert(
+    matchEdition(
+      [entry({ id: 'tagless', tags: ['jazz'] })],
+      '2026-06-18T00:00:00'
+    ) === undefined,
+    'entries without the festival tag are never matched'
+  );
+  assert(
+    matchEdition(
+      [entry({ id: 'open', end_time: null })],
+      '2026-06-18T00:00:00'
+    ) === undefined,
+    'entries without an end_time are never matched'
+  );
+}
+
+console.log('\n=== differs ===\n');
+{
+  const existing: ExistingEntry = {
+    id: 'id',
+    title: 'Terraforma 2026',
+    description: null, // the worker stores '' as null
+    url: 'https://terra.example',
+    venue_name: null,
+    address: 'Bollate',
+    lat: 45.5,
+    lng: 9.1,
+    start_time: '2026-06-18T00:00:00',
+    end_time: '2026-06-21T23:59:59',
+    category: 'music',
+    tags: ['festival', 'electronic'],
+    festival_name: 'Terraforma',
+    festival_url: 'https://terra.example',
+    created_at: '2026-01-01T00:00:00',
+  };
+  const same: NormalizedEvent = {
+    pubkey: 'p',
+    signature: 's',
+    title: 'Terraforma 2026',
+    description: '',
+    url: 'https://terra.example',
+    venue_name: '',
+    address: 'Bollate',
+    lat: 45.5,
+    lng: 9.1,
+    start_time: '2026-06-18T00:00:00',
+    end_time: '2026-06-21T23:59:59',
+    category: 'music',
+    tags: ['electronic', 'festival'],
+    festival_name: 'Terraforma',
+    festival_url: 'https://terra.example',
+    created_at: '2026-01-01T00:00:00',
+  };
+  assert(
+    !differs(existing, same),
+    "null vs '' and tag order are not differences"
+  );
+  assert(
+    !differs(existing, { ...same, lat: 45.5003, lng: 9.1004 }),
+    'geocoder jitter (<~50 m) is not a difference'
+  );
+  assert(
+    differs(existing, { ...same, lat: 45.52 }),
+    'a real move is a difference'
+  );
+  assert(
+    differs(existing, { ...same, end_time: '2026-06-22T23:59:59' }),
+    'changed end_time'
+  );
+  assert(
+    differs(existing, { ...same, description: 'New blurb' }),
+    'changed description'
+  );
+  assert(differs(existing, { ...same, tags: ['festival'] }), 'changed tags');
+  assert(
+    differs(existing, { ...same, festival_name: 'Terra' }),
+    'changed festival_name (unsigned metadata)'
+  );
+}
+
+console.log('\n=== RadarPublisher ===\n');
+{
+  type Call = { url: string; method: string };
+  function fakeFetch(
+    respond: (call: Call) => { status: number; body?: unknown }
+  ) {
+    const calls: Call[] = [];
+    const fn = (async (url: unknown, init?: RequestInit) => {
+      const call = { url: String(url), method: init?.method ?? 'GET' };
+      calls.push(call);
+      const r = respond(call);
+      return new Response(JSON.stringify(r.body ?? {}), { status: r.status });
+    }) as typeof fetch;
+    return { fn, calls };
+  }
+  const event: NormalizedEvent = {
+    pubkey: 'p',
+    signature: 's',
+    title: 'Terraforma 2026',
+    lat: 45.5,
+    lng: 9.1,
+    start_time: '2026-06-18T00:00:00',
+    end_time: '2026-06-21T23:59:59',
+    category: 'music',
+    tags: ['festival'],
+    festival_name: 'Terraforma',
+    festival_url: 'https://terra.example',
+    created_at: '2026-01-01T00:00:00',
+  };
+  const match: ExistingEntry = {
+    id: 'abc',
+    title: 'Terraforma 2026',
+    lat: 45.5,
+    lng: 9.1,
+    start_time: '2026-06-18T00:00:00',
+    end_time: '2026-06-21T23:59:59',
+    category: 'music',
+    tags: ['festival'],
+    festival_name: 'Terraforma',
+    created_at: '2026-01-01T00:00:00',
+  };
+
+  {
+    const { fn, calls } = fakeFetch(() => ({ status: 200, body: [match] }));
+    const existing = await new RadarPublisher('http://api', 'pk', fn).lookup(
+      'https://terra.example'
+    );
+    const url = new URL(calls[0].url);
+    assert(existing.length === 1, 'lookup returns the array');
+    assert(
+      url.pathname === '/events' &&
+        url.searchParams.get('pubkey') === 'pk' &&
+        url.searchParams.get('festival_url') === 'https://terra.example' &&
+        url.searchParams.get('from') === '1970-01-01T00:00:00' &&
+        url.searchParams.get('to') === '2999-12-31T23:59:59',
+      'lookup sends pubkey, festival_url and an explicit wide time window'
+    );
+  }
+  {
+    const { fn } = fakeFetch(() => ({ status: 200, body: { events: [] } }));
+    let threw = false;
+    try {
+      await new RadarPublisher('http://api', 'pk', fn).lookup(
+        'https://terra.example'
+      );
+    } catch {
+      threw = true;
+    }
+    assert(threw, 'lookup throws on an unexpected response shape');
+  }
+  {
+    const { fn, calls } = fakeFetch(() => ({
+      status: 201,
+      body: { id: 'new' },
+    }));
+    const outcome = await new RadarPublisher('http://api', 'pk', fn).apply(
+      event,
+      undefined
+    );
+    assert(
+      outcome === 'published' &&
+        calls.length === 1 &&
+        calls[0].method === 'POST',
+      'no match → POST → published'
+    );
+  }
+  {
+    const { fn, calls } = fakeFetch(() => ({ status: 200 }));
+    const outcome = await new RadarPublisher('http://api', 'pk', fn).apply(
+      event,
+      match
+    );
+    assert(
+      outcome === 'unchanged' && calls.length === 0,
+      'identical match → no API call → unchanged'
+    );
+  }
+  {
+    const { fn, calls } = fakeFetch(() => ({ status: 200 }));
+    const outcome = await new RadarPublisher('http://api', 'pk', fn).apply(
+      { ...event, end_time: '2026-06-22T23:59:59' },
+      match
+    );
+    assert(
+      outcome === 'updated' &&
+        calls.length === 1 &&
+        calls[0].method === 'PUT' &&
+        calls[0].url === 'http://api/events/abc',
+      'changed match → PUT /events/:id → updated'
+    );
+  }
+  {
+    const { fn, calls } = fakeFetch(c =>
+      c.method === 'PUT' ? { status: 404 } : { status: 201 }
+    );
+    const outcome = await new RadarPublisher('http://api', 'pk', fn).apply(
+      { ...event, end_time: '2026-06-22T23:59:59' },
+      match
+    );
+    assert(
+      outcome === 'published' && calls.map(c => c.method).join() === 'PUT,POST',
+      'PUT 404 (expired mid-run) falls back to POST'
+    );
+  }
+  for (const status of [401, 403, 409, 500]) {
+    const { fn, calls } = fakeFetch(() => ({
+      status,
+      body: { error: 'nope' },
+    }));
+    const outcome = await new RadarPublisher('http://api', 'pk', fn).apply(
+      { ...event, end_time: '2026-06-22T23:59:59' },
+      match
+    );
+    assert(
+      outcome === 'failed' && calls.length === 1,
+      `PUT ${status} → failed, no fallback POST`
+    );
+  }
+  {
+    const { fn } = fakeFetch(() => ({
+      status: 409,
+      body: { existing_event_id: 'x' },
+    }));
+    const outcome = await new RadarPublisher('http://api', 'pk', fn).apply(
+      event,
+      undefined
+    );
+    assert(
+      outcome === 'failed',
+      'POST 409 (duplicate of a foreign event) → failed, loudly'
+    );
+  }
+  {
+    const fn = (async () => {
+      throw new Error('network down');
+    }) as unknown as typeof fetch;
+    const outcome = await new RadarPublisher('http://api', 'pk', fn).apply(
+      event,
+      undefined
+    );
+    assert(outcome === 'failed', 'network error → failed, never throws');
+  }
 }
 
 // --- add new test sections above this line ---
