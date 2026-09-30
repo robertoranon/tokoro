@@ -99,6 +99,8 @@ async function main() {
     lat: 46.0637,
     lng: 13.2353,
     start_time: `${year}-09-05T21:00:00`,
+    end_time: `${year}-09-05T23:00:00`,
+    tags: ['festival'],
     category: 'music',
     festival_name: 'Smoke Radar',
     festival_url: festivalUrl,

@@ -56,6 +56,12 @@ async function main() {
   try {
     config = parseFestivalsConfig(await fs.readFile(festivalsFile, 'utf-8'));
   } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      console.error(
+        `Error: ${festivalsFile} not found. Copy festivals.example.yaml to festivals.yaml and edit it.`
+      );
+      process.exit(1);
+    }
     console.error(
       `Error reading festivals config: ${error instanceof Error ? error.message : error}`
     );
@@ -71,6 +77,7 @@ async function main() {
   console.log(
     `Radar: ${active.length} active festival(s), ${config.festivals.length - active.length} paused${debug ? ' (DEBUG: nothing is published)' : ''}`
   );
+  console.log(`API: ${env.apiUrl}`);
 
   const defaultBrowser =
     (process.env.BROWSER_ENGINE as BrowserEngine) || 'chrome';

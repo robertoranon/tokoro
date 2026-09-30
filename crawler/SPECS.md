@@ -373,12 +373,12 @@ Produces **one radar entry per festival homepage**: the festival as a whole (nam
 5. If the draft is not dated: ask the LLM for up to 2 info/edition/tickets links on the homepage, fetch them in order, and merge (**fill missing fields only, never overwrite; dates travel as a pair**) until dates are found. A failing info page is skipped, not fatal.
 6. Still no dates → outcome `skipped_no_dates`. An edition whose `end_time` date is before today is also `skipped_no_dates` (the past-event rule applies to the **end** date, so a festival running now stays).
 7. `festival_url` is set to the watchlist URL in canonical form (scheme + host + path, no query/hash/trailing slash — the API matches `festival_url` exactly). `tags` are trimmed, lowercased, deduplicated and gain `"festival"`; `festival_name` has any trailing year removed (falls back to the title when empty); `url` defaults to the homepage.
-8. Publish-or-update (below). In `--debug` mode this step is replaced by printing the entry (see limitation d).
+8. Publish-or-update (below). In `--debug` mode this step is replaced by printing the entry (see limitation d): `npm run crawl -- --mode festival-entry --debug` prints the raw entry, while the radar runner's `--debug` also normalizes (geocodes and signs) before printing.
 
 **Publish-or-update.** Re-crawling must update, not duplicate:
 
 1. `GET /events?pubkey=<crawler>&festival_url=<url>&from=1970-01-01T00:00:00&to=2999-12-31T23:59:59` — the explicit window is required: the pubkey-only path defaults to _now → +7 days_. A non-array response is an error.
-2. **Match:** among returned entries that _look like radar entries_ (tags contain `"festival"` **and** `end_time` set), the one whose `start_time` is closest to the new one, within 240 days. The radar-entry guard matters because festival-mode program events share the crawler's pubkey and `festival_url`; a next-year edition (~365 days) never matches.
+2. **Match:** among returned entries that _look like radar entries_ (tags contain `"festival"` **and** the radar date shape: `start_time` ends `T00:00:00` **and** `end_time` ends `T23:59:59`, as `finalizeRadarEntry` always produces), the one whose `start_time` is closest to the new one, within 240 days. The radar-entry guard matters because festival-mode program events share the crawler's pubkey and `festival_url`; a next-year edition (~365 days) never matches.
 3. No match → `POST` → `published`. Match that differs → `PUT /events/:id`, re-signed with the stored `created_at` (immutable and signed) → `updated`. Otherwise no API write → `unchanged`.
 4. **Differs** compares title, description, url, venue_name, address, lat/lng, start/end time, category, tags (order-insensitive) and festival_name; `null` equals `''` (the worker stores empty as null); coordinates within 0.0005° (~50 m) are equal (geocoder jitter).
 5. `PUT` 404 → falls back to `POST`. `PUT`/`POST` 401/403 → `failed`, logged as a signing/identity bug. `POST` 409 (duplicate of an event that is not this crawler's radar entry) → `failed`. A network error → `failed`.
@@ -421,7 +421,7 @@ An empty `festivals:` key is an empty list.
 
 **Staleness report.** After each (non-debug) run the runner prints active festivals whose last 4 radar runs (`STALE_WINDOW`, that included them) had no `published`/`updated`/`unchanged` outcome — dead sources, but also festivals between editions. A festival needs 4 runs of its own history before it can be flagged.
 
-Scheduling is a plain crontab line: `0 10 * * 1  cd /path/to/tokoro/crawler && npm run radar`.
+Scheduling is a plain crontab line: `0 10 * * 1  cd /path/to/tokoro/crawler && /absolute/path/to/npm run radar >> logs/radar.log 2>&1`. Cron's PATH usually lacks npm (find it with `which npm`), and `logs/` is gitignored.
 
 **Known limitations:** the same as section 4.7 (a)–(d); in particular (c) means an ended edition shows up in the staleness report until the next edition is announced, and (d) means the `--debug` summary counts extracted entries, not published ones.
 

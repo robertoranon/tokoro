@@ -883,6 +883,31 @@ console.log('\n=== matchEdition ===\n');
     ) === undefined,
     'entries without an end_time are never matched'
   );
+  assert(
+    matchEdition(
+      [
+        entry({
+          id: 'tagged-concert',
+          tags: ['jazz', 'festival'],
+          start_time: '2027-03-20T21:00:00',
+          end_time: '2027-03-20T23:00:00',
+        }),
+      ],
+      '2027-03-20T00:00:00'
+    ) === undefined,
+    'a concert tagged festival with an end_time but not the radar date shape is never matched'
+  );
+  assert(
+    matchEdition(
+      [entry({ id: 'half', end_time: '2026-06-21T22:00:00' })],
+      '2026-06-18T00:00:00'
+    ) === undefined,
+    'festival tag + T00:00:00 start but end not T23:59:59 is never matched'
+  );
+  assert(
+    matchEdition([entry({ id: 'real' })], '2026-06-18T00:00:00')?.id === 'real',
+    'a radar-shaped entry still matches'
+  );
 }
 
 console.log('\n=== differs ===\n');

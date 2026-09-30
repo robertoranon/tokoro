@@ -1,6 +1,7 @@
 # Radar watchlist — one entry per festival homepage.
 # Copy to festivals.yaml and edit. Crawl weekly:
-#   0 10 * * 1  cd /path/to/tokoro/crawler && npm run radar
+#   0 10 * * 1  cd /path/to/tokoro/crawler && /absolute/path/to/npm run radar >> logs/radar.log 2>&1
+#   (cron's PATH usually lacks npm: find it with `which npm`; logs/ is gitignored.)
 #
 # Try a single run without publishing anything:
 #   npm run radar -- --debug

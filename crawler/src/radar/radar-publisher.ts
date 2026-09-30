@@ -41,10 +41,17 @@ const COORD_TOLERANCE = 0.0005;
 /**
  * Festival-mode program events carry the same pubkey and festival_url as a
  * radar entry. Only entries that look like radar entries may ever be matched
- * (and therefore overwritten): the 'festival' tag plus an end_time.
+ * (and therefore overwritten): the 'festival' tag plus the radar date shape
+ * that finalizeRadarEntry always produces (start T00:00:00, end T23:59:59).
+ * A free-form LLM 'festival' tag on a concert must not be enough.
  */
 function isRadarEntry(e: ExistingEntry): boolean {
-  return !!e.end_time && (e.tags ?? []).includes('festival');
+  return (
+    !!e.end_time &&
+    e.start_time.endsWith('T00:00:00') &&
+    e.end_time.endsWith('T23:59:59') &&
+    (e.tags ?? []).includes('festival')
+  );
 }
 
 const asMs = (localIso: string) => Date.parse(`${localIso.slice(0, 19)}Z`);
