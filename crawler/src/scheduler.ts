@@ -54,7 +54,14 @@ export function parseJobsConfig(content: string): SchedulerConfig {
       );
     }
 
-    const validModes = ['direct', 'discover', 'image', 'festival', 'pdf'];
+    const validModes = [
+      'direct',
+      'discover',
+      'image',
+      'festival',
+      'pdf',
+      'festival-entry',
+    ];
     if (j.mode !== undefined && !validModes.includes(j.mode as string)) {
       throw new Error(
         `Invalid jobs.yaml: job ${label} has invalid mode "${j.mode}". Must be: ${validModes.join(', ')}`

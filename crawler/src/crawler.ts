@@ -7,6 +7,19 @@ import { EventExtractor } from './extractors/event-extractor.js';
 import { PageDiscovery } from './extractors/page-discovery.js';
 import { EventNormalizer, KeyPair } from './utils/normalizer.js';
 import { APIPublisher, PublishResult } from './utils/api-publisher.js';
+import { FestivalEntryExtractor } from './extractors/festival-entry-extractor.js';
+import {
+  RadarPublisher,
+  matchEdition,
+  type RadarOutcome,
+} from './radar/radar-publisher.js';
+import { normalizeFestivalUrl } from './radar/festivals-config.js';
+import {
+  hasDates,
+  isPastEntry,
+  finalizeRadarEntry,
+  resolveEntryDraft,
+} from './radar/festival-entry.js';
 
 export interface CrawlResult {
   published: number;
@@ -132,7 +145,18 @@ export function groupEventsByDay(
 // For these, the Jina fetcher is used automatically even when playwright is the default.
 const JINA_PREFERRED_DOMAINS = new Set(['bandsintown.com']);
 
-export type CrawlerMode = 'direct' | 'discover' | 'image' | 'festival' | 'pdf';
+export type CrawlerMode =
+  | 'direct'
+  | 'discover'
+  | 'image'
+  | 'festival'
+  | 'pdf'
+  | 'festival-entry';
+
+export interface RadarEntryResult {
+  url: string;
+  outcome: RadarOutcome;
+}
 export type FetcherType = 'playwright' | 'jina';
 export type { BrowserEngine, PdfParserType };
 
@@ -163,6 +187,8 @@ export class EventCrawler {
   private extractor: EventExtractor;
   private normalizer: EventNormalizer;
   private publisher: APIPublisher;
+  private festivalEntryExtractor: FestivalEntryExtractor;
+  private radarPublisher: RadarPublisher;
 
   constructor(private config: CrawlerConfig) {
     const fetcherType = config.fetcher || 'playwright';
@@ -194,6 +220,14 @@ export class EventCrawler {
       braveSearchKey: config.braveSearchKey,
     });
     this.publisher = new APIPublisher(config.apiUrl, config.debug, config.llm);
+    this.festivalEntryExtractor = new FestivalEntryExtractor({
+      llm: config.llm,
+      referenceDate: config.referenceDate,
+    });
+    this.radarPublisher = new RadarPublisher(
+      config.apiUrl,
+      config.keypair.pubkey
+    );
   }
 
   private fetcherForUrl(url: string): HTMLFetcher | JinaFetcher {
@@ -221,6 +255,8 @@ export class EventCrawler {
       festival:
         'Festival extraction (discover listing pages, extract all events)',
       pdf: 'PDF extraction (from local files or URLs)',
+      'festival-entry':
+        'Festival entry (one radar entry per festival homepage; publish or update)',
     };
 
     console.log(`\n🚀 Starting crawler with ${urls.length} image(s)/URL(s)\n`);
@@ -245,6 +281,11 @@ export class EventCrawler {
     // Handle PDF mode separately
     if (mode === 'pdf') {
       return this.crawlPdfs(urls);
+    }
+
+    // Festival-entry (radar) mode has its own flow
+    if (mode === 'festival-entry') {
+      return this.crawlFestivalEntryMode(urls);
     }
 
     // Festival mode has its own flow
@@ -444,6 +485,100 @@ export class EventCrawler {
     console.log(`✅ Text file extraction complete!`);
     console.log(`Total events extracted: ${publishedCount}`);
     console.log(`${'='.repeat(60)}\n`);
+  }
+
+  /** `--mode festival-entry` / jobs.yaml adapter: map radar outcomes onto CrawlResult. */
+  private async crawlFestivalEntryMode(urls: string[]): Promise<CrawlResult> {
+    const results = await this.crawlFestivalEntries(urls);
+    const totals: CrawlResult = { published: 0, duplicate: 0, failed: 0 };
+    for (const { outcome } of results) {
+      if (outcome === 'published' || outcome === 'updated') totals.published++;
+      else if (outcome === 'unchanged') totals.duplicate++;
+      else if (outcome === 'failed') totals.failed++;
+      // skipped_no_dates is neither a success nor a failure
+    }
+    return totals;
+  }
+
+  /**
+   * One radar entry per festival homepage (spec §2). Returns the exact outcome
+   * per URL; never throws for a single bad URL. Used directly by `npm run radar`.
+   */
+  async crawlFestivalEntries(urls: string[]): Promise<RadarEntryResult[]> {
+    const results: RadarEntryResult[] = [];
+    try {
+      await this.fetcher.initialize();
+      for (const seedUrl of urls) {
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`Festival entry: ${seedUrl}`);
+        console.log(`${'='.repeat(60)}\n`);
+
+        let outcome: RadarOutcome;
+        try {
+          outcome = await this.processFestivalEntry(seedUrl);
+        } catch (error) {
+          console.error(
+            `\n❌ Error processing festival entry ${seedUrl}:`,
+            error
+          );
+          outcome = 'failed';
+        }
+        console.log(`→ ${outcome}`);
+        results.push({ url: seedUrl, outcome });
+      }
+    } finally {
+      await this.fetcher.close();
+    }
+    return results;
+  }
+
+  private async processFestivalEntry(seedUrl: string): Promise<RadarOutcome> {
+    const festivalUrl = normalizeFestivalUrl(seedUrl);
+    const home = await this.fetcherForUrl(seedUrl).fetchPage(seedUrl);
+
+    const draft = await resolveEntryDraft(home, {
+      extract: page => this.festivalEntryExtractor.extract(page),
+      discoverInfoPages: page =>
+        this.discovery.discoverFestivalInfoPages(page.html, seedUrl),
+      fetchPage: url => this.fetcherForUrl(url).fetchPage(url),
+    });
+
+    if (!hasDates(draft)) {
+      console.log('⚠ No dates announced — skipped');
+      return 'skipped_no_dates';
+    }
+
+    // Radar rule: drop on the END date, so a festival running now stays.
+    const today =
+      this.config.referenceDate || new Date().toISOString().slice(0, 10);
+    if (isPastEntry(draft, today)) {
+      console.log(
+        `⚠ Edition already ended (${draft.end_time.slice(0, 10)}) — skipped`
+      );
+      return 'skipped_no_dates';
+    }
+
+    const entry = finalizeRadarEntry(draft, festivalUrl);
+
+    if (this.config.debug) {
+      if (!this.config.normalize) {
+        this.printRawEvents([entry]);
+        return 'published';
+      }
+      const normalized = await this.normalizer.normalize(entry);
+      if (!normalized) return 'failed';
+      console.log(JSON.stringify(normalized, null, 2));
+      return 'published';
+    }
+
+    // Look up first: an update must re-sign with the stored created_at.
+    const existing = await this.radarPublisher.lookup(festivalUrl);
+    const match = matchEdition(existing, String(entry.start_time));
+    const normalized = await this.normalizer.normalize(entry, {
+      createdAt: match?.created_at,
+    });
+    if (!normalized) return 'failed';
+    return this.radarPublisher.apply(normalized, match);
   }
 
   private async crawlFestival(urls: string[]): Promise<CrawlResult> {

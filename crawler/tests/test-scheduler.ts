@@ -148,5 +148,16 @@ console.log('\nInvalid pdf_parser:');
   assert(threw, 'throws for invalid pdf_parser');
 }
 
+console.log('\nfestival-entry mode:');
+{
+  const config = parseJobsConfig(
+    'jobs:\n  - urls:\n      - https://example.com\n    mode: festival-entry'
+  );
+  assert(
+    config.jobs[0].mode === 'festival-entry',
+    'accepts festival-entry mode'
+  );
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

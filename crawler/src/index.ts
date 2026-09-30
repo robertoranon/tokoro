@@ -70,6 +70,9 @@ function printUsage() {
     '  npm run crawl -- --mode festival <url>                # Festival mode: discover program pages + extract all events'
   );
   console.log(
+    '  npm run crawl -- --mode festival-entry <url>          # Festival entry: one radar entry for the festival as a whole (publish or update)'
+  );
+  console.log(
     '  npm run crawl -- --fetcher jina <url>                # Use Jina AI Reader (faster, no browser)'
   );
   console.log(
@@ -153,12 +156,13 @@ async function main() {
       modeArg === 'discover' ||
       modeArg === 'image' ||
       modeArg === 'festival' ||
+      modeArg === 'festival-entry' ||
       modeArg === 'pdf'
     ) {
       mode = modeArg;
     } else {
       console.error(
-        `Error: Invalid mode "${modeArg}". Must be "direct", "discover", "image", "festival", or "pdf"`
+        `Error: Invalid mode "${modeArg}". Must be "direct", "discover", "image", "festival", "festival-entry", or "pdf"`
       );
       process.exit(1);
     }
