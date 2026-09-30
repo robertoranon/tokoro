@@ -24,6 +24,55 @@ export type DatedDraft = FestivalEntryDraft & {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
 
+/** First 10 chars are a real calendar date (rejects 2026-02-31, 2026-13-45). */
+function isRealDate(s: string): boolean {
+  if (!DATE_RE.test(s)) return false;
+  const d = s.slice(0, 10);
+  const date = new Date(`${d}T12:00:00Z`);
+  return !isNaN(date.getTime()) && date.toISOString().slice(0, 10) === d;
+}
+
+/** Drop or coerce malformed OPTIONAL fields so they cannot sink a good entry. */
+function sanitizeOptionalFields(c: Record<string, unknown>): void {
+  delete c.festival_url;
+  delete c.start_time_utc;
+  delete c.end_time_utc;
+
+  if (c.url !== undefined) {
+    try {
+      new URL(String(c.url));
+    } catch {
+      delete c.url;
+    }
+  }
+  for (const [key, min, max] of [
+    ['lat', -90, 90],
+    ['lng', -180, 180],
+  ] as const) {
+    if (c[key] === undefined) continue;
+    const n = typeof c[key] === 'number' ? (c[key] as number) : Number(c[key]);
+    if (isNaN(n) || n < min || n > max) delete c[key];
+    else c[key] = n;
+  }
+  if (c.tags !== undefined) {
+    const list =
+      typeof c.tags === 'string'
+        ? c.tags.split(',')
+        : Array.isArray(c.tags)
+          ? c.tags
+          : [];
+    const tags = list
+      .filter((t): t is string => typeof t === 'string')
+      .map(t => t.trim())
+      .filter(t => t !== '');
+    if (tags.length) c.tags = tags;
+    else delete c.tags;
+  }
+  for (const key of ['start_time', 'end_time']) {
+    if (typeof c[key] === 'number') c[key] = String(c[key]);
+  }
+}
+
 export function parseFestivalEntry(
   raw: unknown,
   pageUrl: string
@@ -37,6 +86,7 @@ export function parseFestivalEntry(
       ([, v]) => v !== null && v !== ''
     )
   );
+  sanitizeOptionalFields(cleaned);
   if (!cleaned.url) cleaned.url = pageUrl;
 
   const parsed = FestivalEntryDraftSchema.safeParse(cleaned);
@@ -57,8 +107,8 @@ export function hasDates(d: FestivalEntryDraft | null): d is DatedDraft {
     !!d &&
     !!d.start_time &&
     !!d.end_time &&
-    DATE_RE.test(d.start_time) &&
-    DATE_RE.test(d.end_time) &&
+    isRealDate(d.start_time) &&
+    isRealDate(d.end_time) &&
     d.end_time.slice(0, 10) >= d.start_time.slice(0, 10)
   );
 }
@@ -68,8 +118,8 @@ export function normalizeRadarDates(d: FestivalEntryDraft): FestivalEntryDraft {
   if (
     !d.start_time ||
     !d.end_time ||
-    !DATE_RE.test(d.start_time) ||
-    !DATE_RE.test(d.end_time)
+    !isRealDate(d.start_time) ||
+    !isRealDate(d.end_time)
   ) {
     return d;
   }
@@ -145,12 +195,15 @@ export function finalizeRadarEntry(
   festivalUrl: string
 ): ExtractedEvent {
   const tags = [
-    ...new Set([...(d.tags ?? []).map(t => t.toLowerCase()), 'festival']),
+    ...new Set([
+      ...(d.tags ?? []).map(t => t.trim().toLowerCase()).filter(t => t !== ''),
+      'festival',
+    ]),
   ];
   return {
     ...d,
     url: d.url ?? festivalUrl,
-    festival_name: stripEdition(d.festival_name ?? d.title),
+    festival_name: stripEdition(d.festival_name || d.title),
     festival_url: festivalUrl,
     tags,
   };

@@ -521,6 +521,103 @@ console.log('\n=== resolveEntryDraft ===\n');
   }
 }
 
+console.log('\n=== review fixes: sanitizing / real dates / finalize ===\n');
+{
+  const P = 'https://page.example';
+  const pf = (o: Record<string, unknown>) =>
+    parseFestivalEntry({ title: 'T', category: 'music', ...o }, P);
+  assert(
+    pf({ url: 'not a url' })?.url === P,
+    'invalid url falls back to page url'
+  );
+  assert(
+    pf({ lat: '45.5', lng: '9.2' })?.lat === 45.5,
+    'numeric-string lat coerced'
+  );
+  const oor = pf({ lat: 123, lng: 9 });
+  assert(
+    oor !== null && oor.lat === undefined && oor.lng === 9,
+    'out-of-range lat dropped, entry survives'
+  );
+  assert(pf({ lat: 'abc' })?.lat === undefined, 'NaN lat dropped');
+  assert(
+    JSON.stringify(pf({ tags: 'a, b ,,c' })?.tags) === '["a","b","c"]',
+    'tags string split on commas'
+  );
+  assert(
+    JSON.stringify(pf({ tags: ['a', 3, ' ', null, ' b '] })?.tags) ===
+      '["a","b"]',
+    'tags filtered to non-empty strings'
+  );
+  assert(pf({ tags: [1, ''] })?.tags === undefined, 'empty tags dropped');
+  const junk = pf({
+    festival_url: 'junk',
+    start_time_utc: 5,
+    end_time_utc: {},
+  });
+  assert(
+    junk !== null &&
+      junk.festival_url === undefined &&
+      junk.start_time_utc === undefined,
+    'junk festival_url / utc fields ignored'
+  );
+  assert(
+    pf({ start_time: 20260618 })?.start_time === '20260618',
+    'numeric start_time coerced to string'
+  );
+  assert(pf({ title: '' }) === null, 'empty title still null');
+
+  const b = { title: 'F', category: 'music' as const };
+  assert(
+    !hasDates({
+      ...b,
+      start_time: '2026-02-31T00:00:00',
+      end_time: '2026-03-05T00:00:00',
+    }),
+    '2026-02-31 → no dates'
+  );
+  assert(
+    !hasDates({ ...b, start_time: '2026-13-45', end_time: '2026-13-46' }),
+    '2026-13-45 → no dates'
+  );
+  assert(
+    hasDates({ ...b, start_time: '2026-06-18', end_time: '2026-06-21' }),
+    'date-only strings count'
+  );
+  const nd = normalizeRadarDates({
+    ...b,
+    start_time: '2026-06-18',
+    end_time: '2026-06-21',
+  });
+  assert(
+    nd.start_time === '2026-06-18T00:00:00' &&
+      nd.end_time === '2026-06-21T23:59:59',
+    'date-only normalizes'
+  );
+  const bad = normalizeRadarDates({
+    ...b,
+    start_time: '2026-02-31',
+    end_time: '2026-03-01',
+  });
+  assert(bad.start_time === '2026-02-31', 'impossible date left untouched');
+
+  const f = finalizeRadarEntry(
+    {
+      ...b,
+      start_time: '2026-06-18T00:00:00',
+      end_time: '2026-06-21T23:59:59',
+      tags: [' Jazz ', '', '  ', 'JAZZ'],
+      festival_name: '',
+    },
+    'https://terra.example'
+  );
+  assert(
+    JSON.stringify(f.tags) === '["jazz","festival"]',
+    'tags trimmed, empties dropped, deduped'
+  );
+  assert(f.festival_name === 'F', 'empty festival_name falls back to title');
+}
+
 // --- add new test sections above this line ---
 
 console.log(`\n${passed} passed, ${failed} failed`);
