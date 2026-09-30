@@ -10,6 +10,8 @@ import {
   dedupSqlWindow,
   passesTimeFilter,
   buildTextFilter,
+  buildFestivalUrlFilter,
+  buildHasFestivalFilter,
 } from './index';
 import { isDuplicate } from '../../shared/llm/duplicate-check';
 import { encode as geohashEncode, neighbors } from './geohash';
@@ -560,5 +562,40 @@ describe('buildTextFilter', () => {
       '%outdoor market%',
       '%outdoor market%',
     ]);
+  });
+});
+
+describe('buildFestivalUrlFilter', () => {
+  it('returns empty filter for empty or blank input', () => {
+    expect(buildFestivalUrlFilter('')).toEqual({ sql: '', params: [] });
+    expect(buildFestivalUrlFilter('   ')).toEqual({ sql: '', params: [] });
+  });
+
+  it('strips a single trailing slash', () => {
+    expect(buildFestivalUrlFilter('https://fest.example/')).toEqual({
+      sql: ' AND festival_url = ?',
+      params: ['https://fest.example'],
+    });
+  });
+
+  it('passes a clean URL through unchanged', () => {
+    expect(buildFestivalUrlFilter('https://fest.example/2026')).toEqual({
+      sql: ' AND festival_url = ?',
+      params: ['https://fest.example/2026'],
+    });
+  });
+});
+
+describe('buildHasFestivalFilter', () => {
+  it("returns the presence clause only for literal '1'", () => {
+    expect(buildHasFestivalFilter('1')).toBe(
+      " AND festival_url IS NOT NULL AND festival_url != ''"
+    );
+  });
+
+  it('returns empty string for anything else', () => {
+    expect(buildHasFestivalFilter('')).toBe('');
+    expect(buildHasFestivalFilter('0')).toBe('');
+    expect(buildHasFestivalFilter('true')).toBe('');
   });
 });

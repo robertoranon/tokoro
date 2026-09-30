@@ -276,6 +276,22 @@ export function buildTextFilter(q: string): { sql: string; params: string[] } {
   };
 }
 
+export function buildFestivalUrlFilter(festivalUrl: string): {
+  sql: string;
+  params: string[];
+} {
+  const normalized = festivalUrl.trim().replace(/\/$/, '');
+  if (!normalized) return { sql: '', params: [] };
+  return { sql: ' AND festival_url = ?', params: [normalized] };
+}
+
+// Only the literal "1" activates the filter; anything else is ignored.
+export function buildHasFestivalFilter(hasFestival: string): string {
+  return hasFestival === '1'
+    ? " AND festival_url IS NOT NULL AND festival_url != ''"
+    : '';
+}
+
 export function makeBackupKey(date: Date): string {
   const yyyy = date.getUTCFullYear();
   const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
