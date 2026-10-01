@@ -16,6 +16,12 @@ import {
 } from '../src/scout/candidates.js';
 import { extractLinks } from '../src/scout/links.js';
 import type { FetchedPage } from '../src/types/event.js';
+import { ScoutExtractor } from '../src/scout/scout-extractor.js';
+import type {
+  LLMProvider,
+  LLMMessage,
+  LLMOptions,
+} from '../../shared/types/llm.js';
 
 let passed = 0;
 let failed = 0;
@@ -701,6 +707,200 @@ console.log('\n=== extractLinks ===\n');
     'markdown links are the fallback when html is empty (social dropped, relative markdown links ignored)'
   );
   assert(extractLinks(page('')).length === 0, 'nothing to extract → []');
+}
+
+function fakeLLM(reply: string) {
+  const llm: LLMProvider & {
+    calls: number;
+    messages: LLMMessage[];
+    options?: LLMOptions;
+  } = {
+    name: 'fake',
+    calls: 0,
+    messages: [],
+    async complete(messages: LLMMessage[], options?: LLMOptions) {
+      llm.calls++;
+      llm.messages = messages;
+      llm.options = options;
+      return { content: reply, model: 'fake' };
+    },
+  };
+  return llm;
+}
+
+console.log('\n=== ScoutExtractor ===\n');
+{
+  const page: FetchedPage = {
+    url: 'https://agg.example/list',
+    html: '',
+    text: 'Terraforma, June, Bollate. Rewire at https://rewire.example/en is also great.\nSonar: https://sonar.example',
+    title: 'List',
+  };
+  const links = [
+    { text: 'Terraforma', url: 'https://terra.example/' },
+    { text: 'Other', url: 'https://other.example/x' },
+  ];
+  const ctx = {
+    taste: 'Small experimental festivals. NOT arena.',
+    sourceName: 'Agg',
+  };
+
+  const reply = JSON.stringify({
+    candidates: [
+      {
+        name: ' Terraforma ',
+        url: 'https://terra.example',
+        why: 'Forest setting, experimental.',
+        dates_hint: 'June',
+        location_hint: 'Bollate',
+      },
+      {
+        name: 'Rewire',
+        url: 'https://rewire.example/en',
+        why: 'Hedged: maybe too big.',
+      },
+      {
+        name: 'Invented',
+        url: 'https://made-up.example',
+        why: 'The url is not on the page.',
+      },
+      { name: 'No Url Fest', why: 'Mentioned without a link.' },
+      { name: 'Bad Url', url: 'javascript:alert(1)', why: 'junk url' },
+      { url: 'https://nameless.example', why: 'missing name' },
+      null,
+      'junk',
+    ],
+  });
+  const llm = fakeLLM(reply);
+  const found = await new ScoutExtractor({
+    llm,
+    referenceDate: '2026-10-01',
+  }).extract(page, links, ctx);
+
+  assert(
+    found.map(c => c.name).join() ===
+      'Terraforma,Rewire,Invented,No Url Fest,Bad Url',
+    'valid items kept in order, invalid ones dropped'
+  );
+  assert(
+    found[0].url === 'https://terra.example',
+    'a url that matches a page link (host+path) is kept'
+  );
+  assert(
+    found[0].dates_hint === 'June' && found[0].location_hint === 'Bollate',
+    'hints kept'
+  );
+  assert(
+    found[1].url === 'https://rewire.example/en',
+    'a url that appears in the page text is kept'
+  );
+  assert(
+    found[2].url === undefined,
+    'an invented url (not on the page) is dropped but the candidate is kept'
+  );
+  assert(found[3].url === undefined, 'no url stays no url');
+  assert(found[4].url === undefined, 'a non-http url is dropped');
+  assert(llm.calls === 1, 'exactly one LLM call');
+  const system = String(llm.messages[0].content);
+  assert(
+    system.includes('Small experimental festivals. NOT arena.'),
+    'the taste profile is in the system prompt'
+  );
+  assert(
+    system.includes('NOT a concert season'),
+    'the prompt excludes seasons/series of separate concerts'
+  );
+  const user = String(llm.messages[1].content);
+  assert(
+    user.includes('Terraforma | https://terra.example/') &&
+      user.includes('Source: Agg') &&
+      user.includes("Today's date: 2026-10-01"),
+    'user prompt has the source, date and the link list'
+  );
+  assert(llm.options?.responseFormat === 'json', 'JSON mode requested');
+
+  const bare = await new ScoutExtractor({
+    llm: fakeLLM(JSON.stringify([{ name: 'Bare Array', why: 'w' }])),
+  }).extract(page, links, ctx);
+  assert(
+    bare.length === 1 && bare[0].name === 'Bare Array',
+    'a bare array is accepted'
+  );
+  assert(
+    (
+      await new ScoutExtractor({ llm: fakeLLM('null') }).extract(
+        page,
+        links,
+        ctx
+      )
+    ).length === 0,
+    'null → []'
+  );
+  assert(
+    (
+      await new ScoutExtractor({ llm: fakeLLM('{"candidates":[]}') }).extract(
+        page,
+        links,
+        ctx
+      )
+    ).length === 0,
+    'empty list → []'
+  );
+
+  const many = JSON.stringify({
+    candidates: Array.from({ length: 60 }, (_, i) => ({
+      name: `Fest ${i}`,
+      why: 'w',
+    })),
+  });
+  assert(
+    (await new ScoutExtractor({ llm: fakeLLM(many) }).extract(page, links, ctx))
+      .length === 40,
+    'at most 40 candidates per source'
+  );
+
+  const long = await new ScoutExtractor({
+    llm: fakeLLM(
+      JSON.stringify({
+        candidates: [
+          {
+            name: 'N'.repeat(300),
+            why: 'W'.repeat(900),
+            dates_hint: 'D'.repeat(300),
+          },
+        ],
+      })
+    ),
+  }).extract(page, links, ctx);
+  assert(
+    long[0].name.length === 120 &&
+      long[0].why.length === 300 &&
+      (long[0].dates_hint ?? '').length === 80,
+    'field lengths are capped'
+  );
+
+  let threw = false;
+  try {
+    await new ScoutExtractor({ llm: fakeLLM('{oops') }).extract(
+      page,
+      links,
+      ctx
+    );
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'malformed JSON throws (the source is counted as failed)');
+
+  const empty = fakeLLM('{"candidates":[{"name":"X","why":"w"}]}');
+  const none = await new ScoutExtractor({ llm: empty }).extract(
+    { ...page, text: '   \n ', html: '' },
+    [],
+    ctx
+  );
+  assert(
+    none.length === 0 && empty.calls === 0,
+    'an empty page costs no LLM call'
+  );
 }
 
 // --- add new test sections above this line ---

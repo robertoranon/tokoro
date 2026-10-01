@@ -46,3 +46,7 @@ export const FESTIVAL_LISTING_MAX_TOKENS = 1000;
  *  event_days list of up to 120 dates, hence the larger budget).
  *  Used by: crawler FestivalEntryExtractor (festival-entry mode) */
 export const FESTIVAL_ENTRY_MAX_TOKENS = 3500;
+
+/** Max output tokens for a scout run over one source page (up to 40 candidates).
+ *  Used by: crawler ScoutExtractor */
+export const SCOUT_MAX_TOKENS = 4000;
