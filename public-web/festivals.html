@@ -115,6 +115,17 @@
         text-transform: uppercase;
         font-size: 10px;
       }
+      /* On phones the badge would overlap the title: put it above it. */
+      @media (max-width: 560px) {
+        .experimental-badge {
+          position: static;
+          display: inline-block;
+          margin: 14px 0 0 24px;
+        }
+        .header-inner {
+          padding-top: 12px;
+        }
+      }
 
       /* ── Layout ─────────────────────────────────────────────────────── */
       .radar-main {
