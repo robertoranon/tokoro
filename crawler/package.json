@@ -26,7 +26,8 @@
     "radar": "tsx src/radar.ts",
     "scout": "tsx src/scout.ts",
     "scout-promote": "tsx src/scout-promote.ts",
-    "smoke:radar": "tsx tests/smoke-radar-publisher.ts"
+    "smoke:radar": "tsx tests/smoke-radar-publisher.ts",
+    "smoke:scout": "tsx tests/smoke-scout.ts"
   },
   "keywords": [
     "crawler",

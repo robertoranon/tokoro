@@ -34,6 +34,7 @@ async function main() {
   const candidatesFile = pathArg('--candidates', 'candidates.yaml');
   const stateFile = pathArg('--state', 'scout-state.json');
   const festivalsFile = pathArg('--festivals', 'festivals.yaml');
+  const logsDir = pathArg('--logs-dir', defaultLogsDir());
   const { debug, fromNpm } = isDebugRequested(process.argv, process.env);
   if (fromNpm) {
     console.log(
@@ -147,7 +148,7 @@ async function main() {
       );
     }
     const finishedAt = new Date();
-    await appendRunLog(defaultLogsDir(), {
+    await appendRunLog(logsDir, {
       kind: 'scout',
       started_at: startedAt.toISOString(),
       finished_at: finishedAt.toISOString(),

@@ -438,7 +438,7 @@ Scheduling is a plain crontab line: `0 10 * * 1  cd /path/to/tokoro/crawler && /
 
 The scout proposes candidate festivals for the radar watchlist. **It never publishes and never contacts the Tokoro API**: it fetches discovery pages, asks the LLM, and writes local files for a human to review. It does not need the Tokoro signing keys (`CRAWLER_PRIVKEY`/`CRAWLER_PUBKEY`); it needs an LLM configured as usual (default in `shared/llm/defaults.ts`) and reads `JINA_API_KEY` from the environment if a source uses the `jina` fetcher.
 
-**Files** (all relative to `crawler/` by default; `--sources`, `--candidates`, `--state`, `--festivals` override):
+**Files** (all relative to `crawler/` by default; `--sources`, `--candidates`, `--state`, `--festivals` override; the scout also takes `--logs-dir` for the run log):
 
 | File | Owner | Purpose |
 |------|-------|---------|
