@@ -104,3 +104,12 @@ for (const f of ['query.js', 'map.html', 'festivals.html']) {
 console.log(
   '✅ theme: CAT_COLORS match --cat-* tokens in query.js, map.html, festivals.html'
 );
+
+// 6. theme.css owns every design token; pages must not redeclare :root
+for (const p of PAGES) {
+  assert.ok(
+    !read(p).includes(':root'),
+    `${p} declares :root; design tokens live only in theme.css`
+  );
+}
+console.log('✅ theme: no inline :root token blocks in pages');
