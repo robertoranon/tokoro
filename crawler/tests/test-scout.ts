@@ -1,4 +1,19 @@
 import { parseScoutConfig } from '../src/scout/sources-config.js';
+import {
+  normalizeName,
+  urlKey,
+  candidateKeys,
+  knownKeysFromFestivals,
+  isKnown,
+  mergeNewCandidates,
+  parseCandidates,
+  serializeCandidates,
+  parseState,
+  serializeState,
+  recordInState,
+  type Candidate,
+  type ScoutState,
+} from '../src/scout/candidates.js';
 
 let passed = 0;
 let failed = 0;
@@ -131,6 +146,290 @@ sources:
       )
     ),
     'duplicate source urls throw'
+  );
+}
+
+console.log('\n=== normalizeName / urlKey / candidateKeys ===\n');
+{
+  assert(
+    normalizeName('Terraforma 2026') === 'terraforma',
+    'drops the edition year'
+  );
+  assert(
+    normalizeName('Sónar Festival') === 'sonar festival',
+    'strips accents, lowercases'
+  );
+  assert(
+    normalizeName('The Wire & Co 2025') === 'wire and co',
+    'ampersand, leading "the", year'
+  );
+  assert(normalizeName('音楽祭 2026') === '音楽祭', 'keeps non-latin letters');
+  assert(
+    normalizeName('  Jazz   em  Agosto! ') === 'jazz em agosto',
+    'collapses punctuation/space'
+  );
+
+  assert(
+    urlKey('https://www.Fest.example/Path/') === 'fest.example/path',
+    'host without www + lowercase path, no trailing slash'
+  );
+  assert(
+    urlKey('https://fest.example/a?x=1#top') === 'fest.example/a',
+    'query and hash ignored'
+  );
+  assert(
+    urlKey('http://fest.example') === 'fest.example',
+    'root path is empty'
+  );
+  assert(urlKey('ftp://fest.example') === undefined, 'non-http(s) → undefined');
+  assert(urlKey('garbage') === undefined, 'garbage → undefined');
+  assert(
+    urlKey('https://controtempo.org/festival/a') !==
+      urlKey('https://controtempo.org/festival/b'),
+    'different festivals on a shared domain have different keys'
+  );
+
+  assert(
+    JSON.stringify(
+      candidateKeys({
+        name: 'Terraforma 2026',
+        url: 'https://www.terra.example/',
+      })
+    ) === '["u:terra.example","n:terraforma"]',
+    'url key then name key'
+  );
+  assert(
+    JSON.stringify(candidateKeys({ name: 'ab', url: 'https://x.example' })) ===
+      '["u:x.example"]',
+    'names under 3 chars give no name key'
+  );
+  assert(
+    candidateKeys({ name: 'ab' }).length === 0,
+    'no url and a too-short name → no keys'
+  );
+  assert(
+    JSON.stringify(candidateKeys({ name: 'Open Air' })) === '["n:open air"]',
+    'no url → name key only'
+  );
+}
+
+console.log('\n=== mergeNewCandidates ===\n');
+{
+  const known = knownKeysFromFestivals([
+    { url: 'https://known.example', name: 'Known Fest' },
+  ]);
+  const base = {
+    source: 'Agg',
+    today: '2026-10-01',
+    known,
+    state: {} as ScoutState,
+  };
+
+  const m = mergeNewCandidates(
+    [
+      {
+        name: 'Alpha Fest',
+        url: 'https://alpha.example/',
+        why: 'Quarry',
+        dates_hint: 'June',
+        location_hint: 'Udine',
+      },
+      { name: 'Known Fest 2027', why: 'same name, different year' },
+      {
+        name: 'Other Name',
+        url: 'https://www.known.example/',
+        why: 'same site',
+      },
+      {
+        name: 'Alpha Fest 2026',
+        url: 'https://alpha.example',
+        why: 'dup within batch',
+      },
+      { name: 'Beta', url: 'https://beta.example', why: 'ok' },
+      { name: 'Gamma Night', why: 'no url' },
+      { name: 'ab', why: 'too short and no url' },
+    ],
+    base
+  );
+  assert(
+    m.added.map(c => c.name).join() === 'Alpha Fest,Beta,Gamma Night',
+    'adds only new candidates, in order'
+  );
+  assert(
+    m.skipped === 4,
+    'skips known url, known name, in-batch duplicate and unkeyable'
+  );
+  const alpha = m.added[0];
+  assert(
+    alpha.status === 'pending' &&
+      alpha.source === 'Agg' &&
+      alpha.found === '2026-10-01' &&
+      alpha.dates_hint === 'June' &&
+      alpha.location_hint === 'Udine' &&
+      alpha.url === 'https://alpha.example/',
+    'candidate fields (status pending, source, found, hints, url as proposed)'
+  );
+  assert(m.added[2].url === undefined, 'a candidate without a url is allowed');
+  assert(
+    'u:alpha.example' in m.state &&
+      'n:alpha fest' in m.state &&
+      m.state['u:alpha.example'].status === 'pending' &&
+      m.state['u:alpha.example'].first_seen === '2026-10-01',
+    'both keys recorded in state as pending with first_seen'
+  );
+  assert(
+    Object.keys(base.state).length === 0,
+    'the input state is not mutated'
+  );
+
+  const again = mergeNewCandidates(
+    [{ name: 'Alpha Fest', url: 'https://alpha.example', why: 'again' }],
+    { ...base, state: m.state }
+  );
+  assert(
+    again.added.length === 0 && again.skipped === 1,
+    'something already in state is never proposed again'
+  );
+
+  const rejected: ScoutState = {
+    'n:alpha fest': { status: 'rejected', first_seen: '2026-01-01' },
+  };
+  assert(
+    mergeNewCandidates([{ name: 'Alpha Fest 2030', why: 'x' }], {
+      ...base,
+      state: rejected,
+    }).added.length === 0,
+    'a rejected name stays rejected (edition years ignored)'
+  );
+  assert(
+    isKnown(['u:a', 'n:b'], new Set(['n:b']), {}),
+    'isKnown: matches any key in the known set'
+  );
+  assert(
+    isKnown(['u:a'], new Set(), {
+      'u:a': { status: 'pending', first_seen: 'x' },
+    }),
+    'isKnown: matches state keys'
+  );
+  assert(
+    !isKnown(['u:a'], new Set(), {}),
+    'isKnown: false when nothing matches'
+  );
+  assert(
+    !isKnown(['constructor'], new Set(), {}),
+    'isKnown ignores Object.prototype keys'
+  );
+}
+
+console.log('\n=== candidates.yaml / scout-state.json ===\n');
+{
+  const list: Candidate[] = [
+    {
+      name: 'Alpha: "Fest"',
+      url: 'https://alpha.example',
+      status: 'pending',
+      why: 'Quarry: loud',
+      source: 'Agg',
+      found: '2026-07-25',
+      dates_hint: 'June',
+    },
+    {
+      name: 'No Url',
+      status: 'approved',
+      why: '',
+      source: 'Mag',
+      found: '2026-07-26',
+    },
+  ];
+  const text = serializeCandidates(list);
+  assert(
+    text.startsWith('#'),
+    'serialized inbox starts with an explanatory comment'
+  );
+  const back = parseCandidates(text);
+  assert(
+    JSON.stringify(back) === JSON.stringify(list),
+    'serialize → parse round-trips (incl. quoting, optional fields, string dates)'
+  );
+  assert(
+    parseCandidates(serializeCandidates([])).length === 0,
+    'empty inbox round-trips'
+  );
+  assert(
+    parseCandidates('').length === 0 &&
+      parseCandidates('candidates:\n').length === 0,
+    'empty file / null list → []'
+  );
+
+  const hand = parseCandidates(`
+candidates:
+  - name: Sample Fest
+    url: https://samplefest.example
+    status: approved
+    why: "300-cap festival"
+    source: "Magazine roundup"
+    found: 2026-07-25
+  - name: No Status
+`);
+  assert(
+    hand[0].found === '2026-07-25',
+    'an unquoted YAML date becomes YYYY-MM-DD'
+  );
+  assert(hand[0].status === 'approved', 'hand-edited status is read');
+  assert(
+    hand[1].status === 'pending' && hand[1].why === '' && hand[1].source === '',
+    'missing fields default (status pending)'
+  );
+  assert(
+    throws(() =>
+      parseCandidates('candidates:\n  - name: A\n    status: maybe')
+    ),
+    'invalid status throws'
+  );
+  assert(
+    throws(() => parseCandidates('candidates:\n  - status: pending')),
+    'missing name throws'
+  );
+  assert(
+    throws(() => parseCandidates('candidates: nope')),
+    'non-list candidates throws'
+  );
+
+  const state = recordInState({}, ['u:a', 'n:b'], 'pending', '2026-07-01');
+  const updated = recordInState(state, ['u:a'], 'approved', '2026-08-01');
+  assert(
+    updated['u:a'].status === 'approved' &&
+      updated['u:a'].first_seen === '2026-07-01',
+    'recordInState keeps first_seen when updating'
+  );
+  assert(
+    state['u:a'].status === 'pending',
+    'recordInState does not mutate its input'
+  );
+  const json = serializeState({
+    'n:z': { status: 'rejected', first_seen: 'x' },
+    'n:a': { status: 'pending', first_seen: 'y' },
+  });
+  assert(
+    json.indexOf('n:a') < json.indexOf('n:z') && json.endsWith('\n'),
+    'state is serialized with sorted keys and a trailing newline'
+  );
+  assert(
+    JSON.stringify(parseState(json)) ===
+      JSON.stringify({
+        'n:a': { status: 'pending', first_seen: 'y' },
+        'n:z': { status: 'rejected', first_seen: 'x' },
+      }),
+    'state round-trips'
+  );
+  assert(Object.keys(parseState('')).length === 0, 'empty state file → {}');
+  assert(
+    throws(() => parseState('{oops')),
+    'invalid JSON throws'
+  );
+  assert(
+    throws(() => parseState('{"n:a": {"status": "weird", "first_seen": "x"}}')),
+    'invalid state status throws'
   );
 }
 
