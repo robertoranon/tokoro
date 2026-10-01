@@ -10,6 +10,9 @@ import {
   parseFestivalEntry,
   applyYearCorrection,
   normalizeRadarDates,
+  hasDates,
+  hasYearEvidence,
+  stripDates,
   type FestivalEntryDraft,
 } from '../radar/festival-entry.js';
 
@@ -62,6 +65,22 @@ export class FestivalEntryExtractor {
 
     const draft = parseFestivalEntry(parsed, page.url);
     if (!draft) return null;
-    return normalizeRadarDates(applyYearCorrection(draft));
+    const hadDayName = !!draft.day_name;
+    const corrected = applyYearCorrection(draft);
+    const dayNameValidated = hadDayName && corrected.start_time !== undefined;
+    const result = normalizeRadarDates(corrected);
+
+    // Year-less dates on a stale page would be read as next year's edition.
+    if (
+      hasDates(result) &&
+      !dayNameValidated &&
+      !hasYearEvidence(result, page, false)
+    ) {
+      console.log(
+        `  ⚠ Dates ${result.start_time}..${result.end_time} have no year evidence on ${page.url} - ignoring`
+      );
+      return stripDates(result);
+    }
+    return result;
   }
 }

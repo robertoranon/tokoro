@@ -263,3 +263,22 @@ export async function resolveEntryDraft(
   }
   return draft;
 }
+
+/** True when the 4-digit start year appears in the page URL, title or text,
+ *  or when a validated weekday already vouches for the year. */
+export function hasYearEvidence(
+  draft: { start_time?: string },
+  page: { url: string; title: string; text: string },
+  dayNameValidated: boolean
+): boolean {
+  if (dayNameValidated) return true;
+  const year = draft.start_time?.slice(0, 4);
+  if (!year || !/^\d{4}$/.test(year)) return false;
+  return [page.url, page.title, page.text].some(s => (s ?? '').includes(year));
+}
+
+/** Remove the dates, keep everything else. */
+export function stripDates(d: FestivalEntryDraft): FestivalEntryDraft {
+  const { start_time: _s, end_time: _e, ...rest } = d;
+  return rest;
+}

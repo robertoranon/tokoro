@@ -16,6 +16,7 @@ import {
   stripEdition,
   finalizeRadarEntry,
   resolveEntryDraft,
+  hasYearEvidence,
   type FestivalEntryDraft,
 } from '../src/radar/festival-entry.js';
 import type { FetchedPage } from '../src/types/event.js';
@@ -1322,6 +1323,118 @@ console.log('\n=== appendRunLog / readRunRecords ===\n');
   } finally {
     await fsp.rm(dir, { recursive: true, force: true });
   }
+}
+
+console.log('\n=== Radar year-evidence guard ===\n');
+{
+  const yearPage = (
+    text: string,
+    url = 'https://fest.example/',
+    title = 'Fest'
+  ): FetchedPage => ({ url, html: '', text, title });
+  const run = async (
+    fields: Record<string, unknown>,
+    page: FetchedPage
+  ): Promise<FestivalEntryDraft | null> =>
+    new FestivalEntryExtractor({
+      llm: fakeLLM(
+        JSON.stringify({ title: 'Fest', category: 'music', ...fields })
+      ),
+      referenceDate: '2026-10-01',
+    }).extract(page);
+  const d27 = { start_time: '2027-06-18', end_time: '2027-06-21' };
+
+  const phantom = await run(d27, yearPage('Fest 2026\n18-21 June'));
+  assert(
+    phantom?.title === 'Fest' && !phantom.start_time && !phantom.end_time,
+    'phantom next-year dates without year evidence are stripped, draft kept'
+  );
+  const inText = await run(d27, yearPage('Fest 2027\n18-21 June'));
+  assert(
+    inText?.start_time === '2027-06-18T00:00:00' &&
+      inText?.end_time === '2027-06-21T23:59:59',
+    'year in page text keeps dates'
+  );
+  const inUrl = await run(
+    d27,
+    yearPage('18-21 June', 'https://fest.example/2027/')
+  );
+  assert(
+    inUrl?.start_time === '2027-06-18T00:00:00',
+    'year in url keeps dates'
+  );
+  const viaDay = await run(
+    { start_time: '2027-06-17', end_time: '2027-06-20', day_name: 'Thursday' },
+    yearPage('17-20 June')
+  );
+  assert(
+    viaDay?.start_time === '2027-06-17T00:00:00',
+    'validated day_name substitutes for year evidence'
+  );
+  const badDay = await run(
+    { start_time: '2027-06-17', end_time: '2027-06-20', day_name: 'Monday' },
+    yearPage('Fest 2027\n17-20 June')
+  );
+  assert(
+    !badDay?.start_time && !badDay?.end_time,
+    'unresolvable day_name still strips dates'
+  );
+  const shifted = await run(
+    { start_time: '2026-06-17', end_time: '2026-06-20', day_name: 'Thursday' },
+    yearPage('17-20 June')
+  );
+  assert(
+    shifted?.start_time === '2027-06-17T00:00:00',
+    'day_name-shifted dates are kept without year in page'
+  );
+  const cur = await run(
+    { start_time: '2026-06-18', end_time: '2026-06-21' },
+    yearPage('Terraforma 2026\n18-21 June')
+  );
+  assert(
+    cur?.start_time === '2026-06-18T00:00:00',
+    'current-year evidence keeps dates'
+  );
+
+  const dr = {
+    title: 't',
+    category: 'music',
+    start_time: '2027-06-18T00:00:00',
+  } as FestivalEntryDraft;
+  const pg = (o: Partial<FetchedPage>) => ({
+    url: 'https://a.example/',
+    title: 'a',
+    text: 'b',
+    ...o,
+  });
+  assert(
+    hasYearEvidence(dr, pg({ text: 'x 2027 y' }), false),
+    'hasYearEvidence: text'
+  );
+  assert(
+    hasYearEvidence(dr, pg({ url: 'https://a.example/2027' }), false),
+    'hasYearEvidence: url'
+  );
+  assert(
+    hasYearEvidence(dr, pg({ title: 'Fest 2027' }), false),
+    'hasYearEvidence: title'
+  );
+  assert(
+    !hasYearEvidence(dr, pg({ text: 'only 2026' }), false),
+    'hasYearEvidence: none -> false'
+  );
+  assert(
+    hasYearEvidence(dr, pg({}), true),
+    'hasYearEvidence: dayNameValidated -> true'
+  );
+  assert(
+    !hasYearEvidence(
+      { ...dr, start_time: undefined },
+      pg({ text: '2027' }),
+      false
+    ),
+    'hasYearEvidence: missing start_time -> false'
+  );
 }
 
 // --- add new test sections above this line ---
