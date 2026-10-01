@@ -18,6 +18,9 @@ export const FestivalEntryDraftSchema = ExtractedEventSchema.extend({
   /** Distinct days (YYYY-MM-DD) on which programmed events take place, when the
    *  page lists a day-by-day program. Used only by the series guard. */
   event_days: z.array(z.string()).optional(),
+  /** Other towns/villages/venues where the festival also takes place (not the
+   *  principal site). Folded into the description by finalizeRadarEntry. */
+  other_places: z.array(z.string()).optional(),
 });
 export type FestivalEntryDraft = z.infer<typeof FestivalEntryDraftSchema>;
 export type DatedDraft = FestivalEntryDraft & {
@@ -28,6 +31,8 @@ export type DatedDraft = FestivalEntryDraft & {
 const RADAR_CATEGORIES: string[] = ['music', 'art', 'theater', 'other'];
 
 const MAX_EVENT_DAYS = 120;
+const MAX_OTHER_PLACES = 6;
+const MAX_PLACE_LENGTH = 60;
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
 
@@ -95,6 +100,27 @@ function sanitizeOptionalFields(c: Record<string, unknown>): void {
       .slice(0, MAX_EVENT_DAYS);
     if (days.length) c.event_days = days;
     else delete c.event_days;
+  }
+  if (c.other_places !== undefined) {
+    const list =
+      typeof c.other_places === 'string'
+        ? c.other_places.split(',')
+        : Array.isArray(c.other_places)
+          ? c.other_places
+          : [];
+    const seen = new Set<string>();
+    const places: string[] = [];
+    for (const item of list) {
+      if (typeof item !== 'string') continue;
+      const place = item.trim();
+      if (!place || place.length > MAX_PLACE_LENGTH) continue;
+      const key = place.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      places.push(place);
+    }
+    if (places.length) c.other_places = places.slice(0, MAX_OTHER_PLACES);
+    else delete c.other_places;
   }
   for (const key of ['start_time', 'end_time']) {
     if (typeof c[key] === 'number') c[key] = String(c[key]);
@@ -305,12 +331,34 @@ export function stripEdition(name: string): string {
   return stripped || name;
 }
 
+/**
+ * Description plus "Also takes place in: A, B." for the places not already
+ * mentioned in it or covered by the principal site (venue_name / address).
+ */
+function appendOtherPlaces(
+  d: { description?: string; venue_name?: string; address?: string },
+  places: string[] | undefined
+): string | undefined {
+  const description = d.description?.trim();
+  if (!places?.length) return d.description;
+  const text = (description ?? '').toLowerCase();
+  const site = [d.venue_name, d.address].map(v => (v ?? '').toLowerCase());
+  const fresh = places.filter(p => {
+    const lower = p.toLowerCase();
+    return !text.includes(lower) && !site.some(s => s.includes(lower));
+  });
+  if (!fresh.length) return d.description;
+  const sentence = `Also takes place in: ${fresh.join(', ')}.`;
+  return description ? `${description} ${sentence}` : sentence;
+}
+
 /** Apply the radar entry conventions (spec §1) to a dated draft. */
 export function finalizeRadarEntry(
   d: DatedDraft,
   festivalUrl: string
 ): ExtractedEvent {
-  const { event_days: _eventDays, ...rest } = d;
+  const { event_days: _eventDays, other_places: otherPlaces, ...rest } = d;
+  const description = appendOtherPlaces(d, otherPlaces);
   const tags = [
     ...new Set([
       ...(d.tags ?? []).map(t => t.trim().toLowerCase()).filter(t => t !== ''),
@@ -319,6 +367,7 @@ export function finalizeRadarEntry(
   ];
   return {
     ...rest,
+    ...(description !== undefined ? { description } : {}),
     url: d.url ?? festivalUrl,
     festival_name: stripEdition(d.festival_name || d.title),
     festival_url: festivalUrl,

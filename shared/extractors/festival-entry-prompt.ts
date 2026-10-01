@@ -14,8 +14,9 @@ Return a single JSON object with these fields:
 - **start_time**: the FIRST day of the festival as "YYYY-MM-DDT00:00:00"
 - **end_time**: the LAST day of the festival as "YYYY-MM-DDT23:59:59" (a one-day festival: same day as start_time)
 - **day_name**: the English full weekday name of the first day, if the page shows a day name next to the date (in any language: "Sun 20 Apr", "DOMENICA 20 APRILE", "Samstag 10. Mai" → "Sunday"/"Saturday"). Used for post-processing validation.
-- **venue_name**: the name of the principal venue or site (no address)
-- **address**: the most complete location the page gives for the principal site (street + city, or just the town). For a multi-venue festival use the principal venue, or the town centre. NEVER invent or guess any part of it; omit it if the page gives no location.
+- **venue_name**: the name of the principal site only (no address, never a list of venues)
+- **address**: the most complete location the page gives for the principal site only (street + city, or just the town); it must be ONE geocodable location, never a list of towns. For a festival held in several places, use the clearly main site (festival headquarters, main stage/venue, box office, where most days happen); if there is none, use the town that hosts most events or is the most central. NEVER invent or guess any part of it; omit it if the page gives no location.
+- **other_places**: if the festival also takes place at other towns, villages or venues, list the names of those other places as an array of short strings (at most 6, no street addresses, not the principal site); only places the page states. Omit it if it is a single-site festival.
 - **lat, lng**: only if explicitly stated
 - **url**: the festival homepage or ticket page
 - **category**: ONE of: music, art, theater, other — the festival's primary art form (use "other" for genuinely mixed festivals)

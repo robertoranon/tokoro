@@ -1896,6 +1896,197 @@ console.log('\n=== applyYearCorrection and event_days ===\n');
   );
 }
 
+console.log('\n=== other_places (additional festival places) ===\n');
+{
+  const parse = (extra: object) =>
+    parseFestivalEntry(
+      { title: 'F', category: 'music', ...extra },
+      'https://f.example'
+    );
+  const op = (v: unknown) => parse({ other_places: v })?.other_places;
+
+  assert(
+    JSON.stringify(op(['  Cividale ', '', 'Gemona', 'cividale', 'GEMONA'])) ===
+      '["Cividale","Gemona"]',
+    'other_places: trimmed, empties dropped, case-insensitive dedupe keeps first spelling'
+  );
+  assert(
+    JSON.stringify(op(['Ok', 'x'.repeat(61), 'y'.repeat(60)])) ===
+      JSON.stringify(['Ok', 'y'.repeat(60)]),
+    'other_places: entries over 60 chars dropped, 60 kept'
+  );
+  assert(
+    op(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'])?.length === 6,
+    'other_places: capped at 6 entries'
+  );
+  assert(
+    JSON.stringify(op('Cividale, Gemona ,')) === '["Cividale","Gemona"]',
+    'other_places: accepts a comma-separated string'
+  );
+  assert(
+    JSON.stringify(op(['A', 5, null, { x: 1 }, 'B'])) === '["A","B"]',
+    'other_places: non-string items ignored'
+  );
+  for (const junk of [42, { a: 1 }, true, [], ['', '  '], [1, 2]]) {
+    const d = parse({ other_places: junk });
+    assert(
+      d !== null && !('other_places' in d),
+      `other_places: junk ${JSON.stringify(junk)} removed, entry still parses`
+    );
+  }
+
+  const base = (o: object): DatedDraft =>
+    ({
+      title: 'F',
+      category: 'music',
+      start_time: '2026-06-01T00:00:00',
+      end_time: '2026-06-02T23:59:59',
+      ...o,
+    }) as DatedDraft;
+  const fin = (o: object) => finalizeRadarEntry(base(o), 'https://f.example');
+
+  const f1 = fin({
+    description: 'A jazz festival.',
+    other_places: ['Cividale', 'Gemona'],
+  });
+  assert(
+    f1.description ===
+      'A jazz festival. Also takes place in: Cividale, Gemona.',
+    'finalize appends the Also takes place in sentence'
+  );
+  assert(!('other_places' in f1), 'finalize strips other_places');
+  assert(
+    fin({ other_places: ['Cividale', 'Gemona'] }).description ===
+      'Also takes place in: Cividale, Gemona.',
+    'finalize: sentence alone when description is absent'
+  );
+  assert(
+    fin({ description: '', other_places: ['Cividale'] }).description ===
+      'Also takes place in: Cividale.',
+    'finalize: sentence alone when description is empty'
+  );
+  assert(
+    fin({
+      description: 'Concerts in cividale and beyond.',
+      other_places: ['Cividale', 'Gemona'],
+    }).description ===
+      'Concerts in cividale and beyond. Also takes place in: Gemona.',
+    'finalize skips places already in the description (case-insensitive)'
+  );
+  assert(
+    fin({
+      address: 'Via X 1, Udine',
+      venue_name: 'Teatro Nuovo',
+      other_places: ['Udine', 'teatro', 'Gemona'],
+    }).description === 'Also takes place in: Gemona.',
+    'finalize skips places equal to / contained in venue_name or address'
+  );
+  assert(
+    fin({ description: 'Nice.', address: 'Udine', other_places: ['udine'] })
+      .description === 'Nice.',
+    'finalize: nothing remains -> description unchanged'
+  );
+  assert(
+    fin({ other_places: ['udine'], address: 'Udine' }).description ===
+      undefined,
+    'finalize: nothing remains and no description -> still absent'
+  );
+  const once = fin({ description: 'Hi.', other_places: ['Gemona'] });
+  const twice = finalizeRadarEntry(
+    base({ ...once, other_places: ['Gemona'] }),
+    'https://f.example'
+  );
+  assert(
+    twice.description === once.description,
+    'finalize is idempotent on an already-finalized description'
+  );
+  const f2 = fin({ tags: ['Jazz'], other_places: ['Gemona'] });
+  assert(
+    f2.festival_name === 'F' &&
+      f2.url === 'https://f.example' &&
+      f2.tags?.includes('festival') === true,
+    'finalize still applies tags/festival_name/url with other_places'
+  );
+
+  const mk = (o: object) =>
+    ({ title: 'F', category: 'music', ...o }) as FestivalEntryDraft;
+  assert(
+    JSON.stringify(
+      mergeEntries(mk({}), mk({ other_places: ['Gemona'] }))?.other_places
+    ) === '["Gemona"]',
+    'mergeEntries fills other_places from the other page'
+  );
+  assert(
+    JSON.stringify(
+      mergeEntries(mk({ other_places: ['A'] }), mk({ other_places: ['B'] }))
+        ?.other_places
+    ) === '["A"]',
+    'mergeEntries never overwrites other_places'
+  );
+  assert(
+    JSON.stringify(stripDates(mk({ other_places: ['A'] })).other_places) ===
+      '["A"]',
+    'stripDates keeps other_places'
+  );
+
+  const page: FetchedPage = {
+    url: 'https://f.example',
+    html: '',
+    text: 'Free Music Impulse 2026\nNova Gorica, Lusevera',
+    title: 'FMI',
+  };
+  const llm = fakeLLM(
+    JSON.stringify({
+      title: 'Free Music Impulse 2026',
+      description: 'Free concerts in the borderland.',
+      start_time: '2026-07-01T00:00:00',
+      end_time: '2026-07-05T23:59:59',
+      venue_name: 'Trg Evrope',
+      address: 'Trg Evrope, Gorizia',
+      category: 'music',
+      other_places: ['Nova Gorica', 'Lusevera'],
+    })
+  );
+  const draft = await new FestivalEntryExtractor({
+    llm,
+    referenceDate: '2026-04-01',
+  }).extract(page);
+  assert(
+    JSON.stringify(draft?.other_places) === '["Nova Gorica","Lusevera"]',
+    'extractor passes other_places through'
+  );
+  const sys = llm.messages[0][0].content;
+  assert(
+    sys.includes('other_places') && sys.includes('principal site'),
+    'system prompt mentions other_places and the principal-site rule'
+  );
+
+  const e2e = finalizeRadarEntry(
+    parseFestivalEntry(
+      {
+        title: 'Free Music Impulse 2026',
+        description: 'Free concerts in the borderland.',
+        start_time: '2026-07-01T00:00:00',
+        end_time: '2026-07-05T23:59:59',
+        venue_name: 'Trg Evrope',
+        address: 'Trg Evrope, Gorizia',
+        category: 'music',
+        other_places: [' Nova Gorica', 'Lusevera', 'nova gorica'],
+      },
+      'https://f.example'
+    ) as DatedDraft,
+    'https://f.example'
+  );
+  assert(
+    e2e.description?.endsWith('Also takes place in: Nova Gorica, Lusevera.') ===
+      true &&
+      e2e.address === 'Trg Evrope, Gorizia' &&
+      e2e.venue_name === 'Trg Evrope' &&
+      !('other_places' in e2e),
+    'end to end: description gets the sentence, address/venue_name untouched'
+  );
+}
+
 // --- add new test sections above this line ---
 
 console.log(`\n${passed} passed, ${failed} failed`);
