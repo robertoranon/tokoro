@@ -132,6 +132,177 @@ async function loadRadarEvents(
   return { events: all, truncated: true };
 }
 
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+const MONTH_ABBR = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/** The next `n` months starting with the current one: [{ key: 'YYYY-MM', label }]. */
+function monthChips(todayYmd, n = 12) {
+  const thisYear = Number(todayYmd.slice(0, 4));
+  let y = thisYear;
+  let m = Number(todayYmd.slice(5, 7));
+  const chips = [];
+  for (let i = 0; i < n; i++) {
+    chips.push({
+      key: y + '-' + String(m).padStart(2, '0'),
+      label: MONTH_ABBR[m - 1] + (y !== thisYear ? ' ' + y : ''),
+    });
+    m++;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+  }
+  return chips;
+}
+
+function monthLabel(key) {
+  return MONTH_NAMES[Number(key.slice(5, 7)) - 1] + ' ' + key.slice(0, 4);
+}
+
+function normalizeText(s) {
+  return String(s || '')
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
+    .toLowerCase();
+}
+
+/**
+ * month: 'YYYY-MM' keeps festivals that OVERLAP that month; category: exact;
+ * keyword: accent- and case-insensitive substring over the text fields.
+ */
+function filterFestivals(
+  list,
+  { month = '', category = '', keyword = '' } = {}
+) {
+  const q = normalizeText(keyword).trim();
+  const first = month ? month + '-01' : '';
+  const last = month ? month + '-31' : ''; // string compare: any day of the month is <= '-31'
+  return list.filter(f => {
+    if (month && !(f.start <= last && f.end >= first)) return false;
+    if (category && f.category !== category) return false;
+    if (q) {
+      const hay = normalizeText(
+        [
+          f.name,
+          f.title,
+          f.description,
+          f.venue,
+          f.address,
+          f.tags.join(' '),
+        ].join(' ')
+      );
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * [{ key, label, items }]: "Happening now" first (already started), then one
+ * group per start month. `cmp` orders the items inside each group.
+ */
+function groupFestivals(list, todayYmd, cmp = byStartThenName) {
+  const nowItems = [];
+  const byMonth = new Map();
+  for (const f of list) {
+    if (f.start <= todayYmd) {
+      nowItems.push(f);
+    } else {
+      const key = f.start.slice(0, 7);
+      if (!byMonth.has(key)) byMonth.set(key, []);
+      byMonth.get(key).push(f);
+    }
+  }
+  const groups = [];
+  if (nowItems.length)
+    groups.push({
+      key: 'now',
+      label: 'Happening now',
+      items: nowItems.sort(cmp),
+    });
+  for (const key of [...byMonth.keys()].sort()) {
+    groups.push({
+      key,
+      label: monthLabel(key),
+      items: byMonth.get(key).sort(cmp),
+    });
+  }
+  return groups;
+}
+
+/** "18–21 Jun", "28 Jun – 3 Jul", "18 Jun"; a year is added when it is not the current one. */
+function fmtFestivalRange(start, end, todayYmd) {
+  const [sy, sm, sd] = start.split('-').map(Number);
+  const [ey, em, ed] = end.split('-').map(Number);
+  const thisYear = Number(todayYmd.slice(0, 4));
+  const dm = (d, m) => d + ' ' + MONTH_ABBR[m - 1];
+  if (sy !== ey) return dm(sd, sm) + ' ' + sy + ' – ' + dm(ed, em) + ' ' + ey;
+  const yr = ey !== thisYear ? ' ' + ey : '';
+  if (sm === em && sd === ed) return dm(sd, sm) + yr;
+  if (sm === em) return sd + '–' + dm(ed, em) + yr;
+  return dm(sd, sm) + ' – ' + dm(ed, em) + yr;
+}
+
+function haversineKm(a, b) {
+  const R = 6371;
+  const rad = x => (x * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat);
+  const dLng = rad(b.lng - a.lng);
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.asin(Math.sqrt(s));
+}
+
+function withDistance(list, origin) {
+  return list.map(f => ({ ...f, distanceKm: haversineKm(origin, f) }));
+}
+
+function byDistance(a, b) {
+  return a.distanceKm - b.distanceKm || byStartThenName(a, b);
+}
+
+function fmtDistance(km) {
+  return km < 10 ? km.toFixed(1) + ' km' : Math.round(km) + ' km';
+}
+
+/** One map pin per distinct location: [{ lat, lng, items }] in first-seen order. */
+function groupPins(list) {
+  const pins = new Map();
+  for (const f of list) {
+    const key = f.lat + ',' + f.lng;
+    if (!pins.has(key)) pins.set(key, { lat: f.lat, lng: f.lng, items: [] });
+    pins.get(key).items.push(f);
+  }
+  return [...pins.values()];
+}
+
 const api = {
   RADAR_TAG,
   addDays,
@@ -142,6 +313,16 @@ const api = {
   radarWindow,
   buildRadarUrl,
   loadRadarEvents,
+  monthChips,
+  monthLabel,
+  filterFestivals,
+  groupFestivals,
+  fmtFestivalRange,
+  haversineKm,
+  withDistance,
+  byDistance,
+  fmtDistance,
+  groupPins,
 };
 
 // Node.js / browser compatibility
