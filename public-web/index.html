@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,800;1,9..144,400&family=Figtree:wght@300;400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&display=swap"
       rel="stylesheet"
     />
     <style>
@@ -17,35 +17,6 @@
         box-sizing: border-box;
         margin: 0;
         padding: 0;
-      }
-
-      :root {
-        --bg: #111a24;
-        --surface: #192534;
-        --header-dark: #0a1520;
-        --header: #cce8f4;
-        --accent: #22d3ee;
-        --accent-hover: #0891b2;
-        --text: #e8f4fb;
-        --text-2: #8aafc4;
-        --text-muted: #5a7a8e;
-        --border: #243445;
-        --radius: 14px;
-        --radius-sm: 8px;
-
-        --cat-music: #a78bfa;
-        --cat-food: #fbbf24;
-        --cat-sports: #34d399;
-        --cat-art: #f472b6;
-        --cat-theater: #f87171;
-        --cat-film: #60a5fa;
-        --cat-nightlife: #c084fc;
-        --cat-community: #22d3ee;
-        --cat-outdoor: #4ade80;
-        --cat-learning: #2dd4bf;
-        --cat-wellness: #a3e635;
-        --cat-talks: #fb923c;
-        --cat-other: #94a3b8;
       }
 
       body {
@@ -122,8 +93,8 @@
         background: linear-gradient(
           135deg,
           var(--header-dark) 0%,
-          #142030 50%,
-          #0c1a30 100%
+          var(--bg) 50%,
+          var(--bg) 100%
         );
         color: white;
         position: relative;
@@ -136,12 +107,12 @@
         background:
           radial-gradient(
             ellipse at 30% 50%,
-            rgba(34, 211, 238, 0.08) 0%,
+            var(--accent-tint) 0%,
             transparent 70%
           ),
           radial-gradient(
             ellipse at 80% 20%,
-            rgba(8, 145, 178, 0.06) 0%,
+            var(--accent-tint) 0%,
             transparent 60%
           );
         pointer-events: none;
@@ -169,7 +140,7 @@
       }
       .header-title em {
         font-style: italic;
-        color: #67e8f9;
+        color: var(--accent-2);
       }
       .header-sub {
         font-size: 15px;
@@ -270,7 +241,7 @@
         font-family: 'Figtree', sans-serif;
         font-size: 13.5px;
         color: var(--text);
-        background: #192534;
+        background: var(--surface);
         transition:
           border-color 0.15s,
           box-shadow 0.15s;
@@ -278,9 +249,9 @@
       }
       input:focus,
       select:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
-        background: #192534;
+        border-color: var(--accent-2);
+        box-shadow: 0 0 0 3px var(--accent-tint);
+        background: var(--surface);
       }
 
       .grid-4 {
@@ -344,14 +315,14 @@
       .btn-primary:hover {
         background: var(--accent-hover);
         transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(34, 211, 238, 0.3);
+        box-shadow: 0 4px 12px var(--accent-tint);
       }
       .btn-primary:active {
         transform: translateY(0);
       }
       .btn-primary:disabled {
-        background: #1e2e3e;
-        color: #3a5060;
+        background: var(--bg);
+        color: var(--text-muted);
         cursor: not-allowed;
         transform: none;
         box-shadow: none;
@@ -362,8 +333,8 @@
         border: 1.5px solid var(--border);
       }
       .btn-secondary:hover {
-        border-color: var(--accent);
-        color: var(--accent);
+        border-color: var(--accent-2);
+        color: var(--link);
       }
       .btn-ghost {
         background: transparent;
@@ -373,9 +344,9 @@
         padding: 7px 14px;
       }
       .btn-ghost:hover {
-        border-color: var(--accent);
-        color: var(--accent);
-        background: rgba(34, 211, 238, 0.05);
+        border-color: var(--accent-2);
+        color: var(--link);
+        background: var(--accent-tint);
       }
       .btn-ghost.copied {
         border-color: #4ade80;
@@ -392,9 +363,9 @@
 
       /* STATUS */
       .status-info {
-        background: rgba(34, 211, 238, 0.1);
-        color: #67e8f9;
-        border: 1px solid rgba(34, 211, 238, 0.25);
+        background: var(--accent-tint);
+        color: var(--accent-2);
+        border: 1px solid var(--accent-tint);
         padding: 12px 16px;
         border-radius: var(--radius-sm);
         font-size: 13px;
@@ -633,7 +604,7 @@
       .event-link {
         font-size: 12.5px;
         font-weight: 600;
-        color: var(--accent);
+        color: var(--link);
         text-decoration: none;
         display: flex;
         align-items: center;
@@ -643,7 +614,7 @@
           color 0.15s;
       }
       .event-link:hover {
-        color: var(--accent-hover);
+        color: var(--accent-2);
         gap: 8px;
       }
       .arrow {
@@ -664,11 +635,11 @@
       .showtime {
         font-size: 12.5px;
         font-weight: 500;
-        color: var(--accent);
+        color: var(--link);
         text-decoration: none;
       }
       .showtime:hover {
-        color: var(--accent-hover);
+        color: var(--accent-2);
         text-decoration: underline;
       }
       .showtime--text {
@@ -685,7 +656,7 @@
         font-family: 'Figtree', sans-serif;
         font-size: 12.5px;
         font-weight: 600;
-        color: var(--accent);
+        color: var(--link);
         cursor: pointer;
         display: flex;
         align-items: center;
@@ -694,7 +665,7 @@
         transition: color 0.15s;
       }
       .festival-card__toggle:hover {
-        color: var(--accent-hover);
+        color: var(--accent-2);
       }
       .festival-card__events {
         display: none;
@@ -737,14 +708,14 @@
       .festival-card__sub-link {
         font-size: 12px;
         font-weight: 600;
-        color: var(--accent);
+        color: var(--link);
         text-decoration: none;
         white-space: nowrap;
         flex-shrink: 0;
         align-self: center;
       }
       .festival-card__sub-link:hover {
-        color: var(--accent-hover);
+        color: var(--accent-2);
         text-decoration: underline;
       }
 
@@ -843,23 +814,23 @@
         font-weight: 700;
         font-size: 13px;
         cursor: grab;
-        box-shadow: 0 2px 8px rgba(34, 211, 238, 0.3);
+        box-shadow: 0 2px 8px var(--accent-tint);
         transition:
           box-shadow 0.15s,
           transform 0.15s;
       }
       .bm-link:hover {
-        box-shadow: 0 4px 16px rgba(34, 211, 238, 0.4);
+        box-shadow: 0 4px 16px var(--accent-tint);
         transform: translateY(-1px);
       }
 
       .ext-link {
-        color: var(--accent);
+        color: var(--link);
         font-weight: 600;
         text-decoration: none;
       }
       .ext-link:hover {
-        color: var(--accent-hover);
+        color: var(--accent-2);
         text-decoration: underline;
       }
 
@@ -911,6 +882,7 @@
         }
       }
     </style>
+    <link rel="stylesheet" href="theme.css" />
   </head>
   <body>
     <header class="site-header">
@@ -1297,7 +1269,7 @@
         bottom: 4px;
         right: 6px;
         font-size: 10px;
-        color: #8aafc4;
+        color: var(--text-2);
         opacity: 0.85;
         pointer-events: none;
       "

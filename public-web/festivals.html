@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,800;1,9..144,400&family=Figtree:wght@300;400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&display=swap"
       rel="stylesheet"
     />
     <link
@@ -25,24 +25,6 @@
       [hidden] {
         display: none !important;
       }
-      :root {
-        --bg: #111a24;
-        --surface: #192534;
-        --header-dark: #0a1520;
-        --header: #cce8f4;
-        --accent: #22d3ee;
-        --accent-hover: #0891b2;
-        --text: #e8f4fb;
-        --text-2: #8aafc4;
-        --text-muted: #7f9db0;
-        --border: #243445;
-        --radius: 14px;
-        --radius-sm: 8px;
-        --cat-music: #a78bfa;
-        --cat-art: #f472b6;
-        --cat-theater: #f87171;
-        --cat-other: #94a3b8;
-      }
       body {
         font-family:
           'Figtree',
@@ -55,7 +37,7 @@
         min-height: 100vh;
       }
       a {
-        color: var(--accent);
+        color: var(--link);
       }
 
       /* ── Header ─────────────────────────────────────────────────────── */
@@ -63,8 +45,8 @@
         background: linear-gradient(
           135deg,
           var(--header-dark) 0%,
-          #142030 50%,
-          #0c1a30 100%
+          var(--bg) 50%,
+          var(--bg) 100%
         );
         color: white;
         position: relative;
@@ -85,7 +67,7 @@
       }
       .header-title em {
         font-style: italic;
-        color: #67e8f9;
+        color: var(--accent-2);
       }
       .header-sub {
         font-size: 15px;
@@ -164,13 +146,13 @@
       }
       .chip:hover,
       .toggle:hover {
-        border-color: var(--accent);
+        border-color: var(--accent-2);
         color: var(--text);
       }
       .chip[aria-pressed='true'],
       .toggle[aria-pressed='true'] {
         background: var(--accent);
-        border-color: var(--accent);
+        border-color: var(--accent-2);
         color: var(--header-dark);
       }
       .filter-row {
@@ -280,7 +262,7 @@
       .fest-card__date {
         font-size: 13px;
         font-weight: 700;
-        color: var(--accent);
+        color: var(--link);
       }
       .fest-card__category {
         font-size: 10px;
@@ -303,7 +285,7 @@
         margin-bottom: 8px;
       }
       .fest-card__distance {
-        color: var(--accent);
+        color: var(--link);
         font-weight: 600;
       }
       .fest-card__desc {
@@ -342,7 +324,7 @@
       .result-actions button {
         font: inherit;
         font-weight: 600;
-        color: var(--accent);
+        color: var(--link);
         background: none;
         border: none;
         padding: 0;
@@ -367,6 +349,7 @@
         cursor: pointer;
       }
     </style>
+    <link rel="stylesheet" href="theme.css" />
   </head>
   <body>
     <header class="site-header">
@@ -615,10 +598,10 @@
         // ── Map (optional: the list works without Leaflet) ─────────────
         const hasMap = typeof L !== 'undefined';
         const CAT_COLORS = {
-          music: '#a78bfa',
-          art: '#f472b6',
-          theater: '#f87171',
-          other: '#94a3b8',
+          music: '#ff8fc7',
+          art: '#d8b4fe',
+          theater: '#ff7a6b',
+          other: '#e2e8f0',
         };
         let map = null;
         let pinLayer = null;
@@ -676,12 +659,12 @@
           for (const pin of F.groupPins(list)) {
             const color = CAT_COLORS[pin.items[0].category] || CAT_COLORS.other;
             const marker = L.circleMarker([pin.lat, pin.lng], {
-              radius: 8,
+              radius: 9,
               fillColor: color,
-              color: '#111a24',
-              weight: 1.5,
+              color: '#1a1a1a',
+              weight: 2,
               opacity: 1,
-              fillOpacity: 0.85,
+              fillOpacity: 1,
             })
               .bindPopup(popupHtml(pin.items))
               .addTo(pinLayer);

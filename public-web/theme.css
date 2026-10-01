@@ -1,0 +1,486 @@
+/* theme.css — "Sunny sticker" theme shared by every public-web page.
+ *
+ * Loaded AFTER each page's inline <style>, so it wins at equal specificity.
+ * Pages keep layout CSS inline; colour, outline and shadow live here.
+ * The yellow --accent is a FILL colour. Use --link for coloured text.
+ */
+
+:root {
+  --bg: #fff4d6;
+  --surface: #ffffff;
+  --ink: #1a1a1a;
+  --text: #1a1a1a;
+  --text-2: #4a4538;
+  --text-muted: #5f5848;
+  --border: #1a1a1a;
+  --header: #1a1a1a;
+  --header-dark: #1a1a1a;
+
+  --accent: #ffd23f;
+  --accent-hover: #ffc400;
+  --accent-2: #e8431f;
+  --accent-tint: rgba(255, 210, 63, 0.35);
+  --link: #b8321a;
+  --ok: #0f7a3d;
+  --err: #b3261e;
+
+  --radius: 14px;
+  --radius-sm: 10px;
+  --stroke: 2.5px solid var(--ink);
+  --stroke-sm: 2px solid var(--ink);
+  --shadow: 5px 5px 0 var(--ink);
+  --shadow-sm: 3px 3px 0 var(--ink);
+
+  --cat-music: #ff8fc7;
+  --cat-food: #ffd23f;
+  --cat-sports: #86efac;
+  --cat-art: #d8b4fe;
+  --cat-theater: #ff7a6b;
+  --cat-film: #93c5fd;
+  --cat-nightlife: #a78bfa;
+  --cat-community: #5eead4;
+  --cat-outdoor: #bef264;
+  --cat-learning: #7dd3fc;
+  --cat-wellness: #fda4af;
+  --cat-talks: #fdba74;
+  --cat-other: #e2e8f0;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────── */
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family:
+    'Figtree',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+h1,
+h2,
+h3,
+.header-title,
+.search-card h2,
+.results-title,
+.section-title,
+.event-card__title,
+.tool-card h3,
+.month-group__title,
+.fest-card__title,
+.events-magazine__col-header {
+  font-family: inherit;
+  font-weight: 800;
+  color: var(--ink);
+}
+a {
+  color: var(--link);
+}
+:focus-visible {
+  outline: 3px solid var(--accent-2);
+  outline-offset: 2px;
+}
+::selection {
+  background: var(--accent);
+  color: var(--ink);
+}
+
+/* ── Header ───────────────────────────────────────────────────────── */
+.site-header {
+  background: var(--bg);
+  color: var(--ink);
+  border-bottom: var(--stroke);
+}
+.site-header::before {
+  display: none;
+}
+.header-eyebrow {
+  color: var(--text-muted);
+}
+.header-title {
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+.header-title em {
+  font-style: normal;
+  color: var(--accent-2);
+}
+.header-sub {
+  color: var(--text-2);
+  font-weight: 500;
+}
+.stat-pill {
+  background: var(--surface);
+  border: var(--stroke-sm);
+  color: var(--ink);
+  font-weight: 600;
+  backdrop-filter: none;
+}
+.stat-pill strong {
+  color: var(--ink);
+}
+.experimental-badge {
+  background: var(--accent);
+  border: var(--stroke-sm);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: none;
+}
+.experimental-badge strong,
+.experimental-badge a {
+  color: var(--ink);
+}
+.experimental-badge a {
+  text-decoration: underline;
+}
+.experimental-badge a:hover {
+  color: var(--ink);
+}
+.lang-selector__current {
+  color: var(--ink);
+  opacity: 1;
+}
+.lang-selector__sep {
+  color: var(--text-muted);
+}
+.lang-selector__link {
+  color: var(--text-2);
+}
+.lang-selector__link:hover {
+  color: var(--link);
+}
+
+/* ── Cards ────────────────────────────────────────────────────────── */
+.search-card,
+.event-card,
+.tool-card,
+.fest-card,
+#cfg,
+.ev-card {
+  background: var(--surface);
+  border: var(--stroke);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+#cfg,
+.ev-card {
+  box-shadow: var(--shadow-sm);
+}
+/* The fadeInUp animation keeps its final transform, so hover moves the shadow only. */
+.event-card,
+.fest-card {
+  transition: box-shadow 0.12s;
+}
+.event-card:hover,
+.fest-card:hover {
+  box-shadow: 8px 8px 0 var(--ink);
+}
+.event-card__stripe,
+.fest-card__stripe {
+  width: 10px;
+  border-right: var(--stroke-sm);
+}
+.event-card__date,
+.event-card__meta,
+.event-card__desc,
+.fest-card__place,
+.fest-card__desc {
+  color: var(--text-2);
+}
+.fest-card__category {
+  color: var(--ink);
+}
+.fest-card__date,
+.fest-card__distance {
+  color: var(--link);
+}
+.festival-card__sub {
+  background: var(--bg);
+  border: var(--stroke-sm);
+}
+.festival-card__events {
+  border-top: var(--stroke-sm);
+}
+.events-magazine__col-header {
+  border-bottom: var(--stroke-sm);
+}
+.site-footer {
+  border-top: var(--stroke);
+  color: var(--text-muted);
+}
+
+/* ── Chips, badges, tags ──────────────────────────────────────────── */
+.event-card__badge,
+.urgency-pill {
+  color: var(--ink);
+  border: var(--stroke-sm);
+  font-weight: 800;
+}
+.urgency-pill--outlined,
+.urgency-pill--muted,
+.urgency-pill--festival {
+  background: var(--surface);
+  color: var(--ink);
+}
+.urgency-pill--muted,
+.urgency-pill--festival {
+  border-color: var(--ink);
+}
+.tag {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+}
+.chip,
+.toggle,
+.tab {
+  background: var(--surface);
+  color: var(--ink);
+  border: var(--stroke-sm);
+  font-weight: 700;
+}
+.chip:hover,
+.toggle:hover,
+.tab:hover {
+  background: var(--accent-tint);
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.chip[aria-pressed='true'],
+.toggle[aria-pressed='true'],
+.tab.active {
+  background: var(--accent);
+  border-color: var(--ink);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────── */
+.btn,
+.controls button,
+.pane button,
+.error-state button,
+.bm-link,
+#cfg-save,
+#pub-btn,
+#cancel-btn,
+.cfg-backup button {
+  border: var(--stroke-sm);
+  border-radius: var(--radius-sm);
+  font-weight: 800;
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform 0.08s,
+    box-shadow 0.08s,
+    background-color 0.15s;
+}
+.btn-primary,
+.btn-search,
+.pane button,
+.error-state button,
+.bm-link,
+#cfg-save,
+#pub-btn {
+  background: var(--accent);
+  color: var(--ink);
+}
+.btn-secondary,
+.btn-ghost,
+.btn-search-here,
+#cancel-btn,
+.cfg-backup button {
+  background: var(--surface);
+  color: var(--ink);
+}
+.btn:hover,
+.controls button:hover:not(:disabled),
+.pane button:hover:not(:disabled),
+.error-state button:hover,
+.bm-link:hover,
+#cfg-save:hover,
+#pub-btn:hover:not(:disabled),
+#cancel-btn:hover,
+.cfg-backup button:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+.btn-primary:hover,
+.btn-search:hover,
+.pane button:hover:not(:disabled),
+#pub-btn:hover:not(:disabled),
+#cfg-save:hover {
+  background: var(--accent-hover);
+}
+.btn-secondary:hover,
+.btn-ghost:hover,
+.btn-search-here:hover:not(:disabled),
+#cancel-btn:hover,
+.cfg-backup button:hover {
+  background: var(--accent-tint);
+  color: var(--ink);
+}
+.btn:active,
+.controls button:active:not(:disabled),
+.pane button:active:not(:disabled),
+.bm-link:active,
+#cfg-save:active,
+#pub-btn:active:not(:disabled),
+#cancel-btn:active {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 var(--ink);
+}
+.btn-ghost.copied {
+  background: #bbf7d0;
+  color: var(--ink);
+}
+.btn:disabled,
+.btn-primary:disabled,
+.btn-search-here:disabled,
+.pane button:disabled,
+#pub-btn:disabled {
+  background: #e9e4d4;
+  color: var(--text-muted);
+  box-shadow: none;
+  transform: none;
+  cursor: not-allowed;
+}
+
+/* ── Links ────────────────────────────────────────────────────────── */
+.event-link:hover,
+.showtime:hover,
+.festival-card__toggle:hover,
+.festival-card__sub-link:hover,
+.ext-link:hover,
+.nav-link:hover {
+  color: var(--accent-2);
+}
+.result-actions button {
+  color: var(--link);
+}
+
+/* ── Inputs ───────────────────────────────────────────────────────── */
+input,
+textarea,
+select,
+.filter-row select,
+.filter-row input,
+.controls input[type='text'],
+.controls input[type='number'],
+.controls input[type='datetime-local'],
+.controls select,
+#cfg-fields input,
+.pane input[type='url'],
+.pane input[type='text'] {
+  background: var(--surface);
+  color: var(--ink);
+  border: var(--stroke-sm);
+  border-radius: var(--radius-sm);
+}
+/* File pickers keep the browser's own control, not the text-input box. */
+input[type='file'] {
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px var(--accent-2);
+  background: var(--surface);
+  outline: none;
+}
+label,
+#cfg-fields label {
+  color: var(--text-2);
+  font-weight: 700;
+}
+.coords-display,
+.ev-card .ev-url {
+  background: var(--bg);
+  border: var(--stroke-sm);
+  color: var(--ink);
+}
+.or-divider::before,
+.or-divider::after {
+  height: 2px;
+  background: var(--ink);
+}
+.controls {
+  background: var(--surface);
+  border-bottom: var(--stroke);
+}
+.controls label,
+.ctrl-unit,
+.ctrl-sep {
+  color: var(--text-muted);
+}
+
+/* ── Status ───────────────────────────────────────────────────────── */
+.status-info,
+.status-error,
+.status-ok {
+  border: var(--stroke-sm);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-weight: 600;
+}
+.status-info,
+#mapStatus.info {
+  background: #cdeafe;
+  color: var(--ink);
+}
+.status-error,
+#mapStatus.error {
+  background: #ffd1cc;
+  color: var(--ink);
+}
+.status-ok {
+  background: #c9f5d4;
+}
+.notice-line {
+  color: var(--ink);
+  font-weight: 600;
+}
+#status.err {
+  color: var(--err);
+}
+#status.ok {
+  color: var(--ok);
+}
+#status.info {
+  color: var(--text-2);
+}
+.spinner {
+  border: 3px solid var(--ink);
+  border-top-color: var(--accent-2);
+}
+
+/* ── Maps ─────────────────────────────────────────────────────────── */
+.map-panel {
+  background: var(--surface);
+  border: var(--stroke);
+  box-shadow: var(--shadow);
+}
+#map {
+  background: var(--surface);
+}
+.leaflet-popup-content-wrapper {
+  background: var(--surface);
+  color: var(--ink);
+  border: var(--stroke-sm);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+.leaflet-popup-tip {
+  background: var(--surface);
+  border: var(--stroke-sm);
+  box-shadow: none;
+}
+.leaflet-popup-content a {
+  color: var(--link);
+}
+.pin-popup__item + .pin-popup__item {
+  border-top: var(--stroke-sm);
+}

@@ -12,19 +12,19 @@ document.getElementById('lastModified').textContent =
   new Date(document.lastModified).toLocaleDateString(LANG.locale);
 
 const CAT_COLORS = {
-  music: '#7c3aed',
-  food: '#d97706',
-  sports: '#059669',
-  art: '#db2777',
-  theater: '#dc2626',
-  film: '#2563eb',
-  nightlife: '#9333ea',
-  community: '#0891b2',
-  outdoor: '#16a34a',
-  learning: '#0d9488',
-  wellness: '#65a30d',
-  talks: '#ea580c',
-  other: '#6b7280',
+  music: '#ff8fc7',
+  food: '#ffd23f',
+  sports: '#86efac',
+  art: '#d8b4fe',
+  theater: '#ff7a6b',
+  film: '#93c5fd',
+  nightlife: '#a78bfa',
+  community: '#5eead4',
+  outdoor: '#bef264',
+  learning: '#7dd3fc',
+  wellness: '#fda4af',
+  talks: '#fdba74',
+  other: '#e2e8f0',
 };
 function catColor(cat) {
   return CAT_COLORS[cat] || CAT_COLORS.other;
@@ -275,11 +275,11 @@ function renderUrgencyPill(event, color, fromTime, toTime) {
     return `<span class="urgency-pill urgency-pill--filled" style="background:${color}">${label}</span>`;
   }
   if (evDateStr === tomorrowStr) {
-    return `<span class="urgency-pill urgency-pill--outlined" style="border-color:${color};color:${color}">${LANG.tomorrow}</span>`;
+    return `<span class="urgency-pill urgency-pill--outlined" style="border-color:${color}">${LANG.tomorrow}</span>`;
   }
   const { satStr, sunStr } = weekendStrs();
   if (evDateStr === satStr || evDateStr === sunStr) {
-    return `<span class="urgency-pill urgency-pill--outlined" style="border-color:${color};color:${color}">${LANG.thisWeekend}</span>`;
+    return `<span class="urgency-pill urgency-pill--outlined" style="border-color:${color}">${LANG.thisWeekend}</span>`;
   }
   const daysUntilStart = Math.round(
     (new Date(evDateStr) - new Date(todayStr)) / 86400000
@@ -428,7 +428,7 @@ function renderEventCard(e, idx, fromTime, toTime) {
 
 function renderFestivalCard(item, idx) {
   const delay = Math.min(idx * 60, 400);
-  const festColor = 'var(--header)';
+  const festColor = 'var(--accent)';
 
   const firstTime = item.events[0].start_time;
   const lastTime = item.events[item.events.length - 1].start_time;

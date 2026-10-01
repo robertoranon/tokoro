@@ -172,7 +172,7 @@ When opened without an opener or matching URL/hash params, `publish.html` shows 
 
 ## NFR
 
-- No build step — plain HTML + inline JS/CSS
+- No build step — plain HTML + inline JS/layout CSS + one shared static stylesheet (`theme.css`, a relative link, so pages still work from a local file)
 - No external JS dependencies
 - MUST work when opened directly as a local file (for development)
 
@@ -261,3 +261,17 @@ A read-only browse page for the festivals on the radar (entries published by the
 - Logic lives in `festivals.js` (pure, unit-tested in `tests/festivals.test.mjs`); `tests/festivals.smoke.mjs` runs the page offline in headless Chromium against a fake API
 
 **Known limitations:** as program events accumulate, `has_festival=1` returns more pages than radar entries (a worker-side `radar` filter would remove that); one pin per location (secondary places of a multi-place festival are in the description text only); the page does not paginate the rendered list.
+
+
+---
+
+## Visual style ("sunny sticker")
+
+All pages share `theme.css`, linked after each page's inline `<style>`. Pages keep layout CSS only; every design token (`:root` variables) and the colour, outline and shadow components live in `theme.css`.
+
+- **Look:** cream page (`--bg`), white cards, 2.5px near-black outlines (`--stroke`), hard offset shadows (`--shadow`), flat bright fills, Figtree 800-900 for headings and the wordmark. The coral accent sits on the `<em>` in the page title.
+- **Accent:** yellow `--accent` is a fill colour only; coloured text uses `--link`; focus rings and hover accents use coral `--accent-2`.
+- **Categories:** the 13 `--cat-*` tokens are flat fills with dark text. The `CAT_COLORS` maps in `query.js`, `map.html` and `festivals.html` must equal these tokens.
+- **Maps:** Leaflet options cannot use CSS variables, so marker colours are literals: ink outline (`#1a1a1a`), weight 2, full fill opacity; the search-radius circle is coral (`#e8431f`).
+- **Contrast and focus:** text is near-black on light fills, and the yellow accent is never used as text. Links and buttons show a 3px coral focus outline; inputs show a 3px coral ring.
+- **Guard:** `tests/theme.test.mjs` enforces that every page links `theme.css` after its inline CSS, that no dark-theme colours or inline `:root` blocks remain, that `--accent` is never a text colour, and that `CAT_COLORS` match the tokens.
