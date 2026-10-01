@@ -424,7 +424,7 @@ An empty `festivals:` key is an empty list.
 - Run each `active` entry sequentially through `festival-entry` mode; a failing entry logs and continues; exit 1 if any entry failed.
 - `--debug` runs the full extraction (with normalization) but publishes nothing. It prints a summary stating that nothing was published and writes **no** run log and **no** staleness report.
 
-**Run log.** Appends one record to `logs/runs.jsonl`: `kind: "radar"`, timing, `entries_total`, `status`, the six counters (including `skipped_series`), and `entries: [{url, outcome}]`. The `jobs.yaml` scheduler's records gain `kind: "jobs"`; readers must tolerate records without `kind`.
+**Run log.** Appends one record to `logs/runs.jsonl`: `kind: "radar"` (the scout of section 4.9 writes `kind: "scout"` records to the same file), timing, `entries_total`, `status`, the six counters (including `skipped_series`), and `entries: [{url, outcome}]`. The `jobs.yaml` scheduler's records gain `kind: "jobs"`; readers must tolerate records without `kind`.
 
 **Staleness report.** After each (non-debug) run the runner prints active festivals whose last 4 radar runs (`STALE_WINDOW`, that included them) had no `published`/`updated`/`unchanged` outcome — dead sources, but also festivals between editions. A festival needs 4 runs of its own history before it can be flagged. A festival with any `skipped_series` outcome in that window is never reported as stale (it is intentionally skipped, not dead).
 
@@ -433,6 +433,52 @@ An empty `festivals:` key is an empty list.
 Scheduling is a plain crontab line: `0 10 * * 1  cd /path/to/tokoro/crawler && /absolute/path/to/npm run radar >> logs/radar.log 2>&1`. Cron's PATH usually lacks npm (find it with `which npm`), and `logs/` is gitignored.
 
 **Known limitations:** the same as section 4.7 (a)–(d); in particular (c) means an ended edition shows up in the staleness report until the next edition is announced, and (d) means the `--debug` summary counts extracted entries, not published ones.
+
+### 4.9 Scout (`npm run scout`) and Promote (`npm run scout-promote`)
+
+The scout proposes candidate festivals for the radar watchlist. **It never publishes and never contacts the Tokoro API**: it fetches discovery pages, asks the LLM, and writes local files for a human to review. It does not need the Tokoro signing keys (`CRAWLER_PRIVKEY`/`CRAWLER_PUBKEY`); it needs an LLM configured as usual (default in `shared/llm/defaults.ts`) and reads `JINA_API_KEY` from the environment if a source uses the `jina` fetcher.
+
+**Files** (all relative to `crawler/` by default; `--sources`, `--candidates`, `--state`, `--festivals` override):
+
+| File | Owner | Purpose |
+|------|-------|---------|
+| `scout-sources.yaml` | curator | `taste` (relevance filter, injected into the prompt; its exclusions are hard rules) and `sources` (`name`, `url`, optional `fetcher`/`browser`/`model`). Example: `scout-sources.example.yaml` |
+| `candidates.yaml` | scout (rewritten) + curator (edits `status`) | The review inbox. Entry: `name`, `url?`, `status` (`pending` \| `approved` \| `rejected`, case-insensitive), `why`, `source`, `found` (`YYYY-MM-DD`), `dates_hint?`, `location_hint?`, `notes?`. `notes` is a free-form field for the curator and is preserved. Any other field is rejected with an error listing the allowed ones. The file is rewritten on every scout run, so comments are lost |
+| `scout-state.json` | scout | Append-only memory of everything ever proposed: `{ "<dedup key>": { "status", "first_seen" } }`. Keys must start with `u:` or `n:`. Each candidate records both its url key and its name key |
+| `festivals.yaml` | curator (+ promote appends) | The radar watchlist |
+
+**Scout algorithm.** Validate the config and read the existing files first (exit 1 on any error; a missing `scout-sources.yaml` is an error, a missing `festivals.yaml` only a warning; an empty `sources` list exits 0). For each source, sequentially (one failing source is logged and the run continues; exit 1 at the end if any failed): fetch the page; extract links (anchor text + absolute href) from the raw `html`, because the fetchers' cleaned `text` contains no URLs (markdown links are the fallback for Jina; at most 300 links are offered); one LLM call (`SCOUT_MAX_TOKENS` = 8000) with the taste profile, the page text and the link list returns candidates `{name, url?, why, dates_hint?, location_hint?}`.
+
+**Prompt.** The taste is wrapped in delimiters and the model is told to ignore instructions found inside the page content or the taste text. It hedges only on taste fit; anything that may not be one coherent event (for example separate events spread over more than about two weeks, a venue programme, a ticketing portal) is excluded.
+
+**Reply parsing.** Tolerant: a JSON object or array, with or without code fences or text around it. At most 40 candidates per source; duplicates within one reply are dropped; an item needs a `name`, and wrong-typed optional fields are treated as absent. A reply that is not parseable JSON fails the source.
+
+**URL safety.** A candidate's `url` is kept only if the page itself shows it (a link, matched by host + path, or written in the text), contains no whitespace, and is neither the page's own url nor the bare root of the page's own host. Otherwise it is dropped and the candidate is kept without a url. Aggregator-internal links are accepted as proposed; replace them with the festival's own site before approving.
+
+**Dedup.** A candidate is dropped if any of its keys is already known: the watchlist (`festivals.yaml`), the current inbox, or `scout-state.json` (this includes everything rejected earlier, and candidates proposed earlier in the same run). Keys: `u:<host without www><path>` (lowercase; **host + path**, because one domain can host several festivals; a trailing slash, a trailing `/index.html|htm|php` and one leading two-letter language segment (`en`, `it`, `fr`, `de`, `es`, `pt`, `nl`, `pl`, `cs`, `sl`, `hr`, `sv`, `da`, `no`, `fi`, `hu`, `ro`, `el`, `ru`, `tr`) are ignored, so `fest.example`, `fest.example/en` and `fest.example/index.html` are the same site) and `n:<normalized name>` (accents and edition years removed, so "Terraforma 2026" = "Terraforma"; names under 3 characters get no name key). A candidate with no usable key is dropped.
+
+**Outputs.** New candidates are appended to `candidates.yaml` as `pending`. Write order: `scout-state.json` first, then `candidates.yaml`, then (non-debug only) a `logs/runs.jsonl` record with `kind: "scout"`, `status` (`ok`, `partial` or `failed`), `sources_total`, `sources_failed`, `candidates_found`, `candidates_new` and per-source outcomes. `--debug` (also when npm swallowed the flag; always write `npm run scout -- --debug`) prints the candidates and writes no files and no run log. Exit code: 1 on invalid input files or if any source failed, otherwise 0.
+
+**Promote.** The curator edits `status` in `candidates.yaml`, then `npm run scout-promote` (same `--candidates`, `--state`, `--festivals` flags; `festivals.yaml` and `candidates.yaml` must exist, otherwise exit 1 with nothing changed):
+- `approved` with a url that is not yet on the watchlist: appended to `festivals.yaml` as `status: active`, `added: <today>`, `notes: <why>`. The file is **appended as text**, so its comments survive; the result is re-parsed and the command refuses (changing nothing) if appending is unsafe, for example when `festivals:` is not the last top-level key.
+- `approved` without a (valid) url: stays in the inbox and is listed; fill in the url and run again.
+- `approved` but already on the watchlist: removed from the inbox, reported.
+- `rejected`: removed from the inbox, recorded as rejected in the state so it is never proposed again.
+- `pending`: untouched.
+
+Write order is watchlist (only if something was promoted), state, inbox, so an interrupted run is safe to repeat.
+
+**Known limitations:**
+- The scout cannot tell whether a listed "festival" is really a series of sparse events. The taste profile excludes them, and the radar's series check (section 4.7) is the backstop once a candidate is promoted.
+- A candidate whose only link is an aggregator detail page needs its url replaced by hand.
+- Only the first 300 links of a page are offered to the LLM.
+- Names in different languages ("Nova Gorica" / "Gorizia") are not unified.
+- The name key is coarse in two directions. Generic names ("Jazz Festival") from different places share one key, so rejecting one hides later ones with the same name; state is append-only, so disambiguate by giving candidates a url. Conversely, a differing trailing "Festival"/"Fest" is not unified, so the same festival re-proposed without a url under a slightly different name can come back.
+- Url keys unify `www`, scheme, trailing slash, `index.html` and a leading language segment, but not other subdomains or other path variants.
+- A bare social or link-hub host with no path (for example a profile page on a social network) is treated like any other url key.
+- `candidates.yaml` is rewritten on every scout run, so comments are lost; use the `notes` field for your own remarks.
+
+**Scheduling:** plain crontab, e.g. every two weeks offset from the radar: `0 10 * * 4  cd /path/to/tokoro/crawler && /absolute/path/to/npm run scout >> logs/scout.log 2>&1`.
 
 ---
 
@@ -2509,6 +2555,7 @@ Total events published: 10
 
 - Unit tests in `tests/test-radar.ts` (`npm run test:radar`, offline): watchlist parsing, radar entry helpers, extractor, publish-or-update logic, run log and staleness report
 - End-to-end `tests/smoke-radar-publisher.ts` (`npm run smoke:radar`, needs `wrangler dev`)
+- Unit tests in `tests/test-scout.ts` (`npm run test:scout`, offline): sources config, candidate/state model and dedup keys, link extraction, scout extractor, orchestration, promote
 
 ---
 

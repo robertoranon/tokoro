@@ -230,6 +230,15 @@ Legitimate parallel events (different stages or acts running at the same time) a
 - **Scheduling**: `0 10 * * 1  cd /path/to/tokoro/crawler && /absolute/path/to/npm run radar >> logs/radar.log 2>&1` (cron's PATH usually lacks npm: find it with `which npm`; `logs/` is gitignored)
 - **Tests**: `npm run test:radar` (offline); `npm run smoke:radar` (needs `wrangler dev`)
 
+#### Scout: finding new festivals for the watchlist
+
+- **What it does**: crawls discovery pages (aggregators, magazine roundups, label/venue news), asks the LLM which festivals match your taste profile, and writes proposals to `candidates.yaml`. It never publishes anything and does not need the Tokoro signing keys
+- **Setup**: `cp scout-sources.example.yaml scout-sources.yaml`, write your `taste`, list your sources
+- **Try it**: `npm run scout -- --debug` (note the `--`) prints candidates and writes nothing; `npm run scout` writes `candidates.yaml` and `scout-state.json`
+- **Review**: set each candidate's `status` to `approved` or `rejected` in `candidates.yaml` (fill in a missing `url` for approved ones), then `npm run scout-promote` adds approved festivals to `festivals.yaml` (comments preserved) and remembers rejected ones so they never come back. `candidates.yaml` is rewritten on every scout run, so comments in it are lost; use the `notes` field for your own remarks (other unknown fields are rejected)
+- **Scheduling**: `0 10 * * 4  cd /path/to/tokoro/crawler && /absolute/path/to/npm run scout >> logs/scout.log 2>&1`
+- **Tests**: `npm run test:scout` (offline)
+
 #### 4. Image Mode
 
 - **Best for**: Event flyers, posters, social media images

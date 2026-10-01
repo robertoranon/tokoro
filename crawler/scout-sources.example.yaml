@@ -1,0 +1,29 @@
+# Scout sources — pages where new festivals show up (aggregators, magazine
+# roundups, label/venue news). Copy to scout-sources.yaml and edit.
+#
+#   npm run scout -- --debug     # dry run: prints candidates, writes nothing
+#   npm run scout                # writes candidates.yaml + scout-state.json
+#   npm run scout-promote        # after you review candidates.yaml
+#
+# Always write the `--` before --debug (without it npm swallows the flag).
+# The scout never publishes anything; it only proposes. Crontab (every two
+# weeks, offset from the radar):
+#   0 10 * * 4  cd /path/to/tokoro/crawler && /absolute/path/to/npm run scout >> logs/scout.log 2>&1
+#   (cron's PATH usually lacks npm: find it with `which npm`.)
+
+# The relevance filter given to the LLM. Exclusions here are hard rules.
+taste: >
+  Small, under-the-radar European festivals at the crossroads of electronic,
+  experimental and jazz music, plus adventurous art and performance festivals.
+  Typically under ~5000 attendees, artist-driven, unusual settings. NOT arena
+  festivals, NOT mainstream pop/rock lineups, NOT city marketing events, and
+  NOT a concert season or series of separate gigs spread over months (a
+  festival is one coherent event in one place and period).
+
+sources:
+  - name: "Festival aggregator X"
+    url: https://example.com/festivals-2026
+    fetcher: jina # optional per-source overrides: fetcher (playwright | jina), browser (chrome | obscura), model
+
+  - name: "Magazine roundup"
+    url: https://example.com/best-small-festivals
