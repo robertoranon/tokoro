@@ -272,6 +272,6 @@ All pages share `theme.css`, linked after each page's inline `<style>`. Pages ke
 - **Look:** cream page (`--bg`), white cards, 2.5px near-black outlines (`--stroke`), hard offset shadows (`--shadow`), flat bright fills, Figtree 800-900 for headings and the wordmark. The coral accent sits on the `<em>` in the page title.
 - **Accent:** yellow `--accent` is a fill colour only; coloured text uses `--link`; focus rings and hover accents use coral `--accent-2`.
 - **Categories:** the 13 `--cat-*` tokens are flat fills with dark text. The `CAT_COLORS` maps in `query.js`, `map.html` and `festivals.html` must equal these tokens.
-- **Maps:** Leaflet options cannot use CSS variables, so marker colours are literals: ink outline (`#1a1a1a`), weight 2, full fill opacity; the search-radius circle is coral (`#ff5a36`).
+- **Maps:** Leaflet options cannot use CSS variables, so marker colours are literals: ink outline (`#1a1a1a`), weight 2, full fill opacity; the search-radius circle is coral (`#e8431f`).
 - **Contrast and focus:** text is near-black on light fills, and the yellow accent is never used as text. Links and buttons show a 3px coral focus outline; inputs show a 3px coral ring.
 - **Guard:** `tests/theme.test.mjs` enforces that every page links `theme.css` after its inline CSS, that no dark-theme colours or inline `:root` blocks remain, that `--accent` is never a text colour, and that `CAT_COLORS` match the tokens.

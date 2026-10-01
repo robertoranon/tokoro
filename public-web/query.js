@@ -428,7 +428,7 @@ function renderEventCard(e, idx, fromTime, toTime) {
 
 function renderFestivalCard(item, idx) {
   const delay = Math.min(idx * 60, 400);
-  const festColor = 'var(--header)';
+  const festColor = 'var(--accent)';
 
   const firstTime = item.events[0].start_time;
   const lastTime = item.events[item.events.length - 1].start_time;

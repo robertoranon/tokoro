@@ -18,7 +18,7 @@
 
   --accent: #ffd23f;
   --accent-hover: #ffc400;
-  --accent-2: #ff5a36;
+  --accent-2: #e8431f;
   --accent-tint: rgba(255, 210, 63, 0.35);
   --link: #b8321a;
   --ok: #0f7a3d;
@@ -132,6 +132,9 @@ a {
 }
 .experimental-badge a {
   text-decoration: underline;
+}
+.experimental-badge a:hover {
+  color: var(--ink);
 }
 .lang-selector__current {
   color: var(--ink);
@@ -291,12 +294,12 @@ a {
   color: var(--ink);
 }
 .btn:hover,
-.controls button:hover,
-.pane button:hover,
+.controls button:hover:not(:disabled),
+.pane button:hover:not(:disabled),
 .error-state button:hover,
 .bm-link:hover,
 #cfg-save:hover,
-#pub-btn:hover,
+#pub-btn:hover:not(:disabled),
 #cancel-btn:hover,
 .cfg-backup button:hover {
   transform: translate(-1px, -1px);
@@ -304,8 +307,8 @@ a {
 }
 .btn-primary:hover,
 .btn-search:hover,
-.pane button:hover,
-#pub-btn:hover,
+.pane button:hover:not(:disabled),
+#pub-btn:hover:not(:disabled),
 #cfg-save:hover {
   background: var(--accent-hover);
 }
@@ -318,11 +321,11 @@ a {
   color: var(--ink);
 }
 .btn:active,
-.controls button:active,
-.pane button:active,
+.controls button:active:not(:disabled),
+.pane button:active:not(:disabled),
 .bm-link:active,
 #cfg-save:active,
-#pub-btn:active,
+#pub-btn:active:not(:disabled),
 #cancel-btn:active {
   transform: translate(3px, 3px);
   box-shadow: 0 0 0 var(--ink);
@@ -373,6 +376,12 @@ select,
   color: var(--ink);
   border: var(--stroke-sm);
   border-radius: var(--radius-sm);
+}
+/* File pickers keep the browser's own control, not the text-input box. */
+input[type='file'] {
+  background: none;
+  border: 0;
+  border-radius: 0;
 }
 input:focus,
 select:focus,
