@@ -110,3 +110,5 @@ graphify-out/cache/stat-index.json
 graphify-out/graph.html
 crawler/festivals.yaml
 crawler/scout-sources.yaml
+crawler/candidates.yaml
+crawler/scout-state.json
