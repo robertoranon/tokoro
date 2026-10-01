@@ -27,7 +27,7 @@ for (const t of [
   'accent-2',
   'link',
   'stroke',
-  'shadow',
+  'line',
 ]) {
   assert.ok(
     new RegExp(`--${t}\\s*:`).test(theme),

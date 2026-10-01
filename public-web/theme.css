@@ -1,7 +1,8 @@
-/* theme.css — "Sunny sticker" theme shared by every public-web page.
+/* theme.css — "Sunny" theme shared by every public-web page.
  *
  * Loaded AFTER each page's inline <style>, so it wins at equal specificity.
- * Pages keep layout CSS inline; colour, outline and shadow live here.
+ * Pages keep layout CSS inline; colour and line work live here.
+ * Flat and soft: hairline borders, no drop shadows, pill buttons.
  * The yellow --accent is a FILL colour. Use --link for coloured text.
  */
 
@@ -12,7 +13,9 @@
   --text: #1a1a1a;
   --text-2: #4a4538;
   --text-muted: #5f5848;
-  --border: #1a1a1a;
+  --line: #eadfbf;
+  --line-input: #8c8062;
+  --border: var(--line);
   --header: #1a1a1a;
   --header-dark: #1a1a1a;
 
@@ -24,12 +27,10 @@
   --ok: #0f7a3d;
   --err: #b3261e;
 
-  --radius: 14px;
-  --radius-sm: 10px;
-  --stroke: 2.5px solid var(--ink);
-  --stroke-sm: 2px solid var(--ink);
-  --shadow: 5px 5px 0 var(--ink);
-  --shadow-sm: 3px 3px 0 var(--ink);
+  --radius: 20px;
+  --radius-sm: 12px;
+  --stroke: 1px solid var(--line);
+  --stroke-input: 1px solid var(--line-input);
 
   --cat-music: #ff8fc7;
   --cat-food: #ffd23f;
@@ -43,7 +44,7 @@
   --cat-learning: #7dd3fc;
   --cat-wellness: #fda4af;
   --cat-talks: #fdba74;
-  --cat-other: #e2e8f0;
+  --cat-other: #94a3b8;
 }
 
 /* ── Base ─────────────────────────────────────────────────────────── */
@@ -70,7 +71,8 @@ h3,
 .fest-card__title,
 .events-magazine__col-header {
   font-family: inherit;
-  font-weight: 800;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: var(--ink);
 }
 a {
@@ -98,8 +100,8 @@ a {
   color: var(--text-muted);
 }
 .header-title {
-  font-weight: 900;
-  letter-spacing: -0.03em;
+  font-weight: 800;
+  letter-spacing: -0.04em;
 }
 .header-title em {
   font-style: normal;
@@ -111,7 +113,7 @@ a {
 }
 .stat-pill {
   background: var(--surface);
-  border: var(--stroke-sm);
+  border: var(--stroke);
   color: var(--ink);
   font-weight: 600;
   backdrop-filter: none;
@@ -121,9 +123,9 @@ a {
 }
 .experimental-badge {
   background: var(--accent);
-  border: var(--stroke-sm);
+  border: 0;
+  border-radius: 999px;
   color: var(--ink);
-  box-shadow: var(--shadow-sm);
   backdrop-filter: none;
 }
 .experimental-badge strong,
@@ -160,25 +162,25 @@ a {
   background: var(--surface);
   border: var(--stroke);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: none;
 }
 #cfg,
 .ev-card {
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-sm);
 }
-/* The fadeInUp animation keeps its final transform, so hover moves the shadow only. */
+/* Flat cards: hover only darkens the hairline (the fadeInUp animation owns transform). */
 .event-card,
 .fest-card {
-  transition: box-shadow 0.12s;
+  transition: border-color 0.15s;
 }
 .event-card:hover,
 .fest-card:hover {
-  box-shadow: 8px 8px 0 var(--ink);
+  box-shadow: none;
+  border-color: var(--line-input);
 }
 .event-card__stripe,
 .fest-card__stripe {
-  width: 10px;
-  border-right: var(--stroke-sm);
+  width: 6px;
 }
 .event-card__date,
 .event-card__meta,
@@ -188,7 +190,7 @@ a {
   color: var(--text-2);
 }
 .fest-card__category {
-  color: var(--ink);
+  color: var(--text-muted);
 }
 .fest-card__date,
 .fest-card__distance {
@@ -196,13 +198,13 @@ a {
 }
 .festival-card__sub {
   background: var(--bg);
-  border: var(--stroke-sm);
+  border: 0;
 }
 .festival-card__events {
-  border-top: var(--stroke-sm);
+  border-top: var(--stroke);
 }
 .events-magazine__col-header {
-  border-bottom: var(--stroke-sm);
+  border-bottom: var(--stroke);
 }
 .site-footer {
   border-top: var(--stroke);
@@ -213,46 +215,43 @@ a {
 .event-card__badge,
 .urgency-pill {
   color: var(--ink);
-  border: var(--stroke-sm);
-  font-weight: 800;
+  border: 0;
+  font-weight: 700;
 }
 .urgency-pill--outlined,
 .urgency-pill--muted,
 .urgency-pill--festival {
-  background: var(--surface);
+  background: var(--bg);
   color: var(--ink);
-}
-.urgency-pill--muted,
-.urgency-pill--festival {
-  border-color: var(--ink);
+  border: 0;
 }
 .tag {
-  background: var(--surface);
-  color: var(--ink);
-  border: 1.5px solid var(--ink);
+  background: var(--bg);
+  color: var(--text-2);
+  border: 0;
 }
 .chip,
 .toggle,
 .tab {
   background: var(--surface);
   color: var(--ink);
-  border: var(--stroke-sm);
-  font-weight: 700;
+  border: var(--stroke-input);
+  font-weight: 600;
 }
 .chip:hover,
 .toggle:hover,
 .tab:hover {
   background: var(--accent-tint);
-  border-color: var(--ink);
+  border-color: var(--line-input);
   color: var(--ink);
 }
 .chip[aria-pressed='true'],
 .toggle[aria-pressed='true'],
 .tab.active {
   background: var(--accent);
-  border-color: var(--ink);
+  border-color: var(--accent);
   color: var(--ink);
-  box-shadow: var(--shadow-sm);
+  font-weight: 700;
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────── */
@@ -265,14 +264,13 @@ a {
 #pub-btn,
 #cancel-btn,
 .cfg-backup button {
-  border: var(--stroke-sm);
-  border-radius: var(--radius-sm);
-  font-weight: 800;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-weight: 700;
   color: var(--ink);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   transition:
     transform 0.08s,
-    box-shadow 0.08s,
     background-color 0.15s;
 }
 .btn-primary,
@@ -292,25 +290,17 @@ a {
 .cfg-backup button {
   background: var(--surface);
   color: var(--ink);
-}
-.btn:hover,
-.controls button:hover:not(:disabled),
-.pane button:hover:not(:disabled),
-.error-state button:hover,
-.bm-link:hover,
-#cfg-save:hover,
-#pub-btn:hover:not(:disabled),
-#cancel-btn:hover,
-.cfg-backup button:hover {
-  transform: translate(-1px, -1px);
-  box-shadow: 4px 4px 0 var(--ink);
+  border: var(--stroke-input);
 }
 .btn-primary:hover,
 .btn-search:hover,
 .pane button:hover:not(:disabled),
 #pub-btn:hover:not(:disabled),
-#cfg-save:hover {
+#cfg-save:hover,
+.bm-link:hover,
+.error-state button:hover {
   background: var(--accent-hover);
+  box-shadow: none;
 }
 .btn-secondary:hover,
 .btn-ghost:hover,
@@ -319,6 +309,7 @@ a {
 .cfg-backup button:hover {
   background: var(--accent-tint);
   color: var(--ink);
+  box-shadow: none;
 }
 .btn:active,
 .controls button:active:not(:disabled),
@@ -327,8 +318,7 @@ a {
 #cfg-save:active,
 #pub-btn:active:not(:disabled),
 #cancel-btn:active {
-  transform: translate(3px, 3px);
-  box-shadow: 0 0 0 var(--ink);
+  transform: scale(0.97);
 }
 .btn-ghost.copied {
   background: #bbf7d0;
@@ -339,9 +329,9 @@ a {
 .btn-search-here:disabled,
 .pane button:disabled,
 #pub-btn:disabled {
-  background: #e9e4d4;
+  background: #efe9d8;
+  border-color: transparent;
   color: var(--text-muted);
-  box-shadow: none;
   transform: none;
   cursor: not-allowed;
 }
@@ -374,7 +364,7 @@ select,
 .pane input[type='text'] {
   background: var(--surface);
   color: var(--ink);
-  border: var(--stroke-sm);
+  border: var(--stroke-input);
   border-radius: var(--radius-sm);
 }
 /* File pickers keep the browser's own control, not the text-input box. */
@@ -387,25 +377,25 @@ input:focus,
 select:focus,
 textarea:focus {
   border-color: var(--ink);
-  box-shadow: 0 0 0 3px var(--accent-2);
+  box-shadow: 0 0 0 3px rgba(232, 67, 31, 0.28);
   background: var(--surface);
   outline: none;
 }
 label,
 #cfg-fields label {
   color: var(--text-2);
-  font-weight: 700;
+  font-weight: 600;
 }
 .coords-display,
 .ev-card .ev-url {
   background: var(--bg);
-  border: var(--stroke-sm);
+  border: var(--stroke);
   color: var(--ink);
 }
 .or-divider::before,
 .or-divider::after {
-  height: 2px;
-  background: var(--ink);
+  height: 1px;
+  background: var(--line);
 }
 .controls {
   background: var(--surface);
@@ -421,23 +411,23 @@ label,
 .status-info,
 .status-error,
 .status-ok {
-  border: var(--stroke-sm);
+  border: 0;
   border-radius: var(--radius-sm);
   color: var(--ink);
   font-weight: 600;
 }
 .status-info,
 #mapStatus.info {
-  background: #cdeafe;
+  background: #dcecfd;
   color: var(--ink);
 }
 .status-error,
 #mapStatus.error {
-  background: #ffd1cc;
+  background: #ffe0dc;
   color: var(--ink);
 }
 .status-ok {
-  background: #c9f5d4;
+  background: #d6f5de;
 }
 .notice-line {
   color: var(--ink);
@@ -453,7 +443,7 @@ label,
   color: var(--text-2);
 }
 .spinner {
-  border: 3px solid var(--ink);
+  border: 3px solid var(--line);
   border-top-color: var(--accent-2);
 }
 
@@ -461,7 +451,6 @@ label,
 .map-panel {
   background: var(--surface);
   border: var(--stroke);
-  box-shadow: var(--shadow);
 }
 #map {
   background: var(--surface);
@@ -469,18 +458,18 @@ label,
 .leaflet-popup-content-wrapper {
   background: var(--surface);
   color: var(--ink);
-  border: var(--stroke-sm);
+  border: var(--stroke-input);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 .leaflet-popup-tip {
   background: var(--surface);
-  border: var(--stroke-sm);
+  border: var(--stroke-input);
   box-shadow: none;
 }
 .leaflet-popup-content a {
   color: var(--link);
 }
 .pin-popup__item + .pin-popup__item {
-  border-top: var(--stroke-sm);
+  border-top: var(--stroke);
 }

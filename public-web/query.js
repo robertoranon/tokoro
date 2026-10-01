@@ -24,7 +24,7 @@ const CAT_COLORS = {
   learning: '#7dd3fc',
   wellness: '#fda4af',
   talks: '#fdba74',
-  other: '#e2e8f0',
+  other: '#94a3b8',
 };
 function catColor(cat) {
   return CAT_COLORS[cat] || CAT_COLORS.other;
@@ -275,11 +275,11 @@ function renderUrgencyPill(event, color, fromTime, toTime) {
     return `<span class="urgency-pill urgency-pill--filled" style="background:${color}">${label}</span>`;
   }
   if (evDateStr === tomorrowStr) {
-    return `<span class="urgency-pill urgency-pill--outlined" style="border-color:${color}">${LANG.tomorrow}</span>`;
+    return `<span class="urgency-pill urgency-pill--outlined">${LANG.tomorrow}</span>`;
   }
   const { satStr, sunStr } = weekendStrs();
   if (evDateStr === satStr || evDateStr === sunStr) {
-    return `<span class="urgency-pill urgency-pill--outlined" style="border-color:${color}">${LANG.thisWeekend}</span>`;
+    return `<span class="urgency-pill urgency-pill--outlined">${LANG.thisWeekend}</span>`;
   }
   const daysUntilStart = Math.round(
     (new Date(evDateStr) - new Date(todayStr)) / 86400000
