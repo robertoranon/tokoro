@@ -219,7 +219,7 @@ Legitimate parallel events (different stages or acts running at the same time) a
 - **Best for**: keeping a "planning radar" of festivals — one entry per festival for the festival as a whole, not its program
 - **Process**: Fetch homepage → LLM extracts one entry (dates from an info page if the homepage has none) → look up the existing entry → publish, update (`PUT`) or leave unchanged
 - **Usage (single URL)**: `npm run crawl -- --mode festival-entry <url>` (add `--debug` to print the extracted entry instead of publishing; no API call is made)
-- **Usage (watchlist)**: `cp festivals.example.yaml festivals.yaml`, list your festivals, then `npm run radar` (`npm run radar -- --debug` tries it without publishing anything and writes no run log)
+- **Usage (watchlist)**: `cp festivals.example.yaml festivals.yaml`, list your festivals, then `npm run radar` (`npm run radar -- --debug` tries it without publishing anything and writes no run log). Always include the `--`: without it npm swallows the flag, but the runner detects npm's `npm_config_debug` and still runs in debug mode
 - **Validation**: `festivals.yaml` is validated up front; any error (bad URL, duplicate URL, wrong field type, unknown `status`) exits 1 before anything is crawled. No active festivals: warning, exit 0
 - **Year evidence**: extracted dates are only trusted if their year appears in the page's URL, title or text, or a weekday confirmed it; otherwise they are dropped (so a stale homepage cannot produce a phantom next-year entry) and the festival is looked up on info pages or ends as `skipped_no_dates`
 - **Outcomes** per festival: `published`, `updated`, `unchanged`, `skipped_no_dates` (no dates announced, or the edition already ended), `failed`. The run exits 1 if any festival failed

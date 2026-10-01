@@ -40,6 +40,19 @@ export function tallyOutcomes(results: RadarEntryResult[]): RadarCounters {
   return counters;
 }
 
+/**
+ * `npm run radar --debug` (no `--`) makes npm swallow the flag and expose it
+ * as npm_config_debug. Treat that as debug too. Only ever errs toward debug.
+ */
+export function isDebugRequested(
+  argv: string[],
+  env: Record<string, string | undefined>
+): { debug: boolean; fromNpm: boolean } {
+  const inArgv = argv.includes('--debug');
+  const inNpm = env.npm_config_debug === 'true';
+  return { debug: inArgv || inNpm, fromNpm: !inArgv && inNpm };
+}
+
 async function main() {
   const startedAt = new Date();
   await loadEnv();
@@ -49,7 +62,12 @@ async function main() {
   if (fileIndex !== -1 && process.argv[fileIndex + 1]) {
     festivalsFile = path.resolve(process.argv[fileIndex + 1]);
   }
-  const debug = process.argv.includes('--debug');
+  const { debug, fromNpm } = isDebugRequested(process.argv, process.env);
+  if (fromNpm) {
+    console.warn(
+      'Note: --debug was picked up from npm (npm_config_debug). Use "npm run radar -- --debug" next time.'
+    );
+  }
 
   // Fail fast on a malformed watchlist, before any crawling.
   let config: FestivalsConfig;
@@ -78,6 +96,11 @@ async function main() {
     `Radar: ${active.length} active festival(s), ${config.festivals.length - active.length} paused${debug ? ' (DEBUG: nothing is published)' : ''}`
   );
   console.log(`API: ${env.apiUrl}`);
+  if (!debug) {
+    console.log(
+      `⚠ LIVE RUN — publishing to ${env.apiUrl} (use "npm run radar -- --debug" for a dry run)`
+    );
+  }
 
   const defaultBrowser =
     (process.env.BROWSER_ENGINE as BrowserEngine) || 'chrome';

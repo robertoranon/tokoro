@@ -22,6 +22,7 @@ import {
 import type { FetchedPage } from '../src/types/event.js';
 import { FestivalEntryExtractor } from '../src/extractors/festival-entry-extractor.js';
 import { PageDiscovery } from '../src/extractors/page-discovery.js';
+import { isDebugRequested } from '../src/radar.js';
 import type { LLMProvider } from '../../shared/types/llm.js';
 import {
   parseFestivalsConfig,
@@ -1450,6 +1451,50 @@ console.log('\n=== Radar year-evidence guard ===\n');
       false
     ),
     'hasYearEvidence: missing start_time -> false'
+  );
+}
+
+// --- isDebugRequested (npm-swallowed --debug) ---
+{
+  const eq = (a: unknown, b: unknown) =>
+    JSON.stringify(a) === JSON.stringify(b);
+  assert(
+    eq(isDebugRequested(['--debug'], {}), { debug: true, fromNpm: false }),
+    'isDebugRequested: argv --debug -> debug, not fromNpm'
+  );
+  assert(
+    eq(isDebugRequested([], { npm_config_debug: 'true' }), {
+      debug: true,
+      fromNpm: true,
+    }),
+    'isDebugRequested: npm_config_debug=true -> debug, fromNpm'
+  );
+  assert(
+    eq(isDebugRequested(['--debug'], { npm_config_debug: 'true' }), {
+      debug: true,
+      fromNpm: false,
+    }),
+    'isDebugRequested: both -> debug, not fromNpm'
+  );
+  assert(
+    eq(isDebugRequested([], {}), { debug: false, fromNpm: false }),
+    'isDebugRequested: neither -> not debug'
+  );
+  for (const v of ['false', '', undefined]) {
+    assert(
+      eq(isDebugRequested([], { npm_config_debug: v }), {
+        debug: false,
+        fromNpm: false,
+      }),
+      `isDebugRequested: npm_config_debug=${JSON.stringify(v)} -> not debug`
+    );
+  }
+  assert(
+    eq(isDebugRequested(['--festivals', 'x.yaml'], {}), {
+      debug: false,
+      fromNpm: false,
+    }),
+    'isDebugRequested: unrelated argv -> not debug'
   );
 }
 

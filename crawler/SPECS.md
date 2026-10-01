@@ -399,7 +399,7 @@ Produces **one radar entry per festival homepage**: the festival as a whole (nam
 
 ### 4.8 Radar Watchlist Runner (`npm run radar`)
 
-Entry point `src/radar.ts`, structured like `src/scheduler.ts`. Reads `festivals.yaml` (`--festivals <path>` to override; example: `festivals.example.yaml`):
+Entry point `src/radar.ts`, structured like `src/scheduler.ts`. Always write `npm run radar -- --debug` (note the `--`): without it npm swallows the flag, but the runner detects npm's `npm_config_debug` environment variable, prints a notice, and still runs in debug mode. Non-debug runs print a `LIVE RUN` line naming the API URL before crawling. Reads `festivals.yaml` (`--festivals <path>` to override; example: `festivals.example.yaml`):
 
 | Field                           | Required | Description                                                                                                        |
 | ------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
