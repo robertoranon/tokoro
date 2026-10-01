@@ -1427,6 +1427,22 @@ console.log('\n=== Radar year-evidence guard ===\n');
     hasYearEvidence(dr, pg({}), true),
     'hasYearEvidence: dayNameValidated -> true'
   );
+  for (const t of ['Postcode 20271 Milano', 'Price 12027 EUR']) {
+    assert(
+      !hasYearEvidence(dr, pg({ text: t }), false),
+      `hasYearEvidence: "${t}" is not the year`
+    );
+  }
+  for (const t of ['Terraforma 2027', '2027-06-18', 'June 2027.', '(2027)']) {
+    assert(
+      hasYearEvidence(dr, pg({ text: t }), false),
+      `hasYearEvidence: standalone "${t}"`
+    );
+  }
+  assert(
+    hasYearEvidence(dr, pg({ url: 'https://a.example/edition-2027/' }), false),
+    'hasYearEvidence: /edition-2027/ in url'
+  );
   assert(
     !hasYearEvidence(
       { ...dr, start_time: undefined },

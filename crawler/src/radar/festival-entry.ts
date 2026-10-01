@@ -274,7 +274,8 @@ export function hasYearEvidence(
   if (dayNameValidated) return true;
   const year = draft.start_time?.slice(0, 4);
   if (!year || !/^\d{4}$/.test(year)) return false;
-  return [page.url, page.title, page.text].some(s => (s ?? '').includes(year));
+  const re = new RegExp(`(?<!\\d)${year}(?!\\d)`);
+  return [page.url, page.title, page.text].some(s => re.test(s ?? ''));
 }
 
 /** Remove the dates, keep everything else. */
