@@ -266,11 +266,11 @@ A read-only browse page for the festivals on the radar (entries published by the
 
 ## Visual style (bold per-page colour)
 
-All pages share `theme.css`, linked after each page's inline `<style>`. Pages keep layout CSS only; design tokens (`:root` variables) and colour, type and line work live in `theme.css`. Each `<body>` carries `data-page` (browse and it = blue, festivals = magenta, map = lime, publish = violet, privacy = yellow), which sets `--page`, the full-bleed page colour.
+All pages share `theme.css`, linked after each page's inline `<style>`. Pages keep layout CSS only; design tokens (`:root` variables) and colour, type and line work live in `theme.css`. Each `<body>` carries `data-page` (browse and it = blue, festivals = orange, map = lime, publish = violet, privacy = yellow), which sets `--page`, the full-bleed page colour.
 
 - **Look:** full-bleed page colour, white cards with 2px black borders, black blocks with white text, square corners, no soft shadows. Hover lifts a card with a hard 5px black offset shadow.
 - **Type:** Archivo 800-900 (expanded, uppercase) for headings and the wordmark; Poppins 400-600 for body text.
-- **Chrome:** a yellow scrolling ticker above a sticky black nav bar (logo, Browse / Festivals / Map, yellow Publish button). The page `<header>` acts as the hero: a large title with an outlined `<em>`, plus an intro line. The map page uses a compact header so the map keeps the viewport.
+- **Chrome:** a yellow scrolling ticker above a sticky black nav bar (logo, Browse / Map, yellow Publish button). Each page has its own ticker text. The festival radar is a separate section: its nav bar holds only the "Tokoro Radar" logo, and no other page links to it or from it. Magenta is not used. The page `<header>` acts as the hero: a large title with an outlined `<em>`, plus an intro line. The map page uses a compact header so the map keeps the viewport.
 - **Colour rules:** text is black on every saturated background; white text appears only on black. Yellow is a fill and the focus halo. Black on violet is about 4.5:1.
 - **Categories:** the 13 `--cat-*` tokens are unchanged. The `CAT_COLORS` maps in `query.js`, `map.html` and `festivals.html` must equal them. `.cat-tab` is the category label on a card edge (`.tab` belongs to the publish page's own tabs).
 - **Motion:** ticker scroll, hero and card rise-in, card hover lift. All of it is disabled under `prefers-reduced-motion`. Keyframes must set opacity in `to`, or elements stay hidden.

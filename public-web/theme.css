@@ -13,7 +13,7 @@
   --blue: #00a0ff;
   --lime: #00ff1e;
   --violet: #9443ff;
-  --magenta: #ff29ff;
+  --orange: #ff7a1a;
   --yellow: #ffff00;
   --page: var(--blue);
 
@@ -63,7 +63,7 @@ body[data-page='browse'] {
   --page: var(--blue);
 }
 body[data-page='festivals'] {
-  --page: var(--magenta);
+  --page: var(--orange);
 }
 body[data-page='map'] {
   --page: var(--lime);

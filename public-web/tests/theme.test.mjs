@@ -25,7 +25,7 @@ for (const t of [
   'blue',
   'lime',
   'violet',
-  'magenta',
+  'orange',
   'yellow',
   'page',
   'stroke',
@@ -145,3 +145,44 @@ for (const m of theme.matchAll(/@keyframes\s+([\w-]+)\s*\{([\s\S]*?\n\})/g)) {
 }
 assert.ok(!/box-shadow:[^;]*blur/.test(theme), 'no soft shadows');
 console.log('✅ theme: reduced-motion honoured, keyframes safe');
+
+// 9. the radar is a separate site section: no cross links either way
+for (const p of PAGES) {
+  const links = [...read(p).matchAll(/<a[^>]+href="([^"]+)"/g)].map(m => m[1]);
+  if (p === 'festivals.html') {
+    const out = links.filter(h =>
+      /(?:^|\/)(?:index|it|map|publish|privacy-policy)\.html/.test(h)
+    );
+    assert.deepEqual(out, [], `festivals.html must not link out: ${out}`);
+  } else {
+    assert.ok(
+      !links.some(h => /(?:^|\/)festivals\.html/.test(h)),
+      `${p} must not link to festivals.html`
+    );
+  }
+}
+console.log('✅ theme: radar page is not cross-linked with the other pages');
+
+// 10. no magenta page backgrounds, and each page has its own ticker text
+assert.ok(!/magenta|#ff29ff/i.test(theme), 'magenta is not used');
+const tickers = PAGES.map(p => {
+  const m = read(p).match(/<div class="ticker__track">([\s\S]*?)<\/div>/);
+  assert.ok(m, `${p} must have ticker text`);
+  assert.ok(
+    !/Follow people|Publish a festival/i.test(m[1]),
+    `${p} ticker uses retired phrases`
+  );
+  return m[1].replace(/\s+/g, ' ');
+});
+for (const a of ['index.html', 'map.html', 'festivals.html']) {
+  const others = ['index.html', 'map.html', 'festivals.html'].filter(
+    b => b !== a
+  );
+  for (const b of others)
+    assert.notEqual(
+      tickers[PAGES.indexOf(a)],
+      tickers[PAGES.indexOf(b)],
+      `${a} and ${b} must have different tickers`
+    );
+}
+console.log('✅ theme: no magenta; Browse, Map and Radar tickers differ');
