@@ -1,6 +1,6 @@
-// Guards the "sunny sticker" theme: every page links theme.css after its inline
-// <style>, no leftover dark-theme colors, the yellow accent is never a text color,
-// and the JS category colors match the --cat-* tokens in theme.css.
+// Guards the "bold per-page colour" theme: every page links theme.css after its
+// inline <style>, no leftover dark-theme colors, and the JS category colors
+// match the --cat-* tokens in theme.css.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,14 +20,15 @@ const theme = read('theme.css');
 
 // 1. tokens exist
 for (const t of [
-  'bg',
-  'surface',
   'ink',
-  'accent',
-  'accent-2',
-  'link',
+  'paper',
+  'blue',
+  'lime',
+  'violet',
+  'magenta',
+  'yellow',
+  'page',
   'stroke',
-  'line',
 ]) {
   assert.ok(
     new RegExp(`--${t}\\s*:`).test(theme),
@@ -65,20 +66,6 @@ for (const f of [...PAGES, 'query.js', 'festivals.js', 'shared.js']) {
 }
 console.log('✅ theme: no legacy dark-theme colors');
 
-// 4. the yellow accent is a fill, never a text color (unreadable on cream)
-const TEXT_ACCENT = /(?<![-\w])color:\s*var\(--accent(?:-hover)?\)/;
-for (const p of PAGES) {
-  const line = read(p)
-    .split('\n')
-    .findIndex(l => TEXT_ACCENT.test(l));
-  assert.equal(
-    line,
-    -1,
-    `${p}:${line + 1} uses --accent as a text color; use --link`
-  );
-}
-console.log('✅ theme: --accent never used as text color');
-
 // 5. JS CAT_COLORS agree with the --cat-* tokens
 const tokens = Object.fromEntries(
   [...theme.matchAll(/--cat-([a-z]+):\s*(#[0-9a-f]{6})/gi)].map(m => [
@@ -113,3 +100,48 @@ for (const p of PAGES) {
   );
 }
 console.log('✅ theme: no inline :root token blocks in pages');
+
+// 7. each page declares its colour and loads the new fonts
+const PAGE_KEY = {
+  'index.html': 'browse',
+  'it.html': 'browse',
+  'festivals.html': 'festivals',
+  'map.html': 'map',
+  'publish.html': 'publish',
+  'privacy-policy.html': 'privacy',
+};
+for (const [p, key] of Object.entries(PAGE_KEY)) {
+  const html = read(p);
+  assert.ok(
+    new RegExp(`<body[^>]*data-page="${key}"`).test(html),
+    `${p} must have <body data-page="${key}">`
+  );
+  assert.ok(html.includes('family=Archivo'), `${p} must load Archivo`);
+  assert.ok(html.includes('family=Poppins'), `${p} must load Poppins`);
+  assert.ok(!html.includes('Figtree'), `${p} still references Figtree`);
+  assert.ok(html.includes('class="ticker"'), `${p} must include the ticker`);
+  assert.ok(html.includes('class="site-bar"'), `${p} must include the nav bar`);
+}
+for (const key of new Set(Object.values(PAGE_KEY))) {
+  assert.ok(
+    theme.includes(`body[data-page='${key}']`),
+    `theme.css must set --page for ${key}`
+  );
+}
+console.log('✅ theme: pages declare data-page, fonts, ticker and nav bar');
+
+// 8. motion safety and shape rules
+assert.ok(
+  theme.includes('prefers-reduced-motion'),
+  'theme.css must honour prefers-reduced-motion'
+);
+for (const m of theme.matchAll(/@keyframes\s+([\w-]+)\s*\{([\s\S]*?\n\})/g)) {
+  if (m[2].includes('opacity')) {
+    assert.ok(
+      /to\s*\{[^}]*opacity/.test(m[2]),
+      `@keyframes ${m[1]} animates opacity in "from" only; add it to "to"`
+    );
+  }
+}
+assert.ok(!/box-shadow:[^;]*blur/.test(theme), 'no soft shadows');
+console.log('✅ theme: reduced-motion honoured, keyframes safe');
