@@ -58,9 +58,12 @@ function runCli(args: string[], env: NodeJS.ProcessEnv): Promise<RunResult> {
 
 async function main() {
   const chatBodies: string[] = [];
+  let listHits = 0;
+  let extraCandidate = false;
   let port = 0;
   const server = http.createServer((req, res) => {
     if (req.method === 'GET' && req.url === '/list') {
+      listHits++;
       res.setHeader('Content-Type', 'text/html');
       res.end(`<!doctype html><html><head><title>Festival list</title></head><body>
 <h1>Small festivals 2027</h1>
@@ -93,6 +96,9 @@ async function main() {
               why: 'url not on the page',
             },
             { name: 'Series Season', why: 'no url' },
+            ...(extraCandidate
+              ? [{ name: 'Brand New', why: 'second wave' }]
+              : []),
           ],
         });
         res.setHeader('Content-Type', 'application/json');
@@ -248,6 +254,7 @@ async function main() {
 
     // c. second run
     const text1 = await fs.readFile(f.candidates, 'utf-8');
+    const stateText1 = await fs.readFile(f.state, 'utf-8');
     const r2 = await runCli(scoutArgs, env);
     check('c. second run exits 0', r2.code === 0, r2.stdout + r2.stderr);
     const c2 = parseCandidates(await fs.readFile(f.candidates, 'utf-8'));
@@ -262,7 +269,11 @@ async function main() {
       log2.length === 2 && log2[1].candidates_new === 0,
       log2
     );
-    void text1;
+    check(
+      'c. a run that adds nothing leaves candidates.yaml and scout-state.json byte-identical',
+      (await fs.readFile(f.candidates, 'utf-8')) === text1 &&
+        (await fs.readFile(f.state, 'utf-8')) === stateText1
+    );
 
     // d. approve / reject, promote
     const setStatus = (text: string, name: string, status: string) => {
@@ -349,6 +360,68 @@ async function main() {
         log3.length === 3 &&
         log3[2].candidates_new === 0,
       { c4: c4.map(c => c.name), log: log3[2] }
+    );
+
+    // f. a hand-added candidate (only a name) survives a run that adds something
+    const beforeHand = await fs.readFile(f.candidates, 'utf-8');
+    await fs.writeFile(f.candidates, beforeHand + '  - name: Hand Added\n');
+    extraCandidate = true;
+    const r4 = await runCli(scoutArgs, env);
+    check(
+      'f. run with a hand-added entry exits 0',
+      r4.code === 0,
+      r4.stdout + r4.stderr
+    );
+    const c5 = parseCandidates(await fs.readFile(f.candidates, 'utf-8'));
+    check(
+      'f. hand-added candidate survives and the new one is appended',
+      c5.map(c => c.name).join('|') === 'Series Season|Hand Added|Brand New',
+      c5.map(c => c.name)
+    );
+    extraCandidate = false;
+
+    // g. missing LLM configuration: fail before fetching anything
+    const tmp2 = path.join(tmp, 'g');
+    await fs.mkdir(tmp2);
+    const g = {
+      candidates: path.join(tmp2, 'candidates.yaml'),
+      state: path.join(tmp2, 'scout-state.json'),
+      logs: path.join(tmp2, 'logs'),
+    };
+    const hitsBefore = listHits;
+    const rg = await runCli(
+      [
+        'src/scout.ts',
+        '--sources',
+        f.sources,
+        '--candidates',
+        g.candidates,
+        '--state',
+        g.state,
+        '--festivals',
+        f.festivals,
+        '--logs-dir',
+        g.logs,
+      ],
+      {
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        LLM_PROVIDER: 'openrouter',
+      }
+    );
+    check(
+      'g. no LLM key: exit 1 with the preflight message',
+      rg.code === 1 &&
+        (rg.stdout + rg.stderr).includes('cannot set up the LLM'),
+      rg.stdout + rg.stderr
+    );
+    check(
+      'g. nothing fetched, nothing written',
+      listHits === hitsBefore &&
+        !(await exists(g.candidates)) &&
+        !(await exists(g.state)) &&
+        !(await exists(g.logs)),
+      { listHits, hitsBefore }
     );
   } finally {
     await fs.rm(tmp, { recursive: true, force: true });

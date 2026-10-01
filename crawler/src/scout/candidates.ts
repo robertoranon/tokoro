@@ -165,7 +165,7 @@ const ALLOWED_FIELDS = [
 
 // js-yaml parses an unquoted `2026-07-25` into a Date.
 function dateString(value: unknown, label: string): string {
-  if (value === undefined || value === null) return '';
+  if (value === undefined || value === null || value === '') return '';
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return value;
@@ -256,8 +256,15 @@ export function serializeCandidates(list: Candidate[]): string {
     '# Scout inbox. Set status to approved or rejected, fill in a missing url,\n' +
     '# then run: npm run scout-promote\n' +
     '# (this file is rewritten by the scout; comments in it are not preserved)\n';
+  // Empty found/source/why are omitted so hand-added entries stay clean.
+  const clean = list.map(c => {
+    const out: Record<string, unknown> = { ...c };
+    for (const k of ['found', 'source', 'why'])
+      if (out[k] === '') delete out[k];
+    return out;
+  });
   return (
-    header + yaml.dump({ candidates: list }, { lineWidth: -1, noRefs: true })
+    header + yaml.dump({ candidates: clean }, { lineWidth: -1, noRefs: true })
   );
 }
 

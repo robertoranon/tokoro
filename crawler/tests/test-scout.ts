@@ -2,7 +2,11 @@ import { parseScoutConfig } from '../src/scout/sources-config.js';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
-import { scoutSources, summarizeScout } from '../src/scout/run.js';
+import {
+  scoutSources,
+  summarizeScout,
+  mergeForWrite,
+} from '../src/scout/run.js';
 import { readIfExists, writeFileAtomic, pathArg } from '../src/scout/files.js';
 import type { ScoutSource } from '../src/scout/sources-config.js';
 import {
@@ -1369,6 +1373,118 @@ console.log('\n=== appendFestivals ===\n');
     ),
     'refuses to append when festivals is not the last top-level key (the result would be invalid or wrong)'
   );
+}
+
+console.log('\n=== found: hand-added candidates round-trip ===\n');
+{
+  const hand = parseCandidates('candidates:\n  - name: Hand Added\n');
+  assert(
+    hand.length === 1 && hand[0].found === '',
+    'a candidate with only a name parses (found is empty)'
+  );
+  const out = serializeCandidates(hand);
+  assert(
+    !/found:|source:|why:/.test(out),
+    'empty found/source/why are omitted when serializing'
+  );
+  const again = parseCandidates(out);
+  assert(
+    again.length === 1 &&
+      again[0].name === 'Hand Added' &&
+      again[0].found === '',
+    'parse -> serialize -> parse round-trips'
+  );
+  const empty = parseCandidates("candidates:\n  - name: X\n    found: ''\n");
+  assert(empty[0].found === '', "found: '' parses");
+  assert(
+    throws(() =>
+      parseCandidates('candidates:\n  - name: X\n    found: yesterday\n')
+    ),
+    'a non-empty invalid found is still rejected'
+  );
+  const full = serializeCandidates([
+    {
+      name: 'F',
+      status: 'pending',
+      why: 'w',
+      source: 'S',
+      found: '2026-10-01',
+    },
+  ]);
+  assert(
+    full.includes('found: 2026-10-01') || full.includes("found: '2026-10-01'"),
+    'non-empty fields are kept'
+  );
+}
+
+console.log('\n=== mergeForWrite ===\n');
+{
+  const mk = (name: string, over: Partial<Candidate> = {}): Candidate => ({
+    name,
+    url: `https://${name.toLowerCase()}.example`,
+    status: 'pending',
+    why: '',
+    source: 'S',
+    found: '2026-10-01',
+    ...over,
+  });
+  const st = (status: 'pending' | 'approved' | 'rejected') => ({
+    status,
+    first_seen: '2026-09-01',
+  });
+
+  const fresh = {
+    candidates: [mk('Alpha', { status: 'approved' }), mk('Hand')],
+    state: { 'n:alpha': st('approved'), 'n:gamma': st('rejected') },
+  };
+  const run = {
+    added: [mk('Alpha'), mk('Delta')],
+    state: {
+      'n:alpha': st('pending'),
+      'n:gamma': st('pending'),
+      'n:delta': st('pending'),
+    },
+  };
+  const m = mergeForWrite(fresh, run);
+  assert(
+    m.candidates.map(c => c.name).join() === 'Alpha,Hand,Delta',
+    'fresh inbox first, added candidates already present are not duplicated'
+  );
+  assert(
+    m.candidates[0].status === 'approved',
+    'a status edited in the fresh inbox is preserved'
+  );
+  assert(
+    m.state['n:gamma'].status === 'rejected' &&
+      m.state['n:alpha'].status === 'approved',
+    'fresh state wins on existing keys'
+  );
+  assert(
+    m.state['n:delta']?.status === 'pending',
+    'new state keys from the run are kept'
+  );
+
+  const m2 = mergeForWrite(
+    { candidates: [], state: {} },
+    { added: [mk('Alpha')], state: {} }
+  );
+  assert(
+    m2.candidates.length === 1,
+    'candidates removed from the inbox by a concurrent promote are not resurrected, new ones added'
+  );
+  const m3 = mergeForWrite(
+    { candidates: [mk('Hand')], state: {} },
+    { added: [], state: {} }
+  );
+  assert(
+    m3.candidates.length === 1 && m3.candidates[0].name === 'Hand',
+    'nothing added keeps the fresh inbox'
+  );
+  const m4 = mergeForWrite(
+    { candidates: [mk('Hand', { url: undefined })], state: {} },
+    { added: [{ ...mk('Zed'), name: 'hand' }], state: {} }
+  );
+  assert(m4.candidates.length === 1, 'overlap by name key also counts');
 }
 
 // --- add new test sections above this line ---

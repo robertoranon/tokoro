@@ -1,5 +1,6 @@
 import type { ScoutSource } from './sources-config.js';
 import {
+  candidateKeys,
   mergeNewCandidates,
   type Candidate,
   type RawCandidate,
@@ -82,4 +83,25 @@ export function summarizeScout(outcomes: SourceOutcome[]) {
     candidates_found: outcomes.reduce((n, o) => n + o.found, 0),
     candidates_new: outcomes.reduce((n, o) => n + o.added, 0),
   };
+}
+
+/**
+ * Combine what the run found with what is on disk right before writing, so an
+ * edit, promote or reject done while the (slow) run was in progress is never
+ * reverted: the fresh files win, the run only contributes what they lack.
+ */
+export function mergeForWrite(
+  fresh: { candidates: Candidate[]; state: ScoutState },
+  run: { added: Candidate[]; state: ScoutState }
+): { candidates: Candidate[]; state: ScoutState } {
+  const freshKeys = new Set(fresh.candidates.flatMap(c => candidateKeys(c)));
+  const candidates = [
+    ...fresh.candidates,
+    ...run.added.filter(c => !candidateKeys(c).some(k => freshKeys.has(k))),
+  ];
+  const state: ScoutState = { ...fresh.state };
+  for (const [key, value] of Object.entries(run.state)) {
+    if (!Object.prototype.hasOwnProperty.call(state, key)) state[key] = value;
+  }
+  return { candidates, state };
 }

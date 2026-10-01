@@ -23,7 +23,7 @@ import {
 } from './scout/candidates.js';
 import { extractLinks } from './scout/links.js';
 import { ScoutExtractor } from './scout/scout-extractor.js';
-import { scoutSources, summarizeScout } from './scout/run.js';
+import { scoutSources, summarizeScout, mergeForWrite } from './scout/run.js';
 import { pathArg, readIfExists, writeFileAtomic } from './scout/files.js';
 
 async function main() {
@@ -83,6 +83,17 @@ async function main() {
     process.exit(0);
   }
 
+  // Fail before fetching anything if the LLM cannot be set up. Per-source
+  // models still go through buildLLM(source.model) below.
+  try {
+    buildLLM();
+  } catch (error) {
+    console.error(
+      `Error: cannot set up the LLM: ${error instanceof Error ? error.message : error}. Configure LLM_PROVIDER / the API key in .env (defaults: shared/llm/defaults.ts).`
+    );
+    process.exit(1);
+  }
+
   // The scout needs no signing keys and never talks to the Tokoro API.
   const jinaKey = process.env.JINA_API_KEY;
   const today = new Date().toISOString().slice(0, 10);
@@ -136,13 +147,26 @@ async function main() {
   if (debug) {
     console.log('\n(debug: nothing was written)');
   } else {
-    // State first: if the second write fails, nothing is proposed twice.
-    await writeFileAtomic(stateFile, serializeState(result.state));
-    await writeFileAtomic(
-      candidatesFile,
-      serializeCandidates(result.candidates)
-    );
     if (added.length > 0) {
+      // The run can take minutes; re-read the files and merge, so edits or a
+      // scout-promote done meanwhile are never reverted.
+      const merged = mergeForWrite(
+        {
+          candidates: parseCandidates(
+            (await readIfExists(candidatesFile)) ?? ''
+          ),
+          state: parseState((await readIfExists(stateFile)) ?? ''),
+        },
+        { added, state: result.state }
+      );
+      // Inbox first, then state: if the second write fails, the new candidates
+      // are in the inbox and their keys are re-added to `known` on the next
+      // run, so nothing is proposed twice.
+      await writeFileAtomic(
+        candidatesFile,
+        serializeCandidates(merged.candidates)
+      );
+      await writeFileAtomic(stateFile, serializeState(merged.state));
       console.log(
         `\nReview ${candidatesFile}: set status to approved or rejected, then run: npm run scout-promote`
       );
