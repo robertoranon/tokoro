@@ -66,6 +66,12 @@ async function main() {
     );
     for (const c of result.needsUrl) console.log(`  - ${c.name}`);
   }
+  if (result.needsOwnSite.length > 0) {
+    console.log(
+      `\n${result.needsOwnSite.length} approved candidate(s) have a url with a query string (likely an aggregator page) — replace it with the festival's own site, then run this again:`
+    );
+    for (const c of result.needsOwnSite) console.log(`  - ${c.name}`);
+  }
 }
 
 // Only run when executed directly, not when imported as a module

@@ -187,6 +187,11 @@ async function main() {
       prompt.includes(`Terraforma | ${base}/f/terra`)
     );
     check(
+      'a. prompt lists the already-known festival names',
+      prompt.includes('Already known festivals (do not return these):') &&
+        prompt.includes('Known Fest')
+    );
+    check(
       'a. prompt does not contain the facebook link',
       !prompt.includes('facebook.com')
     );

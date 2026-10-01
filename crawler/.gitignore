@@ -12,6 +12,7 @@ dist/
 
 # Logs
 *.log
+*.tmp
 logs/
 
 # Benchmark results

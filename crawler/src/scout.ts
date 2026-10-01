@@ -54,6 +54,7 @@ async function main() {
   let existing: Candidate[];
   let state: ScoutState;
   let known: Set<string>;
+  let excludeNames: string[];
   try {
     config = parseScoutConfig(sourcesText);
     existing = parseCandidates((await readIfExists(candidatesFile)) ?? '');
@@ -65,11 +66,22 @@ async function main() {
         `Warning: ${festivalsFile} not found — festivals already on your watchlist cannot be filtered out.`
       );
     }
-    known = knownKeysFromFestivals(
+    const festivals =
       festivalsText === null
         ? []
-        : parseFestivalsConfig(festivalsText).festivals
-    );
+        : parseFestivalsConfig(festivalsText).festivals;
+    known = knownKeysFromFestivals(festivals);
+    // Names the LLM should not return again: watchlist, inbox and everything
+    // ever proposed (the `n:` state keys), deduplicated.
+    excludeNames = [
+      ...new Set([
+        ...festivals.map(f => f.name ?? ''),
+        ...existing.map(c => c.name),
+        ...Object.keys(state)
+          .filter(k => k.startsWith('n:'))
+          .map(k => k.slice(2)),
+      ]),
+    ].filter(Boolean);
     for (const c of existing) for (const k of candidateKeys(c)) known.add(k);
   } catch (error) {
     console.error(
@@ -118,6 +130,7 @@ async function main() {
       return await extractor.extract(page, extractLinks(page), {
         taste: config.taste,
         sourceName: source.name,
+        excludeNames,
       });
     } finally {
       await fetcher.close();

@@ -4,6 +4,7 @@ import {
 } from '../radar/festivals-config.js';
 import {
   candidateKeys,
+  hasMeaningfulQuery,
   recordInState,
   urlKey,
   type Candidate,
@@ -25,6 +26,8 @@ export interface PromoteResult {
   state: ScoutState;
   promoted: Candidate[];
   needsUrl: Candidate[];
+  /** Approved, but the url has a query string (likely an aggregator page). */
+  needsOwnSite: Candidate[];
   alreadyKnown: Candidate[];
   rejected: Candidate[];
 }
@@ -48,12 +51,13 @@ export function appendFestivals(
   if (!/^festivals:/m.test(out)) out += 'festivals:\n';
 
   for (const c of entries) {
+    const notes = [c.why, c.notes].filter(Boolean).join(' — ');
     out +=
       `\n  - url: ${normalizeFestivalUrl(c.url as string)}\n` +
       `    name: ${q(c.name)}\n` +
       `    status: active\n` +
       `    added: ${today}\n` +
-      (c.why ? `    notes: ${q(c.why)}\n` : '');
+      (notes ? `    notes: ${q(notes)}\n` : '');
   }
 
   const parsed = parseFestivalsConfig(out); // throws on invalid YAML/config
@@ -73,6 +77,9 @@ export function promoteCandidates(input: PromoteInput): PromoteResult {
   const remaining: Candidate[] = [];
   const promoted: Candidate[] = [];
   const needsUrl: Candidate[] = [];
+  const needsOwnSite: Candidate[] = [];
+  // Grows while iterating so two approved candidates for one site are not both promoted.
+  const knownUrlKeys = new Set(input.knownUrlKeys);
   const alreadyKnown: Candidate[] = [];
   const rejected: Candidate[] = [];
 
@@ -85,11 +92,16 @@ export function promoteCandidates(input: PromoteInput): PromoteResult {
     } else if (!c.url || urlKey(c.url) === undefined) {
       needsUrl.push(c);
       remaining.push(c); // stays in the inbox until the curator fills the url
-    } else if (input.knownUrlKeys.has(`u:${urlKey(c.url)}`)) {
+    } else if (hasMeaningfulQuery(c.url)) {
+      // The radar's normalizeFestivalUrl drops queries: the entry would crawl a generic page.
+      needsOwnSite.push(c);
+      remaining.push(c);
+    } else if (knownUrlKeys.has(`u:${urlKey(c.url)}`)) {
       alreadyKnown.push(c);
       state = recordInState(state, candidateKeys(c), 'approved', input.today);
     } else {
       promoted.push(c);
+      knownUrlKeys.add(`u:${urlKey(c.url)}`);
       state = recordInState(state, candidateKeys(c), 'approved', input.today);
     }
   }
@@ -100,6 +112,7 @@ export function promoteCandidates(input: PromoteInput): PromoteResult {
     state,
     promoted,
     needsUrl,
+    needsOwnSite,
     alreadyKnown,
     rejected,
   };

@@ -46,20 +46,47 @@ export function normalizeName(name: string): string {
 const LANG_SEGMENT =
   /^\/(en|it|fr|de|es|pt|nl|pl|cs|sl|hr|sv|da|no|fi|hu|ro|el|ru|tr)(?=\/|$)/;
 
+const TRACKING_PARAM =
+  /^(utm_.*|fbclid|gclid|yclid|mc_cid|mc_eid|igshid|ref|ref_src)$/i;
+
+/** Query parameters that identify a page (everything but tracking), sorted by key then value. */
+function meaningfulParams(u: URL): Array<[string, string]> {
+  return [...u.searchParams.entries()]
+    .filter(([k]) => !TRACKING_PARAM.test(k))
+    .sort(([ak, av], [bk, bv]) =>
+      ak === bk ? (av < bv ? -1 : av > bv ? 1 : 0) : ak < bk ? -1 : 1
+    );
+}
+
+/** True if the url has a query string beyond tracking parameters (e.g. `?id=7`). */
+export function hasMeaningfulQuery(url: string): boolean {
+  try {
+    return meaningfulParams(new URL(url)).length > 0;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * host (no www) + path (no trailing slash), lowercased. Host+path, not host
- * only: several festivals can live on one domain.
+ * host (no www) + path (no trailing slash) + meaningful query, lowercased
+ * (except query values). Host+path, not host only: several festivals can live
+ * on one domain; the query is kept because aggregators identify pages with it
+ * (`?id=1` vs `?id=2`), but tracking parameters are ignored.
  */
 export function urlKey(url: string): string | undefined {
   try {
     const u = new URL(url);
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return undefined;
+    const params = meaningfulParams(u);
+    const query = params.length
+      ? '?' + params.map(([k, v]) => `${k.toLowerCase()}=${v}`).join('&')
+      : '';
     const path = u.pathname
       .toLowerCase()
       .replace(/\/index\.(html|htm|php)$/, '')
       .replace(/\/+$/, '')
       .replace(LANG_SEGMENT, '');
-    return `${u.hostname.toLowerCase().replace(/^www\./, '')}${path}`;
+    return `${u.hostname.toLowerCase().replace(/^www\./, '')}${path}${query}`;
   } catch {
     return undefined;
   }

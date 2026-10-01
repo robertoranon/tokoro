@@ -56,7 +56,7 @@ export class ScoutExtractor {
   async extract(
     page: FetchedPage,
     links: PageLink[],
-    ctx: { taste: string; sourceName: string }
+    ctx: { taste: string; sourceName: string; excludeNames?: string[] }
   ): Promise<RawCandidate[]> {
     const content = (page.text || '')
       .split('\n')
@@ -69,6 +69,16 @@ export class ScoutExtractor {
       this.config.referenceDate || new Date().toISOString().split('T')[0];
     console.log(`Scouting: ${ctx.sourceName} (${page.url})`);
 
+    // Without this, the same top-40 known festivals fill the reply every run and
+    // later ones are never surfaced.
+    const exclude = (ctx.excludeNames ?? [])
+      .slice(0, 200)
+      .map(n => n.slice(0, 60));
+    const excludeText =
+      exclude.length > 0
+        ? `\n\nAlready known festivals (do not return these): ${exclude.join('; ')}`
+        : '';
+
     const response = await this.config.llm.complete(
       [
         { role: 'system', content: getScoutPrompt(ctx.taste) },
@@ -78,7 +88,8 @@ export class ScoutExtractor {
             `Source: ${ctx.sourceName}\nPage URL: ${page.url}\nToday's date: ${today}\n\n` +
             `Page content:\n${content}\n\n` +
             `Links found on the page (text | url):\n` +
-            links.map(l => `${l.text} | ${l.url}`).join('\n'),
+            links.map(l => `${l.text} | ${l.url}`).join('\n') +
+            excludeText,
         },
       ],
       { temperature: 0.1, maxTokens: SCOUT_MAX_TOKENS, responseFormat: 'json' }
@@ -113,7 +124,7 @@ export class ScoutExtractor {
 
     // The page itself and the bare root of its host are never festival urls.
     const pageKey = urlKey(page.url);
-    const pageHost = pageKey?.split('/')[0];
+    const pageHost = pageKey?.split(/[/?]/)[0];
     const isSelfOrRoot = (k: string) => k === pageKey || k === pageHost;
 
     const seen = new Set<string>();

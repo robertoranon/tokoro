@@ -12,6 +12,7 @@ import type { ScoutSource } from '../src/scout/sources-config.js';
 import {
   normalizeName,
   urlKey,
+  hasMeaningfulQuery,
   candidateKeys,
   knownKeysFromFestivals,
   isKnown,
@@ -194,8 +195,8 @@ console.log('\n=== normalizeName / urlKey / candidateKeys ===\n');
     'host without www + lowercase path, no trailing slash'
   );
   assert(
-    urlKey('https://fest.example/a?x=1#top') === 'fest.example/a',
-    'query and hash ignored'
+    urlKey('https://fest.example/a?x=1#top') === 'fest.example/a?x=1',
+    'meaningful query kept, hash ignored'
   );
   assert(
     urlKey('http://fest.example') === 'fest.example',
@@ -1485,6 +1486,230 @@ console.log('\n=== mergeForWrite ===\n');
     { added: [{ ...mk('Zed'), name: 'hand' }], state: {} }
   );
   assert(m4.candidates.length === 1, 'overlap by name key also counts');
+}
+
+console.log('\n=== urlKey keeps meaningful queries ===\n');
+{
+  assert(
+    urlKey('https://agg.example/festival?id=1') !==
+      urlKey('https://agg.example/festival?id=2'),
+    'two ids differ'
+  );
+  assert(
+    urlKey('https://agg.example/f?utm_source=x&utm_medium=y') ===
+      'agg.example/f',
+    'utm_* ignored'
+  );
+  for (const p of [
+    'fbclid',
+    'gclid',
+    'yclid',
+    'mc_cid',
+    'mc_eid',
+    'igshid',
+    'ref',
+    'ref_src',
+  ]) {
+    assert(
+      urlKey(`https://a.example/f?${p}=1`) === 'a.example/f',
+      `${p} ignored`
+    );
+  }
+  assert(
+    urlKey('https://a.example/f?b=2&a=1') === 'a.example/f?a=1&b=2',
+    'params sorted by key'
+  );
+  assert(
+    urlKey('https://a.example/f?a=1&b=2') ===
+      urlKey('https://a.example/f?b=2&a=1'),
+    'order-insensitive'
+  );
+  assert(
+    urlKey('https://a.example/f?id=3&utm_source=x') === 'a.example/f?id=3',
+    'tracking dropped, meaningful kept'
+  );
+  assert(
+    urlKey('https://a.example/f?a=2&a=1') === 'a.example/f?a=1&a=2',
+    'same key sorted by value'
+  );
+  assert(
+    hasMeaningfulQuery('https://a.example/f?id=1') === true,
+    'hasMeaningfulQuery: id'
+  );
+  assert(
+    hasMeaningfulQuery('https://a.example/f?utm_source=x') === false,
+    'hasMeaningfulQuery: tracking only'
+  );
+  assert(
+    hasMeaningfulQuery('https://a.example/f') === false,
+    'hasMeaningfulQuery: none'
+  );
+  assert(
+    hasMeaningfulQuery('garbage') === false,
+    'hasMeaningfulQuery: garbage'
+  );
+}
+
+console.log('\n=== promote: query urls, batch dedupe, notes ===\n');
+{
+  const base = 'festivals:\n  - url: https://known.example\n';
+  const cand = (over: Partial<Candidate>): Candidate => ({
+    name: 'X',
+    status: 'approved',
+    why: '',
+    source: 'S',
+    found: '2026-09-01',
+    ...over,
+  });
+  const Q = cand({
+    name: 'Query Fest',
+    url: 'https://agg.example/festival?id=7',
+  });
+  const T = cand({
+    name: 'Tracked Fest',
+    url: 'https://tracked.example/?utm_source=nl',
+  });
+  const r = promoteCandidates({
+    candidates: [Q, T],
+    festivalsText: base,
+    knownUrlKeys: new Set(),
+    state: {},
+    today: '2026-10-01',
+  });
+  assert(
+    r.needsOwnSite.map(c => c.name).join() === 'Query Fest',
+    'approved with a meaningful query → needsOwnSite'
+  );
+  assert(
+    r.promoted.map(c => c.name).join() === 'Tracked Fest',
+    'tracking-only query is still promoted'
+  );
+  assert(
+    r.candidates.map(c => c.name).join() === 'Query Fest',
+    'needsOwnSite stays in the inbox'
+  );
+  assert(!r.festivalsText.includes('agg.example'), 'query url not appended');
+  assert(
+    r.state['u:agg.example/festival?id=7'] === undefined,
+    'needsOwnSite is not recorded as approved'
+  );
+
+  const d1 = cand({ name: 'Q One', url: 'https://q.example/en' });
+  const d2 = cand({ name: 'Q Two', url: 'https://www.q.example/' });
+  const rd = promoteCandidates({
+    candidates: [d1, d2],
+    festivalsText: base,
+    knownUrlKeys: new Set(),
+    state: {},
+    today: '2026-10-01',
+  });
+  assert(
+    rd.promoted.map(c => c.name).join() === 'Q One' &&
+      rd.alreadyKnown.map(c => c.name).join() === 'Q Two',
+    'second approved candidate with the same site → alreadyKnown'
+  );
+
+  const both = promoteCandidates({
+    candidates: [
+      cand({
+        name: 'N1',
+        url: 'https://n1.example',
+        why: 'because',
+        notes: 'check dates',
+      }),
+    ],
+    festivalsText: base,
+    knownUrlKeys: new Set(),
+    state: {},
+    today: '2026-10-01',
+  });
+  assert(
+    parseFestivalsConfig(both.festivalsText).festivals[1].notes ===
+      'because — check dates',
+    'notes = why — curator notes'
+  );
+  const onlyNotes = promoteCandidates({
+    candidates: [
+      cand({ name: 'N2', url: 'https://n2.example', notes: 'just mine' }),
+    ],
+    festivalsText: base,
+    knownUrlKeys: new Set(),
+    state: {},
+    today: '2026-10-01',
+  });
+  assert(
+    parseFestivalsConfig(onlyNotes.festivalsText).festivals[1].notes ===
+      'just mine',
+    'only curator notes'
+  );
+  const neither = promoteCandidates({
+    candidates: [cand({ name: 'N3', url: 'https://n3.example' })],
+    festivalsText: base,
+    knownUrlKeys: new Set(),
+    state: {},
+    today: '2026-10-01',
+  });
+  assert(
+    !neither.festivalsText.includes('notes:'),
+    'no notes line when both are empty'
+  );
+}
+
+console.log('\n=== ScoutExtractor: known-name exclusion and name rule ===\n');
+{
+  const page: FetchedPage = {
+    url: 'https://agg.example/list',
+    html: '',
+    text: 'Some festivals here.',
+    title: 'L',
+  };
+  const ctx = { taste: 'T', sourceName: 'Agg' };
+  const run = async (excludeNames?: string[]) => {
+    const llm = fakeLLM(JSON.stringify({ candidates: [] }));
+    await new ScoutExtractor({ llm, referenceDate: '2026-10-01' }).extract(
+      page,
+      [],
+      { ...ctx, ...(excludeNames ? { excludeNames } : {}) }
+    );
+    return {
+      user: String(llm.messages[1].content),
+      system: String(llm.messages[0].content),
+    };
+  };
+  const withNames = await run(['Terraforma', 'Rewire']);
+  assert(
+    withNames.user.includes(
+      'Already known festivals (do not return these): Terraforma; Rewire'
+    ),
+    'user prompt lists the known names'
+  );
+  const many = await run(Array.from({ length: 250 }, (_, i) => `Fest${i}`));
+  assert(
+    many.user.includes('Fest199') &&
+      !many.user.includes('Fest200;') &&
+      !many.user.includes('Fest200\n') &&
+      !many.user.includes('Fest249'),
+    'capped at 200 names'
+  );
+  const long = await run(['x'.repeat(100)]);
+  assert(
+    long.user.includes('x'.repeat(60)) && !long.user.includes('x'.repeat(61)),
+    'each name cut to 60 characters'
+  );
+  assert(
+    !(await run([])).user.includes('Already known'),
+    'absent when the list is empty'
+  );
+  assert(
+    !(await run()).user.includes('Already known'),
+    'absent when not given'
+  );
+  assert(
+    withNames.system.includes(
+      "copy the festival's name exactly as written on the page (do not translate, reorder or add words like Festival)"
+    ),
+    'name rule in the system prompt'
+  );
 }
 
 // --- add new test sections above this line ---

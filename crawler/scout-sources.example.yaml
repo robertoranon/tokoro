@@ -6,8 +6,8 @@
 #   npm run scout-promote        # after you review candidates.yaml
 #
 # Always write the `--` before --debug (without it npm swallows the flag).
-# The scout never publishes anything; it only proposes. Crontab (every two
-# weeks, offset from the radar):
+# The scout never publishes anything; it only proposes. Crontab (weekly, every
+# Thursday, offset from the radar; edit it for a less frequent schedule):
 #   0 10 * * 4  cd /path/to/tokoro/crawler && /absolute/path/to/npm run scout >> logs/scout.log 2>&1
 #   (cron's PATH usually lacks npm: find it with `which npm`.)
 
