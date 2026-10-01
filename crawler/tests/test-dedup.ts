@@ -15,6 +15,7 @@ import { HTMLFetcher } from '../src/extractors/html-fetcher.js';
 import { EventExtractor } from '../src/extractors/event-extractor.js';
 import { createLLMProvider } from '../../shared/llm/factory.js';
 import { TestFixtureMetadata } from './types.js';
+import { DEFAULT_LLM_PROVIDER } from '../../shared/llm/defaults.js';
 
 async function loadEnv() {
   try {
@@ -81,7 +82,7 @@ async function main() {
     `\n🔍 Duplicate detection test (${fixtures.length} fixture(s))\n`
   );
 
-  const provider = (process.env.LLM_PROVIDER || 'ollama') as any;
+  const provider = (process.env.LLM_PROVIDER || DEFAULT_LLM_PROVIDER) as any;
   let passed = 0;
   let failed = 0;
 

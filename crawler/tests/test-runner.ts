@@ -16,6 +16,7 @@ import {
   FESTIVAL_MAX_CONTENT_LENGTH,
   FESTIVAL_MAX_TOKENS,
 } from '../../shared/extractors/extraction-limits.js';
+import { DEFAULT_LLM_PROVIDER } from '../../shared/llm/defaults.js';
 
 async function loadEnv() {
   // Simple .env loader
@@ -205,7 +206,7 @@ export class TestRunner {
   }
 
   private createLLMForModel(model: string): LLMProvider {
-    const provider = (process.env.LLM_PROVIDER || 'ollama') as any;
+    const provider = (process.env.LLM_PROVIDER || DEFAULT_LLM_PROVIDER) as any;
     const apiKey =
       process.env.OPENROUTER_API_KEY ||
       process.env.OPENAI_API_KEY ||

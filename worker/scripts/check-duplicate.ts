@@ -17,6 +17,11 @@ import { execSync } from 'child_process';
 import { encode as geohashEncode, neighbors } from '../src/geohash';
 import { isDuplicate } from '../../shared/llm/duplicate-check';
 import { createLLMProvider } from '../../shared/llm/factory';
+import {
+  DEFAULT_LLM_PROVIDER,
+  DEFAULT_LLM_MODEL,
+  defaultModelFor,
+} from '../../shared/llm/defaults';
 import type { LLMProvider } from '../../shared/types/llm';
 import {
   DEDUP_DISTANCE_KM,
@@ -261,7 +266,7 @@ async function main() {
       llm = createLLMProvider({ apiKey, provider, model });
       console.log(`\n[5] LLM similarity check`);
       console.log(
-        `    Provider: ${provider || 'openrouter'}  Model: ${model || 'google/gemini-2.5-flash-lite'}`
+        `    Provider: ${provider || DEFAULT_LLM_PROVIDER}  Model: ${model || defaultModelFor(provider ?? DEFAULT_LLM_PROVIDER) || DEFAULT_LLM_MODEL}`
       );
     } catch (e) {
       console.warn('    Could not create LLM provider:', (e as Error).message);

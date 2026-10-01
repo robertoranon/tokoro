@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as ed from '@noble/ed25519';
 import { createLLMProvider } from '../../shared/llm/factory.js';
 import { LLMProvider } from '../../shared/types/llm.js';
+import { DEFAULT_LLM_PROVIDER } from '../../shared/llm/defaults.js';
 
 // Configure SHA-512 for Node.js (required by @noble/ed25519)
 if (typeof crypto !== 'undefined' && crypto.subtle) {
@@ -63,7 +64,7 @@ export function loadCrawlerEnv(): CrawlerEnv {
 }
 
 export function buildLLM(modelOverride?: string): LLMProvider {
-  const provider = process.env.LLM_PROVIDER || 'ollama';
+  const provider = process.env.LLM_PROVIDER || DEFAULT_LLM_PROVIDER;
   const apiKey =
     process.env.OPENROUTER_API_KEY ||
     process.env.OPENAI_API_KEY ||

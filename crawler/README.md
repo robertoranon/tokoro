@@ -87,7 +87,7 @@ npm run crawl
 
 ### Switch LLM providers
 
-In `.env`, set:
+The default provider and model (used when `LLM_PROVIDER` / `LLM_MODEL` are unset) are defined in `shared/llm/defaults.ts`. To override, set in `.env`:
 
 ```bash
 # For OpenRouter (recommended - access to many models)

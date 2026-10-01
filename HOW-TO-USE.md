@@ -145,7 +145,7 @@ wrangler secret put LLM_API_KEY --config worker/wrangler.toml
 # API key for your LLM provider
 
 wrangler secret put LLM_PROVIDER --config worker/wrangler.toml
-# Provider name: openai, anthropic, openrouter, or ollama (default: openrouter)
+# Provider name: openai, anthropic, openrouter, or ollama (default: see shared/llm/defaults.ts, currently openrouter)
 ```
 
 `LLM_MODEL` is optional — omit it to use the provider's default model.

@@ -878,8 +878,8 @@ See `../crawler/SPECS.md` section 10 for detailed provider specifications.
 | ------------------ | -------- | -------------------------------------------------------- |
 | `CRAWLER_API_KEYS` | Yes      | Comma-separated list of allowed API keys                 |
 | `LLM_API_KEY`      | Yes      | API key for LLM provider (OpenAI, Anthropic, etc.)       |
-| `LLM_PROVIDER`     | No       | LLM provider name (default: `openai`)                    |
-| `LLM_MODEL`        | No       | Model identifier (default: provider-specific)            |
+| `LLM_PROVIDER`     | No       | LLM provider name (default: see `shared/llm/defaults.ts`) |
+| `LLM_MODEL`        | No       | Model identifier (default: see `shared/llm/defaults.ts`)  |
 | `JINA_API_KEY`     | No       | Jina AI Reader API key (optional, increases rate limits) |
 
 **Telegram bot secrets (only required when using the `/telegram` endpoint):**

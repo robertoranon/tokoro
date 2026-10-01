@@ -437,8 +437,8 @@ Then apply `are_events_similar()` to each result.
 | Variable | Description | Default |
 |---|---|---|
 | `LLM_API_KEY` | API key for the LLM provider. If not set, LLM duplicate detection is disabled and the structural fallback (Levenshtein ≥ 0.8 or common-prefix ratio ≥ 0.45) is used. Set via `wrangler secret put LLM_API_KEY`. | — |
-| `LLM_PROVIDER` | LLM provider name: `openai`, `anthropic`, or `openrouter`. Set via `wrangler secret put LLM_PROVIDER`. | `openrouter` |
-| `LLM_MODEL` | Optional model override. If not set, the provider's default model is used. Set via `wrangler secret put LLM_MODEL`. | — |
+| `LLM_PROVIDER` | LLM provider name: `openai`, `anthropic`, or `openrouter`. Set via `wrangler secret put LLM_PROVIDER`. | see `shared/llm/defaults.ts` |
+| `LLM_MODEL` | Optional model override. If not set, the default in `shared/llm/defaults.ts` is used. Set via `wrangler secret put LLM_MODEL`. | — |
 
 ---
 

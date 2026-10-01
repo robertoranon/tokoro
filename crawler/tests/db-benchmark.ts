@@ -11,6 +11,7 @@ import { TestFixtureMetadata } from './types.js';
 import { createLLMProvider } from '../../shared/llm/factory.js';
 import { ExtractedEvent } from '../src/types/event.js';
 import { LLMProvider } from '../../shared/types/llm.js';
+import { DEFAULT_LLM_PROVIDER } from '../../shared/llm/defaults.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -518,7 +519,7 @@ async function main(): Promise<void> {
   console.log(`CSV: ${csvPath}\n`);
 
   const llm = createLLMProvider({
-    provider: (process.env.LLM_PROVIDER || 'openrouter') as any,
+    provider: (process.env.LLM_PROVIDER || DEFAULT_LLM_PROVIDER) as any,
     apiKey:
       process.env.OPENROUTER_API_KEY ||
       process.env.OPENAI_API_KEY ||

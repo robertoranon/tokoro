@@ -26,7 +26,7 @@ jobs:
     mode: direct
     fetcher: jina
     browser: chrome
-    model: gpt-4o-mini
+    model: test-model
     date: "2026-05-01"
     max_tokens: 1000
     no_jsonld: true

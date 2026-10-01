@@ -290,8 +290,8 @@ Optional env vars for LLM:
 | Variable       | Default                          |
 | -------------- | -------------------------------- |
 | `LLM_API_KEY`  | — (no LLM, Levenshtein fallback) |
-| `LLM_PROVIDER` | `openrouter`                     |
-| `LLM_MODEL`    | `google/gemini-2.5-flash-lite`   |
+| `LLM_PROVIDER` | see `shared/llm/defaults.ts`     |
+| `LLM_MODEL`    | see `shared/llm/defaults.ts`     |
 
 The script logs each check in order and stops at the first failure:
 
