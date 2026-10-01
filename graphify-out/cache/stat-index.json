@@ -12,13 +12,10 @@
     "word_count": 869
   },
   "HOW-TO-USE.md": {
-    "size": 20346,
-    "mtime_ns": 1778759138452909488,
-    "indexed_at_ns": 1787672794505489000,
-    "word_count": 2808,
-    "hashes": {
-      "how-to-use.md": "50f16e9894849868b98897b81da355e3a9a7a1c38e78a04f798d5a51e2df39f9"
-    }
+    "size": 20384,
+    "mtime_ns": 1790832884731646058,
+    "indexed_at_ns": 1790841534869692000,
+    "word_count": 2811
   },
   "README.md": {
     "size": 6620,
@@ -138,13 +135,10 @@
     }
   },
   "crawler-worker/SPECS.md": {
-    "size": 51742,
-    "mtime_ns": 1779897070740759121,
-    "indexed_at_ns": 1787672794506302000,
-    "word_count": 6808,
-    "hashes": {
-      "crawler-worker/specs.md": "f9df09d4a71e6541017f33351e6e8fe2d1df174560c4eba159e5abab8cb3f97b"
-    }
+    "size": 51744,
+    "mtime_ns": 1790832884732675676,
+    "indexed_at_ns": 1790841534883337000,
+    "word_count": 6810
   },
   "crawler-worker/package.json": {
     "size": 708,
@@ -261,22 +255,16 @@
     }
   },
   "crawler/README.md": {
-    "size": 17753,
-    "mtime_ns": 1778759138462419790,
-    "indexed_at_ns": 1787672794506431000,
-    "word_count": 2387,
-    "hashes": {
-      "crawler/readme.md": "4ac4671c9237fb77c0fcc5daccab0158b43780ffd03cb48cf4fd65e944327cbd"
-    }
+    "size": 22977,
+    "mtime_ns": 1790835479984414335,
+    "indexed_at_ns": 1790841534901819000,
+    "word_count": 3192
   },
   "crawler/SPECS.md": {
-    "size": 100299,
-    "mtime_ns": 1778759138463269291,
-    "indexed_at_ns": 1787672794506540000,
-    "word_count": 13315,
-    "hashes": {
-      "crawler/specs.md": "729fb40843aa51d348417ef805e16a70f4ee3b197a7419c704530483ec8ad902"
-    }
+    "size": 123736,
+    "mtime_ns": 1790835479984818553,
+    "indexed_at_ns": 1790841534903939000,
+    "word_count": 16836
   },
   "crawler/jobs.example.yaml": {
     "size": 428,
@@ -297,12 +285,12 @@
     }
   },
   "crawler/package.json": {
-    "size": 1529,
-    "mtime_ns": 1778759138464529667,
-    "indexed_at_ns": 1787672778651932000,
-    "word_count": 118,
+    "size": 1897,
+    "mtime_ns": 1790835479985138477,
+    "indexed_at_ns": 1790841535125102000,
+    "word_count": 142,
     "hashes": {
-      "crawler/package.json": "80149b1fb980badfa6186e2af38d7c4961a5a2c3a3684153b35cfea887637318"
+      "crawler/package.json": "3836d83454178f7527eacdd107f5c05f125340c9d752fc607c5ee74c3f2b538b"
     }
   },
   "crawler/seeds.txt": {
@@ -315,10 +303,10 @@
     }
   },
   "crawler/src/crawler.ts": {
-    "size": 29605,
-    "mtime_ns": 1781035662135397544,
-    "indexed_at_ns": 1787672746133615000,
-    "word_count": 2769
+    "size": 34609,
+    "mtime_ns": 1790832506406707476,
+    "indexed_at_ns": 1790841534911187000,
+    "word_count": 3255
   },
   "crawler/src/extractors/event-extractor.ts": {
     "size": 3990,
@@ -351,10 +339,10 @@
     "word_count": 102
   },
   "crawler/src/extractors/page-discovery.ts": {
-    "size": 8275,
-    "mtime_ns": 1778759138467152670,
-    "indexed_at_ns": 1787672746138655000,
-    "word_count": 864
+    "size": 11106,
+    "mtime_ns": 1790829986393945215,
+    "indexed_at_ns": 1790829988603620000,
+    "word_count": 1161
   },
   "crawler/src/extractors/pdf-fetcher.ts": {
     "size": 5577,
@@ -363,22 +351,22 @@
     "word_count": 605
   },
   "crawler/src/index.ts": {
-    "size": 11570,
-    "mtime_ns": 1778759138467869921,
-    "indexed_at_ns": 1787672746140195000,
-    "word_count": 1447
+    "size": 12237,
+    "mtime_ns": 1790831877443568507,
+    "indexed_at_ns": 1790841534918369000,
+    "word_count": 1543
   },
   "crawler/src/scheduler.ts": {
-    "size": 6761,
-    "mtime_ns": 1781158972146112372,
-    "indexed_at_ns": 1787672746140930000,
-    "word_count": 752
+    "size": 6558,
+    "mtime_ns": 1790829986395328142,
+    "indexed_at_ns": 1790829988609152000,
+    "word_count": 730
   },
   "crawler/src/setup.ts": {
-    "size": 2427,
-    "mtime_ns": 1778759138468540963,
-    "indexed_at_ns": 1787672746141641000,
-    "word_count": 252
+    "size": 2508,
+    "mtime_ns": 1790832884733682086,
+    "indexed_at_ns": 1790841534929897000,
+    "word_count": 258
   },
   "crawler/src/types/event.ts": {
     "size": 194,
@@ -399,10 +387,10 @@
     "word_count": 150
   },
   "crawler/src/utils/normalizer.ts": {
-    "size": 8738,
-    "mtime_ns": 1778759138469919715,
-    "indexed_at_ns": 1787672746144959000,
-    "word_count": 878
+    "size": 8942,
+    "mtime_ns": 1790829986395642769,
+    "indexed_at_ns": 1790829988613069000,
+    "word_count": 910
   },
   "crawler/tests/README.md": {
     "size": 16698,
@@ -414,10 +402,10 @@
     }
   },
   "crawler/tests/capture-fixture.ts": {
-    "size": 12521,
-    "mtime_ns": 1778759138470965133,
-    "indexed_at_ns": 1787672746147666000,
-    "word_count": 1230
+    "size": 12632,
+    "mtime_ns": 1790832884733851668,
+    "indexed_at_ns": 1790841534937187000,
+    "word_count": 1236
   },
   "crawler/tests/ci.sh": {
     "size": 651,
@@ -444,10 +432,10 @@
     "word_count": 839
   },
   "crawler/tests/db-benchmark.ts": {
-    "size": 21192,
-    "mtime_ns": 1778759138472359176,
-    "indexed_at_ns": 1787672746151005000,
-    "word_count": 2066
+    "size": 21269,
+    "mtime_ns": 1790832884734134666,
+    "indexed_at_ns": 1790841534940185000,
+    "word_count": 2072
   },
   "crawler/tests/evaluator.ts": {
     "size": 15775,
@@ -639,10 +627,10 @@
     }
   },
   "crawler/tests/test-dedup.ts": {
-    "size": 4525,
-    "mtime_ns": 1778759138503158251,
-    "indexed_at_ns": 1787672746247796000,
-    "word_count": 454
+    "size": 4606,
+    "mtime_ns": 1790832884734487872,
+    "indexed_at_ns": 1790841535021806000,
+    "word_count": 460
   },
   "crawler/tests/test-geocode-fallback.ts": {
     "size": 2717,
@@ -663,16 +651,16 @@
     "word_count": 153
   },
   "crawler/tests/test-runner.ts": {
-    "size": 22443,
-    "mtime_ns": 1778759138504153335,
-    "indexed_at_ns": 1787672746250753000,
-    "word_count": 2089
+    "size": 22524,
+    "mtime_ns": 1790832884734704329,
+    "indexed_at_ns": 1790841535026070000,
+    "word_count": 2095
   },
   "crawler/tests/test-scheduler.ts": {
-    "size": 3364,
-    "mtime_ns": 1778759138504406793,
-    "indexed_at_ns": 1787672746251534000,
-    "word_count": 405
+    "size": 3619,
+    "mtime_ns": 1790832884734827078,
+    "indexed_at_ns": 1790841535026787000,
+    "word_count": 429
   },
   "crawler/tests/test-year-inference.ts": {
     "size": 3393,
@@ -984,10 +972,10 @@
     "word_count": 1733
   },
   "shared/extractors/extraction-limits.ts": {
-    "size": 2006,
-    "mtime_ns": 1778759138512306135,
-    "indexed_at_ns": 1787672746283943000,
-    "word_count": 281
+    "size": 2534,
+    "mtime_ns": 1790835479986149000,
+    "indexed_at_ns": 1790841535057164000,
+    "word_count": 365
   },
   "shared/extractors/extraction-prompt.ts": {
     "size": 14539,
@@ -1020,10 +1008,10 @@
     "word_count": 383
   },
   "shared/llm/anthropic.ts": {
-    "size": 2655,
-    "mtime_ns": 1774692384590586305,
-    "indexed_at_ns": 1787672746288490000,
-    "word_count": 261
+    "size": 2842,
+    "mtime_ns": 1790832884734993452,
+    "indexed_at_ns": 1790841535062611000,
+    "word_count": 274
   },
   "shared/llm/duplicate-check.ts": {
     "size": 4195,
@@ -1032,10 +1020,10 @@
     "word_count": 584
   },
   "shared/llm/factory.ts": {
-    "size": 1516,
-    "mtime_ns": 1774703862852467537,
-    "indexed_at_ns": 1787672746289974000,
-    "word_count": 155
+    "size": 1701,
+    "mtime_ns": 1790832884735162701,
+    "indexed_at_ns": 1790841535064773000,
+    "word_count": 164
   },
   "shared/llm/ollama.ts": {
     "size": 1555,
@@ -1044,10 +1032,10 @@
     "word_count": 163
   },
   "shared/llm/openai.ts": {
-    "size": 2439,
-    "mtime_ns": 1775161657884949327,
-    "indexed_at_ns": 1787672746291438000,
-    "word_count": 235
+    "size": 2670,
+    "mtime_ns": 1790832884735298700,
+    "indexed_at_ns": 1790841535066052000,
+    "word_count": 247
   },
   "shared/package.json": {
     "size": 295,
@@ -1090,18 +1078,15 @@
   },
   "worker/README.md": {
     "size": 13174,
-    "mtime_ns": 1778759138514292596,
-    "indexed_at_ns": 1787672794510197000,
-    "word_count": 1769,
-    "hashes": {
-      "worker/readme.md": "4e880d4f25ae4422626eab21d1f97fc2b3a5302efdccb931cd410a7e7eeb836a"
-    }
+    "mtime_ns": 1790832884735410491,
+    "indexed_at_ns": 1790841535071418000,
+    "word_count": 1771
   },
   "worker/SPECS.md": {
-    "size": 43532,
-    "mtime_ns": 1790776962606344928,
-    "indexed_at_ns": 1790777018007582000,
-    "word_count": 6051
+    "size": 43559,
+    "mtime_ns": 1790832884735819322,
+    "indexed_at_ns": 1790841535072268000,
+    "word_count": 6052
   },
   "worker/migrations/0001_create_events_table.sql": {
     "size": 841,
@@ -1158,10 +1143,10 @@
     }
   },
   "worker/scripts/check-duplicate.ts": {
-    "size": 10563,
-    "mtime_ns": 1790761376972835774,
-    "indexed_at_ns": 1790761406718654000,
-    "word_count": 1167
+    "size": 10720,
+    "mtime_ns": 1790832884736037195,
+    "indexed_at_ns": 1790841535077121000,
+    "word_count": 1179
   },
   "worker/src/crypto.ts": {
     "size": 3242,
@@ -1201,5 +1186,161 @@
     "mtime_ns": 1790776962606475699,
     "indexed_at_ns": 1790777018012978000,
     "word_count": 718
+  },
+  "crawler/festivals.example.yaml": {
+    "size": 1092,
+    "mtime_ns": 1790829986392359953,
+    "indexed_at_ns": 1790829988593053000,
+    "word_count": 153
+  },
+  "crawler/src/extractors/festival-entry-extractor.ts": {
+    "size": 2746,
+    "mtime_ns": 1790830261024871770,
+    "indexed_at_ns": 1790841534912904000,
+    "word_count": 264
+  },
+  "crawler/src/radar.ts": {
+    "size": 6011,
+    "mtime_ns": 1790832506406854433,
+    "indexed_at_ns": 1790841534919107000,
+    "word_count": 643
+  },
+  "crawler/src/radar/festival-entry.ts": {
+    "size": 14245,
+    "mtime_ns": 1790833377962600915,
+    "indexed_at_ns": 1790841534920077000,
+    "word_count": 1775
+  },
+  "crawler/src/radar/festivals-config.ts": {
+    "size": 4800,
+    "mtime_ns": 1790829986394889389,
+    "indexed_at_ns": 1790829988607545000,
+    "word_count": 597
+  },
+  "crawler/src/radar/radar-publisher.ts": {
+    "size": 6297,
+    "mtime_ns": 1790832506407200723,
+    "indexed_at_ns": 1790841534921606000,
+    "word_count": 793
+  },
+  "crawler/src/utils/run-log.ts": {
+    "size": 2293,
+    "mtime_ns": 1790832506407418513,
+    "indexed_at_ns": 1790841534934405000,
+    "word_count": 295
+  },
+  "crawler/tests/smoke-radar-publisher.ts": {
+    "size": 5082,
+    "mtime_ns": 1790829986396054689,
+    "indexed_at_ns": 1790829988645835000,
+    "word_count": 563
+  },
+  "crawler/tests/test-radar.ts": {
+    "size": 63517,
+    "mtime_ns": 1790833377962812996,
+    "indexed_at_ns": 1790841535025123000,
+    "word_count": 6802
+  },
+  "shared/extractors/festival-entry-prompt.ts": {
+    "size": 4246,
+    "mtime_ns": 1790833377963019037,
+    "indexed_at_ns": 1790841535058519000,
+    "word_count": 676
+  },
+  "crawler/scout-sources.example.yaml": {
+    "size": 1571,
+    "mtime_ns": 1790835479985196061,
+    "indexed_at_ns": 1790841534908556000,
+    "word_count": 223
+  },
+  "crawler/src/scout-promote.ts": {
+    "size": 3057,
+    "mtime_ns": 1790835479985265813,
+    "indexed_at_ns": 1790841534922866000,
+    "word_count": 306
+  },
+  "crawler/src/scout.ts": {
+    "size": 7339,
+    "mtime_ns": 1790835479985333314,
+    "indexed_at_ns": 1790841534923619000,
+    "word_count": 780
+  },
+  "crawler/src/scout/candidates.ts": {
+    "size": 10173,
+    "mtime_ns": 1790835479985437858,
+    "indexed_at_ns": 1790841534924386000,
+    "word_count": 1316
+  },
+  "crawler/src/scout/files.ts": {
+    "size": 1080,
+    "mtime_ns": 1790835479985492235,
+    "indexed_at_ns": 1790841534925178000,
+    "word_count": 149
+  },
+  "crawler/src/scout/links.ts": {
+    "size": 2022,
+    "mtime_ns": 1790835479985545736,
+    "indexed_at_ns": 1790841534925944000,
+    "word_count": 253
+  },
+  "crawler/src/scout/promote.ts": {
+    "size": 3773,
+    "mtime_ns": 1790835479985598404,
+    "indexed_at_ns": 1790841534926728000,
+    "word_count": 438
+  },
+  "crawler/src/scout/run.ts": {
+    "size": 3235,
+    "mtime_ns": 1790835479985650655,
+    "indexed_at_ns": 1790841534927512000,
+    "word_count": 377
+  },
+  "crawler/src/scout/scout-extractor.ts": {
+    "size": 5796,
+    "mtime_ns": 1790835479985712740,
+    "indexed_at_ns": 1790841534928408000,
+    "word_count": 675
+  },
+  "crawler/src/scout/sources-config.ts": {
+    "size": 3133,
+    "mtime_ns": 1790835479985770283,
+    "indexed_at_ns": 1790841534929200000,
+    "word_count": 412
+  },
+  "crawler/src/utils/debug-flag.ts": {
+    "size": 696,
+    "mtime_ns": 1790831877443813255,
+    "indexed_at_ns": 1790841534932236000,
+    "word_count": 112
+  },
+  "crawler/tests/smoke-scout.ts": {
+    "size": 14759,
+    "mtime_ns": 1790835479985851201,
+    "indexed_at_ns": 1790841534960784000,
+    "word_count": 1589
+  },
+  "crawler/tests/test-llm-defaults.ts": {
+    "size": 3915,
+    "mtime_ns": 1790832884734573705,
+    "indexed_at_ns": 1790841535023886000,
+    "word_count": 403
+  },
+  "crawler/tests/test-scout.ts": {
+    "size": 47408,
+    "mtime_ns": 1790835479985933620,
+    "indexed_at_ns": 1790841535027429000,
+    "word_count": 5158
+  },
+  "shared/extractors/scout-prompt.ts": {
+    "size": 2560,
+    "mtime_ns": 1790835479986207460,
+    "indexed_at_ns": 1790841535061270000,
+    "word_count": 424
+  },
+  "shared/llm/defaults.ts": {
+    "size": 1388,
+    "mtime_ns": 1790832884735068327,
+    "indexed_at_ns": 1790841535063431000,
+    "word_count": 177
   }
 }
