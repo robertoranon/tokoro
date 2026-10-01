@@ -616,10 +616,10 @@
         // ── Map (optional: the list works without Leaflet) ─────────────
         const hasMap = typeof L !== 'undefined';
         const CAT_COLORS = {
-          music: '#a78bfa',
-          art: '#f472b6',
-          theater: '#f87171',
-          other: '#94a3b8',
+          music: '#ff8fc7',
+          art: '#d8b4fe',
+          theater: '#ff7a6b',
+          other: '#e2e8f0',
         };
         let map = null;
         let pinLayer = null;
@@ -677,12 +677,12 @@
           for (const pin of F.groupPins(list)) {
             const color = CAT_COLORS[pin.items[0].category] || CAT_COLORS.other;
             const marker = L.circleMarker([pin.lat, pin.lng], {
-              radius: 8,
+              radius: 9,
               fillColor: color,
-              color: '#111a24',
-              weight: 1.5,
+              color: '#1a1a1a',
+              weight: 2,
               opacity: 1,
-              fillOpacity: 0.85,
+              fillOpacity: 1,
             })
               .bindPopup(popupHtml(pin.items))
               .addTo(pinLayer);

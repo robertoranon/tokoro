@@ -413,19 +413,19 @@
       const DEFAULT_RADIUS = 100;
 
       const CAT_COLORS = {
-        music: '#a78bfa',
-        food: '#fbbf24',
-        sports: '#34d399',
-        art: '#f472b6',
-        theater: '#f87171',
-        film: '#60a5fa',
-        nightlife: '#c084fc',
-        community: '#22d3ee',
-        outdoor: '#4ade80',
-        learning: '#2dd4bf',
-        wellness: '#a3e635',
-        talks: '#fb923c',
-        other: '#94a3b8',
+        music: '#ff8fc7',
+        food: '#ffd23f',
+        sports: '#86efac',
+        art: '#d8b4fe',
+        theater: '#ff7a6b',
+        film: '#93c5fd',
+        nightlife: '#a78bfa',
+        community: '#5eead4',
+        outdoor: '#bef264',
+        learning: '#7dd3fc',
+        wellness: '#fda4af',
+        talks: '#fdba74',
+        other: '#e2e8f0',
       };
 
       // ── Haversine: distance in km between two {lat, lng} points ───────────
@@ -536,9 +536,9 @@
         const circle = L.circle(L.latLng(lat, lng), {
           radius: radiusKm * 1000,
           fill: false,
-          color: '#22d3ee',
-          weight: 1,
-          opacity: 0.4,
+          color: '#ff5a36',
+          weight: 2,
+          opacity: 0.8,
         }).addTo(markerLayer);
 
         // Group events by exact location so co-located events share one marker
@@ -595,12 +595,12 @@
             '</div>';
 
           L.circleMarker([first.lat, first.lng], {
-            radius: 8,
+            radius: 9,
             fillColor: color,
-            color: '#111a24',
-            weight: 1.5,
+            color: '#1a1a1a',
+            weight: 2,
             opacity: 1,
-            fillOpacity: 0.85,
+            fillOpacity: 1,
           })
             .bindPopup(popupHtml)
             .addTo(markerLayer);
