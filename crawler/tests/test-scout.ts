@@ -1,4 +1,10 @@
 import { parseScoutConfig } from '../src/scout/sources-config.js';
+import * as fs from 'fs/promises';
+import * as os from 'os';
+import * as path from 'path';
+import { scoutSources, summarizeScout } from '../src/scout/run.js';
+import { readIfExists, writeFileAtomic, pathArg } from '../src/scout/files.js';
+import type { ScoutSource } from '../src/scout/sources-config.js';
 import {
   normalizeName,
   urlKey,
@@ -1053,6 +1059,137 @@ console.log('\n=== ScoutExtractor hardening ===\n');
     ),
     'own-url rule present'
   );
+}
+
+console.log('\n=== scoutSources / summarizeScout ===\n');
+{
+  const sources: ScoutSource[] = [
+    { name: 'A', url: 'https://a.example' },
+    { name: 'B', url: 'https://b.example' },
+    { name: 'C', url: 'https://c.example' },
+  ];
+  const results: Record<
+    string,
+    () => Promise<{ name: string; url?: string; why: string }[]>
+  > = {
+    A: async () => [
+      { name: 'Alpha', url: 'https://alpha.example', why: 'w' },
+      { name: 'Known Fest', why: 'already on the watchlist' },
+    ],
+    B: async () => {
+      throw new Error('fetch failed');
+    },
+    C: async () => [
+      {
+        name: 'Alpha 2026',
+        url: 'https://www.alpha.example/',
+        why: 'same festival via another source',
+      },
+      { name: 'Gamma', why: 'w' },
+    ],
+  };
+  const existing: Candidate[] = [
+    {
+      name: 'Old Pending',
+      url: 'https://old.example',
+      status: 'pending',
+      why: '',
+      source: 'A',
+      found: '2026-09-01',
+    },
+  ];
+  const run = await scoutSources({
+    sources,
+    scoutOne: s => results[s.name](),
+    existing,
+    state: {},
+    known: knownKeysFromFestivals([
+      { url: 'https://known.example', name: 'Known Fest' },
+    ]),
+    today: '2026-10-01',
+  });
+
+  assert(
+    run.candidates.map(c => c.name).join() === 'Old Pending,Alpha,Gamma',
+    'existing inbox kept; new ones appended; cross-source duplicate and known festival skipped'
+  );
+  assert(
+    run.outcomes.map(o => `${o.source}:${o.status}`).join() ===
+      'A:ok,B:failed,C:ok',
+    'a failing source is reported and the rest still run'
+  );
+  assert(
+    run.outcomes[0].found === 2 &&
+      run.outcomes[0].added === 1 &&
+      run.outcomes[0].skipped === 1,
+    'per-source counts'
+  );
+  assert(run.outcomes[1].error === 'fetch failed', 'failure message kept');
+  assert(
+    run.outcomes[2].added === 1 && run.outcomes[2].skipped === 1,
+    'second source: duplicate skipped via the state recorded from the first'
+  );
+  assert(
+    'u:alpha.example' in run.state &&
+      run.state['u:alpha.example'].status === 'pending',
+    'state updated'
+  );
+  const sum = summarizeScout(run.outcomes);
+  assert(
+    sum.sources_total === 3 &&
+      sum.sources_failed === 1 &&
+      sum.candidates_found === 4 &&
+      sum.candidates_new === 2,
+    'summary totals'
+  );
+}
+
+console.log('\n=== scout file helpers ===\n');
+{
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'scout-test-'));
+  try {
+    assert(
+      (await readIfExists(path.join(dir, 'nope.yaml'))) === null,
+      'readIfExists: missing file → null'
+    );
+    const file = path.join(dir, 'sub', 'x.txt');
+    await writeFileAtomic(file, 'one');
+    await writeFileAtomic(file, 'two');
+    assert(
+      (await readIfExists(file)) === 'two',
+      'writeFileAtomic creates directories and overwrites'
+    );
+    const left = (await fs.readdir(path.join(dir, 'sub'))).filter(
+      f => f !== 'x.txt'
+    );
+    assert(left.length === 0, 'no temp files are left behind');
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+}
+
+console.log('\n=== pathArg ===\n');
+{
+  const saved = process.argv;
+  try {
+    process.argv = [...saved, '--x', '/tmp/a'];
+    assert(
+      pathArg('--x', 'fallback.yaml') === path.resolve('/tmp/a'),
+      'pathArg: flag value → absolute path'
+    );
+    process.argv = saved.filter(a => a !== '--x');
+    assert(
+      pathArg('--x', 'fallback.yaml') === path.resolve('fallback.yaml'),
+      'pathArg: no flag → resolved fallback'
+    );
+    process.argv = [...saved, '--x'];
+    assert(
+      pathArg('--x', 'fallback.yaml') === path.resolve('fallback.yaml'),
+      'pathArg: flag without value → fallback'
+    );
+  } finally {
+    process.argv = saved;
+  }
 }
 
 // --- add new test sections above this line ---
