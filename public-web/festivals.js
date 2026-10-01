@@ -303,6 +303,16 @@ function groupPins(list) {
   return [...pins.values()];
 }
 
+// Points ([lat, lng]) to fit the map to: those inside Europe (lat 34..72,
+// lng -25..45, inclusive), or all of them when none is, so one bad coordinate
+// cannot zoom the map out to the world.
+function fitPoints(points) {
+  const inside = points.filter(
+    ([lat, lng]) => lat >= 34 && lat <= 72 && lng >= -25 && lng <= 45
+  );
+  return inside.length ? inside : points;
+}
+
 const api = {
   RADAR_TAG,
   addDays,
@@ -323,6 +333,7 @@ const api = {
   byDistance,
   fmtDistance,
   groupPins,
+  fitPoints,
 };
 
 // Node.js / browser compatibility

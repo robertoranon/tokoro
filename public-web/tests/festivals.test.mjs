@@ -20,6 +20,7 @@ const {
   byDistance,
   fmtDistance,
   groupPins,
+  fitPoints,
 } = createRequire(import.meta.url)('../festivals.js');
 
 const ev = over => ({
@@ -288,6 +289,16 @@ const sample = [
   assert.equal(pins[0].lat, 45.1);
   assert.deepEqual(groupPins([]), []);
   console.log('✅ groupPins: co-located festivals share one pin, first-seen order'); }
+
+// ── fitPoints ─────────────────────────────────────────────────────────────────
+{ const eu = [[45, 9], [52.5, 13.4]];
+  assert.deepEqual(fitPoints([...eu, [0, 0]]), eu);
+  const far = [[0, 0], [-33, 151]];
+  assert.deepEqual(fitPoints(far), far);
+  assert.deepEqual(fitPoints([]), []);
+  const edge = [[34, -25], [72, 45], [34, 45], [72, -25]];
+  assert.deepEqual(fitPoints([...edge, [33.9, 0], [50, 45.1]]), edge);
+  console.log('✅ fitPoints: Europe box only, all points if none inside, boundaries inclusive'); }
 
 // --- add new test sections above this line ---
 
