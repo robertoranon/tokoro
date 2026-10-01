@@ -24,8 +24,8 @@
       body {
         font-family: system-ui, sans-serif;
         font-size: 15px;
-        background: #111a24;
-        color: #e8f4fb;
+        background: var(--bg);
+        color: var(--ink);
         max-width: 480px;
         margin: 0 auto;
         padding: 12px;
@@ -35,12 +35,12 @@
         margin-bottom: 12px;
       }
       a {
-        color: #22d3ee;
+        color: var(--link);
       }
 
       /* Settings */
       #cfg {
-        border: 1px solid #243445;
+        border: 1px solid var(--ink);
         border-radius: 8px;
         padding: 10px 12px;
         margin-bottom: 14px;
@@ -56,21 +56,21 @@
       }
       #cfg-fields label {
         font-size: 13px;
-        color: #8aafc4;
+        color: var(--text-2);
       }
       #cfg-fields input {
         width: 100%;
         padding: 7px 9px;
-        border: 1px solid #243445;
+        border: 1px solid var(--ink);
         border-radius: 6px;
         font-size: 14px;
-        background: #192534;
-        color: #e8f4fb;
+        background: var(--surface);
+        color: var(--ink);
       }
       .cfg-pubkey {
         font-size: 11px;
         word-break: break-all;
-        color: #8aafc4;
+        color: var(--text-2);
         margin-top: 2px;
       }
       .cfg-backup {
@@ -81,8 +81,8 @@
         flex: 1;
         padding: 6px 10px;
         background: transparent;
-        color: #22d3ee;
-        border: 1px solid #243445;
+        color: var(--link);
+        border: 1px solid var(--ink);
         border-radius: 6px;
         cursor: pointer;
         font-size: 13px;
@@ -90,8 +90,8 @@
       #cfg-save {
         margin-top: 6px;
         padding: 7px 14px;
-        background: #22d3ee;
-        color: #0a1520;
+        background: var(--link);
+        color: var(--ink);
         border: none;
         border-radius: 6px;
         cursor: pointer;
@@ -114,7 +114,7 @@
         color: #4ade80;
       }
       #status.info {
-        color: #8aafc4;
+        color: var(--text-2);
       }
 
       /* Tabs */
@@ -125,17 +125,17 @@
       }
       .tab {
         padding: 6px 14px;
-        border: 1px solid #243445;
+        border: 1px solid var(--ink);
         border-radius: 20px;
-        background: #192534;
+        background: var(--surface);
         cursor: pointer;
         font-size: 14px;
-        color: #e8f4fb;
+        color: var(--ink);
       }
       .tab.active {
-        background: #22d3ee;
-        color: #0a1520;
-        border-color: #22d3ee;
+        background: var(--link);
+        color: var(--ink);
+        border-color: var(--link);
         font-weight: 700;
       }
 
@@ -149,19 +149,19 @@
       .pane input[type='text'] {
         width: 100%;
         padding: 9px 11px;
-        border: 1px solid #243445;
+        border: 1px solid var(--ink);
         border-radius: 8px;
         font-size: 15px;
-        background: #192534;
-        color: #e8f4fb;
+        background: var(--surface);
+        color: var(--ink);
       }
       .pane input[type='file'] {
         font-size: 14px;
       }
       .pane button {
         padding: 10px;
-        background: #22d3ee;
-        color: #0a1520;
+        background: var(--link);
+        color: var(--ink);
         border: none;
         border-radius: 8px;
         font-size: 15px;
@@ -169,8 +169,8 @@
         font-weight: 700;
       }
       .pane button:disabled {
-        background: #1e2e3e;
-        color: #3a5060;
+        background: var(--bg);
+        color: var(--text-muted);
         cursor: default;
       }
 
@@ -182,30 +182,30 @@
         margin-bottom: 14px;
       }
       .ev-card {
-        border: 1px solid #243445;
+        border: 1px solid var(--ink);
         border-radius: 8px;
         padding: 10px 12px;
-        background: #192534;
+        background: var(--surface);
       }
       .ev-card h3 {
         font-size: 15px;
         margin-bottom: 4px;
-        color: #e8f4fb;
+        color: var(--ink);
       }
       .ev-card p {
         font-size: 13px;
-        color: #8aafc4;
+        color: var(--text-2);
         margin-top: 2px;
       }
       .ev-card .ev-url {
         width: 100%;
         margin-top: 6px;
         padding: 6px 8px;
-        border: 1px solid #243445;
+        border: 1px solid var(--ink);
         border-radius: 6px;
         font-size: 12px;
-        background: #111a24;
-        color: #8aafc4;
+        background: var(--bg);
+        color: var(--text-2);
       }
 
       /* Review actions */
@@ -216,8 +216,8 @@
       #pub-btn {
         flex: 1;
         padding: 11px;
-        background: #22d3ee;
-        color: #0a1520;
+        background: var(--link);
+        color: var(--ink);
         border: none;
         border-radius: 8px;
         font-size: 15px;
@@ -225,17 +225,17 @@
         font-weight: 700;
       }
       #pub-btn:disabled {
-        background: #1e2e3e;
-        color: #3a5060;
+        background: var(--bg);
+        color: var(--text-muted);
       }
       #cancel-btn {
         padding: 11px 16px;
-        border: 1px solid #243445;
-        background: #192534;
+        border: 1px solid var(--ink);
+        background: var(--surface);
         border-radius: 8px;
         font-size: 15px;
         cursor: pointer;
-        color: #e8f4fb;
+        color: var(--ink);
       }
 
       /* Result */
@@ -935,7 +935,7 @@
         bottom: 4px;
         right: 6px;
         font-size: 10px;
-        color: #8aafc4;
+        color: var(--text-2);
         opacity: 0.85;
         pointer-events: none;
       "

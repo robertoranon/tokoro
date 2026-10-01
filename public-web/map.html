@@ -24,10 +24,10 @@
       }
 
       :root {
-        --header-dark: #0a1520;
+        --header-dark: var(--ink);
         --header: #cce8f4;
-        --accent: #22d3ee;
-        --accent-hover: #0891b2;
+        --accent: var(--link);
+        --accent-hover: var(--link);
         --radius-sm: 8px;
         --cat-music: #a78bfa;
         --cat-food: #fbbf24;
@@ -36,7 +36,7 @@
         --cat-theater: #f87171;
         --cat-film: #60a5fa;
         --cat-nightlife: #c084fc;
-        --cat-community: #22d3ee;
+        --cat-community: var(--link);
         --cat-outdoor: #4ade80;
         --cat-learning: #2dd4bf;
         --cat-wellness: #a3e635;
@@ -62,8 +62,8 @@
         background: linear-gradient(
           135deg,
           var(--header-dark) 0%,
-          #142030 50%,
-          #0c1a30 100%
+          var(--bg) 50%,
+          var(--bg) 100%
         );
         color: white;
         position: relative;
@@ -76,12 +76,12 @@
         background:
           radial-gradient(
             ellipse at 30% 50%,
-            rgba(34, 211, 238, 0.08) 0%,
+            var(--accent-tint) 0%,
             transparent 70%
           ),
           radial-gradient(
             ellipse at 80% 20%,
-            rgba(8, 145, 178, 0.06) 0%,
+            var(--accent-tint) 0%,
             transparent 60%
           );
         pointer-events: none;
@@ -101,7 +101,7 @@
       }
       .header-title em {
         font-style: italic;
-        color: #67e8f9;
+        color: var(--accent-2);
       }
       .header-sub {
         font-size: 15px;
@@ -174,8 +174,8 @@
       .controls {
         flex-shrink: 0;
         height: 52px;
-        background: #192534;
-        border-bottom: 1px solid #243445;
+        background: var(--surface);
+        border-bottom: 1px solid var(--ink);
         display: flex;
         align-items: center;
         gap: 6px;
@@ -187,50 +187,50 @@
 
       .controls label {
         font-size: 11px;
-        color: #5a7a8e;
+        color: var(--text-muted);
         margin-right: 2px;
       }
 
       .controls input[type='text'] {
         font-size: 13px;
         padding: 4px 8px;
-        border: 1px solid #243445;
+        border: 1px solid var(--ink);
         border-radius: 6px;
         height: 32px;
         width: 160px;
-        background: #111a24;
-        color: #e8f4fb;
+        background: var(--bg);
+        color: var(--ink);
       }
 
       .controls input[type='number'] {
         font-size: 13px;
         padding: 4px 6px;
-        border: 1px solid #243445;
+        border: 1px solid var(--ink);
         border-radius: 6px;
         height: 32px;
         width: 60px;
-        background: #111a24;
-        color: #e8f4fb;
+        background: var(--bg);
+        color: var(--ink);
       }
 
       .controls input[type='datetime-local'] {
         font-size: 12px;
         padding: 4px 6px;
-        border: 1px solid #243445;
+        border: 1px solid var(--ink);
         border-radius: 6px;
         height: 32px;
-        background: #111a24;
-        color: #e8f4fb;
+        background: var(--bg);
+        color: var(--ink);
       }
 
       .controls select {
         font-size: 13px;
         padding: 4px 6px;
-        border: 1px solid #243445;
+        border: 1px solid var(--ink);
         border-radius: 6px;
         height: 32px;
-        background: #111a24;
-        color: #e8f4fb;
+        background: var(--bg);
+        color: var(--ink);
       }
 
       .controls button {
@@ -253,27 +253,27 @@
       }
 
       .btn-search-here {
-        background: rgba(34, 211, 238, 0.15);
-        color: var(--accent);
+        background: var(--accent-tint);
+        color: var(--link);
       }
       .btn-search-here:hover:not(:disabled) {
-        background: rgba(34, 211, 238, 0.25);
+        background: var(--accent-tint);
       }
       .btn-search-here:disabled {
-        background: #1e2e3e;
-        color: #3a5060;
+        background: var(--bg);
+        color: var(--text-muted);
         cursor: not-allowed;
       }
 
       .ctrl-sep {
-        color: #243445;
+        color: var(--ink);
         font-size: 14px;
         flex-shrink: 0;
       }
 
       .nav-link {
         font-size: 12px;
-        color: var(--accent);
+        color: var(--link);
         text-decoration: none;
         white-space: nowrap;
         flex-shrink: 0;
@@ -284,7 +284,7 @@
 
       .ctrl-unit {
         font-size: 11px;
-        color: #5a7a8e;
+        color: var(--text-muted);
         flex-shrink: 0;
       }
 
@@ -302,8 +302,8 @@
         flex-shrink: 0;
       }
       #mapStatus.info {
-        color: var(--accent);
-        background: rgba(34, 211, 238, 0.1);
+        color: var(--link);
+        background: var(--accent-tint);
       }
       #mapStatus.error {
         color: #f87171;
@@ -564,21 +564,21 @@
                 '</a>'
               : escHtml(e.title);
             const venueHtml = e.venue_name
-              ? '<div style="font-size:12px;color:#8aafc4;margin-top:2px">' +
+              ? '<div style="font-size:12px;color:var(--text-2);margin-top:2px">' +
                 escHtml(e.venue_name) +
                 '</div>'
               : '';
             return (
-              '<div style="padding:6px 0;border-top:1px solid #243445">' +
+              '<div style="padding:6px 0;border-top:1px solid var(--ink)">' +
               '<div style="font-weight:600;font-size:14px;margin-bottom:4px">' +
               titleHtml +
               '</div>' +
-              '<div style="font-size:12px;color:#8aafc4;margin-bottom:2px">' +
+              '<div style="font-size:12px;color:var(--text-2);margin-bottom:2px">' +
               escHtml(fmtRange(e.start_time, e.end_time)) +
               '</div>' +
               venueHtml +
               '<span style="display:inline-block;margin-top:6px;padding:2px 8px;' +
-              'border-radius:999px;font-size:11px;font-weight:600;color:#0a1520;' +
+              'border-radius:999px;font-size:11px;font-weight:600;color:var(--ink);' +
               'background:' +
               escHtml(c) +
               '">' +
@@ -590,7 +590,7 @@
 
           const popupHtml =
             '<div style="font-family:-apple-system,sans-serif;min-width:180px;max-width:260px;' +
-            'max-height:320px;overflow-y:auto;background:#192534;color:#e8f4fb;padding:4px 8px">' +
+            'max-height:320px;overflow-y:auto;background:var(--surface);color:var(--ink);padding:4px 8px">' +
             eventItems.join('') +
             '</div>';
 
@@ -750,7 +750,7 @@
         bottom: 4px;
         right: 6px;
         font-size: 10px;
-        color: #8aafc4;
+        color: var(--text-2);
         opacity: 0.85;
         pointer-events: none;
       "

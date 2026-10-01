@@ -19,8 +19,20 @@ const PAGES = [
 const theme = read('theme.css');
 
 // 1. tokens exist
-for (const t of ['bg', 'surface', 'ink', 'accent', 'accent-2', 'link', 'stroke', 'shadow']) {
-  assert.ok(new RegExp(`--${t}\\s*:`).test(theme), `theme.css must define --${t}`);
+for (const t of [
+  'bg',
+  'surface',
+  'ink',
+  'accent',
+  'accent-2',
+  'link',
+  'stroke',
+  'shadow',
+]) {
+  assert.ok(
+    new RegExp(`--${t}\\s*:`).test(theme),
+    `theme.css must define --${t}`
+  );
 }
 console.log('✅ theme: tokens defined');
 
@@ -29,9 +41,14 @@ for (const p of PAGES) {
   const html = read(p);
   const styleEnd = html.lastIndexOf('</style>');
   const link = html.indexOf('href="theme.css"');
-  assert.ok(styleEnd >= 0 && link > styleEnd, `${p} must link theme.css after its inline <style>`);
+  assert.ok(
+    styleEnd >= 0 && link > styleEnd,
+    `${p} must link theme.css after its inline <style>`
+  );
 }
-console.log(`✅ theme: theme.css linked after inline CSS in ${PAGES.length} pages`);
+console.log(
+  `✅ theme: theme.css linked after inline CSS in ${PAGES.length} pages`
+);
 
 // 3. no legacy dark palette anywhere in pages or page scripts
 const LEGACY =
@@ -40,7 +57,11 @@ for (const f of [...PAGES, 'query.js', 'festivals.js', 'shared.js']) {
   const line = read(f)
     .split('\n')
     .findIndex(l => LEGACY.test(l));
-  assert.equal(line, -1, `${f}:${line + 1} still uses a legacy dark-theme color`);
+  assert.equal(
+    line,
+    -1,
+    `${f}:${line + 1} still uses a legacy dark-theme color`
+  );
 }
 console.log('✅ theme: no legacy dark-theme colors');
 
@@ -50,20 +71,36 @@ for (const p of PAGES) {
   const line = read(p)
     .split('\n')
     .findIndex(l => TEXT_ACCENT.test(l));
-  assert.equal(line, -1, `${p}:${line + 1} uses --accent as a text color; use --link`);
+  assert.equal(
+    line,
+    -1,
+    `${p}:${line + 1} uses --accent as a text color; use --link`
+  );
 }
 console.log('✅ theme: --accent never used as text color');
 
 // 5. JS CAT_COLORS agree with the --cat-* tokens
 const tokens = Object.fromEntries(
-  [...theme.matchAll(/--cat-([a-z]+):\s*(#[0-9a-f]{6})/gi)].map(m => [m[1], m[2].toLowerCase()])
+  [...theme.matchAll(/--cat-([a-z]+):\s*(#[0-9a-f]{6})/gi)].map(m => [
+    m[1],
+    m[2].toLowerCase(),
+  ])
 );
-assert.ok(Object.keys(tokens).length === 13, 'theme.css must define 13 --cat-* tokens');
+assert.ok(
+  Object.keys(tokens).length === 13,
+  'theme.css must define 13 --cat-* tokens'
+);
 for (const f of ['query.js', 'map.html', 'festivals.html']) {
   const m = read(f).match(/const CAT_COLORS = \{([\s\S]*?)\};/);
   assert.ok(m, `${f} must define CAT_COLORS`);
   for (const [, k, v] of m[1].matchAll(/(\w+):\s*'(#[0-9a-f]{6})'/gi)) {
-    assert.equal(v.toLowerCase(), tokens[k], `${f} CAT_COLORS.${k} differs from --cat-${k}`);
+    assert.equal(
+      v.toLowerCase(),
+      tokens[k],
+      `${f} CAT_COLORS.${k} differs from --cat-${k}`
+    );
   }
 }
-console.log('✅ theme: CAT_COLORS match --cat-* tokens in query.js, map.html, festivals.html');
+console.log(
+  '✅ theme: CAT_COLORS match --cat-* tokens in query.js, map.html, festivals.html'
+);

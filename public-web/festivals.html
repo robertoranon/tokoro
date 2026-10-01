@@ -26,16 +26,16 @@
         display: none !important;
       }
       :root {
-        --bg: #111a24;
-        --surface: #192534;
-        --header-dark: #0a1520;
+        --bg: var(--bg);
+        --surface: var(--surface);
+        --header-dark: var(--ink);
         --header: #cce8f4;
-        --accent: #22d3ee;
-        --accent-hover: #0891b2;
-        --text: #e8f4fb;
-        --text-2: #8aafc4;
-        --text-muted: #7f9db0;
-        --border: #243445;
+        --accent: var(--link);
+        --accent-hover: var(--link);
+        --text: var(--ink);
+        --text-2: var(--text-2);
+        --text-muted: var(--text-muted);
+        --border: var(--ink);
         --radius: 14px;
         --radius-sm: 8px;
         --cat-music: #a78bfa;
@@ -55,7 +55,7 @@
         min-height: 100vh;
       }
       a {
-        color: var(--accent);
+        color: var(--link);
       }
 
       /* ── Header ─────────────────────────────────────────────────────── */
@@ -63,8 +63,8 @@
         background: linear-gradient(
           135deg,
           var(--header-dark) 0%,
-          #142030 50%,
-          #0c1a30 100%
+          var(--bg) 50%,
+          var(--bg) 100%
         );
         color: white;
         position: relative;
@@ -85,7 +85,7 @@
       }
       .header-title em {
         font-style: italic;
-        color: #67e8f9;
+        color: var(--accent-2);
       }
       .header-sub {
         font-size: 15px;
@@ -164,13 +164,13 @@
       }
       .chip:hover,
       .toggle:hover {
-        border-color: var(--accent);
+        border-color: var(--accent-2);
         color: var(--text);
       }
       .chip[aria-pressed='true'],
       .toggle[aria-pressed='true'] {
         background: var(--accent);
-        border-color: var(--accent);
+        border-color: var(--accent-2);
         color: var(--header-dark);
       }
       .filter-row {
@@ -280,7 +280,7 @@
       .fest-card__date {
         font-size: 13px;
         font-weight: 700;
-        color: var(--accent);
+        color: var(--link);
       }
       .fest-card__category {
         font-size: 10px;
@@ -303,7 +303,7 @@
         margin-bottom: 8px;
       }
       .fest-card__distance {
-        color: var(--accent);
+        color: var(--link);
         font-weight: 600;
       }
       .fest-card__desc {
@@ -342,7 +342,7 @@
       .result-actions button {
         font: inherit;
         font-weight: 600;
-        color: var(--accent);
+        color: var(--link);
         background: none;
         border: none;
         padding: 0;
