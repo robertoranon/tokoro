@@ -22,6 +22,7 @@
     "test:llm-defaults": "tsx tests/test-llm-defaults.ts",
     "test:scheduler": "tsx tests/test-scheduler.ts",
     "test:radar": "tsx tests/test-radar.ts",
+    "test:scout": "tsx tests/test-scout.ts",
     "radar": "tsx src/radar.ts",
     "smoke:radar": "tsx tests/smoke-radar-publisher.ts"
   },
