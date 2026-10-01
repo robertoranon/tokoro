@@ -183,9 +183,28 @@ export function applyYearCorrection(d: FestivalEntryDraft): FestivalEntryDraft {
     const { day_name: _dayName, ...rest } = d;
     return rest;
   }
-  const fixed = correctEventYear(d as ExtractedEvent);
-  if (fixed) return fixed as FestivalEntryDraft;
-  const { day_name: _dayName, start_time: _s, end_time: _e, ...rest } = d;
+  const fixed = correctEventYear(
+    d as ExtractedEvent
+  ) as FestivalEntryDraft | null;
+  if (fixed) {
+    // Keep event_days in step with a year shift of the dates.
+    const yearShift =
+      Number(String(fixed.start_time).slice(0, 4)) -
+      Number(d.start_time.slice(0, 4));
+    if (fixed.event_days && yearShift !== 0) {
+      fixed.event_days = fixed.event_days.map(
+        day => `${Number(day.slice(0, 4)) + yearShift}${day.slice(4)}`
+      );
+    }
+    return fixed;
+  }
+  const {
+    day_name: _dayName,
+    start_time: _s,
+    end_time: _e,
+    event_days: _days,
+    ...rest
+  } = d;
   return rest;
 }
 

@@ -1813,6 +1813,43 @@ console.log('\n=== skipped_series outcome ===\n');
   );
 }
 
+console.log('\n=== applyYearCorrection and event_days ===\n');
+{
+  const shifted = applyYearCorrection({
+    title: 'F',
+    category: 'music',
+    start_time: '2026-06-18T00:00:00',
+    end_time: '2026-06-21T23:59:59',
+    day_name: 'Friday', // 2027-06-18 is a Friday
+    event_days: ['2026-06-18', '2026-06-19', '2026-06-21'],
+  } as FestivalEntryDraft);
+  assert(
+    shifted.start_time === '2027-06-18T00:00:00',
+    'year correction shifts the dates by +1 year'
+  );
+  assert(
+    JSON.stringify(shifted.event_days) ===
+      '["2027-06-18","2027-06-19","2027-06-21"]',
+    'event_days are shifted by the same number of years'
+  );
+  assert(
+    hasDates(shifted) && analyzeEventDays(shifted).days === 3,
+    'analyzeEventDays still sees the shifted days inside the range'
+  );
+  const stripped = applyYearCorrection({
+    title: 'F',
+    category: 'music',
+    start_time: '2026-06-18T00:00:00',
+    end_time: '2026-06-21T23:59:59',
+    day_name: 'Monday', // matches neither 2026 nor 2027
+    event_days: ['2026-06-18'],
+  } as FestivalEntryDraft);
+  assert(
+    stripped.start_time === undefined && stripped.event_days === undefined,
+    'unresolvable day_name strips the dates and event_days'
+  );
+}
+
 // --- add new test sections above this line ---
 
 console.log(`\n${passed} passed, ${failed} failed`);

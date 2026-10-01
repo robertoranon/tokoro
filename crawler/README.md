@@ -34,7 +34,7 @@ npm install
 npx playwright install chromium
 ```
 
-2b. _(Optional)_ Install [Obscura](https://github.com/h4ckf0r0day/obscura) for a faster, stealth-capable alternative to headless Chrome:
+2b. *(Optional)* Install [Obscura](https://github.com/h4ckf0r0day/obscura) for a faster, stealth-capable alternative to headless Chrome:
 
 ```bash
 # macOS Apple Silicon
@@ -209,7 +209,6 @@ The crawler supports four operational modes:
 All extracted events automatically receive `festival_name` (from the page title) and `festival_url` (the homepage origin), which enables festival-scoped queries via `GET /events?festival_url=...`.
 
 After collection, a deduplication LLM call removes two classes of noise:
-
 - **Redundant wrapper events**: a general "Festival 2026" event spanning all days when individual day events already exist
 - **Semantic duplicates**: the same event extracted twice under slightly different names (e.g. "Sunday" vs "Family Sunday")
 
@@ -259,16 +258,16 @@ Run a fixed list of crawl jobs automatically using your system's cron scheduler 
 **1. Edit `jobs.yaml`** in the `crawler/` directory:
 
 ```yaml
-cron: '0 9 * * *' # informational — paste this into your crontab
+cron: "0 9 * * *"   # informational — paste this into your crontab
 
 jobs:
-  - name: 'Blue Note Jazz'
+  - name: "Blue Note Jazz"
     urls:
       - https://bluenotejazz.com/events
     mode: discover
     fetcher: jina
 
-  - name: 'Local Festival'
+  - name: "Local Festival"
     urls:
       - https://somefestival.com
     mode: festival
@@ -303,11 +302,11 @@ Use debug mode to test extraction without publishing to the API.
 
 By default, `--debug` skips normalization (geocoding + signing) for fast feedback on the raw LLM output. Use `--normalize` together with `--debug` to run full normalization without publishing.
 
-| Flags                 | Geocoding | Signing | API publish |
-| --------------------- | --------- | ------- | ----------- |
-| _(none)_              | ✅        | ✅      | ✅          |
-| `--debug`             | ❌        | ❌      | ❌          |
-| `--debug --normalize` | ✅        | ✅      | ❌          |
+| Flags | Geocoding | Signing | API publish |
+|---|---|---|---|
+| _(none)_ | ✅ | ✅ | ✅ |
+| `--debug` | ❌ | ❌ | ❌ |
+| `--debug --normalize` | ✅ | ✅ | ❌ |
 
 - **Usage**: `npm run crawl -- --debug <url>`
 - **Always include the `--`**: `npm run crawl --debug <url>` (without it) makes npm swallow the flag, which used to mean a real publish. The CLI now detects npm's `npm_config_debug`, prints a notice and still runs in debug mode. Live runs print a `LIVE RUN` line naming the API URL before crawling.
@@ -464,9 +463,9 @@ A pre-push hook runs crawler extraction tests automatically when `shared/` files
 
 ### Manual commands (run from `crawler/`)
 
-| Command                      | Effect                                                    |
-| ---------------------------- | --------------------------------------------------------- |
-| `npm run test:ci`            | Run tests and compare against reference snapshot          |
+| Command | Effect |
+|---------|--------|
+| `npm run test:ci` | Run tests and compare against reference snapshot |
 | `npm run test:set-reference` | Promote the latest test run as the new reference baseline |
 
 ### What happens on push
