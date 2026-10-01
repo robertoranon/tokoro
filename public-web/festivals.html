@@ -34,7 +34,7 @@
         --accent-hover: #0891b2;
         --text: #e8f4fb;
         --text-2: #8aafc4;
-        --text-muted: #5a7a8e;
+        --text-muted: #7f9db0;
         --border: #243445;
         --radius: 14px;
         --radius-sm: 8px;
@@ -450,7 +450,12 @@
           keyword: '',
           origin: null,
           nearOn: false,
+          nearPending: false,
+          ready: false,
         };
+        let nearReq = 0;
+        let lastFitKey = null;
+        let keywordTimer = null;
 
         const el = id => document.getElementById(id);
 
@@ -553,7 +558,19 @@
           return list;
         }
 
+        function syncChips() {
+          el('monthChips')
+            .querySelectorAll('.chip')
+            .forEach(b =>
+              b.setAttribute(
+                'aria-pressed',
+                String(b.getAttribute('data-month') === state.month)
+              )
+            );
+        }
+
         function render() {
+          if (!state.ready) return;
           const list = visibleFestivals();
           const cmp =
             state.nearOn && state.origin ? F.byDistance : F.byStartThenName;
@@ -591,7 +608,7 @@
                   ' festivals on the radar'
               : ''
           );
-          renderChips();
+          syncChips();
           renderPins(list);
         }
 
@@ -612,7 +629,10 @@
             el('mapPanel').hidden = true;
             return;
           }
-          map = L.map('map', { scrollWheelZoom: false }).setView([50, 12], 4);
+          map = L.map('map', {
+            scrollWheelZoom: false,
+            dragging: !L.Browser.mobile,
+          }).setView([50, 12], 4);
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution:
               '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -668,8 +688,14 @@
             for (const f of pin.items) markersById.set(f.id, marker);
             points.push([pin.lat, pin.lng]);
           }
-          if (points.length)
-            map.fitBounds(points, { padding: [30, 30], maxZoom: 9 });
+          const fitKey = list.map(f => f.id).join('|');
+          if (points.length && fitKey !== lastFitKey) {
+            lastFitKey = fitKey;
+            map.fitBounds(F.fitPoints(points), {
+              padding: [30, 30],
+              maxZoom: 9,
+            });
+          }
         }
 
         function showOnMap(id) {
@@ -700,7 +726,8 @@
         });
         el('keywordFilter').addEventListener('input', e => {
           state.keyword = e.target.value;
-          render();
+          clearTimeout(keywordTimer);
+          keywordTimer = setTimeout(render, 150);
         });
         el('festList').addEventListener('click', e => {
           const btn = e.target.closest('[data-show-on-map]');
@@ -712,12 +739,14 @@
           el('nearToggle').setAttribute('aria-pressed', String(state.nearOn));
         }
         function nearFailed(message) {
+          state.nearPending = false;
           state.nearOn = false;
           syncNearToggle();
           setNotice(message);
           render();
         }
         el('nearToggle').addEventListener('click', () => {
+          if (state.nearPending) return;
           if (state.nearOn) {
             state.nearOn = false;
             syncNearToggle();
@@ -732,8 +761,12 @@
             return;
           }
           setNotice('Finding your location…');
+          state.nearPending = true;
+          const req = ++nearReq;
           navigator.geolocation.getCurrentPosition(
             pos => {
+              if (req !== nearReq) return;
+              state.nearPending = false;
               state.origin = {
                 lat: pos.coords.latitude,
                 lng: pos.coords.longitude,
@@ -743,13 +776,17 @@
               setNotice('');
               render();
             },
-            () => nearFailed('Location unavailable — showing the full radar.'),
+            () => {
+              if (req !== nearReq) return;
+              nearFailed('Location unavailable — showing the full radar.');
+            },
             { timeout: 10000, maximumAge: 600000 }
           );
         });
 
         // ── Load ────────────────────────────────────────────────────────
         async function load() {
+          state.ready = false;
           el('festList').innerHTML = '';
           setNotice('');
           if (API_URL.indexOf('__TOKORO') === 0) {
@@ -766,6 +803,7 @@
               F.radarWindow(today)
             );
             state.all = F.toFestivals(events, today);
+            state.ready = true;
             render();
             if (truncated)
               setNotice(

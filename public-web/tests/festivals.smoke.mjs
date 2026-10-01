@@ -134,6 +134,13 @@ async function newPage(browser, { geolocation, allowExternal = false } = {}) {
   return { page, context, errors };
 }
 const titles = page => page.$$eval('.fest-card__title', els => els.map(e => e.textContent.trim()));
+// Poll until the card titles equal `expected` (the keyword input is debounced); returns the final titles.
+async function settleTitles(page, expected) {
+  try {
+    await page.waitForFunction(exp => JSON.stringify([...document.querySelectorAll('.fest-card__title')].map(e => e.textContent.trim())) === JSON.stringify(exp), expected, { timeout: 5000 });
+  } catch {}
+  return titles(page);
+}
 const groupLabels = page => page.$$eval('.month-group__title', els => els.map(e => e.textContent.trim()));
 
 let browser;
@@ -172,14 +179,26 @@ try {
     await page.selectOption('#categoryFilter', '');
 
     await page.fill('#keywordFilter', 'cafe');
-    check('keyword is accent-insensitive ("cafe" finds "Café")', JSON.stringify(await titles(page)) === JSON.stringify(['Aurora Art Weekend 2026']), await titles(page));
+    const cafeTitles = await settleTitles(page, ['Aurora Art Weekend 2026']);
+    check('keyword is accent-insensitive ("cafe" finds "Café")', JSON.stringify(cafeTitles) === JSON.stringify(['Aurora Art Weekend 2026']), cafeTitles);
     await page.fill('#keywordFilter', '');
+    await settleTitles(page, EXPECTED_TITLES);
 
     const chipOf = off => F.addDays(today, off).slice(0, 7);
     await page.click(`.chip[data-month="${chipOf(41)}"]`);
     check('month chip filters by overlap and marks itself pressed', (await titles(page)).includes('Berlin Stage Days 2026') && !(await titles(page)).includes('Running Fest 2026') && (await page.getAttribute(`.chip[data-month="${chipOf(41)}"]`, 'aria-pressed')) === 'true', await titles(page));
     await page.click(`.chip[data-month="${chipOf(41)}"]`);
     check('clicking the active chip again clears the month filter', (await titles(page)).length === 6);
+
+    // keyboard: focus must stay on the chip after it is pressed
+    const kSel = `.chip[data-month="${chipOf(41)}"]`;
+    await page.focus(kSel);
+    await page.keyboard.press('Enter');
+    const afterOn = await page.evaluate(() => ({ key: document.activeElement.getAttribute('data-month'), pressed: document.activeElement.getAttribute('aria-pressed') }));
+    check('keyboard: focus stays on the month chip after Enter and it is pressed', afterOn.key === chipOf(41) && afterOn.pressed === 'true', afterOn);
+    await page.keyboard.press('Enter');
+    const afterOff = await page.evaluate(() => ({ key: document.activeElement.getAttribute('data-month'), pressed: document.activeElement.getAttribute('aria-pressed') }));
+    check('keyboard: second Enter un-presses the chip and focus stays', afterOff.key === chipOf(41) && afterOff.pressed === 'false', afterOff);
 
     const emptyKey = chipOf(300);
     await page.click(`.chip[data-month="${emptyKey}"]`);
@@ -218,6 +237,11 @@ try {
     await page.goto(base + '/festivals.html');
     await page.waitForSelector('#retryBtn');
     check('API error: friendly message and a retry button', /could not load/i.test(await page.textContent('#statusLine')) || /could not load/i.test(await page.textContent('#festList')));
+    await page.fill('#keywordFilter', 'x');
+    await page.waitForTimeout(400); // longer than the input debounce
+    check('typing while the error is shown keeps the error and retry button', (await page.locator('#retryBtn').count()) === 1 && /could not load/i.test(await page.textContent('#festList')));
+    await page.fill('#keywordFilter', '');
+    await page.waitForTimeout(400);
     state.failApi = false;
     await page.click('#retryBtn');
     await page.waitForSelector('.fest-card');

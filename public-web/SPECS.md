@@ -249,6 +249,8 @@ A read-only browse page for the festivals on the radar (entries published by the
 **FR-7.4: Map**
 
 - MUST show a Leaflet map fitted to the visible festivals, one pin per distinct location, coloured by art form (of the first festival at that location), popup with title, dates and link; each card has a "Show on map" action
+- MUST re-fit the map only when the set of visible festivals changes (not on every keystroke; the keyword input is debounced), and MUST ignore outlier coordinates outside Europe (lat 34..72, lng -25..45) for the fit while still drawing every pin; if no point is inside that box it fits all points
+- MUST disable one-finger map dragging on touch devices so the page stays scrollable (zoom buttons, pinch zoom, tapping pins and "Show on map" still work)
 - MUST keep working without the map: if Leaflet fails to load the map panel is hidden, the "Show on map" actions are omitted and the list is fully functional
 
 **FR-7.5: Safety and build**
