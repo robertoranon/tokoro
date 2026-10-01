@@ -67,6 +67,20 @@
         color: #8aafc4;
         margin-top: 2px;
       }
+      .cfg-backup {
+        display: flex;
+        gap: 8px;
+      }
+      .cfg-backup button {
+        flex: 1;
+        padding: 6px 10px;
+        background: transparent;
+        color: #22d3ee;
+        border: 1px solid #243445;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+      }
       #cfg-save {
         margin-top: 6px;
         padding: 7px 14px;
@@ -265,6 +279,16 @@
           >Public Key
           <div class="cfg-pubkey" id="cfg-pubkey"></div
         ></label>
+        <div class="cfg-backup">
+          <button type="button" id="cfg-export">⬇ Download backup</button>
+          <button type="button" id="cfg-import">⬆ Restore backup</button>
+          <input
+            type="file"
+            id="cfg-import-file"
+            accept="application/json,.json"
+            hidden
+          />
+        </div>
         <button id="cfg-save">Save</button>
       </div>
     </section>
@@ -389,35 +413,109 @@
         updateCfgVisibility();
       });
 
+      // Derives the hex public key from a PKCS8 base64 private key.
+      async function pubkeyFromPrivB64(privB64) {
+        const privBytes = Uint8Array.from(atob(privB64), c => c.charCodeAt(0));
+        const cryptoKey = await crypto.subtle.importKey(
+          'pkcs8',
+          privBytes.buffer,
+          'Ed25519',
+          true,
+          ['sign']
+        );
+        const jwk = await crypto.subtle.exportKey('jwk', cryptoKey);
+        const pubB64std = jwk.x.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = pubB64std.padEnd(
+          Math.ceil(pubB64std.length / 4) * 4,
+          '='
+        );
+        const pubBytes = Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+        return bytesToHex(pubBytes);
+      }
+
+      async function setPrivKey(privB64) {
+        const pubHex = await pubkeyFromPrivB64(privB64);
+        cfgPrivKey.value = privB64;
+        cfgPubKey.textContent = pubHex;
+        localStorage.setItem(
+          'tokoro_keypair',
+          JSON.stringify({ pubkey: pubHex, privkeyB64: privB64 })
+        );
+      }
+
       cfgPrivKey.addEventListener('change', async function () {
         const privB64 = cfgPrivKey.value.trim();
         if (!privB64) return;
         try {
-          const privBytes = Uint8Array.from(atob(privB64), c =>
-            c.charCodeAt(0)
-          );
-          const cryptoKey = await crypto.subtle.importKey(
-            'pkcs8',
-            privBytes.buffer,
-            'Ed25519',
-            true,
-            ['sign']
-          );
-          const jwk = await crypto.subtle.exportKey('jwk', cryptoKey);
-          const pubB64std = jwk.x.replace(/-/g, '+').replace(/_/g, '/');
-          const padded = pubB64std.padEnd(
-            Math.ceil(pubB64std.length / 4) * 4,
-            '='
-          );
-          const pubBytes = Uint8Array.from(atob(padded), c => c.charCodeAt(0));
-          const pubHex = bytesToHex(pubBytes);
-          cfgPubKey.textContent = pubHex;
-          localStorage.setItem(
-            'tokoro_keypair',
-            JSON.stringify({ pubkey: pubHex, privkeyB64: privB64 })
-          );
+          await setPrivKey(privB64);
         } catch (e) {
           setSt('Invalid private key: ' + e.message, 'err');
+        }
+      });
+
+      // ── Backup / restore ──────────────────────────────────────────────────────
+      const cfgImportFile = document.getElementById('cfg-import-file');
+
+      document
+        .getElementById('cfg-export')
+        .addEventListener('click', function () {
+          const kp = getStoredKeypair();
+          const backup = {
+            tokoro_backup: 1,
+            exported_at: new Date().toISOString(),
+            api_key: localStorage.getItem('tokoro_api_key') || '',
+            worker_url: localStorage.getItem('tokoro_worker_url') || '',
+            api_url: localStorage.getItem('tokoro_api_url') || '',
+            keypair: kp,
+          };
+          const blob = new Blob([JSON.stringify(backup, null, 2)], {
+            type: 'application/json',
+          });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download =
+            'tokoro-backup-' + (kp ? kp.pubkey.slice(0, 8) : 'nokey') + '.json';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(function () {
+            URL.revokeObjectURL(a.href);
+          }, 1000);
+        });
+
+      document
+        .getElementById('cfg-import')
+        .addEventListener('click', function () {
+          cfgImportFile.click();
+        });
+
+      cfgImportFile.addEventListener('change', async function () {
+        const file = cfgImportFile.files[0];
+        cfgImportFile.value = '';
+        if (!file) return;
+        try {
+          const backup = JSON.parse(await file.text());
+          if (!backup || backup.tokoro_backup !== 1) {
+            throw new Error('not a Tokoro backup file');
+          }
+          if (backup.keypair && backup.keypair.privkeyB64) {
+            await setPrivKey(backup.keypair.privkeyB64);
+          }
+          const fields = [
+            ['api_key', 'tokoro_api_key', cfgApiKey],
+            ['worker_url', 'tokoro_worker_url', cfgWorker],
+            ['api_url', 'tokoro_api_url', cfgApiUrl],
+          ];
+          fields.forEach(function ([prop, storageKey, input]) {
+            if (backup[prop]) {
+              localStorage.setItem(storageKey, backup[prop]);
+              input.value = backup[prop];
+            }
+          });
+          updateCfgVisibility();
+          setSt('Backup restored.', 'ok');
+        } catch (e) {
+          setSt('Restore failed: ' + e.message, 'err');
         }
       });
 

@@ -126,6 +126,8 @@ Events sharing the same `festival_url` (≥3 events) are grouped into a festival
 
 - When a new keypair is generated (first use or after reset), MUST expand the settings form so the Public Key field is visible, allowing the user to copy it
 - MUST populate the Private Key and Public Key fields from the stored keypair on every open
+- MUST show a "Download backup" button in the settings form that downloads a JSON file `tokoro-backup-<first 8 hex chars of pubkey>.json` containing `{ tokoro_backup: 1, exported_at, api_key, worker_url, api_url, keypair }` (values read from `localStorage`)
+- MUST show a "Restore backup" button that opens a file picker; on selecting a file with `tokoro_backup: 1`, MUST validate the private key by deriving its public key (as in FR-5.3), persist the keypair and any non-empty settings to `localStorage`, refresh the form, and show a success status; MUST show an error status and change nothing if the file is not a valid backup or the key is invalid
 
 **FR-5.5: Bookmarklet**
 
