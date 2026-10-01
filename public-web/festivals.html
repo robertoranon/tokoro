@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tokoro Radar – festivals on the horizon</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,800;1,9..144,400&family=Figtree:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      :root {
+        --bg: #111a24;
+        --surface: #192534;
+        --header-dark: #0a1520;
+        --header: #cce8f4;
+        --accent: #22d3ee;
+        --accent-hover: #0891b2;
+        --text: #e8f4fb;
+        --text-2: #8aafc4;
+        --text-muted: #5a7a8e;
+        --border: #243445;
+        --radius: 14px;
+        --radius-sm: 8px;
+        --cat-music: #a78bfa;
+        --cat-art: #f472b6;
+        --cat-theater: #f87171;
+        --cat-other: #94a3b8;
+      }
+      body {
+        font-family:
+          'Figtree',
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+      }
+      a {
+        color: var(--accent);
+      }
+
+      /* ── Header ─────────────────────────────────────────────────────── */
+      .site-header {
+        background: linear-gradient(
+          135deg,
+          var(--header-dark) 0%,
+          #142030 50%,
+          #0c1a30 100%
+        );
+        color: white;
+        position: relative;
+        overflow: hidden;
+      }
+      .header-inner {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 28px 24px 24px;
+        position: relative;
+      }
+      .header-title {
+        font-family: 'Fraunces', serif;
+        font-size: clamp(2.2rem, 6vw, 3.4rem);
+        font-weight: 800;
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+      }
+      .header-title em {
+        font-style: italic;
+        color: #67e8f9;
+      }
+      .header-sub {
+        font-size: 15px;
+        color: rgba(255, 255, 255, 0.6);
+        margin-top: 10px;
+        font-weight: 300;
+        max-width: 560px;
+      }
+      .experimental-badge {
+        position: absolute;
+        top: 16px;
+        right: 24px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: var(--radius-sm);
+        padding: 8px 14px;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.8);
+        line-height: 1.5;
+        text-align: right;
+      }
+      .experimental-badge strong {
+        display: block;
+        color: #fbbf24;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        font-size: 10px;
+      }
+
+      /* ── Layout ─────────────────────────────────────────────────────── */
+      .radar-main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 20px 24px 60px;
+      }
+      .filter-bar {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .chip-row {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+      .chip,
+      .toggle {
+        flex-shrink: 0;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-2);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 100px;
+        padding: 7px 14px;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          color 0.15s,
+          border-color 0.15s;
+      }
+      .chip:hover,
+      .toggle:hover {
+        border-color: var(--accent);
+        color: var(--text);
+      }
+      .chip[aria-pressed='true'],
+      .toggle[aria-pressed='true'] {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--header-dark);
+      }
+      .filter-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+      .filter-row select,
+      .filter-row input {
+        font: inherit;
+        font-size: 14px;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 8px 12px;
+      }
+      .filter-row input {
+        flex: 1 1 200px;
+        min-width: 160px;
+      }
+      .status-line,
+      .notice-line {
+        font-size: 13px;
+        color: var(--text-2);
+        min-height: 1.2em;
+      }
+      .notice-line {
+        color: #fbbf24;
+      }
+      .map-panel {
+        height: 340px;
+        border-radius: var(--radius);
+        overflow: hidden;
+        border: 1px solid var(--border);
+        margin-bottom: 24px;
+      }
+      #map {
+        height: 100%;
+        width: 100%;
+        background: var(--surface);
+      }
+      .leaflet-popup-content-wrapper,
+      .leaflet-popup-tip {
+        background: var(--surface);
+        color: var(--text);
+      }
+      .pin-popup__item + .pin-popup__item {
+        border-top: 1px solid var(--border);
+        margin-top: 6px;
+        padding-top: 6px;
+      }
+      .pin-popup__item div {
+        font-size: 12px;
+        color: var(--text-2);
+      }
+
+      /* ── Timeline list ──────────────────────────────────────────────── */
+      .month-group {
+        margin-bottom: 28px;
+      }
+      .month-group__title {
+        font-family: 'Fraunces', serif;
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 12px;
+        letter-spacing: -0.01em;
+      }
+      .fest-grid {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+      }
+      .fest-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        display: flex;
+        overflow: hidden;
+      }
+      .fest-card__stripe {
+        width: 5px;
+        flex-shrink: 0;
+        background: var(--cat-other);
+      }
+      .fest-card__stripe--music {
+        background: var(--cat-music);
+      }
+      .fest-card__stripe--art {
+        background: var(--cat-art);
+      }
+      .fest-card__stripe--theater {
+        background: var(--cat-theater);
+      }
+      .fest-card__body {
+        flex: 1;
+        padding: 16px 20px;
+        min-width: 0;
+      }
+      .fest-card__top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      .fest-card__date {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent);
+      }
+      .fest-card__category {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .fest-card__title {
+        font-family: 'Fraunces', serif;
+        font-size: 1.15rem;
+        font-weight: 700;
+        line-height: 1.25;
+        margin-bottom: 6px;
+        overflow-wrap: anywhere;
+      }
+      .fest-card__place {
+        font-size: 12px;
+        color: var(--text-2);
+        margin-bottom: 8px;
+      }
+      .fest-card__distance {
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .fest-card__desc {
+        font-size: 13px;
+        color: var(--text-2);
+        line-height: 1.6;
+        margin-bottom: 12px;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .fest-card__tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-bottom: 12px;
+      }
+      .tag {
+        font-size: 10px;
+        padding: 2px 8px;
+        border-radius: 100px;
+        background: var(--bg);
+        color: var(--text-2);
+        border: 1px solid var(--border);
+        font-weight: 500;
+      }
+      .result-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: center;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .result-actions button {
+        font: inherit;
+        font-weight: 600;
+        color: var(--accent);
+        background: none;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+      }
+      .empty-state,
+      .error-state {
+        color: var(--text-2);
+        padding: 32px 0;
+        text-align: center;
+        font-size: 15px;
+      }
+      .error-state button {
+        margin-left: 8px;
+        font: inherit;
+        font-weight: 600;
+        color: var(--header-dark);
+        background: var(--accent);
+        border: none;
+        border-radius: var(--radius-sm);
+        padding: 6px 14px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="experimental-badge"><strong>⚠ Experimental</strong></div>
+      <div class="header-inner">
+        <h1 class="header-title">Tokoro <em>Radar</em></h1>
+        <p class="header-sub">
+          Under-the-radar festivals across Europe — music, art &amp;
+          performance, worth planning ahead for
+        </p>
+      </div>
+    </header>
+
+    <main class="radar-main">
+      <section class="filter-bar" aria-label="Filters">
+        <div
+          class="chip-row"
+          id="monthChips"
+          role="group"
+          aria-label="Month"
+        ></div>
+        <div class="filter-row">
+          <select id="categoryFilter" aria-label="Art form">
+            <option value="">All art forms</option>
+            <option value="music">Music</option>
+            <option value="art">Art</option>
+            <option value="theater">Performance</option>
+            <option value="other">Other</option>
+          </select>
+          <input
+            id="keywordFilter"
+            type="search"
+            placeholder="Search name, genre, place…"
+            aria-label="Search festivals"
+          />
+          <button
+            id="nearToggle"
+            class="toggle"
+            type="button"
+            aria-pressed="false"
+          >
+            Near me
+          </button>
+        </div>
+        <p
+          id="statusLine"
+          class="status-line"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <p
+          id="noticeLine"
+          class="notice-line"
+          role="status"
+          aria-live="polite"
+        ></p>
+      </section>
+
+      <section class="map-panel" id="mapPanel" aria-label="Map of festivals">
+        <div id="map"></div>
+      </section>
+
+      <section id="festList" aria-label="Festivals by month"></section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="./shared.js"></script>
+    <script src="./festivals.js"></script>
+    <script>
+      (function () {
+        'use strict';
+
+        const API_URL = '__TOKORO_WORKER_URL__';
+        const F = window.TokoroFestivals;
+        const today = formatLocalDateTime(new Date()).slice(0, 10);
+
+        const state = {
+          all: [],
+          month: '',
+          category: '',
+          keyword: '',
+          origin: null,
+          nearOn: false,
+        };
+
+        const el = id => document.getElementById(id);
+
+        function setStatus(text) {
+          el('statusLine').textContent = text;
+        }
+        function setNotice(text) {
+          el('noticeLine').textContent = text || '';
+        }
+
+        // ── Month chips ─────────────────────────────────────────────────
+        function renderChips() {
+          const chips = [{ key: '', label: 'All' }].concat(
+            F.monthChips(today, 12)
+          );
+          el('monthChips').innerHTML = chips
+            .map(
+              c =>
+                '<button type="button" class="chip" data-month="' +
+                escHtml(c.key) +
+                '" aria-pressed="' +
+                (state.month === c.key) +
+                '">' +
+                escHtml(c.label) +
+                '</button>'
+            )
+            .join('');
+        }
+
+        // ── Cards and groups ────────────────────────────────────────────
+        function cardHtml(f) {
+          const url = safeUrl(f.url);
+          const place = [f.venue, f.address].filter(Boolean).join(' · ');
+          const distance =
+            typeof f.distanceKm === 'number'
+              ? ' <span class="fest-card__distance">' +
+                escHtml(F.fmtDistance(f.distanceKm)) +
+                ' away</span>'
+              : '';
+          const tags = f.tags
+            .slice(0, 6)
+            .map(t => '<span class="tag">' + escHtml(t) + '</span>')
+            .join('');
+          const catClass = ['music', 'art', 'theater'].includes(f.category)
+            ? f.category
+            : 'other';
+          return (
+            '<article class="fest-card" data-id="' +
+            escHtml(f.id) +
+            '">' +
+            '<div class="fest-card__stripe fest-card__stripe--' +
+            catClass +
+            '"></div>' +
+            '<div class="fest-card__body">' +
+            '<div class="fest-card__top">' +
+            '<span class="fest-card__date">' +
+            escHtml(F.fmtFestivalRange(f.start, f.end, today)) +
+            '</span>' +
+            '<span class="fest-card__category">' +
+            escHtml(f.category) +
+            '</span>' +
+            '</div>' +
+            '<h3 class="fest-card__title">' +
+            escHtml(f.title) +
+            '</h3>' +
+            (place || distance
+              ? '<div class="fest-card__place">' +
+                escHtml(place) +
+                distance +
+                '</div>'
+              : '') +
+            (f.description
+              ? '<p class="fest-card__desc">' + escHtml(f.description) + '</p>'
+              : '') +
+            (tags ? '<div class="fest-card__tags">' + tags + '</div>' : '') +
+            '<div class="result-actions">' +
+            (url
+              ? '<a href="' +
+                escHtml(url) +
+                '" target="_blank" rel="noopener noreferrer">Festival website ↗</a>'
+              : '') +
+            (hasMap
+              ? '<button type="button" data-show-on-map="' +
+                escHtml(f.id) +
+                '">Show on map</button>'
+              : '') +
+            '</div>' +
+            '</div></article>'
+          );
+        }
+
+        function visibleFestivals() {
+          let list = F.filterFestivals(state.all, {
+            month: state.month,
+            category: state.category,
+            keyword: state.keyword,
+          });
+          if (state.nearOn && state.origin)
+            list = F.withDistance(list, state.origin);
+          return list;
+        }
+
+        function render() {
+          const list = visibleFestivals();
+          const cmp =
+            state.nearOn && state.origin ? F.byDistance : F.byStartThenName;
+          const groups = F.groupFestivals(list, today, cmp);
+
+          if (!state.all.length) {
+            el('festList').innerHTML =
+              '<p class="empty-state">Nothing on the radar yet.</p>';
+          } else if (!list.length) {
+            el('festList').innerHTML =
+              '<p class="empty-state">' +
+              (state.month && !state.category && !state.keyword
+                ? 'Nothing on the radar yet for ' +
+                  escHtml(F.monthLabel(state.month))
+                : 'No festivals match your filters.') +
+              '</p>';
+          } else {
+            el('festList').innerHTML = groups
+              .map(
+                g =>
+                  '<section class="month-group"><h2 class="month-group__title">' +
+                  escHtml(g.label) +
+                  '</h2><div class="fest-grid">' +
+                  g.items.map(cardHtml).join('') +
+                  '</div></section>'
+              )
+              .join('');
+          }
+
+          setStatus(
+            state.all.length
+              ? list.length +
+                  ' of ' +
+                  state.all.length +
+                  ' festivals on the radar'
+              : ''
+          );
+          renderChips();
+          renderPins(list);
+        }
+
+        // ── Map (optional: filled in by the map code in Task 5) ─────────
+        const hasMap = typeof L !== 'undefined';
+        function renderPins() {}
+        function showOnMap() {}
+        if (!hasMap) el('mapPanel').hidden = true;
+
+        // ── Events ──────────────────────────────────────────────────────
+        el('monthChips').addEventListener('click', e => {
+          const chip = e.target.closest('.chip');
+          if (!chip) return;
+          const key = chip.getAttribute('data-month');
+          state.month = key && state.month === key ? '' : key;
+          setNotice('');
+          render();
+        });
+        el('categoryFilter').addEventListener('change', e => {
+          state.category = e.target.value;
+          render();
+        });
+        el('keywordFilter').addEventListener('input', e => {
+          state.keyword = e.target.value;
+          render();
+        });
+        el('festList').addEventListener('click', e => {
+          const btn = e.target.closest('[data-show-on-map]');
+          if (btn) showOnMap(btn.getAttribute('data-show-on-map'));
+        });
+
+        // ── Load ────────────────────────────────────────────────────────
+        async function load() {
+          el('festList').innerHTML = '';
+          setNotice('');
+          if (API_URL.indexOf('__TOKORO') === 0) {
+            setStatus('');
+            el('festList').innerHTML =
+              '<p class="error-state">The API address is not configured (the deploy step replaces the placeholder).</p>';
+            return;
+          }
+          setStatus('Loading the radar…');
+          try {
+            const { events, truncated } = await F.loadRadarEvents(
+              window.fetch.bind(window),
+              API_URL,
+              F.radarWindow(today)
+            );
+            state.all = F.toFestivals(events, today);
+            render();
+            if (truncated)
+              setNotice(
+                'Showing the first results only — the radar is larger than one page load.'
+              );
+          } catch (err) {
+            setStatus('');
+            el('festList').innerHTML =
+              '<p class="error-state">Could not load the radar right now. ' +
+              '<button type="button" id="retryBtn">Try again</button></p>';
+            el('retryBtn').addEventListener('click', load);
+          }
+        }
+
+        renderChips();
+        load();
+      })();
+    </script>
+    <!-- build: __BUILD_VERSION__ -->
+  </body>
+</html>
