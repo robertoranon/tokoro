@@ -584,11 +584,95 @@
           renderPins(list);
         }
 
-        // ── Map (optional: filled in by the map code in Task 5) ─────────
+        // ── Map (optional: the list works without Leaflet) ─────────────
         const hasMap = typeof L !== 'undefined';
-        function renderPins() {}
-        function showOnMap() {}
-        if (!hasMap) el('mapPanel').hidden = true;
+        const CAT_COLORS = {
+          music: '#a78bfa',
+          art: '#f472b6',
+          theater: '#f87171',
+          other: '#94a3b8',
+        };
+        let map = null;
+        let pinLayer = null;
+        const markersById = new Map();
+
+        function initMap() {
+          if (!hasMap) {
+            el('mapPanel').hidden = true;
+            return;
+          }
+          map = L.map('map', { scrollWheelZoom: false }).setView([50, 12], 4);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19,
+          }).addTo(map);
+          pinLayer = L.layerGroup().addTo(map);
+        }
+
+        function popupHtml(items) {
+          return (
+            '<div class="pin-popup">' +
+            items
+              .map(f => {
+                const url = safeUrl(f.url);
+                const title = url
+                  ? '<a href="' +
+                    escHtml(url) +
+                    '" target="_blank" rel="noopener noreferrer">' +
+                    escHtml(f.title) +
+                    '</a>'
+                  : escHtml(f.title);
+                return (
+                  '<div class="pin-popup__item"><strong>' +
+                  title +
+                  '</strong>' +
+                  '<div>' +
+                  escHtml(F.fmtFestivalRange(f.start, f.end, today)) +
+                  '</div></div>'
+                );
+              })
+              .join('') +
+            '</div>'
+          );
+        }
+
+        function renderPins(list) {
+          if (!map) return;
+          pinLayer.clearLayers();
+          markersById.clear();
+          const points = [];
+          for (const pin of F.groupPins(list)) {
+            const color = CAT_COLORS[pin.items[0].category] || CAT_COLORS.other;
+            const marker = L.circleMarker([pin.lat, pin.lng], {
+              radius: 8,
+              fillColor: color,
+              color: '#111a24',
+              weight: 1.5,
+              opacity: 1,
+              fillOpacity: 0.85,
+            })
+              .bindPopup(popupHtml(pin.items))
+              .addTo(pinLayer);
+            for (const f of pin.items) markersById.set(f.id, marker);
+            points.push([pin.lat, pin.lng]);
+          }
+          if (points.length)
+            map.fitBounds(points, { padding: [30, 30], maxZoom: 9 });
+        }
+
+        function showOnMap(id) {
+          const marker = markersById.get(id);
+          if (!map || !marker) return;
+          el('mapPanel').scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+          });
+          map.setView(marker.getLatLng(), Math.max(map.getZoom(), 9));
+          marker.openPopup();
+        }
+
+        initMap();
 
         // ── Events ──────────────────────────────────────────────────────
         el('monthChips').addEventListener('click', e => {
@@ -610,6 +694,47 @@
         el('festList').addEventListener('click', e => {
           const btn = e.target.closest('[data-show-on-map]');
           if (btn) showOnMap(btn.getAttribute('data-show-on-map'));
+        });
+
+        // ── Near me (opt-in; sorts and shows distances, never filters) ─
+        function syncNearToggle() {
+          el('nearToggle').setAttribute('aria-pressed', String(state.nearOn));
+        }
+        function nearFailed(message) {
+          state.nearOn = false;
+          syncNearToggle();
+          setNotice(message);
+          render();
+        }
+        el('nearToggle').addEventListener('click', () => {
+          if (state.nearOn) {
+            state.nearOn = false;
+            syncNearToggle();
+            setNotice('');
+            render();
+            return;
+          }
+          if (!navigator.geolocation) {
+            nearFailed(
+              'Location unavailable in this browser — showing the full radar.'
+            );
+            return;
+          }
+          setNotice('Finding your location…');
+          navigator.geolocation.getCurrentPosition(
+            pos => {
+              state.origin = {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+              };
+              state.nearOn = true;
+              syncNearToggle();
+              setNotice('');
+              render();
+            },
+            () => nearFailed('Location unavailable — showing the full radar.'),
+            { timeout: 10000, maximumAge: 600000 }
+          );
         });
 
         // ── Load ────────────────────────────────────────────────────────
