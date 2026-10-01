@@ -1,16 +1,16 @@
 # Graph Report - tokoro  (2026-10-01)
 
 ## Corpus Check
-- 162 files · ~342,830 words
+- 166 files · ~350,250 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1380 nodes · 2713 edges · 171 communities (66 shown, 105 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 110 edges (avg confidence: 0.83)
+- 1431 nodes · 2772 edges · 177 communities (70 shown, 107 thin omitted)
+- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 130 edges (avg confidence: 0.84)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `7353eb0e`
+- Built from commit: `832a71f7`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -24,12 +24,12 @@
 - scripts
 - query.js
 - llm.ts
-- ExtractedEvent
+- LLMProvider
 - test-scout.ts
 - telegram.ts
 - manifest.json
 - popup.js
-- test-radar.ts
+- radar.ts
 - dependencies
 - compilerOptions
 - compilerOptions
@@ -37,14 +37,14 @@
 - Tokoro Ideas Backlog
 - crawler.ts
 - compilerOptions
-- crawler/src/index.ts
+- festivals.js
 - crawler-adapter.ts
 - scripts
 - EventCrawler
 - normalizer.ts
 - Tokoro Worker — Technical Specification
 - crawler-worker/src/index.ts
-- publish.html — Mobile Publisher
+- Tokoro Public Web Query Interface README
 - shared/package.json
 - Tracing an Event from Browser to Database
 - devDependencies
@@ -55,7 +55,7 @@
 - index.html — Public Web Query Interface (EN)
 - Overall Structure — Getting Started Outline
 - devDependencies
-- Canonical Event Data Format & Ed25519 Signature Verification
+- web-publisher/index.html — Event Publisher (legacy manual form)
 - crawler/package.json
 - JSON-LD event extraction algorithm
 - Tokoro project overview (6 components)
@@ -173,12 +173,18 @@
 - Telegram Bot component summary
 - Web Publisher component summary
 - Worker component summary
-- festival-entry.ts
-- check-duplicate.ts
+- test-radar.ts
+- NormalizedEvent
 - smoke-put.ts
-- LLMProvider
-- year-inference.ts
-- OllamaProvider
+- api-publisher.ts
+- db-benchmark.ts
+- TestRunner
+- compare.ts
+- publish.html — Mobile Publisher
+- HTMLFetcher
+- report.ts
+- festivals.test.mjs
+- inject.test.mjs
 
 ## God Nodes (most connected - your core abstractions)
 1. `LLMProvider` - 47 edges
@@ -193,14 +199,14 @@
 10. `TestResult` - 18 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `signEvent()` --shares_data_with--> `Canonical Event Data Format & Ed25519 Signature Verification`  [INFERRED]
-  public-web/signing.js → worker/SPECS.md
+- `Server-side HTML cleaning (extractCleanText)` --references--> `extractCleanText()`  [EXTRACTED]
+  docs/diving-deeper/tracing-an-event.md → shared/extractors/html-cleaner.ts
 - `publish.html — Mobile Publisher` --semantically_similar_to--> `web-publisher/index.html — Event Publisher (legacy manual form)`  [INFERRED] [semantically similar]
   public-web/publish.html → web-publisher/index.html
 - `map.html — Map View` --semantically_similar_to--> `Geospatial Query Algorithm / Dynamic Geohash Precision Selection`  [INFERRED] [semantically similar]
   public-web/map.html → worker/SPECS.md
-- `Server-side HTML cleaning (extractCleanText)` --references--> `extractCleanText()`  [EXTRACTED]
-  docs/diving-deeper/tracing-an-event.md → shared/extractors/html-cleaner.ts
+- `signEvent()` --shares_data_with--> `Canonical Event Data Format & Ed25519 Signature Verification`  [INFERRED]
+  public-web/signing.js → worker/SPECS.md
 - `Tracing an Event from Browser to Database` --references--> `verifyEventSignature()`  [EXTRACTED]
   docs/diving-deeper/tracing-an-event.md → worker/src/crypto.ts
 
@@ -215,27 +221,27 @@
 - **Crawler extraction test fixtures (event pages and images)** — crawler_tests_readme_overview, crawler_tests_cleaned_pages_abetone_fixture, crawler_tests_fixtures_alcatraz_autechre_event_fixture, crawler_tests_fixtures_alcatraz_fat_freddys_drop_event_fixture, crawler_tests_fixtures_fareast_2026_events_fixture, crawler_tests_fixtures_ig_quod_fixture, crawler_tests_fixtures_naon_event_fixture, crawler_tests_fixtures_nick_cave_tour_fixture [INFERRED 0.85]
 - **Extract (crawler-worker) -> sign+publish (client) pipeline** — crawler_worker_specs_crawl_endpoint, chrome_extension_specs_preparedevent, chrome_extension_specs_fr6_publishing_workflow, chrome_extension_specs_signedevent [INFERRED 0.85]
 
-## Communities (171 total, 105 thin omitted)
+## Communities (177 total, 107 thin omitted)
 
 ### Community 0 - "shared/extractors/event-extractor.ts"
-Cohesion: 0.07
-Nodes (37): extractJsonLd(), jsdomJsonLdParser(), EventLinks, EventLinksSchema, FestivalInfoPagesSchema, FestivalListingsSchema, silentConsole, EventLinks (+29 more)
+Cohesion: 0.06
+Nodes (42): extractJsonLd(), jsdomJsonLdParser(), EventLinks, EventLinksSchema, FestivalInfoPagesSchema, FestivalListingsSchema, silentConsole, EventLinks (+34 more)
 
 ### Community 1 - "worker/src/index.ts"
-Cohesion: 0.09
-Nodes (51): DEDUP_SQL_BUFFER_MS, DedupContext, hashEventData(), hexToBytes(), verifyAdminSignature(), verifyDeleteSignature(), verifyEventSignature(), encode() (+43 more)
+Cohesion: 0.06
+Nodes (73): COMMON_PREFIX_RATIO, DEDUP_DISTANCE_KM, DEDUP_SQL_BUFFER_MS, DEDUP_TIME_WINDOW_MS, LEVENSHTEIN_FALLBACK, LEVENSHTEIN_FAST_PATH, LLM_PROBABILITY_THRESHOLD, defaultModelFor() (+65 more)
 
 ### Community 2 - "TestResult"
-Cohesion: 0.10
-Nodes (16): compareReports(), ComparisonEntry, findLatestSnapshots(), formatDelta(), loadSnapshot(), main(), ResultKey, statusIcon() (+8 more)
+Cohesion: 0.29
+Nodes (4): HumanReviewer, main(), HumanReviewSession, TestResult
 
 ### Community 3 - "pdf-fetcher.ts"
 Cohesion: 0.14
 Nodes (5): ImageData, ImageFetcher, isTextDense(), PdfData, PdfFetcher
 
 ### Community 4 - "whatsapp.ts"
-Cohesion: 0.16
-Nodes (22): deletePendingEvents(), loadPendingEvents(), storePendingEvents(), ButtonData, encodeButtonId(), formatEventDetail(), formatEventLine(), formatEventSummary() (+14 more)
+Cohesion: 0.15
+Nodes (24): deletePendingEvents(), loadPendingEvents(), publishEvent(), storePendingEvents(), handlePublishAll(), ButtonData, encodeButtonId(), formatEventDetail() (+16 more)
 
 ### Community 5 - "crawler-worker/package.json"
 Cohesion: 0.06
@@ -250,20 +256,20 @@ Cohesion: 0.11
 Nodes (22): buildICalUrl(), buildShareUrl(), CAT_COLORS, catColor(), copyICalUrl(), effectiveDays(), listEvents(), _loadedEvents (+14 more)
 
 ### Community 8 - "llm.ts"
-Cohesion: 0.16
-Nodes (12): AnthropicConfig, AnthropicProvider, OllamaConfig, OpenAIConfig, OpenAIProvider, LLMContentBlock, LLMImageBlock, LLMMessage (+4 more)
+Cohesion: 0.07
+Nodes (33): captureFixture(), CaptureOptions, loadEnv(), main(), loadEnv(), main(), dirs, files (+25 more)
 
-### Community 9 - "ExtractedEvent"
-Cohesion: 0.06
-Nodes (36): EventExtractor, HTMLFetcher, JinaFetcher, captureFixture(), CaptureOptions, loadEnv(), main(), BenchmarkReport (+28 more)
+### Community 9 - "LLMProvider"
+Cohesion: 0.19
+Nodes (7): FestivalEntryExtractorConfig, ExtractionResult, matchDbEvent(), UrlFetchResult, TestEvaluator, ExtractedEvent, LLMProvider
 
 ### Community 10 - "test-scout.ts"
-Cohesion: 0.07
-Nodes (72): dateString(), FestivalsConfig, normalizeFestivalUrl(), optionalString(), parseFestivalsConfig(), pick(), VALID_BROWSERS, VALID_FETCHERS (+64 more)
+Cohesion: 0.06
+Nodes (72): dateString(), FestivalsConfig, optionalString(), parseFestivalsConfig(), pick(), VALID_BROWSERS, VALID_FETCHERS, VALID_STATUSES (+64 more)
 
 ### Community 11 - "telegram.ts"
 Cohesion: 0.16
-Nodes (23): buildKvKey(), CallbackData, encodeCallback(), escapeHtml(), formatEventDetail(), formatEventLine(), formatEventSummary(), handleCallbackQuery() (+15 more)
+Nodes (22): buildKvKey(), CallbackData, encodeCallback(), escapeHtml(), formatEventDetail(), formatEventLine(), formatEventSummary(), handleCallbackQuery() (+14 more)
 
 ### Community 12 - "manifest.json"
 Cohesion: 0.07
@@ -273,9 +279,9 @@ Nodes (27): action, default_icon, default_popup, background, service_worker, con
 Cohesion: 0.22
 Nodes (25): applyImageExtractionResult(), applyPageCrawlResult(), bytesToHex(), cacheExtractedEvents(), cancelPreview(), displayEventPreview(), extractRenderedContent(), formatDateRange() (+17 more)
 
-### Community 14 - "test-radar.ts"
+### Community 14 - "radar.ts"
 Cohesion: 0.20
-Nodes (14): activeFestivals(), main(), RadarCounters, tallyOutcomes(), isDebugRequested(), appendRunLog(), defaultLogsDir(), findStaleFestivals() (+6 more)
+Nodes (20): generateKeypair(), loadSeedUrls(), main(), printUsage(), activeFestivals(), main(), RadarCounters, tallyOutcomes() (+12 more)
 
 ### Community 15 - "dependencies"
 Cohesion: 0.08
@@ -298,32 +304,32 @@ Cohesion: 0.11
 Nodes (20): Tokoro Ideas Backlog, Add to Calendar Buttons, tokoro CLI for querying, Curator Profile Pages (/profile?pubkey=), Discover View (GET /discover?pubkey=), Embeddable Calendar Widget (iframe), Event Images (image_url field), Multi-instance Federation (+12 more)
 
 ### Community 20 - "crawler.ts"
-Cohesion: 0.17
-Nodes (17): CrawlerConfig, CrawlerMode, CrawlResult, FetcherType, JINA_PREFERRED_DOMAINS, RadarEntryResult, BrowserEngine, PdfParserType (+9 more)
+Cohesion: 0.18
+Nodes (16): CrawlerConfig, CrawlerMode, CrawlResult, FetcherType, JINA_PREFERRED_DOMAINS, RadarEntryResult, BrowserEngine, PdfParserType (+8 more)
 
 ### Community 21 - "compilerOptions"
 Cohesion: 0.11
 Nodes (18): compilerOptions, allowSyntheticDefaultImports, esModuleInterop, forceConsistentCasingInFileNames, lib, module, moduleResolution, resolveJsonModule (+10 more)
 
-### Community 22 - "crawler/src/index.ts"
-Cohesion: 0.44
-Nodes (8): generateKeypair(), loadSeedUrls(), main(), printUsage(), main(), buildLLM(), loadCrawlerEnv(), loadEnv()
+### Community 22 - "festivals.js"
+Cohesion: 0.06
+Nodes (31): addDays(), api, buildRadarUrl(), byDistance(), byStartThenName(), filterFestivals(), groupFestivals(), haversineKm() (+23 more)
 
 ### Community 23 - "crawler-adapter.ts"
-Cohesion: 0.16
-Nodes (15): bytesToHex(), hexToBytes(), KV_TTL_SECONDS, publishEvent(), signEvent(), CrawlerConfig, CrawlerMode, CrawlResult (+7 more)
+Cohesion: 0.15
+Nodes (16): bytesToHex(), hexToBytes(), KV_TTL_SECONDS, signEvent(), CrawlerConfig, CrawlerMode, CrawlResult, WorkerCrawler (+8 more)
 
 ### Community 24 - "scripts"
 Cohesion: 0.08
 Nodes (24): scripts, build, crawl, crawl-jobs, dev, radar, scout, scout-promote (+16 more)
 
 ### Community 25 - "EventCrawler"
-Cohesion: 0.26
+Cohesion: 0.36
 Nodes (3): accumulateResult(), EventCrawler, groupEventsByDay()
 
 ### Community 26 - "normalizer.ts"
-Cohesion: 0.09
-Nodes (24): asMs(), differs(), EDITION_WINDOW_DAYS, ExistingEntry, isRadarEntry(), matchEdition(), RadarPublisher, text() (+16 more)
+Cohesion: 0.11
+Nodes (13): PageDiscovery, encode(), EventNormalizer, extractAddressFromSearchPage(), NormalizerConfig, EventNormalizer, PageDiscovery, geocodeAddress() (+5 more)
 
 ### Community 27 - "Tokoro Worker — Technical Specification"
 Cohesion: 0.17
@@ -333,17 +339,17 @@ Nodes (16): Nine-cell geohash neighborhood duplicate check, Event Editing UI (PU
 Cohesion: 0.30
 Nodes (13): AuthResult, unauthorizedResponse(), validateApiKey(), CORS_HEADERS, fetch(), handleCrawl(), handleExtractText(), handlePreviewFetch() (+5 more)
 
-### Community 29 - "publish.html — Mobile Publisher"
-Cohesion: 0.22
-Nodes (14): Diving Deeper topic: Publishing via iOS Shortcut, publish.html — Mobile Publisher, ?preview=TOKEN handoff (tryPreview), Tokoro Public Web Query Interface README, build-bookmarklet.js / inject-worker-url.js build process, scripts/deploy-public-web.sh deploy flow, Mobile Publishing (publish.html) entry modes, shortcut-bookmarklet.js Apple Shortcut build artifact (+6 more)
+### Community 29 - "Tokoro Public Web Query Interface README"
+Cohesion: 0.28
+Nodes (9): Diving Deeper topic: Publishing via iOS Shortcut, ?preview=TOKEN handoff (tryPreview), Tokoro Public Web Query Interface README, build-bookmarklet.js / inject-worker-url.js build process, scripts/deploy-public-web.sh deploy flow, Mobile Publishing (publish.html) entry modes, shortcut-bookmarklet.js Apple Shortcut build artifact, FR-5.7: Apple Shortcut KV-relay handoff (+1 more)
 
 ### Community 30 - "shared/package.json"
 Cohesion: 0.13
 Nodes (14): dependencies, @anthropic-ai/sdk, openai, zod, exports, ./extractors/*, ./llm/*, ./types/* (+6 more)
 
 ### Community 31 - "Tracing an Event from Browser to Database"
-Cohesion: 0.15
-Nodes (13): Tracing an Event from Browser to Database, CrawlRequest { url, mode, html?, title? }, CrawlResponse { success, events, dropped_events?, cleaned_text? }, Two geohash precisions for radius queries, Event ID = SHA-256 of canonical JSON, EventNormalizer.normalize(event), ExtractedEvent (JSON-LD + LLM merge), Iframe capture raced against 5s timeout (+5 more)
+Cohesion: 0.14
+Nodes (14): Tracing an Event from Browser to Database, CrawlRequest { url, mode, html?, title? }, CrawlResponse { success, events, dropped_events?, cleaned_text? }, Two geohash precisions for radius queries, Event ID = SHA-256 of canonical JSON, EventNormalizer.normalize(event), ExtractedEvent (JSON-LD + LLM merge), Iframe capture raced against 5s timeout (+6 more)
 
 ### Community 32 - "devDependencies"
 Cohesion: 0.15
@@ -373,9 +379,9 @@ Nodes (10): Stateless crawler worker / client-side signing design, Scheduled Cra
 Cohesion: 0.20
 Nodes (9): lint-staged, devDependencies, lint-staged, prettier, wrangler, prettier, wrangler, lint-staged (+1 more)
 
-### Community 40 - "Canonical Event Data Format & Ed25519 Signature Verification"
-Cohesion: 0.25
-Nodes (8): Canonical JSON fixed key order for signature integrity, Diving Deeper topic: Working with local timestamps, Diving Deeper topic: Signing events with Ed25519, web-publisher/index.html — Event Publisher (legacy manual form), handleSubmit(e), hashEventData(eventData), Canonical Event Data Format & Ed25519 Signature Verification, Timestamp Format Convention (ISO 8601, no timezone, venue-local)
+### Community 40 - "web-publisher/index.html — Event Publisher (legacy manual form)"
+Cohesion: 0.33
+Nodes (5): Diving Deeper topic: Working with local timestamps, web-publisher/index.html — Event Publisher (legacy manual form), handleSubmit(e), hashEventData(eventData), Timestamp Format Convention (ISO 8601, no timezone, venue-local)
 
 ### Community 41 - "crawler/package.json"
 Cohesion: 0.25
@@ -431,27 +437,63 @@ Nodes (3): Regression testing via pre-push hook + reference.json, Far East Film 
 
 ### Community 68 - "test-runner.ts"
 Cohesion: 0.13
-Nodes (20): CrawlerEnv, loadEnv(), main(), dirs, files, forbidden, root, skipDirs (+12 more)
+Nodes (7): EventExtractor, JinaFetcher, EntryResolverDeps, fetchAndExtract(), loadEnv(), main(), FetchedPage
 
-### Community 165 - "festival-entry.ts"
+### Community 165 - "test-radar.ts"
 Cohesion: 0.11
-Nodes (28): FestivalEntryExtractor, FestivalEntryExtractorConfig, analyzeEventDays(), appendOtherPlaces(), applyYearCorrection(), DatedDraft, EntryResolverDeps, EventDaysAnalysis (+20 more)
+Nodes (30): FestivalEntryExtractor, analyzeEventDays(), appendOtherPlaces(), applyYearCorrection(), DatedDraft, EventDaysAnalysis, FestivalEntryDraft, FestivalEntryDraftSchema (+22 more)
 
-### Community 166 - "check-duplicate.ts"
-Cohesion: 0.15
-Nodes (21): COMMON_PREFIX_RATIO, DEDUP_DISTANCE_KM, DEDUP_TIME_WINDOW_MS, LEVENSHTEIN_FALLBACK, LEVENSHTEIN_FAST_PATH, LLM_PROBABILITY_THRESHOLD, buildPrompt(), commonPrefixRatio() (+13 more)
+### Community 166 - "NormalizedEvent"
+Cohesion: 0.20
+Nodes (13): asMs(), differs(), EDITION_WINDOW_DAYS, ExistingEntry, isRadarEntry(), matchEdition(), RadarPublisher, text() (+5 more)
 
 ### Community 167 - "smoke-put.ts"
 Cohesion: 0.73
 Nodes (5): bytesToHex(), check(), hexToBytes(), main(), signEvent()
 
-### Community 168 - "LLMProvider"
-Cohesion: 0.14
-Nodes (5): PageDiscovery, PublishOutcome, extractAddressFromSearchPage(), PageDiscovery, LLMProvider
+### Community 168 - "api-publisher.ts"
+Cohesion: 0.32
+Nodes (3): APIPublisher, PublishOutcome, PublishResult
 
-### Community 169 - "year-inference.ts"
+### Community 169 - "db-benchmark.ts"
+Cohesion: 0.18
+Nodes (17): BenchmarkReport, buildReport(), CliArgs, computeStats(), CSV_HEADER, csvEscape(), DbEvent, FetcherMode (+9 more)
+
+### Community 170 - "TestRunner"
 Cohesion: 0.33
-Nodes (5): correctEventYear(), FULL_DAY_NAMES, normalizeDayName(), replaceYear(), weekdayOf()
+Nodes (3): TestRunner, TestFixtureMetadata, TestReport
+
+### Community 171 - "compare.ts"
+Cohesion: 0.36
+Nodes (8): compareReports(), ComparisonEntry, findLatestSnapshots(), formatDelta(), loadSnapshot(), main(), ResultKey, statusIcon()
+
+### Community 172 - "publish.html — Mobile Publisher"
+Cohesion: 0.42
+Nodes (8): Canonical JSON fixed key order for signature integrity, Diving Deeper topic: Signing events with Ed25519, publish.html — Mobile Publisher, signing.js shared signing utilities, bytesToHex(), loadOrCreateKeypair(), signEvent(), Canonical Event Data Format & Ed25519 Signature Verification
+
+### Community 175 - "festivals.test.mjs"
+Cohesion: 0.29
+Nodes (3): {
+  isRadarEntry,
+  toFestival,
+  toFestivals,
+  addDays,
+  radarWindow,
+  buildRadarUrl,
+  loadRadarEvents,
+  monthChips,
+  monthLabel,
+  filterFestivals,
+  groupFestivals,
+  fmtFestivalRange,
+  byStartThenName,
+  haversineKm,
+  withDistance,
+  byDistance,
+  fmtDistance,
+  groupPins,
+  fitPoints,
+}, sample, win
 
 ## Ambiguous Edges - Review These
 - `Event Editing UI (PUT /events/:id)` → `REST API Endpoints (events, admin/blocklist)`  [AMBIGUOUS]
@@ -464,9 +506,9 @@ Nodes (5): correctEventYear(), FULL_DAY_NAMES, normalizeDayName(), replaceYear()
   HOW-TO-USE.md · relation: conceptually_related_to
 
 ## Knowledge Gaps
-- **458 isolated node(s):** `manifest_version`, `name`, `version`, `minimum_chrome_version`, `description` (+453 more)
+- **475 isolated node(s):** `manifest_version`, `name`, `version`, `minimum_chrome_version`, `description` (+470 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **105 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **107 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -479,9 +521,9 @@ _Questions this graph is uniquely positioned to answer:_
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
 - **What is the exact relationship between `LLM provider configuration (openai/anthropic/openrouter; no Ollama)` and `Troubleshooting common errors`?**
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
-- **Why does `LLMProvider` connect `LLMProvider` to `shared/extractors/event-extractor.ts`, `worker/src/index.ts`, `TestResult`, `test-runner.ts`, `festival-entry.ts`, `check-duplicate.ts`, `llm.ts`, `ExtractedEvent`, `test-scout.ts`, `OllamaProvider`, `test-radar.ts`, `crawler.ts`, `crawler-adapter.ts`, `normalizer.ts`?**
-  _High betweenness centrality (0.073) - this node is a cross-community bridge._
-- **Why does `Tokoro Worker — Technical Specification` connect `Tokoro Worker — Technical Specification` to `Canonical Event Data Format & Ed25519 Signature Verification`, `worker/src/index.ts`, `Tracing an Event from Browser to Database`?**
-  _High betweenness centrality (0.053) - this node is a cross-community bridge._
-- **Why does `encode()` connect `worker/src/index.ts` to `Tokoro Worker — Technical Specification`, `check-duplicate.ts`?**
-  _High betweenness centrality (0.045) - this node is a cross-community bridge._
+- **Why does `LLMProvider` connect `LLMProvider` to `shared/extractors/event-extractor.ts`, `worker/src/index.ts`, `test-runner.ts`, `test-radar.ts`, `api-publisher.ts`, `db-benchmark.ts`, `test-scout.ts`, `llm.ts`, `TestRunner`, `radar.ts`, `crawler.ts`, `crawler-adapter.ts`, `normalizer.ts`?**
+  _High betweenness centrality (0.076) - this node is a cross-community bridge._
+- **Why does `Tokoro Worker — Technical Specification` connect `Tokoro Worker — Technical Specification` to `web-publisher/index.html — Event Publisher (legacy manual form)`, `worker/src/index.ts`, `publish.html — Mobile Publisher`, `Tracing an Event from Browser to Database`?**
+  _High betweenness centrality (0.044) - this node is a cross-community bridge._
+- **Why does `createLLMProvider()` connect `llm.ts` to `worker/src/index.ts`, `test-runner.ts`, `db-benchmark.ts`, `TestRunner`, `radar.ts`, `query-shared.ts`, `crawler-adapter.ts`, `crawler-worker/src/index.ts`?**
+  _High betweenness centrality (0.042) - this node is a cross-community bridge._

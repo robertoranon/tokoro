@@ -414,10 +414,10 @@
     "semantic_hash": "364d124f2a4fe84f339c67946dbdfe41"
   },
   "public-web/inject-worker-url.js": {
-    "mtime": 1778759138.5081027,
-    "seen": 1787675060.302272,
-    "ast_hash": "84c84a50eb64f9a5c91efdf92d32c85d",
-    "semantic_hash": "84c84a50eb64f9a5c91efdf92d32c85d"
+    "mtime": 1790843784.2800312,
+    "seen": 1790843856.5542579,
+    "ast_hash": "e3fd9f6610a1be5b18c41d9b9d010e8d",
+    "semantic_hash": ""
   },
   "public-web/publish.manifest.json": {
     "mtime": 1778759138.509384,
@@ -714,9 +714,9 @@
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1790776962.6060388,
-    "seen": 1790777018.9445288,
-    "ast_hash": "0f6886a435e2c0450af795f24baf461c",
+    "mtime": 1790843784.278123,
+    "seen": 1790843856.554761,
+    "ast_hash": "a4899f6f35737cffa00ca736928f2850",
     "semantic_hash": ""
   },
   "HOW-TO-USE.md": {
@@ -870,15 +870,15 @@
     "semantic_hash": "cd87d80df9985defd7324c59862d92ca"
   },
   "public-web/README.md": {
-    "mtime": 1778759138.5065393,
-    "seen": 1787675060.3022988,
-    "ast_hash": "0ddb0ba3a8594effbbf05f0a4253bd62",
-    "semantic_hash": "0ddb0ba3a8594effbbf05f0a4253bd62"
+    "mtime": 1790843784.278454,
+    "seen": 1790843856.555062,
+    "ast_hash": "3ff9f96be9c014d6aa5e9c5b99b36f37",
+    "semantic_hash": ""
   },
   "public-web/SPECS.md": {
-    "mtime": 1790760403.990807,
-    "seen": 1790760405.3956962,
-    "ast_hash": "d1a5f951ca52ff0a50ee324e0757a8fa",
+    "mtime": 1790843784.2791684,
+    "seen": 1790843856.555062,
+    "ast_hash": "0f08038886d85f98099bc64d08ddb7f8",
     "semantic_hash": ""
   },
   "public-web/index.html": {
@@ -1131,6 +1131,36 @@
     "mtime": 1790835479.985196,
     "seen": 1790841536.194402,
     "ast_hash": "1acb63c45a21b457ca581e9d725a8f7a",
+    "semantic_hash": ""
+  },
+  "public-web/festivals.js": {
+    "mtime": 1790843784.2796645,
+    "seen": 1790843856.554247,
+    "ast_hash": "f29a74355cc7b03e09c2df7e4c57acb7",
+    "semantic_hash": ""
+  },
+  "public-web/tests/festivals.smoke.mjs": {
+    "mtime": 1790843784.2802536,
+    "seen": 1790843856.5543082,
+    "ast_hash": "aa242f8a970641b7715af3baca3277be",
+    "semantic_hash": ""
+  },
+  "public-web/tests/festivals.test.mjs": {
+    "mtime": 1790843784.2804573,
+    "seen": 1790843856.5543091,
+    "ast_hash": "b734d36462d486aaa0b2794ad9afa7e8",
+    "semantic_hash": ""
+  },
+  "public-web/tests/inject.test.mjs": {
+    "mtime": 1790843784.280564,
+    "seen": 1790843856.5543208,
+    "ast_hash": "b05598238fbbf89bfb1f44078a01a42a",
+    "semantic_hash": ""
+  },
+  "public-web/festivals.html": {
+    "mtime": 1790843784.2793965,
+    "seen": 1790843856.555063,
+    "ast_hash": "9971e0d878346fbd5bdb786d7db545ce",
     "semantic_hash": ""
   }
 }

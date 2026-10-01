@@ -6,10 +6,10 @@
     "word_count": 740
   },
   "CLAUDE.md": {
-    "size": 6351,
-    "mtime_ns": 1790776962606038919,
-    "indexed_at_ns": 1790777017823223000,
-    "word_count": 869
+    "size": 6438,
+    "mtime_ns": 1790843784278122846,
+    "indexed_at_ns": 1790843855198406000,
+    "word_count": 881
   },
   "HOW-TO-USE.md": {
     "size": 20384,
@@ -729,19 +729,16 @@
     }
   },
   "public-web/README.md": {
-    "size": 7233,
-    "mtime_ns": 1778759138506539254,
-    "indexed_at_ns": 1787672794509288000,
-    "word_count": 1009,
-    "hashes": {
-      "public-web/readme.md": "e32ae9e8469d9b2bf0d39e4aba9bac4484267bf5d7e2edc9d21e06c04e9cae50"
-    }
+    "size": 7710,
+    "mtime_ns": 1790843784278454022,
+    "indexed_at_ns": 1790843855363038000,
+    "word_count": 1066
   },
   "public-web/SPECS.md": {
-    "size": 12280,
-    "mtime_ns": 1790760403990806979,
-    "indexed_at_ns": 1790761406683198000,
-    "word_count": 1886
+    "size": 16570,
+    "mtime_ns": 1790843784279168417,
+    "indexed_at_ns": 1790843855363883000,
+    "word_count": 2565
   },
   "public-web/bookmarklet.src.js": {
     "size": 1704,
@@ -780,10 +777,10 @@
     }
   },
   "public-web/inject-worker-url.js": {
-    "size": 3806,
-    "mtime_ns": 1778759138508102631,
-    "indexed_at_ns": 1787672746265051000,
-    "word_count": 398
+    "size": 3969,
+    "mtime_ns": 1790843784280031149,
+    "indexed_at_ns": 1790843855368985000,
+    "word_count": 416
   },
   "public-web/it.html": {
     "size": 36937,
@@ -1342,5 +1339,35 @@
     "mtime_ns": 1790832884735068327,
     "indexed_at_ns": 1790841535063431000,
     "word_count": 177
+  },
+  "public-web/festivals.html": {
+    "size": 25296,
+    "mtime_ns": 1790843784279396590,
+    "indexed_at_ns": 1790843855365884000,
+    "word_count": 1886
+  },
+  "public-web/festivals.js": {
+    "size": 9358,
+    "mtime_ns": 1790843784279664514,
+    "indexed_at_ns": 1790843855366482000,
+    "word_count": 1365
+  },
+  "public-web/tests/festivals.smoke.mjs": {
+    "size": 15118,
+    "mtime_ns": 1790843784280253572,
+    "indexed_at_ns": 1790843855376236000,
+    "word_count": 1531
+  },
+  "public-web/tests/festivals.test.mjs": {
+    "size": 17269,
+    "mtime_ns": 1790843784280457161,
+    "indexed_at_ns": 1790843855377058000,
+    "word_count": 1680
+  },
+  "public-web/tests/inject.test.mjs": {
+    "size": 1854,
+    "mtime_ns": 1790843784280564081,
+    "indexed_at_ns": 1790843855378359000,
+    "word_count": 192
   }
 }
