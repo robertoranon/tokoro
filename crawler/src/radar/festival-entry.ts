@@ -331,6 +331,16 @@ export function stripEdition(name: string): string {
   return stripped || name;
 }
 
+/** Lowercase, accents stripped, whitespace collapsed. */
+function normalizePlace(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
  * Description plus "Also takes place in: A, B." for the places not already
  * mentioned in it or covered by the principal site (venue_name / address).
@@ -341,11 +351,17 @@ function appendOtherPlaces(
 ): string | undefined {
   const description = d.description?.trim();
   if (!places?.length) return d.description;
-  const text = (description ?? '').toLowerCase();
-  const site = [d.venue_name, d.address].map(v => (v ?? '').toLowerCase());
+  const text = normalizePlace(description ?? '');
+  const venue = normalizePlace(d.venue_name ?? '');
+  const segments = (d.address ?? '').split(',').map(normalizePlace);
   const fresh = places.filter(p => {
-    const lower = p.toLowerCase();
-    return !text.includes(lower) && !site.some(s => s.includes(lower));
+    const norm = normalizePlace(p);
+    if (!norm || norm === venue || segments.includes(norm)) return false;
+    const escaped = norm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return !new RegExp(
+      `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`,
+      'u'
+    ).test(text);
   });
   if (!fresh.length) return d.description;
   const sentence = `Also takes place in: ${fresh.join(', ')}.`;

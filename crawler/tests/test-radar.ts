@@ -1977,9 +1977,9 @@ console.log('\n=== other_places (additional festival places) ===\n');
     fin({
       address: 'Via X 1, Udine',
       venue_name: 'Teatro Nuovo',
-      other_places: ['Udine', 'teatro', 'Gemona'],
+      other_places: ['Udine', 'Gemona'],
     }).description === 'Also takes place in: Gemona.',
-    'finalize skips places equal to / contained in venue_name or address'
+    'finalize skips places equal to an address segment'
   );
   assert(
     fin({ description: 'Nice.', address: 'Udine', other_places: ['udine'] })
@@ -2000,6 +2000,73 @@ console.log('\n=== other_places (additional festival places) ===\n');
     twice.description === once.description,
     'finalize is idempotent on an already-finalized description'
   );
+  // Whole-word / equality dedupe (no plain substring matching).
+  const places = (o: object) =>
+    fin(o).description?.replace(/^.*Also takes place in: /, '');
+  assert(
+    places({ description: 'Palazzo concerts.', other_places: ['Ala'] }) ===
+      'Ala.',
+    "'Ala' is not present in 'Palazzo'"
+  );
+  assert(
+    places({ description: 'Not troubled.', other_places: ['Bled'] }) ===
+      'Bled.',
+    "'Bled' is not present in 'troubled'"
+  );
+  assert(
+    fin({
+      description: 'Concerts in Gemona del Friuli.',
+      other_places: ['Gemona'],
+    }).description === 'Concerts in Gemona del Friuli.',
+    "'Gemona' is present in 'Gemona del Friuli' (whole word)"
+  );
+  assert(
+    places({ address: 'Via Gorizia 5, Udine', other_places: ['Gorizia'] }) ===
+      'Gorizia.',
+    "'Gorizia' kept for address 'Via Gorizia 5, Udine'"
+  );
+  assert(
+    fin({ address: 'Via Gorizia 5, Udine', other_places: ['Udine'] })
+      .description === undefined,
+    "'Udine' dropped for address 'Via Gorizia 5, Udine'"
+  );
+  assert(
+    fin({ address: 'Via Fametta 1, Bollate', other_places: ['Bollate'] })
+      .description === undefined,
+    "'Bollate' dropped for address 'Via Fametta 1, Bollate'"
+  );
+  assert(
+    fin({ description: 'Live at Sónar.', other_places: ['Sonar'] })
+      .description === 'Live at Sónar.',
+    'accent-insensitive match against the description'
+  );
+  assert(
+    fin({ venue_name: 'Teatro  Nuovo', other_places: ['TEATRO nuovo'] })
+      .description === undefined,
+    'place equal to venue_name ignoring case and whitespace is dropped'
+  );
+  assert(
+    fin({ venue_name: 'Café Ré', other_places: ['cafe re'] }).description ===
+      undefined,
+    'place equal to venue_name ignoring accents is dropped'
+  );
+  assert(
+    fin({ venue_name: 'Teatro Nuovo', other_places: ['Teatro'] })
+      .description === 'Also takes place in: Teatro.',
+    'a place merely contained in venue_name is kept'
+  );
+  assert(
+    places({
+      description: 'Villa Nord only.',
+      other_places: ['Villa (Nord)'],
+    }) === 'Villa (Nord).' &&
+      fin({
+        description: 'At Villa (Nord) too.',
+        other_places: ['Villa (Nord)'],
+      }).description === 'At Villa (Nord) too.',
+    'regex metacharacters in a place name are literal'
+  );
+
   const f2 = fin({ tags: ['Jazz'], other_places: ['Gemona'] });
   assert(
     f2.festival_name === 'F' &&
