@@ -14,6 +14,8 @@ import {
   type Candidate,
   type ScoutState,
 } from '../src/scout/candidates.js';
+import { extractLinks } from '../src/scout/links.js';
+import type { FetchedPage } from '../src/types/event.js';
 
 let passed = 0;
 let failed = 0;
@@ -611,6 +613,94 @@ console.log(
       .length === 1,
     'valid prefixed keys accepted'
   );
+}
+
+console.log('\n=== extractLinks ===\n');
+{
+  const page = (html: string, text = ''): FetchedPage => ({
+    url: 'https://agg.example/list/',
+    html,
+    text,
+    title: 'List',
+  });
+
+  const links = extractLinks(
+    page(`<html><body>
+      <a href="/f/terraforma">  Terraforma
+         2026 </a>
+      <a href="https://www.sonar.example/en?x=1#top">Sónar</a>
+      <a href="https://facebook.com/terra">FB</a>
+      <a href="https://instagram.com/terra">IG</a>
+      <a href="mailto:a@b.example">mail</a>
+      <a href="tel:123">tel</a>
+      <a href="javascript:void(0)">js</a>
+      <a href="#section">anchor</a>
+      <a href="/list/">self</a>
+      <a href="/f/terraforma">Terraforma again</a>
+      <a href="https://img.example/x"></a>
+    </body></html>`)
+  );
+  const byUrl = new Map(links.map(l => [l.url, l.text]));
+  assert(
+    byUrl.get('https://agg.example/f/terraforma') === 'Terraforma 2026',
+    'relative href resolved; anchor text whitespace collapsed'
+  );
+  assert(
+    byUrl.has('https://www.sonar.example/en?x=1'),
+    'absolute href kept; hash dropped, query kept'
+  );
+  assert(
+    ![...byUrl.keys()].some(u => /facebook|instagram/.test(u)),
+    'social links dropped'
+  );
+  assert(
+    ![...byUrl.keys()].some(u => /^(mailto|tel|javascript)/.test(u)),
+    'mailto/tel/javascript dropped'
+  );
+  assert(
+    !byUrl.has('https://agg.example/list/') &&
+      !byUrl.has('https://agg.example/list'),
+    'self links dropped'
+  );
+  assert(
+    links.filter(l => l.url === 'https://agg.example/f/terraforma').length ===
+      1,
+    'duplicates removed (first anchor text wins)'
+  );
+  assert(
+    byUrl.get('https://img.example/x') === 'img.example',
+    'empty anchor text falls back to the hostname'
+  );
+
+  const long = extractLinks(page(`<a href="/x">${'w'.repeat(200)}</a>`));
+  assert(long[0].text.length === 80, 'anchor text capped at 80 chars');
+
+  const many = extractLinks(
+    page(
+      Array.from({ length: 20 }, (_, i) => `<a href="/p${i}">p${i}</a>`).join(
+        ''
+      )
+    ),
+    5
+  );
+  assert(
+    many.length === 5 && many[0].url.endsWith('/p0'),
+    'cap keeps the first N links in page order'
+  );
+
+  const md = extractLinks(
+    page(
+      '',
+      'See [Terraforma](https://terra.example/) and [FB](https://facebook.com/x) and [Local](/rel)'
+    )
+  );
+  assert(
+    md.length === 1 &&
+      md[0].url === 'https://terra.example/' &&
+      md[0].text === 'Terraforma',
+    'markdown links are the fallback when html is empty (social dropped, relative markdown links ignored)'
+  );
+  assert(extractLinks(page('')).length === 0, 'nothing to extract → []');
 }
 
 // --- add new test sections above this line ---
