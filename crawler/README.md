@@ -223,6 +223,7 @@ Legitimate parallel events (different stages or acts running at the same time) a
 - **Validation**: `festivals.yaml` is validated up front; any error (bad URL, duplicate URL, wrong field type, unknown `status`) exits 1 before anything is crawled. No active festivals: warning, exit 0
 - **Outcomes** per festival: `published`, `updated`, `unchanged`, `skipped_no_dates` (no dates announced, or the edition already ended), `failed`. The run exits 1 if any festival failed
 - **Staleness report**: each run appends to `logs/runs.jsonl` and prints active festivals with no `published`/`updated`/`unchanged` result in their last 4 runs (dead source, or between editions)
+- **Updates**: an existing entry is only re-published (`PUT`) when something that matters to the radar changed: dates, category, a move of more than ~500 m, or a previously empty description now filled. Wording differences between runs are ignored, since LLM output varies
 - **Safety**: an existing entry is only ever updated if it looks like a radar entry (tagged `festival` and with the radar date shape: start `T00:00:00`, end `T23:59:59`), so program events from Festival Mode under the same `festival_url` are never overwritten
 - **Scheduling**: `0 10 * * 1  cd /path/to/tokoro/crawler && /absolute/path/to/npm run radar >> logs/radar.log 2>&1` (cron's PATH usually lacks npm: find it with `which npm`; `logs/` is gitignored)
 - **Tests**: `npm run test:radar` (offline); `npm run smoke:radar` (needs `wrangler dev`)

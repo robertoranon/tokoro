@@ -952,25 +952,62 @@ console.log('\n=== differs ===\n');
     "null vs '' and tag order are not differences"
   );
   assert(
-    !differs(existing, { ...same, lat: 45.5003, lng: 9.1004 }),
-    'geocoder jitter (<~50 m) is not a difference'
+    !differs(existing, { ...same, lat: 45.503, lng: 9.103 }),
+    'a move within ~500 m (geocoder jitter) is not a difference'
   );
   assert(
     differs(existing, { ...same, lat: 45.52 }),
-    'a real move is a difference'
+    'a real move (lat) is a difference'
+  );
+  assert(
+    differs(existing, { ...same, lng: 9.12 }),
+    'a real move (lng) is a difference'
   );
   assert(
     differs(existing, { ...same, end_time: '2026-06-22T23:59:59' }),
     'changed end_time'
   );
   assert(
-    differs(existing, { ...same, description: 'New blurb' }),
-    'changed description'
+    differs(existing, { ...same, start_time: '2026-06-19T00:00:00' }),
+    'changed start_time'
   );
-  assert(differs(existing, { ...same, tags: ['festival'] }), 'changed tags');
+  assert(differs(existing, { ...same, category: 'art' }), 'changed category');
   assert(
-    differs(existing, { ...same, festival_name: 'Terra' }),
-    'changed festival_name (unsigned metadata)'
+    differs(existing, { ...same, description: 'New blurb' }),
+    'stored description empty + new non-empty → gap fill is a difference'
+  );
+  assert(
+    !differs(
+      { ...existing, description: 'Old blurb' },
+      { ...same, description: '' }
+    ),
+    'stored description non-empty + new empty → not a difference'
+  );
+  assert(
+    !differs(
+      { ...existing, description: 'Old blurb' },
+      { ...same, description: 'Reworded blurb' }
+    ),
+    'reworded description is not a difference'
+  );
+  assert(
+    !differs(existing, { ...same, tags: ['festival'] }),
+    'changed tags are not a difference'
+  );
+  assert(
+    !differs(existing, { ...same, festival_name: 'Terra' }),
+    'changed festival_name is not a difference'
+  );
+  assert(
+    !differs(existing, {
+      ...same,
+      title: 'Terraforma Festival 2026',
+      url: 'https://terra.example/en',
+      venue_name: 'Villa Arconati',
+      address: 'Bollate (MI)',
+      tags: ['festival', 'techno'],
+    }),
+    'reworded title/url/venue_name/address/tags together are not a difference'
   );
 }
 

@@ -35,8 +35,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const LOOKUP_FROM = '1970-01-01T00:00:00';
 const LOOKUP_TO = '2999-12-31T23:59:59';
 
-// ~50 m: absorbs geocoder jitter between weekly runs so it never causes a PUT.
-const COORD_TOLERANCE = 0.0005;
+// ~500 m: a move within a town is not a radar-level change; absorbs geocoder
+// jitter between weekly runs. Real moves are detected via coordinates only.
+const COORD_TOLERANCE = 0.005;
 
 /**
  * Festival-mode program events carry the same pubkey and festival_url as a
@@ -77,26 +78,23 @@ export function matchEdition(
 
 const text = (v: string | null | undefined) => v ?? '';
 
-/** True if publishing `next` over `existing` would change anything visible. */
+/**
+ * True only for changes that matter to the radar: dates, category, a real
+ * move (coordinates), or filling a previously empty description. LLM output
+ * varies between runs (titles, blurbs, venue/address text, tags), so wording
+ * differences never trigger a PUT; when a PUT happens the whole event is sent.
+ */
 export function differs(
   existing: ExistingEntry,
   next: NormalizedEvent
 ): boolean {
-  const tags = (t: string[] | undefined) =>
-    [...(t ?? [])].sort().join('\u0000');
-  return !(
-    existing.title === next.title &&
-    text(existing.description) === text(next.description) &&
-    text(existing.url) === text(next.url) &&
-    text(existing.venue_name) === text(next.venue_name) &&
-    text(existing.address) === text(next.address) &&
-    Math.abs(existing.lat - next.lat) <= COORD_TOLERANCE &&
-    Math.abs(existing.lng - next.lng) <= COORD_TOLERANCE &&
-    existing.start_time === next.start_time &&
-    text(existing.end_time) === text(next.end_time) &&
-    existing.category === next.category &&
-    text(existing.festival_name) === text(next.festival_name) &&
-    tags(existing.tags) === tags(next.tags)
+  return (
+    existing.start_time !== next.start_time ||
+    text(existing.end_time) !== text(next.end_time) ||
+    existing.category !== next.category ||
+    Math.abs(existing.lat - next.lat) > COORD_TOLERANCE ||
+    Math.abs(existing.lng - next.lng) > COORD_TOLERANCE ||
+    (text(existing.description) === '' && text(next.description) !== '')
   );
 }
 
