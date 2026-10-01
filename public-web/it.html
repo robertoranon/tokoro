@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,800..900&family=Poppins:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
     <style>
@@ -20,7 +20,7 @@
       }
 
       body {
-        font-family: 'Figtree', sans-serif;
+        font-family: 'Poppins', sans-serif;
         background: var(--bg);
         color: var(--text);
         min-height: 100vh;
@@ -238,7 +238,7 @@
         padding: 10px 12px;
         border: 1.5px solid var(--border);
         border-radius: var(--radius-sm);
-        font-family: 'Figtree', sans-serif;
+        font-family: 'Poppins', sans-serif;
         font-size: 13.5px;
         color: var(--text);
         background: var(--surface);
@@ -296,7 +296,7 @@
         border: none;
         border-radius: var(--radius-sm);
         cursor: pointer;
-        font-family: 'Figtree', sans-serif;
+        font-family: 'Poppins', sans-serif;
         font-size: 13.5px;
         font-weight: 600;
         transition:
@@ -467,7 +467,6 @@
         box-shadow:
           0 1px 3px rgba(0, 0, 0, 0.04),
           0 4px 12px rgba(0, 0, 0, 0.04);
-        animation: fadeInUp 0.35s ease both;
       }
       .event-card:hover {
         box-shadow:
@@ -671,16 +670,6 @@
           transform: rotate(360deg);
         }
       }
-      @keyframes fadeInUp {
-        from {
-          opacity: 0;
-          transform: translateY(10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
 
       /* TOOLS SECTION */
       .tools-section {
@@ -878,7 +867,24 @@
     </style>
     <link rel="stylesheet" href="theme.css" />
   </head>
-  <body>
+  <body data-page="browse">
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker__track">
+        <span>Festival poco noti in tutta Europa</span
+        ><span>Musica · Arte · Spettacolo</span
+        ><span>Segui chi ha i tuoi gusti</span><span>Pubblica un festival</span>
+        <span>Festival poco noti in tutta Europa</span
+        ><span>Musica · Arte · Spettacolo</span
+        ><span>Segui chi ha i tuoi gusti</span><span>Pubblica un festival</span>
+      </div>
+    </div>
+    <nav class="site-bar" aria-label="Main">
+      <a class="site-bar__logo" href="it.html">Tokoro</a>
+      <a class="site-bar__link" href="it.html" aria-current="page">Esplora</a>
+      <a class="site-bar__link" href="festivals.html">Festival</a>
+      <a class="site-bar__link" href="map.html">Mappa</a>
+      <a class="site-bar__cta" href="publish.html">Pubblica</a>
+    </nav>
     <header class="site-header">
       <div class="lang-selector">
         <a class="lang-selector__link" id="langSwitchLink" href="/index.html"

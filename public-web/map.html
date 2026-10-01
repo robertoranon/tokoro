@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,800..900&family=Poppins:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
     <link
@@ -25,7 +25,7 @@
 
       body {
         font-family:
-          'Figtree',
+          'Poppins',
           -apple-system,
           BlinkMacSystemFont,
           'Segoe UI',
@@ -297,7 +297,26 @@
     </style>
     <link rel="stylesheet" href="theme.css" />
   </head>
-  <body>
+  <body data-page="map">
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker__track">
+        <span>Under-the-radar festivals across Europe</span
+        ><span>Music · Art · Performance</span
+        ><span>Follow people with your taste</span
+        ><span>Publish a festival</span>
+        <span>Under-the-radar festivals across Europe</span
+        ><span>Music · Art · Performance</span
+        ><span>Follow people with your taste</span
+        ><span>Publish a festival</span>
+      </div>
+    </div>
+    <nav class="site-bar" aria-label="Main">
+      <a class="site-bar__logo" href="index.html">Tokoro</a>
+      <a class="site-bar__link" href="index.html">Browse</a>
+      <a class="site-bar__link" href="festivals.html">Festivals</a>
+      <a class="site-bar__link" href="map.html" aria-current="page">Map</a>
+      <a class="site-bar__cta" href="publish.html">Publish</a>
+    </nav>
     <header class="site-header">
       <div class="experimental-badge">
         <strong>⚠ Experimental</strong>
@@ -515,7 +534,7 @@
         const circle = L.circle(L.latLng(lat, lng), {
           radius: radiusKm * 1000,
           fill: false,
-          color: '#e8431f',
+          color: '#000000',
           weight: 2,
           opacity: 0.8,
         }).addTo(markerLayer);
@@ -557,7 +576,7 @@
               '</div>' +
               venueHtml +
               '<span style="display:inline-block;margin-top:6px;padding:2px 8px;' +
-              'border-radius:999px;font-size:11px;font-weight:600;color:var(--ink);' +
+              'font-size:11px;font-weight:600;color:var(--ink);' +
               'background:' +
               escHtml(c) +
               '">' +
@@ -576,8 +595,8 @@
           L.circleMarker([first.lat, first.lng], {
             radius: 9,
             fillColor: color,
-            color: '#ffffff',
-            weight: 2,
+            color: '#000000',
+            weight: 3,
             opacity: 1,
             fillOpacity: 1,
           })

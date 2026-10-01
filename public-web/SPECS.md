@@ -262,16 +262,17 @@ A read-only browse page for the festivals on the radar (entries published by the
 
 **Known limitations:** as program events accumulate, `has_festival=1` returns more pages than radar entries (a worker-side `radar` filter would remove that); one pin per location (secondary places of a multi-place festival are in the description text only); the page does not paginate the rendered list.
 
-
 ---
 
-## Visual style ("sunny")
+## Visual style (bold per-page colour)
 
-All pages share `theme.css`, linked after each page's inline `<style>`. Pages keep layout CSS only; every design token (`:root` variables) and the colour, outline and shadow components live in `theme.css`.
+All pages share `theme.css`, linked after each page's inline `<style>`. Pages keep layout CSS only; design tokens (`:root` variables) and colour, type and line work live in `theme.css`. Each `<body>` carries `data-page` (browse and it = blue, festivals = magenta, map = lime, publish = violet, privacy = yellow), which sets `--page`, the full-bleed page colour.
 
-- **Look:** cream page (`--bg`), white cards with hairline warm borders (`--stroke`, `--line`), 20px card radius, pill buttons, no drop shadows, flat fills (yellow buttons without outlines, borderless pastel badges), Figtree 700-800 for headings and the wordmark. The coral accent sits on the `<em>` in the page title. Form controls use the darker `--line-input` so their edges stay visible (3:1).
-- **Accent:** yellow `--accent` is a fill colour only; coloured text uses `--link`; focus rings and hover accents use coral `--accent-2`.
-- **Categories:** the 13 `--cat-*` tokens are flat fills with dark text. The `CAT_COLORS` maps in `query.js`, `map.html` and `festivals.html` must equal these tokens.
-- **Maps:** Leaflet options cannot use CSS variables, so marker colours are literals: white ring (`#ffffff`), weight 2, full fill opacity; the search-radius circle is coral (`#e8431f`).
-- **Contrast and focus:** text is near-black on light fills, and the yellow accent is never used as text. Links and buttons show a 3px coral focus outline; inputs show a dark border plus a soft coral ring.
-- **Guard:** `tests/theme.test.mjs` enforces that every page links `theme.css` after its inline CSS, that no dark-theme colours or inline `:root` blocks remain, that `--accent` is never a text colour, and that `CAT_COLORS` match the tokens.
+- **Look:** full-bleed page colour, white cards with 2px black borders, black blocks with white text, square corners, no soft shadows. Hover lifts a card with a hard 5px black offset shadow.
+- **Type:** Archivo 800-900 (expanded, uppercase) for headings and the wordmark; Poppins 400-600 for body text.
+- **Chrome:** a yellow scrolling ticker above a sticky black nav bar (logo, Browse / Festivals / Map, yellow Publish button). The page `<header>` acts as the hero: a large title with an outlined `<em>`, plus an intro line. The map page uses a compact header so the map keeps the viewport.
+- **Colour rules:** text is black on every saturated background; white text appears only on black. Yellow is a fill and the focus halo. Black on violet is about 4.5:1.
+- **Categories:** the 13 `--cat-*` tokens are unchanged. The `CAT_COLORS` maps in `query.js`, `map.html` and `festivals.html` must equal them. `.cat-tab` is the category label on a card edge (`.tab` belongs to the publish page's own tabs).
+- **Motion:** ticker scroll, hero and card rise-in, card hover lift. All of it is disabled under `prefers-reduced-motion`. Keyframes must set opacity in `to`, or elements stay hidden.
+- **Maps:** Leaflet options cannot use CSS variables, so marker colours are literals: black ring (`#000000`), weight 3, full fill opacity; the search-radius circle is black. `.leaflet-container` is `isolation: isolate` so map controls never overlap the sticky bar.
+- **Guard:** `tests/theme.test.mjs` enforces the tokens, the `theme.css` link order, per-page `data-page`, fonts, ticker and nav bar, no legacy dark colours, no inline `:root`, category-colour parity, reduced-motion support, safe keyframes and no soft shadows.

@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,800..900&family=Poppins:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
     <link
@@ -27,7 +27,7 @@
       }
       body {
         font-family:
-          'Figtree',
+          'Poppins',
           -apple-system,
           BlinkMacSystemFont,
           'Segoe UI',
@@ -351,7 +351,28 @@
     </style>
     <link rel="stylesheet" href="theme.css" />
   </head>
-  <body>
+  <body data-page="festivals">
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker__track">
+        <span>Under-the-radar festivals across Europe</span
+        ><span>Music · Art · Performance</span
+        ><span>Follow people with your taste</span
+        ><span>Publish a festival</span>
+        <span>Under-the-radar festivals across Europe</span
+        ><span>Music · Art · Performance</span
+        ><span>Follow people with your taste</span
+        ><span>Publish a festival</span>
+      </div>
+    </div>
+    <nav class="site-bar" aria-label="Main">
+      <a class="site-bar__logo" href="index.html">Tokoro</a>
+      <a class="site-bar__link" href="index.html">Browse</a>
+      <a class="site-bar__link" href="festivals.html" aria-current="page"
+        >Festivals</a
+      >
+      <a class="site-bar__link" href="map.html">Map</a>
+      <a class="site-bar__cta" href="publish.html">Publish</a>
+    </nav>
     <header class="site-header">
       <div class="experimental-badge"><strong>⚠ Experimental</strong></div>
       <div class="header-inner">
@@ -661,8 +682,8 @@
             const marker = L.circleMarker([pin.lat, pin.lng], {
               radius: 9,
               fillColor: color,
-              color: '#ffffff',
-              weight: 2,
+              color: '#000000',
+              weight: 3,
               opacity: 1,
               fillOpacity: 1,
             })
