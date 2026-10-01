@@ -112,3 +112,4 @@ Rules:
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- The generated graph files (graph.json, GRAPH_REPORT.md, graph.html, ...) are gitignored local artifacts. After a fresh clone or worktree, run `graphify update .` once to create them (AST-only, no API cost). The full `/graphify --update` also extracts docs semantically and reuses the committed cache in graphify-out/cache/semantic/.
