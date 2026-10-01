@@ -433,6 +433,186 @@ candidates:
   );
 }
 
+console.log(
+  '\n=== review fixes: urlKey variants, strict inbox/state parsing ===\n'
+);
+{
+  assert(
+    urlKey('https://fest.example/en') === 'fest.example',
+    'language-only path /en -> root'
+  );
+  assert(
+    urlKey('https://fest.example/it/') === 'fest.example',
+    'language-only path /it/ -> root'
+  );
+  assert(
+    urlKey('https://fest.example/index.html') === 'fest.example',
+    'index.html -> root'
+  );
+  assert(
+    urlKey('https://fest.example/index.htm') === 'fest.example',
+    'index.htm -> root'
+  );
+  assert(
+    urlKey('https://fest.example/index.php') === 'fest.example',
+    'index.php -> root'
+  );
+  assert(
+    urlKey('https://fest.example/en/program') === 'fest.example/program',
+    'leading language segment stripped'
+  );
+  assert(
+    urlKey('https://fest.example/en/index.html') === 'fest.example',
+    'language + index'
+  );
+  assert(
+    urlKey('https://fest.example/ab') === 'fest.example/ab',
+    'unknown two-letter segment kept'
+  );
+  assert(
+    urlKey('https://fest.example/en/it/x') === 'fest.example/it/x',
+    'only one language segment stripped'
+  );
+  assert(
+    urlKey('https://fest.example/english') === 'fest.example/english',
+    'longer segment not stripped'
+  );
+  assert(
+    urlKey('https://fest.example/a/index.html') === 'fest.example/a',
+    'nested index.html stripped'
+  );
+
+  const known = new Set<string>();
+  const rej: ScoutState = {
+    'u:alpha.example': { status: 'rejected', first_seen: '2026-01-01' },
+  };
+  assert(
+    mergeNewCandidates(
+      [{ name: 'Totally Different', url: 'https://alpha.example/', why: 'x' }],
+      {
+        source: 'S',
+        today: '2026-10-01',
+        known,
+        state: rej,
+      }
+    ).added.length === 0,
+    'a rejected URL key blocks a later candidate with a different name'
+  );
+  const nm = mergeNewCandidates(
+    [
+      { name: 'Night Garden', why: 'a' },
+      { name: 'Night Garden 2027', why: 'b' },
+      { name: 'Other Place', why: 'c' },
+    ],
+    { source: 'S', today: '2026-10-01', known, state: {} }
+  );
+  assert(
+    nm.added.map(c => c.name).join() === 'Night Garden,Other Place' &&
+      nm.skipped === 1,
+    'in-batch duplicates via name key only'
+  );
+
+  const withNotes: Candidate[] = [
+    {
+      name: 'N',
+      status: 'approved',
+      why: 'w',
+      source: 's',
+      found: '2026-07-25',
+      notes: 'check dates: "maybe"',
+    },
+  ];
+  assert(
+    JSON.stringify(parseCandidates(serializeCandidates(withNotes))) ===
+      JSON.stringify(withNotes),
+    'notes round-trip'
+  );
+
+  assert(
+    throws(() =>
+      parseCandidates('candidates:\n  - name: A\n    statuss: approved')
+    ),
+    'typo field statuss throws'
+  );
+  let msg = '';
+  try {
+    parseCandidates('candidates:\n  - name: A\n    bogus: 1');
+  } catch (e) {
+    msg = (e as Error).message;
+  }
+  assert(
+    msg ===
+      'Invalid candidates.yaml: "A" has unknown field "bogus". Allowed: name, url, status, why, source, found, dates_hint, location_hint, notes',
+    'unknown field message'
+  );
+
+  const st = (s: string) =>
+    parseCandidates(`candidates:\n  - name: A\n    status: ${s}`)[0].status;
+  assert(
+    st('Approved') === 'approved' &&
+      st('" PENDING "') === 'pending' &&
+      st('REJECTED') === 'rejected',
+    'status is case/space-insensitive'
+  );
+  msg = '';
+  try {
+    st('Maybe');
+  } catch (e) {
+    msg = (e as Error).message;
+  }
+  assert(
+    msg.includes('"Maybe"') && msg.includes('pending, approved, rejected'),
+    'invalid status quotes original and lists allowed'
+  );
+
+  const fd = (s: string) =>
+    parseCandidates(`candidates:\n  - name: A\n    found: ${s}`)[0].found;
+  assert(
+    fd('2026-07-25') === '2026-07-25' && fd('"2026-07-25"') === '2026-07-25',
+    'found: date and string accepted'
+  );
+  assert(fd('null') === '', 'found: null -> empty');
+  assert(
+    parseCandidates('candidates:\n  - name: A')[0].found === '',
+    'found: absent -> empty'
+  );
+  assert(
+    throws(() => fd('20260725')),
+    'found: number throws'
+  );
+  assert(
+    throws(() => fd('"2026-7-5"')),
+    'found: bad string throws'
+  );
+  msg = '';
+  try {
+    fd('"2026-7-5"');
+  } catch (e) {
+    msg = (e as Error).message;
+  }
+  assert(
+    msg ===
+      'Invalid candidates.yaml: "A" has invalid found "2026-7-5": expected YYYY-MM-DD',
+    'found error message'
+  );
+
+  assert(
+    throws(() =>
+      parseState('{"__proto__": {"status":"pending","first_seen":"x"}}')
+    ),
+    '__proto__ state key throws'
+  );
+  assert(
+    throws(() => parseState('{"x:a": {"status":"pending","first_seen":"x"}}')),
+    'state key without u:/n: prefix throws'
+  );
+  assert(
+    Object.keys(parseState('{"u:a": {"status":"pending","first_seen":"x"}}'))
+      .length === 1,
+    'valid prefixed keys accepted'
+  );
+}
+
 // --- add new test sections above this line ---
 
 console.log(`\n${passed} passed, ${failed} failed`);

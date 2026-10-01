@@ -22,6 +22,7 @@ export interface Candidate extends RawCandidate {
   status: CandidateStatus;
   source: string;
   found: string; // YYYY-MM-DD
+  notes?: string; // free-form curator notes
 }
 
 /** scout-state.json: append-only memory of everything ever proposed, by dedup key. */
@@ -42,6 +43,9 @@ export function normalizeName(name: string): string {
     .replace(/^the /, '');
 }
 
+const LANG_SEGMENT =
+  /^\/(en|it|fr|de|es|pt|nl|pl|cs|sl|hr|sv|da|no|fi|hu|ro|el|ru|tr)(?=\/|$)/;
+
 /**
  * host (no www) + path (no trailing slash), lowercased. Host+path, not host
  * only: several festivals can live on one domain.
@@ -50,9 +54,12 @@ export function urlKey(url: string): string | undefined {
   try {
     const u = new URL(url);
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return undefined;
-    return `${u.hostname.toLowerCase().replace(/^www\./, '')}${u.pathname
+    const path = u.pathname
+      .toLowerCase()
+      .replace(/\/index\.(html|htm|php)$/, '')
       .replace(/\/+$/, '')
-      .toLowerCase()}`;
+      .replace(LANG_SEGMENT, '');
+    return `${u.hostname.toLowerCase().replace(/^www\./, '')}${path}`;
   } catch {
     return undefined;
   }
@@ -144,10 +151,28 @@ export function mergeNewCandidates(
 
 // ---------- candidates.yaml ----------
 
+const ALLOWED_FIELDS = [
+  'name',
+  'url',
+  'status',
+  'why',
+  'source',
+  'found',
+  'dates_hint',
+  'location_hint',
+  'notes',
+];
+
 // js-yaml parses an unquoted `2026-07-25` into a Date.
-function dateString(value: unknown): string {
+function dateString(value: unknown, label: string): string {
+  if (value === undefined || value === null) return '';
   if (value instanceof Date) return value.toISOString().slice(0, 10);
-  return typeof value === 'string' ? value : '';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+  throw new Error(
+    `Invalid candidates.yaml: ${label} has invalid found "${String(value)}": expected YYYY-MM-DD`
+  );
 }
 
 function text(
@@ -191,7 +216,18 @@ export function parseCandidates(content: string): Candidate[] {
       );
     }
     const label = `"${name}"`;
-    const status = (c.status ?? 'pending') as CandidateStatus;
+    for (const key of Object.keys(c)) {
+      if (!ALLOWED_FIELDS.includes(key)) {
+        throw new Error(
+          `Invalid candidates.yaml: ${label} has unknown field "${key}". Allowed: ${ALLOWED_FIELDS.join(', ')}`
+        );
+      }
+    }
+    const status = (
+      c.status === undefined || c.status === null
+        ? 'pending'
+        : String(c.status).trim().toLowerCase()
+    ) as CandidateStatus;
     if (!STATUSES.includes(status)) {
       throw new Error(
         `Invalid candidates.yaml: ${label} has invalid status "${c.status}". Must be: ${STATUSES.join(', ')}`
@@ -200,15 +236,17 @@ export function parseCandidates(content: string): Candidate[] {
     const url = text(c.url, label, 'url');
     const dates = text(c.dates_hint, label, 'dates_hint');
     const where = text(c.location_hint, label, 'location_hint');
+    const notes = text(c.notes, label, 'notes');
     return {
       name,
       ...(url ? { url } : {}),
       status,
       why: text(c.why, label, 'why') ?? '',
       source: text(c.source, label, 'source') ?? '',
-      found: dateString(c.found),
+      found: dateString(c.found, label),
       ...(dates ? { dates_hint: dates } : {}),
       ...(where ? { location_hint: where } : {}),
+      ...(notes ? { notes } : {}),
     };
   });
 }
@@ -233,6 +271,9 @@ export function parseState(content: string): ScoutState {
   }
   const state: ScoutState = {};
   for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!key.startsWith('u:') && !key.startsWith('n:')) {
+      throw new Error(`Invalid scout-state.json: bad key "${key}"`);
+    }
     const v = value as { status?: unknown; first_seen?: unknown } | null;
     if (
       !v ||
