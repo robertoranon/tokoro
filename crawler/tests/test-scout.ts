@@ -20,6 +20,8 @@ import {
   type Candidate,
   type ScoutState,
 } from '../src/scout/candidates.js';
+import { promoteCandidates, appendFestivals } from '../src/scout/promote.js';
+import { parseFestivalsConfig } from '../src/radar/festivals-config.js';
 import { extractLinks } from '../src/scout/links.js';
 import type { FetchedPage } from '../src/types/event.js';
 import { ScoutExtractor } from '../src/scout/scout-extractor.js';
@@ -1190,6 +1192,183 @@ console.log('\n=== pathArg ===\n');
   } finally {
     process.argv = saved;
   }
+}
+
+console.log('\n=== promoteCandidates ===\n');
+{
+  const festivalsText = `# my watchlist — keep this comment
+defaults:
+  fetcher: playwright
+
+festivals:
+  - url: https://known.example
+    name: Known
+`;
+  const cand = (over: Partial<Candidate>): Candidate => ({
+    name: 'X',
+    status: 'pending',
+    why: '',
+    source: 'Agg',
+    found: '2026-09-01',
+    ...over,
+  });
+  const A = cand({
+    name: 'Alpha Fest',
+    url: 'https://alpha.example/',
+    status: 'approved',
+    why: 'Quarry: "loud"',
+  });
+  const B = cand({ name: 'Beta', status: 'approved' }); // approved but no url
+  const C = cand({
+    name: 'Gamma',
+    url: 'https://gamma.example',
+    status: 'rejected',
+  });
+  const D = cand({
+    name: 'Delta',
+    url: 'https://delta.example',
+    status: 'pending',
+  });
+  const E = cand({
+    name: 'Epsilon',
+    url: 'https://www.known.example/',
+    status: 'approved',
+  }); // already on the watchlist
+  let state: ScoutState = {};
+  for (const c of [A, B, C, D, E])
+    state = recordInState(state, candidateKeys(c), 'pending', '2026-09-01');
+
+  const r = promoteCandidates({
+    candidates: [A, B, C, D, E],
+    festivalsText,
+    knownUrlKeys: knownKeysFromFestivals([{ url: 'https://known.example' }]),
+    state,
+    today: '2026-10-01',
+  });
+
+  assert(
+    r.promoted.map(c => c.name).join() === 'Alpha Fest',
+    'approved + url + not on the watchlist → promoted'
+  );
+  assert(
+    r.needsUrl.map(c => c.name).join() === 'Beta',
+    'approved without url → needs a url'
+  );
+  assert(
+    r.alreadyKnown.map(c => c.name).join() === 'Epsilon',
+    'approved but already on the watchlist → reported, not duplicated'
+  );
+  assert(r.rejected.map(c => c.name).join() === 'Gamma', 'rejected → reported');
+  assert(
+    r.candidates.map(c => c.name).join() === 'Beta,Delta',
+    'inbox keeps pending candidates and approved ones without a url'
+  );
+  assert(
+    r.festivalsText.includes('# my watchlist — keep this comment'),
+    'comments in festivals.yaml are preserved (text append)'
+  );
+  const parsed = parseFestivalsConfig(r.festivalsText);
+  assert(
+    parsed.festivals.length === 2,
+    'watchlist now has the old entry plus one'
+  );
+  const added = parsed.festivals[1];
+  assert(
+    added.url === 'https://alpha.example' &&
+      added.name === 'Alpha Fest' &&
+      added.status === 'active' &&
+      added.added === '2026-10-01' &&
+      added.notes === 'Quarry: "loud"',
+    'promoted entry: normalized url, name, active, added today, notes from "why" (special characters survive)'
+  );
+  assert(
+    r.state['u:alpha.example'].status === 'approved' &&
+      r.state['n:alpha fest'].status === 'approved',
+    'promoted → approved in state'
+  );
+  assert(
+    r.state['u:gamma.example'].status === 'rejected',
+    'rejected → rejected in state (never proposed again)'
+  );
+  assert(
+    r.state['u:delta.example'].status === 'pending',
+    'pending stays pending'
+  );
+  assert(
+    r.state['u:known.example'] === undefined ||
+      r.state['u:known.example'].status === 'approved',
+    'already-known → approved in state'
+  );
+  assert(
+    Object.values(state).every(v => v.status === 'pending'),
+    'the input state is not mutated'
+  );
+
+  const none = promoteCandidates({
+    candidates: [D],
+    festivalsText,
+    knownUrlKeys: new Set(),
+    state: {},
+    today: '2026-10-01',
+  });
+  assert(
+    none.festivalsText === festivalsText && none.promoted.length === 0,
+    'nothing approved → festivals.yaml text is returned unchanged'
+  );
+}
+
+console.log('\n=== appendFestivals ===\n');
+{
+  const one = [
+    {
+      name: 'Alpha',
+      url: 'https://alpha.example/x/',
+      status: 'approved' as const,
+      why: '',
+      source: 's',
+      found: '2026-09-01',
+    },
+  ];
+  const inline = appendFestivals('festivals: []\n', one, '2026-10-01');
+  assert(
+    parseFestivalsConfig(inline).festivals[0].url === 'https://alpha.example/x',
+    '`festivals: []` is converted so the list can grow'
+  );
+  assert(
+    parseFestivalsConfig(appendFestivals('festivals:\n', one, '2026-10-01'))
+      .festivals.length === 1,
+    'a bare `festivals:` works'
+  );
+  assert(
+    parseFestivalsConfig(
+      appendFestivals('defaults:\n  fetcher: jina\n', one, '2026-10-01')
+    ).festivals.length === 1,
+    'a file without a festivals key gets one'
+  );
+  assert(
+    parseFestivalsConfig(
+      appendFestivals(
+        'festivals:\n  - url: https://k.example',
+        one,
+        '2026-10-01'
+      )
+    ).festivals.length === 2,
+    'a file without a trailing newline works'
+  );
+  assert(
+    !appendFestivals('festivals: []\n', one, '2026-10-01').includes('notes:'),
+    'no notes line when "why" is empty'
+  );
+  assert(
+    throws(() =>
+      appendFestivals(
+        'festivals:\n  - url: https://k.example\ndefaults:\n  fetcher: jina\n',
+        one,
+        '2026-10-01'
+      )
+    ),
+    'refuses to append when festivals is not the last top-level key (the result would be invalid or wrong)'
+  );
 }
 
 // --- add new test sections above this line ---
