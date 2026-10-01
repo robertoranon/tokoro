@@ -8,6 +8,7 @@ A simple web interface for querying events from the Tokoro API.
 - Filter by category and time range
 - Geocoding support via OpenStreetMap Nominatim API
 - Mobile-responsive design
+- `festivals.html`: Festival radar. Browse under-the-radar festivals by month on a map; independent of the event pages
 
 ## Deployment to Cloudflare Pages
 
@@ -78,6 +79,14 @@ Users can override all URLs and the API key at runtime via the relay popup's set
 ## Local Testing
 
 Simply open `index.html` in a web browser. No build step required.
+
+Tests (run from the repo root):
+
+```bash
+node public-web/tests/festivals.test.mjs   # festivals.js unit tests
+node public-web/tests/inject.test.mjs      # every page with the API placeholder is handled by the deploy injector
+node public-web/tests/festivals.smoke.mjs  # festivals.html offline in headless Chromium (Playwright from crawler/node_modules)
+```
 
 ## Bookmarklet Publisher
 

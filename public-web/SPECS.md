@@ -219,3 +219,43 @@ A full-viewport map-first page for discovering events spatially.
 
 - `build-bookmarklet.js` MUST inject `__TOKORO_WORKER_URL__` into `map.html`
 - `deploy-public-web.sh` MUST include `map.html` in git-diff check and cleanup restore
+
+---
+
+## FR-7: Festival Radar (`festivals.html`)
+
+A read-only browse page for the festivals on the radar (entries published by the crawler's `npm run radar`). It is independent of the other pages: no shared navigation, no changes to them.
+
+**FR-7.1: Data**
+
+- MUST fetch `GET {API}/events?has_festival=1&from=<today − 366 days>&to=<today + 548 days (~18 months)>&offset=N` (no-geo browse), following `has_more` until exhausted, capped at 30 pages (then show a notice)
+- MUST reach back one year with `from`: the no-geo path filters `start_time >= from` (not overlap), so a festival already under way would otherwise be hidden; the worker deletes radar entries ~2 days after they end, so nothing older exists
+- MUST show only **radar entries**: `tags` contains `festival`, `start_time` ends `T00:00:00`, `end_time` ends `T23:59:59`, numeric `lat`/`lng`. Festival-mode program events share `has_festival=1` and MUST NOT appear
+- MUST hide festivals that ended before today (a festival ending today stays)
+- MUST treat dates as venue-local `YYYY-MM-DD` strings (no `Date` parsing)
+
+**FR-7.2: Filters**
+
+- MUST offer month chips (All + the next 12 months, starting with the current one); a festival matches a month if its date range **overlaps** it; clicking the active chip clears it
+- MUST offer an art-form filter (music / art / performance / other; "performance" is the `theater` category) and a keyword field (accent- and case-insensitive match over name, title, description, tags, venue, address); filters combine with AND
+- MUST offer an opt-in "Near me" toggle using browser geolocation: it **sorts** by distance and shows the distance on each card; it MUST NOT filter by location; if location is unavailable or denied it MUST revert with a notice and keep the full list
+
+**FR-7.3: Timeline list**
+
+- MUST group festivals under "Happening now" (already started) and then one heading per start month, ordered by start date then name (by distance when "Near me" is on)
+- MUST show per card: date range (`18–21 Jun`, year only if not the current one), title, category (raw category value), venue/address, description (clamped to 3 lines), up to 6 tags, and an outbound link to the festival's own site
+- MUST show friendly empty states ("Nothing on the radar yet." when there are no entries; "Nothing on the radar yet for {month}" when only a month is selected; "No festivals match your filters." otherwise) and a retryable error state when the API fails; if the deploy step has not replaced the API placeholder it shows a "not configured" error instead of fetching
+
+**FR-7.4: Map**
+
+- MUST show a Leaflet map fitted to the visible festivals, one pin per distinct location, coloured by art form (of the first festival at that location), popup with title, dates and link; each card has a "Show on map" action
+- MUST keep working without the map: if Leaflet fails to load the map panel is hidden, the "Show on map" actions are omitted and the list is fully functional
+
+**FR-7.5: Safety and build**
+
+- MUST escape all API text with `escHtml` and link only through `safeUrl`
+- MUST use functional CSS class names (content blockers hide names such as `share-*`/`ad-*`)
+- MUST be listed in `inject-worker-url.js` (`ALL_FILES`) so the deploy step replaces `__TOKORO_WORKER_URL__` and `__BUILD_VERSION__`; `tests/inject.test.mjs` enforces this for every HTML page
+- Logic lives in `festivals.js` (pure, unit-tested in `tests/festivals.test.mjs`); `tests/festivals.smoke.mjs` runs the page offline in headless Chromium against a fake API
+
+**Known limitations:** as program events accumulate, `has_festival=1` returns more pages than radar entries (a worker-side `radar` filter would remove that); one pin per location (secondary places of a multi-place festival are in the description text only); the page does not paginate the rendered list.
