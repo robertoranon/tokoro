@@ -15,6 +15,9 @@ export const FestivalEntryDraftSchema = ExtractedEventSchema.extend({
   start_time: z.string().optional(),
   end_time: z.string().optional(),
   category: ExtractedEventSchema.shape.category.default('other'),
+  /** Distinct days (YYYY-MM-DD) on which programmed events take place, when the
+   *  page lists a day-by-day program. Used only by the series guard. */
+  event_days: z.array(z.string()).optional(),
 });
 export type FestivalEntryDraft = z.infer<typeof FestivalEntryDraftSchema>;
 export type DatedDraft = FestivalEntryDraft & {
@@ -23,6 +26,8 @@ export type DatedDraft = FestivalEntryDraft & {
 };
 
 const RADAR_CATEGORIES: string[] = ['music', 'art', 'theater', 'other'];
+
+const MAX_EVENT_DAYS = 120;
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
 
@@ -69,6 +74,27 @@ function sanitizeOptionalFields(c: Record<string, unknown>): void {
       .filter(t => t !== '');
     if (tags.length) c.tags = tags;
     else delete c.tags;
+  }
+  if (c.event_days !== undefined) {
+    const list =
+      typeof c.event_days === 'string'
+        ? c.event_days.split(',')
+        : Array.isArray(c.event_days)
+          ? c.event_days
+          : [];
+    const days = [
+      ...new Set(
+        list
+          .filter((d): d is string => typeof d === 'string')
+          .map(d => d.trim())
+          .filter(d => isRealDate(d))
+          .map(d => d.slice(0, 10))
+      ),
+    ]
+      .sort()
+      .slice(0, MAX_EVENT_DAYS);
+    if (days.length) c.event_days = days;
+    else delete c.event_days;
   }
   for (const key of ['start_time', 'end_time']) {
     if (typeof c[key] === 'number') c[key] = String(c[key]);
@@ -192,6 +218,54 @@ export function mergeEntries(
   return merged as FestivalEntryDraft;
 }
 
+/** Largest allowed gap (days) between consecutive event days of one festival. */
+export const SERIES_MAX_GAP_DAYS = 7;
+
+export interface EventDaysAnalysis {
+  isSeries: boolean;
+  days: number;
+  firstDay?: string;
+  lastDay?: string;
+  maxGap: number;
+}
+
+const MS_PER_DAY = 86_400_000;
+
+/**
+ * Series guard: the listed event days (inside the entry's date range) must
+ * form one continuous block. A gap above `maxGapDays` between consecutive
+ * distinct days means separate events spread over time, not one festival.
+ */
+export function analyzeEventDays(
+  draft: DatedDraft,
+  maxGapDays = SERIES_MAX_GAP_DAYS
+): EventDaysAnalysis {
+  const start = draft.start_time.slice(0, 10);
+  const end = draft.end_time.slice(0, 10);
+  const days = [...new Set(draft.event_days ?? [])]
+    .filter(d => d >= start && d <= end)
+    .sort();
+  if (days.length < 2) {
+    return { isSeries: false, days: days.length, maxGap: 0 };
+  }
+  let maxGap = 0;
+  for (let i = 1; i < days.length; i++) {
+    const gap = Math.round(
+      (Date.parse(`${days[i]}T00:00:00Z`) -
+        Date.parse(`${days[i - 1]}T00:00:00Z`)) /
+        MS_PER_DAY
+    );
+    if (gap > maxGap) maxGap = gap;
+  }
+  return {
+    isSeries: maxGap > maxGapDays,
+    days: days.length,
+    firstDay: days[0],
+    lastDay: days[days.length - 1],
+    maxGap,
+  };
+}
+
 /** A festival that ended before today is off the radar; one running now stays. */
 export function isPastEntry(d: DatedDraft, todayISO: string): boolean {
   return d.end_time.slice(0, 10) < todayISO;
@@ -211,6 +285,7 @@ export function finalizeRadarEntry(
   d: DatedDraft,
   festivalUrl: string
 ): ExtractedEvent {
+  const { event_days: _eventDays, ...rest } = d;
   const tags = [
     ...new Set([
       ...(d.tags ?? []).map(t => t.trim().toLowerCase()).filter(t => t !== ''),
@@ -218,7 +293,7 @@ export function finalizeRadarEntry(
     ]),
   ];
   return {
-    ...d,
+    ...rest,
     url: d.url ?? festivalUrl,
     festival_name: stripEdition(d.festival_name || d.title),
     festival_url: festivalUrl,

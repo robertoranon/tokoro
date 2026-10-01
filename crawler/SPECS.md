@@ -373,6 +373,7 @@ Produces **one radar entry per festival homepage**: the festival as a whole (nam
 5. Dates are forced to the radar convention: first day `T00:00:00`, last day `T23:59:59`. A draft counts as _dated_ only if both are present, real calendar dates (`2026-02-31` is rejected), and `end >= start`.
 6. If the draft is not dated: ask the LLM for up to 2 info/edition/tickets links on the homepage, fetch them in order, and merge (**fill missing fields only, never overwrite; dates travel as a pair**) until dates are found. A failing info page is skipped, not fatal.
 7. Still no dates → outcome `skipped_no_dates`. An edition whose `end_time` date is before today is also `skipped_no_dates` (the past-event rule applies to the **end** date, so a festival running now stays).
+   7a. **Series guard.** The LLM may also return `event_days` (distinct `YYYY-MM-DD` days on which programmed events take place; only when the page lists a day-by-day program). Parsing keeps real dates only, normalizes, dedupes, sorts and caps at 120; a malformed value is dropped and never rejects the entry. After the dated and past-edition checks, the days inside `[start_time date, end_time date]` must form one continuous block: if any gap between consecutive distinct days exceeds `SERIES_MAX_GAP_DAYS` (7), the entry is a series of separate events rather than one festival and the outcome is `skipped_series` (logged with the day count, first/last day and largest gap; no lookup, no API call). Fewer than 2 valid days, or no `event_days`, never triggers it. `event_days` is not part of the published event. Nothing is changed in `festivals.yaml`: the log line tells the curator to set `status: paused`. Applies in debug mode too. Existing published entries are never touched.
 8. `festival_url` is set to the watchlist URL in canonical form (scheme + host + path, no query/hash/trailing slash — the API matches `festival_url` exactly). `tags` are trimmed, lowercased, deduplicated and gain `"festival"`; `festival_name` has any trailing year removed (falls back to the title when empty); `url` defaults to the homepage.
 9. Publish-or-update (below). In `--debug` mode this step is replaced by printing the entry (see limitation d): `npm run crawl -- --mode festival-entry --debug` prints the raw entry, while the radar runner's `--debug` also normalizes (geocodes and signs) before printing.
 
@@ -381,11 +382,11 @@ Produces **one radar entry per festival homepage**: the festival as a whole (nam
 1. `GET /events?pubkey=<crawler>&festival_url=<url>&from=1970-01-01T00:00:00&to=2999-12-31T23:59:59` — the explicit window is required: the pubkey-only path defaults to _now → +7 days_. A non-array response is an error.
 2. **Match:** among returned entries that _look like radar entries_ (tags contain `"festival"` **and** the radar date shape: `start_time` ends `T00:00:00` **and** `end_time` ends `T23:59:59`, as `finalizeRadarEntry` always produces), the one whose `start_time` is closest to the new one, within 240 days. The radar-entry guard matters because festival-mode program events share the crawler's pubkey and `festival_url`; a next-year edition (~365 days) never matches.
 3. No match → `POST` → `published`. Match that differs → `PUT /events/:id`, re-signed with the stored `created_at` (immutable and signed) → `updated`. Otherwise no API write → `unchanged`.
-5. **Differs** is true only for changes that matter to the radar: `start_time` or `end_time` changed, `category` changed, the coordinates moved by more than 0.005° (~500 m) in lat or lng, or the stored description is empty and the new one is not (gap fill). `null` equals `''` (the worker stores empty as null). Wording differences in title, description (when the stored one is non-empty), url, venue_name, address, tags and festival_name never trigger an update, because LLM output varies between runs and would otherwise cause a `PUT` every week; real moves are detected through coordinates only. When a `PUT` is issued the whole event is sent, so all fields are refreshed.
-6. `PUT` 404 → falls back to `POST`. `PUT`/`POST` 401/403 → `failed`, logged as a signing/identity bug. `POST` 409 (duplicate of an event that is not this crawler's radar entry) → `failed`. A network error → `failed`.
-7. The LLM pre-publish duplicate check is **not** used for radar entries.
+4. **Differs** is true only for changes that matter to the radar: `start_time` or `end_time` changed, `category` changed, the coordinates moved by more than 0.005° (~500 m) in lat or lng, or the stored description is empty and the new one is not (gap fill). `null` equals `''` (the worker stores empty as null). Wording differences in title, description (when the stored one is non-empty), url, venue_name, address, tags and festival_name never trigger an update, because LLM output varies between runs and would otherwise cause a `PUT` every week; real moves are detected through coordinates only. When a `PUT` is issued the whole event is sent, so all fields are refreshed.
+5. `PUT` 404 → falls back to `POST`. `PUT`/`POST` 401/403 → `failed`, logged as a signing/identity bug. `POST` 409 (duplicate of an event that is not this crawler's radar entry) → `failed`. A network error → `failed`.
+6. The LLM pre-publish duplicate check is **not** used for radar entries.
 
-**Outcomes:** `published | updated | unchanged | skipped_no_dates | failed`. Via `--mode festival-entry` / `jobs.yaml` they map onto the usual counters (`published`+`updated` → published, `unchanged` → duplicate, `failed` → failed; skips count nowhere).
+**Outcomes:** `published | updated | unchanged | skipped_no_dates | skipped_series | failed`. Via `--mode festival-entry` / `jobs.yaml` they map onto the usual counters (`published`+`updated` → published, `unchanged` → duplicate, `failed` → failed; skips count nowhere).
 
 **Debug mode.** `--debug` prints the extracted entry and performs **no API lookup and no write**; with `--normalize` the entry is also geocoded and signed before printing.
 
@@ -396,19 +397,20 @@ Produces **one radar entry per festival homepage**: the festival as a whole (nam
 - (c) An ended edition is reported as `skipped_no_dates`, so it appears in the staleness report (section 4.8) between editions.
 - (d) In debug mode an extracted entry is reported as `published` although nothing is published.
 - (e) A page that never states the year in its text, title or URL and shows no weekday cannot yield an entry: it is `skipped_no_dates` until the site shows the year.
+- (f) The series guard needs the page to list its event days. A series that only states "May-October" with no list is not detected. A legitimate festival whose listed program has a pause of more than 7 days (e.g. two editions-in-one a fortnight apart) would be skipped as a series.
 
 ### 4.8 Radar Watchlist Runner (`npm run radar`)
 
 Entry point `src/radar.ts`, structured like `src/scheduler.ts`. Always write `npm run radar -- --debug` (note the `--`): without it npm swallows the flag, but the runner detects npm's `npm_config_debug` environment variable, prints a notice, and still runs in debug mode. Non-debug runs print a `LIVE RUN` line naming the API URL before crawling. Reads `festivals.yaml` (`--festivals <path>` to override; example: `festivals.example.yaml`):
 
-| Field                           | Required | Description                                                                                                        |
-| ------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
-| `url`                           | yes      | Canonical festival homepage; normalized, becomes `festival_url`. Duplicates (after normalization) are an error     |
-| `name`                          | no       | Display name for logs (must be a string)                                                                           |
-| `status`                        | no       | `active` (default) or `paused` (skipped, not deleted). `null` or any other value is an error                       |
-| `added`                         | no       | `YYYY-MM-DD`, bookkeeping (YAML dates are converted back to strings)                                               |
-| `notes`                         | no       | Curator notes (must be a string); never sent to the LLM or API                                                     |
-| `fetcher` / `browser` / `model` | no       | Per-festival overrides; `defaults:` at the top level supplies fallbacks. A non-string `model` is an error          |
+| Field                           | Required | Description                                                                                                    |
+| ------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+| `url`                           | yes      | Canonical festival homepage; normalized, becomes `festival_url`. Duplicates (after normalization) are an error |
+| `name`                          | no       | Display name for logs (must be a string)                                                                       |
+| `status`                        | no       | `active` (default) or `paused` (skipped, not deleted). `null` or any other value is an error                   |
+| `added`                         | no       | `YYYY-MM-DD`, bookkeeping (YAML dates are converted back to strings)                                           |
+| `notes`                         | no       | Curator notes (must be a string); never sent to the LLM or API                                                 |
+| `fetcher` / `browser` / `model` | no       | Per-festival overrides; `defaults:` at the top level supplies fallbacks. A non-string `model` is an error      |
 
 An empty `festivals:` key is an empty list.
 
@@ -419,9 +421,11 @@ An empty `festivals:` key is an empty list.
 - Run each `active` entry sequentially through `festival-entry` mode; a failing entry logs and continues; exit 1 if any entry failed.
 - `--debug` runs the full extraction (with normalization) but publishes nothing. It prints a summary stating that nothing was published and writes **no** run log and **no** staleness report.
 
-**Run log.** Appends one record to `logs/runs.jsonl`: `kind: "radar"`, timing, `entries_total`, `status`, the five counters, and `entries: [{url, outcome}]`. The `jobs.yaml` scheduler's records gain `kind: "jobs"`; readers must tolerate records without `kind`.
+**Run log.** Appends one record to `logs/runs.jsonl`: `kind: "radar"`, timing, `entries_total`, `status`, the six counters (including `skipped_series`), and `entries: [{url, outcome}]`. The `jobs.yaml` scheduler's records gain `kind: "jobs"`; readers must tolerate records without `kind`.
 
-**Staleness report.** After each (non-debug) run the runner prints active festivals whose last 4 radar runs (`STALE_WINDOW`, that included them) had no `published`/`updated`/`unchanged` outcome — dead sources, but also festivals between editions. A festival needs 4 runs of its own history before it can be flagged.
+**Staleness report.** After each (non-debug) run the runner prints active festivals whose last 4 radar runs (`STALE_WINDOW`, that included them) had no `published`/`updated`/`unchanged` outcome — dead sources, but also festivals between editions. A festival needs 4 runs of its own history before it can be flagged. A festival with any `skipped_series` outcome in that window is never reported as stale (it is intentionally skipped, not dead).
+
+**Series block.** After the summary (debug runs too), if any entry ended `skipped_series`, the runner prints `Skipped as a series of separate events (consider "status: paused" in festivals.yaml):` followed by one `  - <url>` line per entry. The summary line carries a `N skipped (series)` count. The runner never edits `festivals.yaml`.
 
 Scheduling is a plain crontab line: `0 10 * * 1  cd /path/to/tokoro/crawler && /absolute/path/to/npm run radar >> logs/radar.log 2>&1`. Cron's PATH usually lacks npm (find it with `which npm`), and `logs/` is gitignored.
 
@@ -464,20 +468,22 @@ interface FetchedPage {
 
 Two engines are supported via `--browser <engine>` (or `BROWSER_ENGINE` env var):
 
-| | Chrome (default) | Obscura |
-|---|---|---|
-| Launch | `chromium.launch()` | `chromium.connectOverCDP()` |
-| Memory | ~200 MB | ~30 MB |
-| Startup | ~2 s | instant |
-| Page load | ~500 ms | ~85 ms |
-| Anti-detect | No | Built-in (stealth mode) |
-| Compatibility | Highest | Good; may differ on complex JS apps |
+|               | Chrome (default)    | Obscura                             |
+| ------------- | ------------------- | ----------------------------------- |
+| Launch        | `chromium.launch()` | `chromium.connectOverCDP()`         |
+| Memory        | ~200 MB             | ~30 MB                              |
+| Startup       | ~2 s                | instant                             |
+| Page load     | ~500 ms             | ~85 ms                              |
+| Anti-detect   | No                  | Built-in (stealth mode)             |
+| Compatibility | Highest             | Good; may differ on complex JS apps |
 
 **Chrome engine:**
+
 - Playwright launches a managed Chromium subprocess directly
 - No external binary required (Playwright bundles Chromium)
 
 **Obscura engine:**
+
 - Playwright connects via Chrome DevTools Protocol (CDP) to an Obscura server
 - Auto-launch: if `OBSCURA_WS_ENDPOINT` is not set, the crawler spawns `obscura serve --port 9222` and polls TCP port 9222 until it accepts connections (up to 10 s timeout) before connecting
 - External server: set `OBSCURA_WS_ENDPOINT=ws://host:port` to connect to an already-running instance (no auto-launch)
@@ -1959,7 +1965,13 @@ interface CrawlerConfig {
   apiUrl: string; // e.g., "https://worker.tokoro.dev" or "http://localhost:8787"
 
   // Crawler mode
-  mode?: 'direct' | 'discover' | 'image' | 'festival' | 'pdf' | 'festival-entry'; // Default: 'direct'
+  mode?:
+    | 'direct'
+    | 'discover'
+    | 'image'
+    | 'festival'
+    | 'pdf'
+    | 'festival-entry'; // Default: 'direct'
 
   // Fetcher type
   fetcher?: 'playwright' | 'jina'; // Default: 'playwright'
@@ -2864,16 +2876,16 @@ The scheduler runs a list of crawl jobs sequentially from a YAML config file. It
 Lives at the root of `crawler/`. Override the path with `--jobs <path>`.
 
 ```yaml
-cron: "0 9 * * *"   # informational — paste into your system crontab
+cron: '0 9 * * *' # informational — paste into your system crontab
 
 jobs:
-  - name: "Blue Note Jazz"
+  - name: 'Blue Note Jazz'
     urls:
       - https://bluenotejazz.com/events
     mode: discover
     fetcher: jina
 
-  - name: "Local Festival"
+  - name: 'Local Festival'
     urls:
       - https://somefestival.com
     mode: festival
@@ -2883,28 +2895,28 @@ jobs:
 
 **Top-level fields:**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `cron` | string | no | Cron expression — informational, not parsed by the runner |
-| `jobs` | array | yes | List of crawl jobs |
+| Field  | Type   | Required | Description                                               |
+| ------ | ------ | -------- | --------------------------------------------------------- |
+| `cron` | string | no       | Cron expression — informational, not parsed by the runner |
+| `jobs` | array  | yes      | List of crawl jobs                                        |
 
 **Per-job fields:**
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `name` | string | — | Display name for log output |
-| `urls` | string[] | required | One or more URLs to crawl |
-| `mode` | string | `direct` | `direct` \| `discover` \| `image` \| `festival` \| `pdf` |
-| `fetcher` | string | `playwright` | `playwright` \| `jina` |
-| `browser` | string | env/`chrome` | `chrome` \| `obscura` |
-| `model` | string | env | LLM model name (overrides `.env`) |
-| `date` | string | today | Reference date `YYYY-MM-DD` for LLM extraction |
-| `max_tokens` | number | auto | Output token budget override |
-| `no_jsonld` | boolean | false | Disable JSON-LD extraction |
-| `group_by_day` | boolean | false | Group extracted events into one per calendar day |
-| `pdf_parser` | string | `pdfjs` | `pdfjs` \| `liteparse` |
-| `debug` | boolean | false | Print raw LLM output, skip normalization/publishing |
-| `normalize` | boolean | false | Run normalization in debug mode (no publish) |
+| Field          | Type     | Default      | Description                                              |
+| -------------- | -------- | ------------ | -------------------------------------------------------- |
+| `name`         | string   | —            | Display name for log output                              |
+| `urls`         | string[] | required     | One or more URLs to crawl                                |
+| `mode`         | string   | `direct`     | `direct` \| `discover` \| `image` \| `festival` \| `pdf` |
+| `fetcher`      | string   | `playwright` | `playwright` \| `jina`                                   |
+| `browser`      | string   | env/`chrome` | `chrome` \| `obscura`                                    |
+| `model`        | string   | env          | LLM model name (overrides `.env`)                        |
+| `date`         | string   | today        | Reference date `YYYY-MM-DD` for LLM extraction           |
+| `max_tokens`   | number   | auto         | Output token budget override                             |
+| `no_jsonld`    | boolean  | false        | Disable JSON-LD extraction                               |
+| `group_by_day` | boolean  | false        | Group extracted events into one per calendar day         |
+| `pdf_parser`   | string   | `pdfjs`      | `pdfjs` \| `liteparse`                                   |
+| `debug`        | boolean  | false        | Print raw LLM output, skip normalization/publishing      |
+| `normalize`    | boolean  | false        | Run normalization in debug mode (no publish)             |
 
 ### 20.3 Runner Behavior
 

@@ -42,6 +42,7 @@ export const PAGE_DISCOVERY_MAX_TOKENS = 2000;
  *  Used by: crawler PageDiscovery (festival mode only) */
 export const FESTIVAL_LISTING_MAX_TOKENS = 1000;
 
-/** Max output tokens for a single festival radar entry (one small object).
+/** Max output tokens for a single festival radar entry (one object, plus an
+ *  event_days list of up to 120 dates, hence the larger budget).
  *  Used by: crawler FestivalEntryExtractor (festival-entry mode) */
-export const FESTIVAL_ENTRY_MAX_TOKENS = 2000;
+export const FESTIVAL_ENTRY_MAX_TOKENS = 3500;

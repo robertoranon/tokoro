@@ -69,6 +69,9 @@ export function findStaleFestivals(
       .map(r => r.entries?.find(e => e.url === url)?.outcome)
       .filter((o): o is string => o !== undefined)
       .slice(-window);
-    return outcomes.length >= window && !outcomes.some(o => HEALTHY.has(o));
+    return (
+      outcomes.length >= window &&
+      !outcomes.some(o => HEALTHY.has(o) || o === 'skipped_series')
+    );
   });
 }

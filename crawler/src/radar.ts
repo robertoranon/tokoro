@@ -26,6 +26,7 @@ export interface RadarCounters {
   updated: number;
   unchanged: number;
   skipped_no_dates: number;
+  skipped_series: number;
   failed: number;
 }
 
@@ -35,6 +36,7 @@ export function tallyOutcomes(results: RadarEntryResult[]): RadarCounters {
     updated: 0,
     unchanged: 0,
     skipped_no_dates: 0,
+    skipped_series: 0,
     failed: 0,
   };
   for (const { outcome } of results) counters[outcome]++;
@@ -138,12 +140,22 @@ async function main() {
     // Debug publishes nothing; the crawler still reports 'published' for
     // entries it extracted, so word the summary accordingly.
     console.log(
-      `\nRadar debug run complete (nothing was published): ${counters.published} entries extracted, ${counters.skipped_no_dates} skipped (no dates), ${counters.failed} failed`
+      `\nRadar debug run complete (nothing was published): ${counters.published} entries extracted, ${counters.skipped_no_dates} skipped (no dates), ${counters.skipped_series} skipped (series), ${counters.failed} failed`
     );
   } else {
     console.log(
-      `\nRadar complete: ${counters.published} published, ${counters.updated} updated, ${counters.unchanged} unchanged, ${counters.skipped_no_dates} skipped (no dates), ${counters.failed} failed`
+      `\nRadar complete: ${counters.published} published, ${counters.updated} updated, ${counters.unchanged} unchanged, ${counters.skipped_no_dates} skipped (no dates), ${counters.skipped_series} skipped (series), ${counters.failed} failed`
     );
+  }
+
+  const seriesUrls = results
+    .filter(r => r.outcome === 'skipped_series')
+    .map(r => r.url);
+  if (seriesUrls.length > 0) {
+    console.log(
+      '\nSkipped as a series of separate events (consider "status: paused" in festivals.yaml):'
+    );
+    for (const url of seriesUrls) console.log(`  - ${url}`);
   }
 
   if (!debug) {

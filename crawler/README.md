@@ -34,7 +34,7 @@ npm install
 npx playwright install chromium
 ```
 
-2b. *(Optional)* Install [Obscura](https://github.com/h4ckf0r0day/obscura) for a faster, stealth-capable alternative to headless Chrome:
+2b. _(Optional)_ Install [Obscura](https://github.com/h4ckf0r0day/obscura) for a faster, stealth-capable alternative to headless Chrome:
 
 ```bash
 # macOS Apple Silicon
@@ -209,6 +209,7 @@ The crawler supports four operational modes:
 All extracted events automatically receive `festival_name` (from the page title) and `festival_url` (the homepage origin), which enables festival-scoped queries via `GET /events?festival_url=...`.
 
 After collection, a deduplication LLM call removes two classes of noise:
+
 - **Redundant wrapper events**: a general "Festival 2026" event spanning all days when individual day events already exist
 - **Semantic duplicates**: the same event extracted twice under slightly different names (e.g. "Sunday" vs "Family Sunday")
 
@@ -222,7 +223,7 @@ Legitimate parallel events (different stages or acts running at the same time) a
 - **Usage (watchlist)**: `cp festivals.example.yaml festivals.yaml`, list your festivals, then `npm run radar` (`npm run radar -- --debug` tries it without publishing anything and writes no run log). Always include the `--`: without it npm swallows the flag, but the runner detects npm's `npm_config_debug` and still runs in debug mode
 - **Validation**: `festivals.yaml` is validated up front; any error (bad URL, duplicate URL, wrong field type, unknown `status`) exits 1 before anything is crawled. No active festivals: warning, exit 0
 - **Year evidence**: extracted dates are only trusted if their year appears in the page's URL, title or text, or a weekday confirmed it; otherwise they are dropped (so a stale homepage cannot produce a phantom next-year entry) and the festival is looked up on info pages or ends as `skipped_no_dates`
-- **Outcomes** per festival: `published`, `updated`, `unchanged`, `skipped_no_dates` (no dates announced, or the edition already ended), `failed`. The run exits 1 if any festival failed
+- **Outcomes** per festival: `published`, `updated`, `unchanged`, `skipped_no_dates` (no dates announced, or the edition already ended), `skipped_series` (the page lists separate events with gaps over 7 days between them, so it is a series rather than one festival; set `status: paused` for it), `failed`. The run exits 1 if any festival failed
 - **Staleness report**: each run appends to `logs/runs.jsonl` and prints active festivals with no `published`/`updated`/`unchanged` result in their last 4 runs (dead source, or between editions)
 - **Updates**: an existing entry is only re-published (`PUT`) when something that matters to the radar changed: dates, category, a move of more than ~500 m, or a previously empty description now filled. Wording differences between runs are ignored, since LLM output varies
 - **Safety**: an existing entry is only ever updated if it looks like a radar entry (tagged `festival` and with the radar date shape: start `T00:00:00`, end `T23:59:59`), so program events from Festival Mode under the same `festival_url` are never overwritten
@@ -258,16 +259,16 @@ Run a fixed list of crawl jobs automatically using your system's cron scheduler 
 **1. Edit `jobs.yaml`** in the `crawler/` directory:
 
 ```yaml
-cron: "0 9 * * *"   # informational — paste this into your crontab
+cron: '0 9 * * *' # informational — paste this into your crontab
 
 jobs:
-  - name: "Blue Note Jazz"
+  - name: 'Blue Note Jazz'
     urls:
       - https://bluenotejazz.com/events
     mode: discover
     fetcher: jina
 
-  - name: "Local Festival"
+  - name: 'Local Festival'
     urls:
       - https://somefestival.com
     mode: festival
@@ -302,11 +303,11 @@ Use debug mode to test extraction without publishing to the API.
 
 By default, `--debug` skips normalization (geocoding + signing) for fast feedback on the raw LLM output. Use `--normalize` together with `--debug` to run full normalization without publishing.
 
-| Flags | Geocoding | Signing | API publish |
-|---|---|---|---|
-| _(none)_ | ✅ | ✅ | ✅ |
-| `--debug` | ❌ | ❌ | ❌ |
-| `--debug --normalize` | ✅ | ✅ | ❌ |
+| Flags                 | Geocoding | Signing | API publish |
+| --------------------- | --------- | ------- | ----------- |
+| _(none)_              | ✅        | ✅      | ✅          |
+| `--debug`             | ❌        | ❌      | ❌          |
+| `--debug --normalize` | ✅        | ✅      | ❌          |
 
 - **Usage**: `npm run crawl -- --debug <url>`
 - **Always include the `--`**: `npm run crawl --debug <url>` (without it) makes npm swallow the flag, which used to mean a real publish. The CLI now detects npm's `npm_config_debug`, prints a notice and still runs in debug mode. Live runs print a `LIVE RUN` line naming the API URL before crawling.
@@ -463,9 +464,9 @@ A pre-push hook runs crawler extraction tests automatically when `shared/` files
 
 ### Manual commands (run from `crawler/`)
 
-| Command | Effect |
-|---------|--------|
-| `npm run test:ci` | Run tests and compare against reference snapshot |
+| Command                      | Effect                                                    |
+| ---------------------------- | --------------------------------------------------------- |
+| `npm run test:ci`            | Run tests and compare against reference snapshot          |
 | `npm run test:set-reference` | Promote the latest test run as the new reference baseline |
 
 ### What happens on push

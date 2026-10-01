@@ -19,6 +19,7 @@ Return a single JSON object with these fields:
 - **lat, lng**: only if explicitly stated
 - **url**: the festival homepage or ticket page
 - **category**: ONE of: music, art, theater, other — the festival's primary art form (use "other" for genuinely mixed festivals)
+- **event_days**: if the page lists a program of individual dated events or performances for the edition you are describing, list every distinct day on which one takes place as an array of "YYYY-MM-DD" strings (use the same year rules as for start_time; at most 120). Only days of THIS edition. Omit event_days if the page only gives a date range or no day-by-day program.
 - **tags**: lowercase genre/character tags, e.g. ["experimental", "electronic", "jazz"]
 
 RULES:
@@ -27,6 +28,7 @@ RULES:
 - If no dates are visible on the page, OMIT start_time and end_time entirely. Do NOT guess dates. Still return the object with everything else you can find.
 - Use the exact dates shown on the page. Do NOT convert time zones.
 - Today's date is given in the user message. If the page URL contains a year (e.g. /2026/, /edition-2026), use that year for the dates. If the dates show no year, assume the current year, or next year if the current-year date is more than a few months in the past.
+- For a season or series of separate concerts spread over months, start_time and end_time are still the first and last event day, and event_days must list them (the caller decides what to do with series).
 - If the page is clearly not a festival (or has no usable information), return null.
 
 Example output:

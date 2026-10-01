@@ -5,6 +5,7 @@ export type RadarOutcome =
   | 'updated'
   | 'unchanged'
   | 'skipped_no_dates'
+  | 'skipped_series'
   | 'failed';
 
 /** An event as returned by GET /events (nulls for empty columns, tags parsed). */

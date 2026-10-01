@@ -17,7 +17,10 @@ import {
   finalizeRadarEntry,
   resolveEntryDraft,
   hasYearEvidence,
+  analyzeEventDays,
+  SERIES_MAX_GAP_DAYS,
   type FestivalEntryDraft,
+  type DatedDraft,
 } from '../src/radar/festival-entry.js';
 import type { FetchedPage } from '../src/types/event.js';
 import { FestivalEntryExtractor } from '../src/extractors/festival-entry-extractor.js';
@@ -1518,6 +1521,295 @@ console.log('\n=== Radar year-evidence guard ===\n');
   assert(
     sharedIsDebugRequested(['https://a.example'], {}).debug === false,
     'a plain crawl invocation is not debug'
+  );
+}
+
+console.log('\n=== analyzeEventDays (series guard) ===\n');
+{
+  const dated = (start: string, end: string, days?: string[]): DatedDraft =>
+    ({
+      title: 'F',
+      category: 'music',
+      start_time: `${start}T00:00:00`,
+      end_time: `${end}T23:59:59`,
+      ...(days ? { event_days: days } : {}),
+    }) as DatedDraft;
+
+  assert(SERIES_MAX_GAP_DAYS === 7, 'default max gap is 7 days');
+
+  const fmi = analyzeEventDays(
+    dated('2026-05-12', '2026-10-03', [
+      '2026-05-12',
+      '2026-06-06',
+      '2026-06-13',
+      '2026-07-17',
+      '2026-07-31',
+      '2026-08-14',
+      '2026-08-21',
+      '2026-08-29',
+      '2026-08-30',
+      '2026-09-12',
+      '2026-09-13',
+      '2026-09-19',
+      '2026-10-02',
+      '2026-10-03',
+    ])
+  );
+  assert(
+    fmi.isSeries && fmi.maxGap === 34 && fmi.days === 14,
+    'Free-Music-Impulse-like list is a series (gap 34, 14 days)'
+  );
+  assert(
+    fmi.firstDay === '2026-05-12' && fmi.lastDay === '2026-10-03',
+    'reports first and last day'
+  );
+
+  const contiguous = analyzeEventDays(
+    dated('2026-06-18', '2026-06-21', [
+      '2026-06-18',
+      '2026-06-19',
+      '2026-06-20',
+      '2026-06-21',
+    ])
+  );
+  assert(
+    !contiguous.isSeries && contiguous.maxGap === 1,
+    'contiguous festival is not a series'
+  );
+
+  const weekends = analyzeEventDays(
+    dated('2026-09-04', '2026-09-13', [
+      '2026-09-04',
+      '2026-09-05',
+      '2026-09-06',
+      '2026-09-11',
+      '2026-09-12',
+      '2026-09-13',
+    ])
+  );
+  assert(
+    !weekends.isSeries && weekends.maxGap === 5,
+    'two weekends 5 days apart is not a series'
+  );
+
+  const gap7 = analyzeEventDays(
+    dated('2026-09-01', '2026-09-08', ['2026-09-01', '2026-09-08'])
+  );
+  assert(
+    !gap7.isSeries && gap7.maxGap === 7,
+    'exactly 7-day gap is not a series'
+  );
+  const gap8 = analyzeEventDays(
+    dated('2026-09-01', '2026-09-09', ['2026-09-01', '2026-09-09'])
+  );
+  assert(gap8.isSeries && gap8.maxGap === 8, '8-day gap is a series');
+
+  const one = analyzeEventDays(
+    dated('2026-09-01', '2026-09-30', ['2026-09-01'])
+  );
+  assert(!one.isSeries && one.days === 1, 'one day only is not a series');
+  const none = analyzeEventDays(dated('2026-09-01', '2026-09-30'));
+  assert(
+    !none.isSeries && none.maxGap === 0 && none.days === 0,
+    'no event_days: not a series, maxGap 0'
+  );
+
+  const messy = analyzeEventDays(
+    dated('2026-09-01', '2026-09-30', [
+      '2026-09-20',
+      '2026-09-01',
+      '2026-09-20',
+      '2026-09-10',
+    ])
+  );
+  assert(
+    messy.days === 3 && messy.maxGap === 10 && messy.isSeries,
+    'unsorted and duplicate days are handled'
+  );
+
+  const stray = analyzeEventDays(
+    dated('2026-06-18', '2026-06-21', [
+      '2025-06-20',
+      '2026-06-18',
+      '2026-06-19',
+      '2026-12-01',
+    ])
+  );
+  assert(
+    !stray.isSeries && stray.days === 2 && stray.maxGap === 1,
+    'days outside [start, end] are ignored'
+  );
+
+  const boundary = analyzeEventDays(
+    dated('2026-12-30', '2027-01-12', ['2026-12-30', '2027-01-12'])
+  );
+  assert(
+    boundary.maxGap === 13 && boundary.isSeries,
+    'month/year boundary gap is 13'
+  );
+  const custom = analyzeEventDays(
+    dated('2026-09-01', '2026-09-09', ['2026-09-01', '2026-09-09']),
+    10
+  );
+  assert(!custom.isSeries, 'custom maxGapDays is honoured');
+}
+
+console.log('\n=== parseFestivalEntry event_days ===\n');
+{
+  const base = { title: 'F', start_time: '2026-06-01', end_time: '2026-06-30' };
+  const p = (event_days: unknown) =>
+    parseFestivalEntry({ ...base, event_days }, 'https://f.example');
+
+  const a = p([
+    '2026-06-20',
+    'garbage',
+    '2026-02-31',
+    '2026-06-01T20:00:00',
+    '2026-06-20',
+    5,
+  ]);
+  assert(
+    JSON.stringify(a?.event_days) === '["2026-06-01","2026-06-20"]',
+    'invalid dropped, normalized to YYYY-MM-DD, deduped, sorted'
+  );
+  const b = p('2026-06-05, 2026-06-02');
+  assert(
+    JSON.stringify(b?.event_days) === '["2026-06-02","2026-06-05"]',
+    'comma-separated string accepted'
+  );
+  for (const junk of [42, { a: 1 }, true, [], ['nope'], 'nope']) {
+    const r = p(junk);
+    assert(
+      r !== null && r.title === 'F' && r.event_days === undefined,
+      `junk event_days ${JSON.stringify(junk)} ignored, entry survives`
+    );
+  }
+  const many = Array.from({ length: 150 }, (_, i) => {
+    const d = new Date(Date.UTC(2026, 0, 1 + i));
+    return d.toISOString().slice(0, 10);
+  });
+  assert(p(many)?.event_days?.length === 120, 'capped at 120 entries');
+}
+
+console.log('\n=== event_days through extractor, finalize, merge ===\n');
+{
+  const page: FetchedPage = {
+    url: 'https://series.example',
+    html: '',
+    text: 'Programma 2026\n12 May concert\n6 June concert',
+    title: 'Programma 2026',
+  };
+  const llm = fakeLLM(
+    JSON.stringify({
+      title: 'Series 2026',
+      start_time: '2026-05-12T00:00:00',
+      end_time: '2026-06-06T23:59:59',
+      category: 'music',
+      event_days: ['2026-06-06', '2026-05-12'],
+    })
+  );
+  const draft = await new FestivalEntryExtractor({
+    llm,
+    referenceDate: '2026-04-01',
+  }).extract(page);
+  assert(
+    JSON.stringify(draft?.event_days) === '["2026-05-12","2026-06-06"]',
+    'extractor passes event_days through'
+  );
+  assert(
+    llm.messages[0][0].content.includes('event_days'),
+    'system prompt mentions event_days'
+  );
+
+  const fin = finalizeRadarEntry(
+    {
+      title: 'F',
+      category: 'music',
+      start_time: '2026-06-01T00:00:00',
+      end_time: '2026-06-02T23:59:59',
+      event_days: ['2026-06-01', '2026-06-02'],
+    } as DatedDraft,
+    'https://f.example'
+  );
+  assert(!('event_days' in fin), 'finalizeRadarEntry strips event_days');
+
+  const baseNo = { title: 'F', category: 'music' } as FestivalEntryDraft;
+  const extra = {
+    title: 'F',
+    category: 'music',
+    event_days: ['2026-06-01'],
+  } as FestivalEntryDraft;
+  assert(
+    JSON.stringify(mergeEntries(baseNo, extra)?.event_days) ===
+      '["2026-06-01"]',
+    'mergeEntries fills event_days when base lacks it'
+  );
+  const baseHas = {
+    ...baseNo,
+    event_days: ['2026-07-01'],
+  } as FestivalEntryDraft;
+  assert(
+    JSON.stringify(mergeEntries(baseHas, extra)?.event_days) ===
+      '["2026-07-01"]',
+    'mergeEntries never overwrites existing event_days'
+  );
+}
+
+console.log('\n=== skipped_series outcome ===\n');
+{
+  const t = tallyOutcomes([
+    { url: 'a', outcome: 'skipped_series' },
+    { url: 'b', outcome: 'skipped_series' },
+    { url: 'c', outcome: 'published' },
+  ]);
+  assert(
+    t.skipped_series === 2 && t.published === 1,
+    'tallyOutcomes counts skipped_series'
+  );
+  assert(tallyOutcomes([]).skipped_series === 0, 'empty list: zero series');
+
+  const run = (outcome: string): RunRecord => ({
+    kind: 'radar',
+    entries: [{ url: 'https://s.example', outcome }],
+  });
+  assert(
+    findStaleFestivals(
+      [
+        run('skipped_series'),
+        run('skipped_series'),
+        run('skipped_series'),
+        run('skipped_series'),
+      ],
+      ['https://s.example'],
+      4
+    ).length === 0,
+    'all-skipped_series is never stale'
+  );
+  assert(
+    findStaleFestivals(
+      [
+        run('skipped_no_dates'),
+        run('skipped_no_dates'),
+        run('skipped_series'),
+        run('skipped_no_dates'),
+      ],
+      ['https://s.example'],
+      4
+    ).length === 0,
+    'any skipped_series in the window prevents a stale flag'
+  );
+  assert(
+    findStaleFestivals(
+      [
+        run('skipped_no_dates'),
+        run('skipped_no_dates'),
+        run('skipped_no_dates'),
+        run('skipped_no_dates'),
+      ],
+      ['https://s.example'],
+      4
+    ).length === 1,
+    'all-skipped_no_dates is still stale'
   );
 }
 

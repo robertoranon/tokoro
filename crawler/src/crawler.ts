@@ -16,6 +16,7 @@ import {
 import { normalizeFestivalUrl } from './radar/festivals-config.js';
 import {
   hasDates,
+  analyzeEventDays,
   isPastEntry,
   finalizeRadarEntry,
   resolveEntryDraft,
@@ -495,7 +496,7 @@ export class EventCrawler {
       if (outcome === 'published' || outcome === 'updated') totals.published++;
       else if (outcome === 'unchanged') totals.duplicate++;
       else if (outcome === 'failed') totals.failed++;
-      // skipped_no_dates is neither a success nor a failure
+      // skipped_no_dates / skipped_series are neither a success nor a failure
     }
     return totals;
   }
@@ -556,6 +557,15 @@ export class EventCrawler {
         `⚠ Edition already ended (${draft.end_time.slice(0, 10)}) — skipped`
       );
       return 'skipped_no_dates';
+    }
+
+    // Series guard: separate events spread over months are not one festival.
+    const series = analyzeEventDays(draft);
+    if (series.isSeries) {
+      console.log(
+        `⚠ Looks like a series of separate events, not one festival: ${series.days} event days between ${series.firstDay} and ${series.lastDay}, largest gap ${series.maxGap} days — skipped. Set "status: paused" for this entry in festivals.yaml to stop checking it.`
+      );
+      return 'skipped_series';
     }
 
     const entry = finalizeRadarEntry(draft, festivalUrl);
