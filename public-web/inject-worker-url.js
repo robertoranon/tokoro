@@ -43,10 +43,16 @@ if (!workerUrl) {
   process.exit(1);
 }
 
-// map.html has no relay UI and therefore no crawler/bookmarklet placeholders
-const ALL_FILES = ['index.html', 'it.html', 'map.html', 'publish.html'].map(f =>
-  path.join(targetDir, f)
-);
+// map.html and festivals.html have no relay UI and therefore no crawler/bookmarklet placeholders.
+// Every page that contains __TOKORO_WORKER_URL__ MUST be listed here
+// (tests/inject.test.mjs fails otherwise).
+const ALL_FILES = [
+  'index.html',
+  'it.html',
+  'map.html',
+  'publish.html',
+  'festivals.html',
+].map(f => path.join(targetDir, f));
 const RELAY_FILES = ['index.html', 'it.html'].map(f => path.join(targetDir, f));
 
 // Build bookmarklet if relay URL is provided
