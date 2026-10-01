@@ -309,6 +309,7 @@ By default, `--debug` skips normalization (geocoding + signing) for fast feedbac
 | `--debug --normalize` | ✅ | ✅ | ❌ |
 
 - **Usage**: `npm run crawl -- --debug <url>`
+- **Always include the `--`**: `npm run crawl --debug <url>` (without it) makes npm swallow the flag, which used to mean a real publish. The CLI now detects npm's `npm_config_debug`, prints a notice and still runs in debug mode. Live runs print a `LIVE RUN` line naming the API URL before crawling.
 - **Usage (with normalization)**: `npm run crawl -- --debug --normalize <url>`
 
 **Example:**

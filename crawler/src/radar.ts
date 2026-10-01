@@ -19,6 +19,7 @@ import {
   findStaleFestivals,
   STALE_WINDOW,
 } from './utils/run-log.js';
+import { isDebugRequested } from './utils/debug-flag.js';
 
 export interface RadarCounters {
   published: number;
@@ -40,18 +41,7 @@ export function tallyOutcomes(results: RadarEntryResult[]): RadarCounters {
   return counters;
 }
 
-/**
- * `npm run radar --debug` (no `--`) makes npm swallow the flag and expose it
- * as npm_config_debug. Treat that as debug too. Only ever errs toward debug.
- */
-export function isDebugRequested(
-  argv: string[],
-  env: Record<string, string | undefined>
-): { debug: boolean; fromNpm: boolean } {
-  const inArgv = argv.includes('--debug');
-  const inNpm = env.npm_config_debug === 'true';
-  return { debug: inArgv || inNpm, fromNpm: !inArgv && inNpm };
-}
+export { isDebugRequested };
 
 async function main() {
   const startedAt = new Date();

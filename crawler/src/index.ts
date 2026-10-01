@@ -11,6 +11,7 @@ import {
 } from './crawler.js';
 import * as ed from '@noble/ed25519';
 import { loadEnv, loadCrawlerEnv, buildLLM } from './setup.js';
+import { isDebugRequested } from './utils/debug-flag.js';
 
 async function generateKeypair() {
   console.log('Generating new Ed25519 keypair...\n');
@@ -222,8 +223,13 @@ async function main() {
     textFilePath = args[textFileIndex + 1];
   }
 
-  // Parse debug flag
-  const debug = args.includes('--debug');
+  // Parse debug flag (also catches `npm run crawl --debug` without `--`, which npm swallows)
+  const { debug, fromNpm } = isDebugRequested(args, process.env);
+  if (fromNpm) {
+    console.log(
+      'Note: --debug was picked up from npm (npm_config_debug). Use "npm run crawl -- --debug" next time.'
+    );
+  }
 
   // Parse --normalize flag (only meaningful with --debug: run full normalization even in debug mode)
   const normalize = args.includes('--normalize');
@@ -340,6 +346,12 @@ async function main() {
 
   const { privkey, pubkey, apiUrl, jinaKey, braveSearchKey } = loadCrawlerEnv();
   const llm = buildLLM(model);
+
+  if (!debug) {
+    console.log(
+      `⚠ LIVE RUN — publishing to ${apiUrl} (use "npm run crawl -- --debug" for a dry run)`
+    );
+  }
 
   // Create crawler
   const crawler = new EventCrawler({

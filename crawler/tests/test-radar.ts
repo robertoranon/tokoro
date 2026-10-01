@@ -23,6 +23,7 @@ import type { FetchedPage } from '../src/types/event.js';
 import { FestivalEntryExtractor } from '../src/extractors/festival-entry-extractor.js';
 import { PageDiscovery } from '../src/extractors/page-discovery.js';
 import { isDebugRequested } from '../src/radar.js';
+import { isDebugRequested as sharedIsDebugRequested } from '../src/utils/debug-flag.js';
 import type { LLMProvider } from '../../shared/types/llm.js';
 import {
   parseFestivalsConfig,
@@ -1495,6 +1496,28 @@ console.log('\n=== Radar year-evidence guard ===\n');
       fromNpm: false,
     }),
     'isDebugRequested: unrelated argv -> not debug'
+  );
+}
+
+// --- shared debug-flag helper (used by `npm run radar` and `npm run crawl`) ---
+{
+  console.log('\n=== shared debug-flag helper ===\n');
+  assert(
+    sharedIsDebugRequested === isDebugRequested,
+    'radar.ts re-exports the shared helper (one implementation for both CLIs)'
+  );
+  assert(
+    sharedIsDebugRequested(['--debug', '--normalize'], {}).debug === true,
+    'crawl-style argv with --debug and --normalize is debug'
+  );
+  assert(
+    sharedIsDebugRequested(['https://a.example'], { npm_config_debug: 'true' })
+      .fromNpm === true,
+    'crawl-style argv with only a url, npm swallowed --debug -> debug via npm'
+  );
+  assert(
+    sharedIsDebugRequested(['https://a.example'], {}).debug === false,
+    'a plain crawl invocation is not debug'
   );
 }
 
