@@ -101,5 +101,12 @@ crawler/jobs.yaml
 # graphify - machine-specific paths, regenerated automatically
 graphify-out/.graphify_python
 graphify-out/.graphify_root
+# graphify - regenerable / local-only outputs (do not commit)
+graphify-out/20??-??-??/
+graphify-out/.graphify_labels.json.sig
+graphify-out/cache/last_query_stamp
+graphify-out/cache/ast/
+graphify-out/cache/stat-index.json
+graphify-out/graph.html
 crawler/festivals.yaml
 crawler/scout-sources.yaml
