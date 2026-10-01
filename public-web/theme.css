@@ -160,6 +160,7 @@ a {
   overflow: hidden;
   white-space: nowrap;
   border-bottom: var(--stroke);
+  line-height: 1.2;
 }
 .ticker__track {
   display: inline-flex;
@@ -182,6 +183,7 @@ a {
   align-items: center;
   gap: 0.5rem;
   padding: 0.7rem 1.25rem;
+  line-height: 1.2;
   position: sticky;
   top: 0;
   z-index: 1000;
@@ -243,11 +245,12 @@ a {
   font-weight: 700;
 }
 .header-title {
-  font-size: clamp(3rem, 9vw, 7rem);
+  font-size: clamp(2.4rem, 8vw, 5.5rem);
   animation: rise-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 .header-title em {
   font-style: normal;
+  white-space: nowrap;
   color: var(--page);
   -webkit-text-stroke: 2px var(--ink);
 }
@@ -624,14 +627,23 @@ label,
   color: var(--ink);
   font-weight: 600;
 }
-#status.err {
-  color: var(--err);
-}
-#status.ok {
-  color: var(--ok);
-}
+/* publish status sits on violet: black text in a white/lime block */
+#status.err,
+#status.ok,
 #status.info {
   color: var(--ink);
+  font-weight: 600;
+}
+#status.err,
+#status.ok {
+  border: var(--stroke);
+  padding: 6px 10px;
+}
+#status.err {
+  background: #ffd6d2;
+}
+#status.ok {
+  background: var(--lime);
 }
 .spinner {
   border: 3px solid rgba(0, 0, 0, 0.2);
@@ -655,6 +667,42 @@ label,
   box-shadow: none;
 }
 .leaflet-popup-content a {
+  color: var(--ink);
+}
+/* Contain Leaflet's internal z-indices (panes 400, controls 1000) so the
+   sticky .site-bar (z-index 1000) always stays above a scrolled map. */
+.leaflet-container {
+  isolation: isolate;
+}
+.leaflet-bar,
+.leaflet-touch .leaflet-bar {
+  border: var(--stroke);
+  border-radius: 0;
+  box-shadow: none;
+}
+.leaflet-bar a,
+.leaflet-bar a:first-child,
+.leaflet-bar a:last-child,
+.leaflet-touch .leaflet-bar a:first-child,
+.leaflet-touch .leaflet-bar a:last-child {
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+.leaflet-bar a:hover,
+.leaflet-bar a:focus {
+  background: var(--yellow);
+  color: var(--ink);
+}
+.leaflet-container .leaflet-control-attribution {
+  background: var(--paper);
+  color: var(--ink);
+  border-top: var(--stroke);
+  border-left: var(--stroke);
+  border-radius: 0;
+}
+.leaflet-container .leaflet-control-attribution a {
   color: var(--ink);
 }
 
@@ -686,4 +734,39 @@ body[data-page='privacy'] > .ticker {
 }
 body[data-page='privacy'] > .site-bar {
   margin-bottom: 2.5rem;
+}
+
+/* map: compact header so the full-height map keeps most of the viewport */
+body[data-page='map'] .header-inner {
+  max-width: none;
+  padding: 12px 24px 14px;
+}
+body[data-page='map'] .header-title {
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+}
+body[data-page='map'] .header-sub {
+  font-size: 1rem;
+  margin-top: 4px;
+}
+body[data-page='map'] .experimental-badge {
+  top: 8px;
+  padding: 4px 10px;
+}
+body[data-page='map'] .lang-selector {
+  bottom: 6px;
+}
+@media (max-width: 700px) {
+  body[data-page='map'] .header-inner {
+    padding: 10px 16px 6px;
+  }
+  body[data-page='map'] .header-sub {
+    font-size: 0.9rem;
+  }
+  body[data-page='map'] .experimental-badge {
+    display: none;
+  }
+  body[data-page='map'] .lang-selector {
+    position: static;
+    padding: 0 16px 10px;
+  }
 }

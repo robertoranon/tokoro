@@ -534,7 +534,7 @@
         const circle = L.circle(L.latLng(lat, lng), {
           radius: radiusKm * 1000,
           fill: false,
-          color: '#e8431f',
+          color: '#000000',
           weight: 2,
           opacity: 0.8,
         }).addTo(markerLayer);
@@ -576,7 +576,7 @@
               '</div>' +
               venueHtml +
               '<span style="display:inline-block;margin-top:6px;padding:2px 8px;' +
-              'border-radius:999px;font-size:11px;font-weight:600;color:var(--ink);' +
+              'font-size:11px;font-weight:600;color:var(--ink);' +
               'background:' +
               escHtml(c) +
               '">' +
@@ -595,8 +595,8 @@
           L.circleMarker([first.lat, first.lng], {
             radius: 9,
             fillColor: color,
-            color: '#ffffff',
-            weight: 2,
+            color: '#000000',
+            weight: 3,
             opacity: 1,
             fillOpacity: 1,
           })
