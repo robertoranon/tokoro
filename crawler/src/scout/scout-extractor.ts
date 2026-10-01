@@ -6,18 +6,44 @@ import {
   FESTIVAL_MAX_CONTENT_LENGTH,
   SCOUT_MAX_TOKENS,
 } from '../../../shared/extractors/extraction-limits.js';
-import { urlKey, type RawCandidate } from './candidates.js';
+import { urlKey, candidateKeys, type RawCandidate } from './candidates.js';
 import type { PageLink } from './links.js';
 
 const MAX_CANDIDATES = 40;
 
+// Only `name` is mandatory; wrong-typed optional fields are treated as absent.
+const optStr = z.string().optional().catch(undefined);
 const ItemSchema = z.object({
   name: z.string().min(1),
-  url: z.string().optional(),
-  dates_hint: z.string().optional(),
-  location_hint: z.string().optional(),
-  why: z.string().optional(),
+  url: optStr,
+  dates_hint: optStr,
+  location_hint: optStr,
+  why: optStr,
 });
+
+/** Parse an LLM reply as JSON, tolerating a code fence or surrounding prose. */
+function parseReply(raw: string): unknown {
+  const trimmed = raw
+    .trim()
+    .replace(/^```[a-zA-Z]*\s*/, '')
+    .replace(/\s*```$/, '')
+    .trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // fall through to substring extraction
+  }
+  const starts = [trimmed.indexOf('{'), trimmed.indexOf('[')].filter(
+    i => i >= 0
+  );
+  if (starts.length > 0) {
+    const start = Math.min(...starts);
+    const close = trimmed[start] === '{' ? '}' : ']';
+    const end = trimmed.lastIndexOf(close);
+    if (end > start) return JSON.parse(trimmed.slice(start, end + 1));
+  }
+  throw new Error('no JSON found');
+}
 
 export interface ScoutExtractorConfig {
   llm: LLMProvider;
@@ -60,7 +86,7 @@ export class ScoutExtractor {
 
     let parsed: unknown;
     try {
-      parsed = JSON.parse(response.content);
+      parsed = parseReply(response.content);
     } catch {
       throw new Error(`LLM returned malformed JSON for source ${page.url}`);
     }
@@ -70,18 +96,27 @@ export class ScoutExtractor {
       : parsed && typeof parsed === 'object'
         ? (parsed as { candidates?: unknown }).candidates
         : undefined;
-    if (!Array.isArray(list)) return [];
+    if (!Array.isArray(list)) {
+      console.warn(`Scout reply for ${page.url} had no "candidates" list`);
+      return [];
+    }
 
     // A URL is only trusted if the page itself shows it: as a link or in the text.
     const allowed = new Set(
       links.map(l => urlKey(l.url)).filter((k): k is string => k !== undefined)
     );
-    const textUrls = page.text.match(/https?:\/\/[^\s)\]>"']+/g) ?? [];
+    const textUrls = page.text.match(/https?:\/\/[^\s)\]>"']+/gi) ?? [];
     for (const u of textUrls) {
-      const k = urlKey(u);
+      const k = urlKey(u.replace(/[.,;:!?]+$/, ''));
       if (k !== undefined) allowed.add(k);
     }
 
+    // The page itself and the bare root of its host are never festival urls.
+    const pageKey = urlKey(page.url);
+    const pageHost = pageKey?.split('/')[0];
+    const isSelfOrRoot = (k: string) => k === pageKey || k === pageHost;
+
+    const seen = new Set<string>();
     const out: RawCandidate[] = [];
     for (const item of list) {
       if (out.length >= MAX_CANDIDATES) break;
@@ -100,13 +135,19 @@ export class ScoutExtractor {
 
       let url: string | undefined;
       if (d.url) {
-        const key = urlKey(d.url.trim());
-        if (key !== undefined && allowed.has(key)) url = d.url.trim();
-        else
+        const trimmedUrl = d.url.trim();
+        const key = /\s/.test(trimmedUrl) ? undefined : urlKey(trimmedUrl);
+        if (key !== undefined && allowed.has(key) && !isSelfOrRoot(key)) {
+          url = trimmedUrl;
+        } else
           console.log(
             `  ⚠ Dropped url not found on the page for "${name}": ${d.url}`
           );
       }
+
+      const keys = candidateKeys({ name, url });
+      if (keys.some(k => seen.has(k))) continue;
+      keys.forEach(k => seen.add(k));
 
       out.push({
         name,

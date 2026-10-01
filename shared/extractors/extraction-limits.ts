@@ -47,6 +47,8 @@ export const FESTIVAL_LISTING_MAX_TOKENS = 1000;
  *  Used by: crawler FestivalEntryExtractor (festival-entry mode) */
 export const FESTIVAL_ENTRY_MAX_TOKENS = 3500;
 
-/** Max output tokens for a scout run over one source page (up to 40 candidates).
+/** Max output tokens for a scout run over one source page (up to 40 candidates
+ *  with name, url, hints and a one-sentence reason; generous so the JSON is
+ *  never truncated mid-object).
  *  Used by: crawler ScoutExtractor */
-export const SCOUT_MAX_TOKENS = 4000;
+export const SCOUT_MAX_TOKENS = 8000;
