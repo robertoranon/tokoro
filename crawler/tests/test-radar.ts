@@ -17,6 +17,7 @@ import {
   finalizeRadarEntry,
   resolveEntryDraft,
   hasYearEvidence,
+  stripDates,
   analyzeEventDays,
   SERIES_MAX_GAP_DAYS,
   type FestivalEntryDraft,
@@ -1733,25 +1734,46 @@ console.log('\n=== event_days through extractor, finalize, merge ===\n');
   );
   assert(!('event_days' in fin), 'finalizeRadarEntry strips event_days');
 
-  const baseNo = { title: 'F', category: 'music' } as FestivalEntryDraft;
-  const extra = {
-    title: 'F',
-    category: 'music',
-    event_days: ['2026-06-01'],
-  } as FestivalEntryDraft;
+  const mk = (o: object) =>
+    ({ title: 'F', category: 'music', ...o }) as FestivalEntryDraft;
+  const dates = {
+    start_time: '2026-06-01T00:00:00',
+    end_time: '2026-06-02T23:59:59',
+  };
+  const m1 = mergeEntries(mk({ event_days: ['2026-01-01'] }), mk({ ...dates }));
   assert(
-    JSON.stringify(mergeEntries(baseNo, extra)?.event_days) ===
-      '["2026-06-01"]',
-    'mergeEntries fills event_days when base lacks it'
+    m1?.start_time === dates.start_time && m1?.event_days === undefined,
+    'event_days of an undated base is dropped when dates come from the info page'
   );
-  const baseHas = {
-    ...baseNo,
-    event_days: ['2026-07-01'],
-  } as FestivalEntryDraft;
+  const m2 = mergeEntries(
+    mk({ event_days: ['2026-01-01'] }),
+    mk({ ...dates, event_days: ['2026-06-01', '2026-06-02'] })
+  );
   assert(
-    JSON.stringify(mergeEntries(baseHas, extra)?.event_days) ===
-      '["2026-07-01"]',
-    'mergeEntries never overwrites existing event_days'
+    JSON.stringify(m2?.event_days) === '["2026-06-01","2026-06-02"]',
+    'event_days travels with the dates copied from the info page'
+  );
+  const m3 = mergeEntries(
+    mk({ ...dates, event_days: ['2026-06-02'] }),
+    mk({
+      start_time: '2026-08-01T00:00:00',
+      end_time: '2026-08-02T23:59:59',
+      event_days: ['2026-08-01'],
+    })
+  );
+  assert(
+    m3?.start_time === dates.start_time &&
+      JSON.stringify(m3?.event_days) === '["2026-06-02"]',
+    'base with dates keeps its dates and its own event_days'
+  );
+  const m4 = mergeEntries(mk({ ...dates }), mk({ event_days: ['2026-06-01'] }));
+  assert(
+    m4?.event_days === undefined,
+    'event_days from another page is not filled in next to base dates'
+  );
+  assert(
+    !('event_days' in stripDates(mk({ ...dates, event_days: ['2026-06-01'] }))),
+    'stripDates removes event_days'
   );
 }
 
@@ -1835,6 +1857,30 @@ console.log('\n=== applyYearCorrection and event_days ===\n');
   assert(
     hasDates(shifted) && analyzeEventDays(shifted).days === 3,
     'analyzeEventDays still sees the shifted days inside the range'
+  );
+  const leap = applyYearCorrection({
+    title: 'F',
+    category: 'music',
+    start_time: '2028-02-28T00:00:00',
+    end_time: '2028-03-01T23:59:59',
+    day_name: 'Wednesday', // 2029-02-28 is a Wednesday
+    event_days: ['2028-02-28', '2028-02-29', '2028-03-01'],
+  } as FestivalEntryDraft);
+  assert(
+    JSON.stringify(leap.event_days) === '["2029-02-28","2029-03-01"]',
+    'a shifted leap day that does not exist is dropped'
+  );
+  const leapOnly = applyYearCorrection({
+    title: 'F',
+    category: 'music',
+    start_time: '2028-02-28T00:00:00',
+    end_time: '2028-03-01T23:59:59',
+    day_name: 'Wednesday',
+    event_days: ['2028-02-29'],
+  } as FestivalEntryDraft);
+  assert(
+    leapOnly.event_days === undefined,
+    'event_days removed when nothing valid remains after the shift'
   );
   const stripped = applyYearCorrection({
     title: 'F',

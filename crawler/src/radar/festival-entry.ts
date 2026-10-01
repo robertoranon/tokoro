@@ -192,9 +192,11 @@ export function applyYearCorrection(d: FestivalEntryDraft): FestivalEntryDraft {
       Number(String(fixed.start_time).slice(0, 4)) -
       Number(d.start_time.slice(0, 4));
     if (fixed.event_days && yearShift !== 0) {
-      fixed.event_days = fixed.event_days.map(
-        day => `${Number(day.slice(0, 4)) + yearShift}${day.slice(4)}`
-      );
+      const days = fixed.event_days
+        .map(day => `${Number(day.slice(0, 4)) + yearShift}${day.slice(4)}`)
+        .filter(isRealDate); // e.g. a leap day has no counterpart
+      if (days.length) fixed.event_days = days;
+      else delete fixed.event_days;
     }
     return fixed;
   }
@@ -227,12 +229,16 @@ export function mergeEntries(
 
   const merged: Record<string, unknown> = { ...base };
   for (const [key, value] of Object.entries(extra)) {
-    if (key === 'start_time' || key === 'end_time') continue;
+    // event_days describes the date range, so it travels with the date pair.
+    if (key === 'start_time' || key === 'end_time' || key === 'event_days')
+      continue;
     if (isEmpty(key, merged[key]) && !isEmpty(key, value)) merged[key] = value;
   }
   if (!hasDates(base) && hasDates(extra)) {
     merged.start_time = extra.start_time;
     merged.end_time = extra.end_time;
+    if (extra.event_days) merged.event_days = extra.event_days;
+    else delete merged.event_days;
   }
   return merged as FestivalEntryDraft;
 }
@@ -374,6 +380,6 @@ export function hasYearEvidence(
 
 /** Remove the dates, keep everything else. */
 export function stripDates(d: FestivalEntryDraft): FestivalEntryDraft {
-  const { start_time: _s, end_time: _e, ...rest } = d;
+  const { start_time: _s, end_time: _e, event_days: _days, ...rest } = d;
   return rest;
 }
