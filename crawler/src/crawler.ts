@@ -584,9 +584,19 @@ export class EventCrawler {
     // Look up first: an update must re-sign with the stored created_at.
     const existing = await this.radarPublisher.lookup(festivalUrl);
     const match = matchEdition(existing, String(entry.start_time));
-    const normalized = await this.normalizer.normalize(entry, {
-      createdAt: match?.created_at,
-    });
+    const createdAt = match?.created_at;
+    let normalized = await this.normalizer.normalize(entry, { createdAt });
+    if (!normalized && match) {
+      // LLM extraction varies between runs: a run that finds no usable
+      // location must not fail an entry whose location is already known.
+      console.log(
+        `  ↺ No usable location this run — reusing stored coordinates (${match.lat}, ${match.lng})`
+      );
+      normalized = await this.normalizer.normalize(
+        { ...entry, lat: match.lat, lng: match.lng },
+        { createdAt }
+      );
+    }
     if (!normalized) return 'failed';
     return this.radarPublisher.apply(normalized, match);
   }
