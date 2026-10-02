@@ -190,7 +190,7 @@ A full-viewport map-first page for discovering events spatially.
 
 **FR-6.2: Map and Markers**
 
-- MUST render an OpenStreetMap/Leaflet map filling the viewport below the control strip
+- MUST render a Leaflet map using the abstract Esri World Light Gray basemap (no terrain shading, no API key) filling the viewport below the control strip
 - MUST place one `L.circleMarker` per event at `event.lat`/`event.lng`, colour-coded by category
 - MUST draw a circle overlay showing the queried area
 - MUST fit the map view to the queried circle after each search
@@ -274,5 +274,5 @@ All pages share `theme.css`, linked after each page's inline `<style>`. Pages ke
 - **Colour rules:** text is black on every saturated background; white text appears only on black. Yellow is a fill and the focus halo. Black on violet is about 4.5:1.
 - **Categories:** the 13 `--cat-*` tokens are unchanged. The `CAT_COLORS` maps in `query.js`, `map.html` and `festivals.html` must equal them. `.cat-tab` is the category label on a card edge (`.tab` belongs to the publish page's own tabs).
 - **Motion:** ticker scroll, hero and card rise-in, card hover lift. All of it is disabled under `prefers-reduced-motion`. Keyframes must set opacity in `to`, or elements stay hidden.
-- **Maps:** Leaflet options cannot use CSS variables, so marker colours are literals: black ring (`#000000`), weight 3, full fill opacity; the search-radius circle is black. `.leaflet-container` is `isolation: isolate` so map controls never overlap the sticky bar.
+- **Maps:** Basemap is Esri World Light Gray (base + reference layers, no API key; CARTO basemaps now require one). Leaflet options cannot use CSS variables, so marker colours are literals: black ring (`#000000`), weight 3, full fill opacity; the search-radius circle is black. `.leaflet-container` is `isolation: isolate` so map controls never overlap the sticky bar.
 - **Guard:** `tests/theme.test.mjs` enforces the tokens, the `theme.css` link order, per-page `data-page`, fonts, ticker and nav bar, no legacy dark colours, no inline `:root`, category-colour parity, reduced-motion support, safe keyframes and no soft shadows.
