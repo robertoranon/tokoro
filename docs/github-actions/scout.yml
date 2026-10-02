@@ -1,0 +1,72 @@
+# Copy to .github/workflows/scout.yml in the private data repo.
+name: Festival scout
+
+on:
+  schedule:
+    - cron: "0 10 * * 4" # Thursdays 10:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: scout
+  cancel-in-progress: false
+
+permissions:
+  contents: write # commit candidates.yaml / scout-state.json back
+
+jobs:
+  scout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout private data repo
+        uses: actions/checkout@v4
+        with:
+          path: data
+
+      - name: Checkout tokoro (public)
+        uses: actions/checkout@v4
+        with:
+          repository: robertoranon/tokoro
+          path: tokoro
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            tokoro/crawler/package-lock.json
+            tokoro/shared/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci --prefix tokoro/shared
+          npm ci --prefix tokoro/crawler
+
+      - name: Install Playwright Chromium
+        working-directory: tokoro/crawler
+        run: npx playwright install --with-deps chromium
+
+      - name: Run scout
+        working-directory: tokoro/crawler
+        env:
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
+        run: |
+          D="$GITHUB_WORKSPACE/data"
+          npm run scout -- \
+            --sources "$D/scout-sources.yaml" \
+            --candidates "$D/candidates.yaml" \
+            --state "$D/scout-state.json" \
+            --festivals "$D/festivals.yaml"
+
+      - name: Commit updated candidates and state
+        working-directory: data
+        run: |
+          git config user.name "tokoro-scout[bot]"
+          git config user.email "actions@users.noreply.github.com"
+          git add candidates.yaml scout-state.json
+          git diff --cached --quiet || git commit -m "chore: scout run $(date -u +%F)"
+          git pull --rebase
+          git push
