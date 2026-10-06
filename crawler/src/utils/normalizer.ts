@@ -16,10 +16,13 @@ import * as path from 'path';
 import type { LLMProvider } from '../../../shared/types/llm.js';
 import type { FetchedPage } from '../types/event.js';
 
-// Configure SHA-512 for Node.js
+// Configure SHA-512 for Node.js. noble calls this with several arrays (e.g. the
+// nonce is SHA-512(prefix || message)): hash them all, as worker/src/crypto.ts
+// does. Hashing only the first one makes the nonce independent of the message.
 if (typeof crypto !== 'undefined' && crypto.subtle) {
   ed.etc.sha512Async = async (...m) => {
-    const buffer = await crypto.subtle.digest('SHA-512', m[0] as BufferSource);
+    const data = ed.etc.concatBytes(...m);
+    const buffer = await crypto.subtle.digest('SHA-512', data as BufferSource);
     return new Uint8Array(buffer);
   };
 }

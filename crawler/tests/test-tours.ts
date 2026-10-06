@@ -1,4 +1,5 @@
 import * as ed from '@noble/ed25519';
+import { signAdoption, adoptMessage } from '../src/tours/adopt.js';
 import { getTourShowsPrompt } from '../../shared/extractors/tour-prompt.js';
 import { selectRetrySources } from '../src/tours/retry.js';
 import { looksBlocked, assertNotBlocked } from '../src/utils/block-page.js';
@@ -628,29 +629,31 @@ sources:
         body: init?.body ? JSON.parse(String(init.body)) : undefined,
       });
       if ((init?.method ?? 'GET') === 'GET')
-        return respond(200, [
-          {
-            id: 'e1',
-            start_time: '2030-11-12T21:00:00',
-            lat: 46.06,
-            lng: 13.23,
-            tags: [],
-            category: 'music',
-            title: 't',
-            created_at: 'c',
-          },
-        ]);
+        return respond(200, {
+          events: [
+            {
+              id: 'e1',
+              start_time: '2030-11-12T21:00:00',
+              lat: 46.06,
+              lng: 13.23,
+              tags: [],
+              category: 'music',
+              title: 't',
+              created_at: 'c',
+            },
+          ],
+          has_more: false,
+        });
       return respond(nextStatus);
     }) as unknown as typeof fetch;
 
     const pub = new TourPublisher('http://api.test', 'PUBKEY', fakeFetch);
     const found = await pub.lookup('https://testband.example');
-    assert(found.length === 1, 'lookup returns the array');
+    assert(found.length === 1, 'lookup returns the events of the page');
     const q = new URL(calls[0].url).searchParams;
     assert(
-      q.get('pubkey') === 'PUBKEY' &&
-        q.get('act_url') === 'https://testband.example',
-      'lookup filters by pubkey + act_url'
+      !q.has('pubkey') && q.get('act_url') === 'https://testband.example',
+      'lookup filters by act_url only (no pubkey)'
     );
     assert(
       q.get('from') === '1970-01-01T00:00:00' &&
@@ -735,13 +738,13 @@ sources:
     );
 
     const badShape = new TourPublisher('http://api.test', 'PUBKEY', (async () =>
-      respond(200, { events: [] })) as unknown as typeof fetch);
+      respond(200, [])) as unknown as typeof fetch);
     assert(
       await badShape.lookup('https://x.example').then(
         () => false,
         () => true
       ),
-      'lookup rejects a non-array response'
+      'lookup rejects a response without an events array (bare array)'
     );
     const notOk = new TourPublisher('http://api.test', 'PUBKEY', (async () =>
       respond(500)) as unknown as typeof fetch);
@@ -2581,6 +2584,245 @@ sources:
     assert(
       rec.status === 'ok',
       'adopted and duplicate shows do not make a run partial'
+    );
+  }
+
+  console.log('\n=== adopting: signature matches the worker ===\n');
+  {
+    // ACT_VECTOR from worker/src/index.test.ts: the same bytes the worker verifies.
+    const V = {
+      privkey:
+        '0101010101010101010101010101010101010101010101010101010101010101',
+      eventId:
+        'abababababababababababababababababababababababababababababababab',
+      actName: 'Test Band',
+      actUrl: 'https://testband.example',
+      signature:
+        'eb42a79e717ed8cf6a9657d1f8b426ee770dc35a6705a77f648b1b27f908d139f7481f05e916b75fc5a6c7ecf4e38ff4c1daa70dff51ce70cd19b923e9b64303',
+    };
+    assert(
+      (await signAdoption(V.privkey, V.eventId, V.actName, V.actUrl)) ===
+        V.signature,
+      'signAdoption reproduces the worker test vector byte for byte'
+    );
+    assert(
+      (await adoptMessage(V.eventId, V.actName, V.actUrl)).length === 32,
+      'the signed message is a SHA-256 digest'
+    );
+    assert(
+      (await signAdoption(V.privkey, V.eventId, 'Other', V.actUrl)) !==
+        V.signature,
+      'a different name gives a different signature'
+    );
+  }
+
+  console.log('\n=== TourPublisher: lookup by act_url only ===\n');
+  {
+    const calls: string[] = [];
+    const page = (events: unknown[], hasMore: boolean) =>
+      ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          events,
+          offset: 0,
+          count: events.length,
+          has_more: hasMore,
+        }),
+      }) as Response;
+    let n = 0;
+    const f = (async (url: string) => {
+      calls.push(String(url));
+      n++;
+      return n === 1
+        ? page(
+            [
+              { id: 'a', pubkey: 'other', act_url: 'https://x.example' },
+              { id: 'b', pubkey: 'me' },
+            ],
+            true
+          )
+        : page([{ id: 'c' }], false);
+    }) as unknown as typeof fetch;
+    const pub = new TourPublisher('http://api.test', 'me', f);
+    const found = await pub.lookup('https://x.example');
+    assert(
+      found.map(s => s.id).join() === 'a,b,c',
+      'every page is followed (has_more) and shows of other keys are included'
+    );
+    const q0 = new URL(calls[0]).searchParams;
+    assert(
+      !q0.has('pubkey') && q0.get('act_url') === 'https://x.example',
+      'the lookup is by act_url, not by pubkey'
+    );
+    assert(
+      q0.get('from') === '1970-01-01T00:00:00' &&
+        q0.get('to') === '2999-12-31T23:59:59',
+      'with the explicit wide window'
+    );
+    assert(
+      new URL(calls[1]).searchParams.get('offset') === '2',
+      'the second page starts after the first page’s events'
+    );
+    const bareArray = new TourPublisher(
+      'http://api.test',
+      'me',
+      (async () =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () => [],
+        }) as Response) as unknown as typeof fetch
+    );
+    assert(
+      await bareArray.lookup('https://x.example').then(
+        () => false,
+        () => true
+      ),
+      'a bare array is not the expected shape'
+    );
+    const bad = new TourPublisher(
+      'http://api.test',
+      'me',
+      (async () =>
+        ({ ok: false, status: 500 }) as Response) as unknown as typeof fetch
+    );
+    assert(
+      await bad.lookup('https://x.example').then(
+        () => false,
+        () => true
+      ),
+      'HTTP errors reject'
+    );
+  }
+
+  console.log('\n=== TourPublisher: a duplicate is adopted ===\n');
+  {
+    const ev = {
+      pubkey: 'me',
+      signature: 's',
+      title: 'Fatoumata',
+      lat: 49.9,
+      lng: 2.3,
+      start_time: '2030-03-13T19:00:00',
+      category: 'music',
+      created_at: 'c',
+      act_name: 'Fatoumata Diawara',
+      act_url: 'https://fd.example',
+    } as NormalizedEvent;
+    type Call = { url: string; method: string; body?: any };
+    const mk = (
+      adoptStatus: number | 'throw',
+      adoptJson: unknown = {},
+      postBody: unknown = { error: 'Duplicate event', existing_event_id: 'ex1' }
+    ) => {
+      const calls: Call[] = [];
+      const f = (async (url: string, init?: RequestInit) => {
+        const call: Call = {
+          url: String(url),
+          method: init?.method ?? 'GET',
+          body: init?.body ? JSON.parse(String(init.body)) : undefined,
+        };
+        calls.push(call);
+        if (call.url.endsWith('/events') && call.method === 'POST') {
+          return {
+            ok: false,
+            status: 409,
+            text: async () => JSON.stringify(postBody),
+            json: async () => postBody,
+          } as Response;
+        }
+        if (adoptStatus === 'throw') throw new Error('network');
+        return {
+          ok: adoptStatus >= 200 && adoptStatus < 300,
+          status: adoptStatus,
+          text: async () => JSON.stringify(adoptJson),
+          json: async () => adoptJson,
+        } as Response;
+      }) as unknown as typeof fetch;
+      const signed: string[][] = [];
+      const pub = new TourPublisher(
+        'http://api.test',
+        'me',
+        f,
+        async (id, name, url) => {
+          signed.push([id, name, url]);
+          return 'SIG';
+        }
+      );
+      return { pub, calls, signed, fetchFn: f };
+    };
+
+    let t = mk(200, { id: 'ex1', adopted: true });
+    assert(
+      (await t.pub.apply(ev, undefined)) === 'adopted',
+      '409 + adopt accepted → adopted'
+    );
+    assert(
+      t.calls.length === 2 &&
+        t.calls[1].url === 'http://api.test/events/ex1/act' &&
+        t.calls[1].method === 'POST',
+      'one adopt request to /events/<existing id>/act'
+    );
+    assert(
+      JSON.stringify(t.calls[1].body) ===
+        JSON.stringify({
+          pubkey: 'me',
+          act_name: 'Fatoumata Diawara',
+          act_url: 'https://fd.example',
+          signature: 'SIG',
+        }),
+      'with pubkey, act, and the signature'
+    );
+    assert(
+      JSON.stringify(t.signed) ===
+        JSON.stringify([['ex1', 'Fatoumata Diawara', 'https://fd.example']]),
+      'the signer is given the existing id and the act'
+    );
+
+    t = mk(200, { id: 'ex1', adopted: false, already: true });
+    assert(
+      (await t.pub.apply(ev, undefined)) === 'unchanged',
+      'already linked → unchanged'
+    );
+    for (const status of [401, 403, 404, 409, 500] as const) {
+      t = mk(status, { error: 'x' });
+      assert(
+        (await t.pub.apply(ev, undefined)) === 'duplicate',
+        `adopt refused (${status}) → duplicate, not failed`
+      );
+    }
+    t = mk('throw');
+    assert(
+      (await t.pub.apply(ev, undefined)) === 'duplicate',
+      'network error while adopting → duplicate'
+    );
+    t = mk(200, {}, { error: 'Duplicate event' });
+    assert(
+      (await t.pub.apply(ev, undefined)) === 'failed' && t.calls.length === 1,
+      '409 without an existing id stays failed (no adopt request)'
+    );
+    const noSignerCase = mk(200);
+    const noSigner = new TourPublisher(
+      'http://api.test',
+      'me',
+      noSignerCase.fetchFn
+    );
+    assert(
+      (await noSigner.apply(ev, undefined)) === 'failed' &&
+        noSignerCase.calls.length === 1,
+      'without a signer a 409 stays failed'
+    );
+    t = mk(200, { adopted: true });
+    const noAct = {
+      ...ev,
+      act_name: undefined,
+      act_url: undefined,
+    } as NormalizedEvent;
+    assert(
+      (await t.pub.apply(noAct, undefined)) === 'failed' &&
+        t.calls.length === 1,
+      'an event without act fields cannot be adopted'
     );
   }
 

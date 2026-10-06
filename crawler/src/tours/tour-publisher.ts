@@ -29,8 +29,8 @@ export interface ExistingShow {
   pubkey?: string;
 }
 
-// The pubkey-only GET path is bounded by start_time (default: now → +7 days),
-// so the lookup must ask for everything explicitly.
+// GET /events is bounded by start_time (default window from now), so the
+// lookup must ask for everything explicitly.
 const LOOKUP_FROM = '1970-01-01T00:00:00';
 const LOOKUP_TO = '2999-12-31T23:59:59';
 
@@ -113,30 +113,51 @@ export function differs(
   );
 }
 
+export type AdoptSigner = (
+  eventId: string,
+  actName: string,
+  actUrl: string
+) => Promise<string>;
+
 export class TourPublisher {
   constructor(
     private apiUrl: string,
     private pubkey: string,
-    private fetchFn: typeof fetch = fetch
+    private fetchFn: typeof fetch = fetch,
+    private signAdopt?: AdoptSigner
   ) {}
 
-  /** All of this crawler's shows for one act_url (any date). */
+  /**
+   * Every show of one act (any date), whichever key published it, so events
+   * adopted from other keys are recognised. The no-geo browse path answers
+   * `{ events, has_more }`, 100 per page.
+   */
   async lookup(actUrl: string): Promise<ExistingShow[]> {
-    const params = new URLSearchParams({
-      pubkey: this.pubkey,
-      act_url: actUrl,
-      from: LOOKUP_FROM,
-      to: LOOKUP_TO,
-    });
-    const res = await this.fetchFn(`${this.apiUrl}/events?${params}`);
-    if (!res.ok) throw new Error(`Lookup failed (${res.status})`);
-    const data: unknown = await res.json();
-    if (!Array.isArray(data)) {
-      throw new Error(
-        'Lookup returned an unexpected shape (expected an array)'
-      );
+    const all: ExistingShow[] = [];
+    let offset = 0;
+    for (let page = 0; page < 20; page++) {
+      const params = new URLSearchParams({
+        act_url: actUrl,
+        from: LOOKUP_FROM,
+        to: LOOKUP_TO,
+        offset: String(offset),
+      });
+      const res = await this.fetchFn(`${this.apiUrl}/events?${params}`);
+      if (!res.ok) throw new Error(`Lookup failed (${res.status})`);
+      const data = (await res.json()) as {
+        events?: unknown;
+        has_more?: boolean;
+      };
+      if (!data || !Array.isArray(data.events)) {
+        throw new Error(
+          'Lookup returned an unexpected shape (expected { events: [...] })'
+        );
+      }
+      all.push(...(data.events as ExistingShow[]));
+      if (!data.has_more || data.events.length === 0) return all;
+      offset += data.events.length;
     }
-    return data as ExistingShow[];
+    return all;
   }
 
   /**
@@ -162,8 +183,81 @@ export class TourPublisher {
       console.log(`✓ Published: ${event.title}`);
       return 'published';
     }
-    await this.logError(res, event);
+    const body = await res.text().catch(() => '');
+    if (res.status === 409) {
+      const adopted = await this.adoptDuplicate(body, event);
+      if (adopted) return adopted;
+    }
+    this.logError(res.status, event, body);
     return 'failed';
+  }
+
+  /**
+   * The worker judged this show a duplicate of an existing event, usually one
+   * published by another key (so it cannot be updated). Attach the band to it
+   * so it appears under the band; null when this is not an adoptable 409.
+   */
+  private async adoptDuplicate(
+    body: string,
+    event: NormalizedEvent
+  ): Promise<TourOutcome | null> {
+    let existingId: unknown;
+    try {
+      existingId = JSON.parse(body)?.existing_event_id;
+    } catch {
+      return null;
+    }
+    if (
+      typeof existingId !== 'string' ||
+      !existingId ||
+      !this.signAdopt ||
+      !event.act_name ||
+      !event.act_url
+    ) {
+      return null;
+    }
+    try {
+      const signature = await this.signAdopt(
+        existingId,
+        event.act_name,
+        event.act_url
+      );
+      const res = await this.fetchFn(
+        `${this.apiUrl}/events/${existingId}/act`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pubkey: this.pubkey,
+            act_name: event.act_name,
+            act_url: event.act_url,
+            signature,
+          }),
+        }
+      );
+      if (res.ok) {
+        const json = (await res.json().catch(() => ({}))) as {
+          adopted?: boolean;
+        };
+        if (json.adopted) {
+          console.log(
+            `⛓ Linked to existing event ${existingId}: ${event.title}`
+          );
+          return 'adopted';
+        }
+        console.log(`= Already linked (event ${existingId}): ${event.title}`);
+        return 'unchanged';
+      }
+      console.log(
+        `= Duplicate of event ${existingId}, which could not be linked (HTTP ${res.status}): ${event.title}`
+      );
+      return 'duplicate';
+    } catch (error) {
+      console.log(
+        `= Duplicate of event ${existingId}, which could not be linked (${error instanceof Error ? error.message : error}): ${event.title}`
+      );
+      return 'duplicate';
+    }
   }
 
   private async put(id: string, event: NormalizedEvent): Promise<TourOutcome> {
@@ -177,7 +271,7 @@ export class TourPublisher {
       console.log(`Show ${id} vanished before the update — publishing as new`);
       return this.post(event);
     }
-    await this.logError(res, event);
+    this.logError(res.status, event, await res.text().catch(() => ''));
     return 'failed';
   }
 
@@ -198,14 +292,13 @@ export class TourPublisher {
     }
   }
 
-  private async logError(res: Response, event: NormalizedEvent): Promise<void> {
-    const body = await res.text().catch(() => '');
+  private logError(status: number, event: NormalizedEvent, body: string): void {
     const hint =
-      res.status === 401 || res.status === 403
+      status === 401 || status === 403
         ? ' — signing or identity bug: check CRAWLER_PRIVKEY / CRAWLER_PUBKEY'
-        : res.status === 409
-          ? ' — duplicate of an existing event that is not this crawler’s show'
+        : status === 409
+          ? ' — duplicate of an existing event that could not be linked to this band'
           : '';
-    console.error(`API error (${res.status})${hint}: ${event.title}: ${body}`);
+    console.error(`API error (${status})${hint}: ${event.title}: ${body}`);
   }
 }
