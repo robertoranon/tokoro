@@ -32,6 +32,7 @@
     "bands-scout": "tsx src/bands-scout.ts",
     "smoke:radar": "tsx tests/smoke-radar-publisher.ts",
     "smoke:tours": "tsx tests/smoke-tours-publisher.ts",
+    "probe:fetch": "tsx tests/probe-fetch.ts",
     "smoke:scout": "tsx tests/smoke-scout.ts"
   },
   "keywords": [
