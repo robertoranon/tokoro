@@ -13,6 +13,7 @@ const PAGES = [
   'it.html',
   'map.html',
   'festivals.html',
+  'tours.html',
   'publish.html',
   'privacy-policy.html',
 ];
@@ -54,7 +55,13 @@ console.log(
 // 3. no legacy dark palette anywhere in pages or page scripts
 const LEGACY =
   /#(?:111a24|192534|0a1520|142030|0c1a30|243445|e8f4fb|8aafc4|5a7a8e|7f9db0|22d3ee|0891b2|67e8f9|1e2e3e|3a5060)\b|rgba\(\s*34,\s*211,\s*238/i;
-for (const f of [...PAGES, 'query.js', 'festivals.js', 'shared.js']) {
+for (const f of [
+  ...PAGES,
+  'query.js',
+  'festivals.js',
+  'tours.js',
+  'shared.js',
+]) {
   const line = read(f)
     .split('\n')
     .findIndex(l => LEGACY.test(l));
@@ -106,6 +113,7 @@ const PAGE_KEY = {
   'index.html': 'browse',
   'it.html': 'browse',
   'festivals.html': 'festivals',
+  'tours.html': 'tours',
   'map.html': 'map',
   'publish.html': 'publish',
   'privacy-policy.html': 'privacy',
@@ -146,22 +154,26 @@ for (const m of theme.matchAll(/@keyframes\s+([\w-]+)\s*\{([\s\S]*?\n\})/g)) {
 assert.ok(!/box-shadow:[^;]*blur/.test(theme), 'no soft shadows');
 console.log('✅ theme: reduced-motion honoured, keyframes safe');
 
-// 9. the radar is a separate site section: no cross links either way
+// 9. the radar and the tours page are separate site sections: no cross links either way
+const SEPARATE = ['festivals.html', 'tours.html'];
+const MAIN_LINK = /(?:^|\/)(?:index|it|map|publish|privacy-policy)\.html/;
 for (const p of PAGES) {
   const links = [...read(p).matchAll(/<a[^>]+href="([^"]+)"/g)].map(m => m[1]);
-  if (p === 'festivals.html') {
-    const out = links.filter(h =>
-      /(?:^|\/)(?:index|it|map|publish|privacy-policy)\.html/.test(h)
+  if (SEPARATE.includes(p)) {
+    const out = links.filter(
+      h => MAIN_LINK.test(h) || SEPARATE.some(s => s !== p && h.includes(s))
     );
-    assert.deepEqual(out, [], `festivals.html must not link out: ${out}`);
+    assert.deepEqual(out, [], `${p} must not link out: ${out}`);
   } else {
     assert.ok(
-      !links.some(h => /(?:^|\/)festivals\.html/.test(h)),
-      `${p} must not link to festivals.html`
+      !links.some(h => SEPARATE.some(s => h.includes(s))),
+      `${p} must not link to ${SEPARATE.join(' or ')}`
     );
   }
 }
-console.log('✅ theme: radar page is not cross-linked with the other pages');
+console.log(
+  '✅ theme: radar and tours pages are not cross-linked with other pages'
+);
 
 // 10. no magenta page backgrounds, and each page has its own ticker text
 assert.ok(!/magenta|#ff29ff/i.test(theme), 'magenta is not used');
@@ -174,10 +186,13 @@ const tickers = PAGES.map(p => {
   );
   return m[1].replace(/\s+/g, ' ');
 });
-for (const a of ['index.html', 'map.html', 'festivals.html']) {
-  const others = ['index.html', 'map.html', 'festivals.html'].filter(
-    b => b !== a
-  );
+for (const a of ['index.html', 'map.html', 'festivals.html', 'tours.html']) {
+  const others = [
+    'index.html',
+    'map.html',
+    'festivals.html',
+    'tours.html',
+  ].filter(b => b !== a);
   for (const b of others)
     assert.notEqual(
       tickers[PAGES.indexOf(a)],
@@ -185,4 +200,6 @@ for (const a of ['index.html', 'map.html', 'festivals.html']) {
       `${a} and ${b} must have different tickers`
     );
 }
-console.log('✅ theme: no magenta; Browse, Map and Radar tickers differ');
+console.log(
+  '✅ theme: no magenta; Browse, Map, Radar and Tours tickers differ'
+);

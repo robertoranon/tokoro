@@ -15,6 +15,7 @@
   --violet: #9443ff;
   --orange: #ff7a1a;
   --yellow: #ffff00;
+  --teal: #00d6b4;
   --page: var(--blue);
 
   /* legacy names kept so inline page CSS keeps working */
@@ -65,6 +66,9 @@ body[data-page='browse'] {
 body[data-page='festivals'] {
   --page: var(--orange);
 }
+body[data-page='tours'] {
+  --page: var(--teal);
+}
 body[data-page='map'] {
   --page: var(--lime);
 }
@@ -94,6 +98,7 @@ h3,
 .tool-card h3,
 .month-group__title,
 .fest-card__title,
+.band-card__name,
 .events-magazine__col-header,
 .site-bar__logo {
   font-family: var(--display);
@@ -301,6 +306,7 @@ a {
 .event-card,
 .tool-card,
 .fest-card,
+.band-card,
 #cfg,
 .ev-card,
 .map-panel {
@@ -311,14 +317,16 @@ a {
 }
 /* Entry rise-in; "backwards" so the animation releases transform for hover. */
 .event-card,
-.fest-card {
+.fest-card,
+.band-card {
   animation: rise-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
   transition:
     transform 0.18s,
     box-shadow 0.18s;
 }
 .event-card:hover,
-.fest-card:hover {
+.fest-card:hover,
+.band-card:hover {
   transform: translate(-5px, -5px);
   box-shadow: var(--lift);
   border-color: var(--ink);
@@ -335,7 +343,12 @@ a {
 .fest-card__desc,
 .fest-card__category,
 .fest-card__date,
-.fest-card__distance {
+.fest-card__distance,
+.band-card__next,
+.band-card__count,
+.band-show__place,
+.band-show__distance,
+.band-show__date {
   color: var(--ink);
 }
 .festival-card__sub {
