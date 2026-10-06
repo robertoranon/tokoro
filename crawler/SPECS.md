@@ -551,6 +551,41 @@ Watches band sites and venue/aggregator listings for new shows of a curated set 
 - (f) A listing-mode bill only matches by exact normalized name or alias; a band billed under an unlisted spelling is `unmatched` until an alias is added.
 - (g) In debug mode an extracted show is counted as `published` internally; the summary labels it "extracted".
 
+### 4.11 Bands Scout (`npm run bands-scout`)
+
+A manual helper that turns a plain list of band names into `bands.yaml` entries: it finds each band's official site and tour page and inserts the missing `bands` and `sources` entries. Not scheduled, never contacts the Tokoro API, uses no signing keys. Entry point `src/bands-scout.ts`; the pieces (list parser, finder, YAML inserter, search client) live in `src/tours/` and `src/utils/` and take their dependencies (LLM, search, page fetch) as injected functions, so they are testable offline.
+
+**Command.** `npm run bands-scout -- <file> [--bands <path>] [--dry-run] [--fetcher playwright|jina]` (note the `--`). `<file>` is the band list. `--bands` is the `bands.yaml` to extend (default `bands.yaml`, which must already exist; the error points to `bands.example.yaml`). `--dry-run` computes and reports everything but writes nothing. `--fetcher` selects the page fetcher (default `playwright`; the browser engine comes from `BROWSER_ENGINE`, default `chrome`; `jina` uses `JINA_API_KEY` when set). An unknown flag, an invalid `--fetcher` value, a second positional argument, a missing list file, a missing or invalid `bands.yaml`, or no `<file>` is an error (message, exit 1) before anything is fetched. Environment: the LLM comes from the usual `LLM_PROVIDER`/API key settings (section 11.2); `BRAVE_SEARCH_API_KEY` enables the search step.
+
+**Input format.** One band per line. Blank lines and lines starting with `#` are ignored; a leading byte-order mark and CRLF line endings are tolerated. `Name | https://site` supplies the official site and skips the search for that band (the hint must be an `http`/`https` URL). A band repeated in the file (equal under name normalization: lowercase, accents stripped, punctuation to space) is dropped, first one wins. A line with no usable name, or with a hint that is not an `http`/`https` URL, is invalid: it is ignored and listed in the report.
+
+**Already-known bands.** Before any lookup, each name is compared (normalized) with the names and aliases already in `bands.yaml`. A match is reported as already present and is never searched. The LLM, the fetcher and the search client are created only when at least one band is left to look up, so a list of known bands needs no keys and launches no browser.
+
+**Per-band pipeline** (sequential, one band at a time; any exception becomes the `error` outcome for that band and the run continues):
+
+1. **Site.** With a hint, the hint (normalized like a `bands.yaml` `url`: scheme + host + path, no query/hash/trailing slash) is the site, and no search or site-choosing LLM call is made (the hint is trusted and is not checked against the deny-list). Without a hint: if no search key is configured the outcome is `not_searched` (a warning is printed at start-up when any band needs a search). Otherwise one search is made for `"<name>" official site` (Brave web search, top 8 results with title, url and snippet; HTML tags stripped from snippets; 10 s timeout; a non-success status is an error for that band). An LLM call receives the name and the numbered results and returns one result url, or null when none is clearly the band's own site. The answer is accepted only if it equals (normalized) a url actually present in the results and its host is not on the deny-list; otherwise, or when there are no results, the outcome is `no_site`. The LLM never supplies a url from memory.
+2. **Homepage.** The site is fetched; its links are extracted (same extractor as the scout; social-network hosts are already dropped) and up to 200 `text → url` pairs plus the first 2000 characters of page text go to a second LLM call, which returns a `tour_url` (a page listing upcoming dates) or null, and whether the homepage text itself already lists dated upcoming shows.
+3. **Tour page.** The returned `tour_url` is accepted only if it equals (normalized) one of the extracted links. The chosen page is then fetched to confirm it loads with non-empty text. The tour page may be on another host than the site (a booking or agenda page); the deny-list applies to the site only, not to the tour page. If the chosen page does not load, the outcome is `no_tour_page` with a note saying so. If no link was chosen but the homepage was declared to list the shows, the homepage itself (the site url) is the tour page (single-page fallback). Otherwise the outcome is `no_tour_page`.
+4. **Outcomes:** `found` (site and tour page), `no_tour_page` (site known; the band is added without a source and the report says to add one by hand), `no_site`, `not_searched`, `error`. A malformed or wrongly shaped LLM JSON answer, or a failing homepage fetch, is an `error`. Both LLM calls use temperature 0 and JSON mode.
+
+**Deny-list.** Hosts that are never accepted as a band's own site: major social networks and video sites (Facebook, Instagram, X/Twitter, YouTube, TikTok, Vimeo, Linktree), streaming and music stores (Spotify, Bandcamp, SoundCloud, Deezer, Tidal, Apple/iTunes, Amazon, Beatport), encyclopedias and databases (Wikipedia, Wikidata, Discogs, MusicBrainz, RateYourMusic, AllMusic, Last.fm, Genius, Setlist.fm), concert aggregators and ticket sellers (Songkick, Bandsintown, Ticketmaster, TicketOne, Eventbrite, DICE, Resident Advisor, Viagogo, StubHub). A host matches when it equals a listed domain or is a subdomain of it. The LLM is told the same rule, and it is enforced again on its answer. An unparseable url counts as denied.
+
+**Entries written.** A band entry: `name` (as typed in the list), `url` (the site, normalized), `status: active`, `added` (today, `YYYY-MM-DD`), and `notes` explaining how it was found (for example "site from search, tour page from site links", or the reason there is no tour page). When there is a tour page, a source entry: `url` (as found), `mode: band`, `band` (the name). Values containing free text are written as double-quoted scalars.
+
+**Duplicate rules** (applied again at insertion time, after the lookups; the first applicable rule skips the band): its name equals (normalized) the name or an alias of an existing or just-added band; its site url equals the url of an existing or just-added band. A band whose tour page already is a source (compared normalized, including sources added earlier in the same batch) is still added, but no second source is written and the report mentions it. A band skipped here is reported as already present, naming the existing band.
+
+**Insertion rules.** The file is edited as text, not re-serialized, so comments, ordering and formatting survive. New source blocks go at the end of the `sources:` block and new band blocks at the end of the `bands:` block, each preceded by a blank line; trailing blank lines and column-0 comments that follow a block are treated as belonging to the next key, so insertion goes before them. A `bands: []` or `sources: []` (optionally followed by a comment) is converted to a block list, and the inserted key may then be followed by a blank line. A missing `bands:` key is created (above `sources:` when that exists, else at the end), a missing `sources:` key at the end. The result is re-parsed with the normal `bands.yaml` validation, and must contain exactly the added bands and sources and no other change in counts; otherwise the run fails with an error saying to add the entries by hand, and nothing is written. The file is written atomically (temporary file then rename), and only when not in `--dry-run` and at least one band was added. Nothing is written if inserting fails. Nothing is inserted into a file that is not valid to begin with.
+
+**Report and exit codes.** Per band the run prints its progress and outcome; at the end it prints: added bands (`+ name — site — tour: url`, or a note that no tour page was found), tour pages that were already sources, already-present bands (with the existing match), bands with no site, bands not searched (hint: set `BRAVE_SEARCH_API_KEY` or give a site), errors, ignored input lines, and a summary line of counts. A dry run is labelled. Exit code 0 on completion, even when some bands had no site or failed (they are listed); exit 1 for argument, file, LLM set-up, YAML or insertion errors, in which case nothing was written. Only one run at a time should edit a given `bands.yaml`.
+
+**Known limitations:**
+
+- (a) A tour page may be on an external host; only the site is deny-listed.
+- (b) Aliases, regions, `paused` status and listing-mode sources are never created; add them by hand.
+- (c) Quality depends on the search results: one search per band, no retries or follow-up queries; a band with a common name may get no site or the wrong one (a hint avoids this).
+- (d) Only the homepage's links are considered when looking for the tour page; a tour page reachable only through another page is not found (the band is then added without a source).
+- (e) Cosmetic: when `bands:` is created above an existing `sources:` that is preceded by a column-0 comment, that comment can end up above the new `bands:` key.
+
 ---
 
 ## 5. HTML Fetching
@@ -2633,6 +2668,10 @@ Total events published: 10
 - Unit tests in `tests/test-tours.ts` (`npm run test:tours`, offline): `bands.yaml` parsing and validation, show parsing and finalization, name/alias matching, region check, show matching and `differs`, publish-or-update, extractor, source processing (attribution, skips, duplicates within a run), run log and staleness report
 - End-to-end `tests/smoke-tours-publisher.ts` (`npm run smoke:tours`, needs `wrangler dev`)
 - `tests/` is not covered by `tsc` (the tsconfig includes `src` and `shared` only), so test files are only checked by running them
+
+### 14.10 Bands Scout Tests
+
+- Unit tests in `tests/test-bands-scout.ts` (`npm run test:bands-scout`, offline, with fake LLM, search and fetch functions): list parsing (comments, hints, in-file duplicates, invalid lines), `bands.yaml` insertion (duplicate rules, comment preservation, `[]` and missing keys, safety check), known-name matching, the Brave client (against a fake `fetch`), the deny-list, the per-band finder (outcomes, urls not in the results or links rejected, single-page fallback), argument parsing and the report
 
 ---
 
