@@ -2,6 +2,8 @@ import type { LLMProvider } from '../../../shared/types/llm.js';
 import type { FetchedPage } from '../types/event.js';
 import { extractLinks } from '../scout/links.js';
 import { normalizeActUrl } from './bands-config.js';
+import { DEFAULT_MAX_CONTENT_LENGTH } from '../../../shared/extractors/extraction-limits.js';
+import { looksLikeShowListing, saysNoEvents } from './page-signals.js';
 import type { BandInput } from './band-list.js';
 import type { SearchFn, SearchResult } from '../utils/brave-search.js';
 
@@ -177,15 +179,15 @@ export async function findBand(
 
     const home = await deps.fetchPage(siteUrl);
     const links = extractLinks(home);
-    const listing = links
-      .slice(0, 200)
-      .map(l => `${l.text} → ${l.url}`)
-      .join('\n');
-    const excerpt = (home.text || '').replace(/\s+/g, ' ').slice(0, 2000);
+    // The scout runs once per band, so the LLM gets the whole page.
+    const listing = links.map(l => `${l.text} → ${l.url}`).join('\n');
+    const pageText = (home.text || '')
+      .replace(/\s+/g, ' ')
+      .slice(0, DEFAULT_MAX_CONTENT_LENGTH);
     const answer = await askJson(
       deps.llm,
       TOUR_PROMPT,
-      `Band: ${name}\nHomepage: ${home.url}\n\nLinks:\n${listing}\n\nHomepage text:\n${excerpt}`
+      `Band: ${name}\nHomepage: ${home.url}\n\nLinks:\n${listing}\n\nHomepage text:\n${pageText}`
     );
 
     const chosen =
@@ -197,32 +199,35 @@ export async function findBand(
           )
         : undefined;
 
+    // 1. A tour/live link on the band's own site. It is accepted even when
+    //    the page cannot be loaded right now (blocked, JavaScript-only, slow):
+    //    a link the site itself offers as its tour page is more likely right
+    //    than not, and the tours crawler reports a source that stays empty.
     if (chosen) {
-      let loaded = false;
+      let verified = false;
       try {
         const tour = await deps.fetchPage(chosen.url);
-        loaded = (tour.text || '').trim() !== '';
+        verified = (tour.text || '').trim() !== '';
       } catch {
-        loaded = false;
-      }
-      if (loaded) {
-        return {
-          status: 'found',
-          name,
-          siteUrl,
-          tourUrl: chosen.url,
-          note: `bands-scout: ${how}, tour page from site links`,
-        };
+        verified = false;
       }
       return {
-        status: 'no_tour_page',
+        status: 'found',
         name,
         siteUrl,
-        note: `bands-scout: ${how}; the tour page ${chosen.url} did not load — add a source by hand`,
+        tourUrl: chosen.url,
+        note: verified
+          ? `bands-scout: ${how}, tour page from site links`
+          : `bands-scout: ${how}, tour page from site links (not verified: the page did not load during the scan)`,
       };
     }
 
-    if (answer.homepage_lists_shows === true) {
+    // 2. The homepage itself lists the shows (decided by the LLM, or by the
+    //    page text: several dates plus tour wording, wherever they are).
+    if (
+      answer.homepage_lists_shows === true ||
+      looksLikeShowListing(home.text || '')
+    ) {
       return {
         status: 'found',
         name,
@@ -231,6 +236,19 @@ export async function findBand(
         note: `bands-scout: ${how}; the homepage lists the shows`,
       };
     }
+
+    // 3. The homepage says there are no upcoming events: it is still where
+    //    they will appear, so it is the page to check.
+    if (saysNoEvents(home.text || '')) {
+      return {
+        status: 'found',
+        name,
+        siteUrl,
+        tourUrl: siteUrl,
+        note: `bands-scout: ${how}; the homepage says no events are scheduled right now`,
+      };
+    }
+
     return {
       status: 'no_tour_page',
       name,

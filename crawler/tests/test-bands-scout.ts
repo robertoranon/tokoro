@@ -1,5 +1,10 @@
 import { parseBandList } from '../src/tours/band-list.js';
 import {
+  countDateMentions,
+  looksLikeShowListing,
+  saysNoEvents,
+} from '../src/tours/page-signals.js';
+import {
   appendBands,
   knownBandName,
   type NewBand,
@@ -645,8 +650,10 @@ sources:
         })
       );
       assert(
-        o1.status === 'no_tour_page',
-        'tour page fetch failure → no_tour_page'
+        o1.status === 'found' &&
+          o1.tourUrl === 'https://testband.example/live' &&
+          /not verified/.test(o1.note),
+        'tour link whose page fails to load is still used, flagged as not verified'
       );
       const o2 = await findBand(
         { name: 'Test Band' },
@@ -655,7 +662,12 @@ sources:
             u.endsWith('/live') ? page(u, '', '   ') : page(u, homeHtml),
         })
       );
-      assert(o2.status === 'no_tour_page', 'empty tour page → no_tour_page');
+      assert(
+        o2.status === 'found' &&
+          o2.tourUrl === 'https://testband.example/live' &&
+          /not verified/.test(o2.note),
+        'tour link whose page is empty is still used, flagged as not verified'
+      );
     }
     // errors are contained
     {
@@ -704,6 +716,147 @@ sources:
         'tour prompt carries the homepage links'
       );
     }
+
+    // the LLM gets the whole homepage and every link, not a prefix
+    {
+      const longText = 'intro '.repeat(2000) + 'FAR-END-MARKER';
+      const manyLinks = Array.from(
+        { length: 300 },
+        (_, i) => `<a href="/p${i}">Page ${i}</a>`
+      ).join('');
+      const llm = llmFor({
+        site: 'https://testband.example/en/home?utm=1',
+        tour: null,
+      });
+      await findBand(
+        { name: 'Test Band' },
+        mkDeps(llm, {
+          fetchPage: async u => page(u, manyLinks, longText),
+        })
+      );
+      assert(
+        llm.prompts[1].includes('FAR-END-MARKER'),
+        'text beyond the first few thousand characters reaches the LLM'
+      );
+      assert(
+        llm.prompts[1].includes('/p299'),
+        'links beyond the first 200 reach the LLM'
+      );
+    }
+
+    // dates far down the homepage count even when the LLM says no
+    {
+      const text =
+        'Welcome to the band site. '.repeat(900) +
+        ' Live dates: 12 Nov 2030 Udine, 20 Nov 2030 Ljubljana';
+      const llm = llmFor({
+        site: 'https://testband.example/en/home?utm=1',
+        tour: null,
+        homepageShows: false,
+      });
+      const o = await findBand(
+        { name: 'Test Band' },
+        mkDeps(llm, { fetchPage: async u => page(u, '', text) })
+      );
+      assert(
+        o.status === 'found' &&
+          o.tourUrl === 'https://testband.example/en/home',
+        'several dates + tour wording anywhere on the homepage → the homepage is the tour page'
+      );
+    }
+
+    // "no upcoming events" is still the page to check
+    {
+      const llm = llmFor({
+        site: 'https://testband.example/en/home?utm=1',
+        tour: null,
+        homepageShows: false,
+      });
+      const o = await findBand(
+        { name: 'Test Band' },
+        mkDeps(llm, {
+          fetchPage: async u =>
+            page(u, '', 'Latest news. Tour: No upcoming events at the moment.'),
+        })
+      );
+      assert(
+        o.status === 'found' &&
+          o.tourUrl === 'https://testband.example/en/home' &&
+          /no events are scheduled/.test(o.note),
+        'a homepage saying there are no upcoming events is used as the tour page'
+      );
+    }
+
+    // news dates without tour wording are not a show listing
+    {
+      const llm = llmFor({
+        site: 'https://testband.example/en/home?utm=1',
+        tour: null,
+        homepageShows: false,
+      });
+      const o = await findBand(
+        { name: 'Test Band' },
+        mkDeps(llm, {
+          fetchPage: async u =>
+            page(
+              u,
+              '',
+              'Album news 3 Mar 2030. Interview 14 Apr 2030. Press kit.'
+            ),
+        })
+      );
+      assert(
+        o.status === 'no_tour_page',
+        'dates alone (news archive) are not enough'
+      );
+    }
+  }
+
+  console.log('\n=== page signals ===\n');
+  {
+    assert(
+      countDateMentions(
+        '12 Nov 2030, Nov 20, 3rd March, 12.11.2030, 2030-11-12'
+      ) === 5,
+      'five date forms counted'
+    );
+    assert(
+      countDateMentions('12 novembre, 3 février, 5. März, 7 juil') === 4,
+      'Italian, French and German month names'
+    );
+    assert(
+      countDateMentions('We played 300 shows and 12 cities') === 0,
+      'numbers alone are not dates'
+    );
+    assert(
+      looksLikeShowListing('Tour dates: 12 Nov Udine, 20 Nov Ljubljana'),
+      'dates + tour wording'
+    );
+    assert(
+      !looksLikeShowListing('News 12 Nov, interview 20 Nov'),
+      'dates without tour wording'
+    );
+    assert(
+      !looksLikeShowListing('Live at 12 Nov'),
+      'one date is not a listing'
+    );
+    for (const t of [
+      'No upcoming events',
+      'There are no upcoming shows',
+      'no events scheduled',
+      'Nothing scheduled right now',
+      'Keine aktuellen Termine',
+      'Nessun concerto in programma',
+      'Aucune date pour le moment',
+      'No Upcoming Shows',
+    ]) {
+      assert(saysNoEvents(t), `says no events: "${t}"`);
+    }
+    assert(
+      !saysNoEvents('Upcoming events: 12 Nov Udine'),
+      'a real listing does not say none'
+    );
+    assert(!saysNoEvents('We have no idea what comes next'), 'unrelated "no"');
   }
 
   console.log('\n=== parseArgs ===\n');
