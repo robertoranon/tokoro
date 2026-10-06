@@ -62,6 +62,14 @@ import assert from 'node:assert/strict';
   assert.ok(url.includes('category=music'));
   console.log('✅ buildQueryUrl: includes category when provided'); }
 
+{ const url = buildQueryUrl('https://api.example.com', {
+    lat: '46.0637', lng: '13.2353', radius: '100',
+    from: '2026-04-15T00:00:00', to: '2026-04-22T23:59:59',
+  });
+  assert.ok(url.includes('&has_act=0'), 'band shows are excluded from the general browse queries');
+  assert.equal(url.split('has_act=').length - 1, 1, 'has_act appears once');
+  console.log('✅ buildQueryUrl: excludes band shows (has_act=0)'); }
+
 // ── formatLocalDateTime ───────────────────────────────────────────────────────
 { const d = new Date(2026, 2, 15, 21, 30, 5); // local: 2026-03-15T21:30:05
   assert.equal(formatLocalDateTime(d), '2026-03-15T21:30:05');
