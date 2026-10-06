@@ -7,19 +7,12 @@
 //
 // Exit code 1 if any URL looked blocked or failed to load.
 import { HTMLFetcher } from '../src/extractors/html-fetcher.js';
+import { looksBlocked } from '../src/utils/block-page.js';
 
 const DEFAULT_URLS = ['https://www.bandsintown.com/a/754-the-fratellis'];
 
-const BLOCK_PATTERNS =
-  /sorry, you have been blocked|attention required|captcha|access denied|are you a human|unusual traffic|verify you are|just a moment|enable javascript and cookies/i;
-
 const DATE_LIKE =
   /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.? \d{1,2}\b|\b\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/gi;
-
-/** True when the text/title look like a bot-protection page instead of content. */
-function looksBlocked(title: string, text: string): boolean {
-  return BLOCK_PATTERNS.test(`${title}\n${text.slice(0, 2000)}`);
-}
 
 async function main() {
   const urls = process.argv.slice(2).filter(a => !a.startsWith('--'));

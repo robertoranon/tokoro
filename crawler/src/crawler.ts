@@ -30,6 +30,7 @@ import {
   type SourceOutcome,
 } from './tours/tour-source.js';
 import type { BandsConfig, TourSource } from './tours/bands-config.js';
+import { assertNotBlocked } from './utils/block-page.js';
 
 export interface CrawlResult {
   published: number;
@@ -649,8 +650,8 @@ export class EventCrawler {
         let shows: ShowResult[] = [];
         let outcome: SourceOutcome;
         try {
-          const page = await this.fetcherForUrl(source.url).fetchPage(
-            source.url
+          const page = assertNotBlocked(
+            await this.fetcherForUrl(source.url).fetchPage(source.url)
           );
           shows = await this.processTourSource(page, source, config);
           outcome = sourceOutcome(shows);

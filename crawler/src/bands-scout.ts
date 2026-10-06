@@ -11,6 +11,7 @@ import {
 } from './tours/bands-append.js';
 import { findBand, type FinderDeps } from './tours/band-finder.js';
 import { braveSearch } from './utils/brave-search.js';
+import { assertNotBlocked } from './utils/block-page.js';
 import { readIfExists, writeFileAtomic } from './scout/files.js';
 
 export interface ScoutArgs {
@@ -192,7 +193,8 @@ async function main() {
     const deps: FinderDeps = {
       llm,
       search: braveKey ? braveSearch(braveKey) : undefined,
-      fetchPage: (url: string) => fetcher.fetchPage(url),
+      fetchPage: async (url: string) =>
+        assertNotBlocked(await fetcher.fetchPage(url)),
     };
 
     await fetcher.initialize();

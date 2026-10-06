@@ -1,4 +1,5 @@
 import * as ed from '@noble/ed25519';
+import { looksBlocked, assertNotBlocked } from '../src/utils/block-page.js';
 import { EventNormalizer } from '../src/utils/normalizer.js';
 import { ExtractedEventSchema } from '../src/types/event.js';
 import {
@@ -1307,6 +1308,77 @@ sources:
       buildTourRunRecord(results.slice(0, 1), new Date(), new Date()).status ===
         'ok',
       'no failures → ok'
+    );
+  }
+
+  console.log('\n=== looksBlocked / assertNotBlocked ===\n');
+  {
+    const cfText =
+      'Attention Required! | Cloudflare Please enable cookies. Sorry, you have been blocked You are unable to access bandsintown.com Why have I been blocked?';
+    assert(
+      looksBlocked('Attention Required! | Cloudflare', cfText),
+      'Cloudflare block page (title and text)'
+    );
+    assert(looksBlocked('', cfText), 'block text alone is enough');
+    assert(
+      looksBlocked(
+        'Just a moment...',
+        'Checking your browser before accessing example.com'
+      ),
+      'challenge interstitial'
+    );
+    assert(
+      looksBlocked('Access Denied', 'You do not have permission'),
+      'short page with a block title'
+    );
+    assert(
+      !looksBlocked(
+        'The Fratellis Concerts & Live Tour Dates',
+        'Tour dates\n12 Nov Udine Club X\n20 Nov Ljubljana'
+      ),
+      'a normal short page'
+    );
+    assert(
+      !looksBlocked('Contact', 'Please complete the form. Captcha protected.'),
+      'the bare word captcha is not enough'
+    );
+    const long =
+      'Tour dates and news. '.repeat(300) +
+      ' Sorry, you have been blocked from commenting. Access denied to the shop.';
+    assert(
+      long.length > 3000 && !looksBlocked('Access denied news', long),
+      'a long page that quotes block phrases is content'
+    );
+    assert(
+      !looksBlocked('', ''),
+      'empty page is not a block (that is "no shows", reported elsewhere)'
+    );
+
+    const ok = {
+      url: 'https://a.example',
+      title: 'Live',
+      text: 'dates',
+      html: '',
+    };
+    assert(
+      assertNotBlocked(ok) === ok,
+      'assertNotBlocked returns the page when fine'
+    );
+    let message = '';
+    try {
+      assertNotBlocked({
+        url: 'https://b.example/live',
+        title: 'Attention Required! | Cloudflare',
+        text: cfText,
+        html: '',
+      });
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    assert(
+      /Blocked by bot protection/.test(message) &&
+        message.includes('https://b.example/live'),
+      'assertNotBlocked throws naming the url'
     );
   }
 
