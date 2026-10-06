@@ -28,6 +28,12 @@ import {
 import type { NormalizedEvent } from '../src/types/event.js';
 import { TourExtractor } from '../src/extractors/tour-extractor.js';
 import type { LLMProvider } from '../../shared/types/llm.js';
+import {
+  findStaleSources,
+  findStaleFestivals,
+  STALE_WINDOW,
+  type RunRecord,
+} from '../src/utils/run-log.js';
 import type { FetchedPage } from '../src/types/event.js';
 
 let passed = 0;
@@ -790,6 +796,45 @@ sources:
     assert(
       (await new TourExtractor({ llm: none }).extract(page)).length === 0,
       'empty list → no shows'
+    );
+  }
+
+  console.log('\n=== findStaleSources ===\n');
+  {
+    const run = (kind: 'radar' | 'tours', outcome: string): RunRecord => ({
+      kind,
+      entries: [{ url: 'https://s.example/live', outcome }],
+    });
+    const dead = Array.from({ length: STALE_WINDOW }, () =>
+      run('tours', 'no_shows')
+    );
+    assert(
+      findStaleSources(dead, ['https://s.example/live'], 'tours').length === 1,
+      'dead source flagged after a full window'
+    );
+    assert(
+      findStaleSources(dead.slice(1), ['https://s.example/live'], 'tours')
+        .length === 0,
+      'not flagged before a full window'
+    );
+    assert(
+      findStaleSources(
+        [...dead.slice(1), run('tours', 'unchanged')],
+        ['https://s.example/live'],
+        'tours'
+      ).length === 0,
+      'a healthy run inside the window clears it'
+    );
+    assert(
+      findStaleSources(dead, ['https://s.example/live'], 'radar').length === 0,
+      'other kinds are ignored'
+    );
+    assert(
+      findStaleFestivals(
+        Array.from({ length: STALE_WINDOW }, () => run('radar', 'failed')),
+        ['https://s.example/live']
+      ).length === 1,
+      'findStaleFestivals still works (radar kind)'
     );
   }
 
