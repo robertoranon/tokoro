@@ -14,8 +14,10 @@ import {
   inRegion,
   isPastShow,
   matchBand,
+  placeQuery,
   type TourShowDraft,
 } from './tour-shows.js';
+import type { GeoBias } from '../../../shared/utils/geocode.js';
 import {
   matchShow,
   type ExistingShow,
@@ -44,6 +46,8 @@ export interface TourCounters {
   published: number;
   updated: number;
   unchanged: number;
+  adopted: number;
+  duplicate: number;
   unmatched: number;
   skipped_past: number;
   skipped_out_of_region: number;
@@ -55,6 +59,8 @@ export function tallyShows(results: ShowResult[]): TourCounters {
     published: 0,
     updated: 0,
     unchanged: 0,
+    adopted: 0,
+    duplicate: 0,
     unmatched: 0,
     skipped_past: 0,
     skipped_out_of_region: 0,
@@ -75,8 +81,8 @@ export type SourceOutcome =
 export function sourceOutcome(results: ShowResult[]): SourceOutcome {
   const has = (o: ShowOutcome) => results.some(r => r.outcome === o);
   if (has('published')) return 'published';
-  if (has('updated')) return 'updated';
-  if (has('unchanged')) return 'unchanged';
+  if (has('updated') || has('adopted')) return 'updated';
+  if (has('unchanged') || has('duplicate')) return 'unchanged';
   if (has('failed')) return 'failed';
   return 'no_shows';
 }
@@ -86,12 +92,20 @@ export interface TourSourceDeps {
   lookup: (actUrl: string) => Promise<ExistingShow[]>;
   normalize: (
     event: ExtractedEvent,
-    options?: { createdAt?: string }
+    options?: { createdAt?: string; geoBias?: GeoBias }
   ) => Promise<NormalizedEvent | null>;
   apply: (
     event: NormalizedEvent,
     match: ExistingShow | undefined
   ) => Promise<TourOutcome>;
+  /**
+   * Where the page's places cluster (see `medianBias`), given the geocoder
+   * queries of the upcoming shows that have no coordinates. Optional: without
+   * it ambiguous places keep the geocoder's own ranking.
+   */
+  locate?: (queries: string[]) => Promise<GeoBias | undefined>;
+  /** This crawler's pubkey; a show held by another key is never updated. */
+  ownPubkey?: string;
   /** YYYY-MM-DD; shows before it are skipped. */
   today: string;
 }
@@ -132,6 +146,22 @@ export async function processTourSourcePage(
   const seenSameDay = new Map<string, ExistingShow[]>();
   // Ids (real, or stub ids for new shows) already POSTed/PUT in this run.
   const sentIds = new Set<string>();
+
+  // The page's centre, from the places of the upcoming shows that still need
+  // geocoding, so a bare "Durham" among US cities resolves to Durham, NC.
+  let geoBias: GeoBias | undefined;
+  if (deps.locate) {
+    const queries = drafts
+      .filter(d => !isPastShow(d.start_time, deps.today))
+      .filter(d => d.lat === undefined || d.lng === undefined)
+      .map(d => placeQuery(d))
+      .filter((q): q is string => !!q);
+    try {
+      geoBias = await deps.locate(queries);
+    } catch {
+      geoBias = undefined; // evidence unavailable: keep the geocoder's ranking
+    }
+  }
 
   for (const draft of drafts) {
     const band =
@@ -190,6 +220,7 @@ export async function processTourSourcePage(
             );
       let normalized = await deps.normalize(entry, {
         createdAt: match?.created_at,
+        geoBias,
       });
       if (normalized && !match) {
         match = matchShow(
@@ -202,7 +233,7 @@ export async function processTourSourcePage(
         if (match) {
           normalized = await deps.normalize(
             { ...entry, lat: normalized.lat, lng: normalized.lng },
-            { createdAt: match.created_at }
+            { createdAt: match.created_at, geoBias }
           );
         }
       }
@@ -214,7 +245,7 @@ export async function processTourSourcePage(
         );
         normalized = await deps.normalize(
           { ...entry, lat: match.lat, lng: match.lng },
-          { createdAt: match.created_at }
+          { createdAt: match.created_at, geoBias }
         );
       }
       if (!normalized) {
@@ -242,6 +273,22 @@ export async function processTourSourcePage(
               }
             : {}),
         });
+        continue;
+      }
+
+      // Held by another key (an event adopted into this band, or imported
+      // elsewhere): it counts as the show, but it is not ours to update, and
+      // posting it again would only meet the duplicate check once more.
+      if (
+        match &&
+        match.pubkey &&
+        deps.ownPubkey &&
+        match.pubkey !== deps.ownPubkey
+      ) {
+        console.log(
+          `= Already in the database under another key: ${normalized.title}`
+        );
+        results.push({ title: draft.title, outcome: 'unchanged' });
         continue;
       }
 

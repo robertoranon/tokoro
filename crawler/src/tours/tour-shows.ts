@@ -205,6 +205,32 @@ function containsWords(text: string, part: string): boolean {
     .every(w => have.has(w));
 }
 
+/**
+ * The address handed to the geocoder: the street address (if any) followed by
+ * the city, region and country, each appended only when the address does not
+ * already contain all its words.
+ *
+ * The geocoder (Nominatim) picks the most prominent place with a given name,
+ * so "Forth" alone lands in Scotland. Hand it everything the page says:
+ * street address, then city, region and country, skipping any part the
+ * address already contains.
+ */
+export function buildAddress(d: TourShowDraft): string | undefined {
+  let address = d.address?.trim() || undefined;
+  for (const part of [d.city, d.region, d.country]) {
+    const p = part?.trim();
+    if (!p) continue;
+    if (!address) address = p;
+    else if (!containsWords(address, p)) address = `${address}, ${p}`;
+  }
+  return address;
+}
+
+/** What the normalizer will geocode for a draft without coordinates. */
+export function placeQuery(d: TourShowDraft): string | undefined {
+  return buildAddress(d) || d.venue_name || undefined;
+}
+
 /** Apply the tour show conventions (spec §2.3) to a draft for a known band. */
 export function finalizeTourShow(
   d: TourShowDraft,
@@ -219,17 +245,7 @@ export function finalizeTourShow(
     ]),
   ].filter(t => normalizeName(t) !== bandKey);
 
-  // The geocoder (Nominatim) picks the most prominent place with a given name,
-  // so "Forth" alone lands in Scotland. Hand it everything the page says:
-  // street address, then city, region and country, skipping any part the
-  // address already contains.
-  let address = d.address?.trim() || undefined;
-  for (const part of [d.city, d.region, d.country]) {
-    const p = part?.trim();
-    if (!p) continue;
-    if (!address) address = p;
-    else if (!containsWords(address, p)) address = `${address}, ${p}`;
-  }
+  const address = buildAddress(d);
 
   const support = d.performers.filter(p => normalizeName(p) !== bandKey);
   const description =

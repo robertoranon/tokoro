@@ -1,4 +1,5 @@
 import * as ed from '@noble/ed25519';
+import { signAdoption, adoptMessage } from '../src/tours/adopt.js';
 import { getTourShowsPrompt } from '../../shared/extractors/tour-prompt.js';
 import { selectRetrySources } from '../src/tours/retry.js';
 import { looksBlocked, assertNotBlocked } from '../src/utils/block-page.js';
@@ -19,6 +20,8 @@ import {
   isPastShow,
   inRegion,
   finalizeTourShow,
+  buildAddress,
+  placeQuery,
   type TourShowDraft,
 } from '../src/tours/tour-shows.js';
 import type { BandConfig } from '../src/tours/bands-config.js';
@@ -49,6 +52,16 @@ import {
 } from '../src/tours/tour-source.js';
 import { parseBandsConfig as parseCfg } from '../src/tours/bands-config.js';
 import type { ExtractedEvent } from '../src/types/event.js';
+import {
+  geocodeCandidates,
+  geocodeAddress,
+  pickCandidate,
+  medianBias,
+  clearGeocodeCache,
+  setGeocodeMinIntervalMs,
+  type GeoCandidate,
+  type GeoBias,
+} from '../../shared/utils/geocode.js';
 
 let passed = 0;
 let failed = 0;
@@ -616,29 +629,31 @@ sources:
         body: init?.body ? JSON.parse(String(init.body)) : undefined,
       });
       if ((init?.method ?? 'GET') === 'GET')
-        return respond(200, [
-          {
-            id: 'e1',
-            start_time: '2030-11-12T21:00:00',
-            lat: 46.06,
-            lng: 13.23,
-            tags: [],
-            category: 'music',
-            title: 't',
-            created_at: 'c',
-          },
-        ]);
+        return respond(200, {
+          events: [
+            {
+              id: 'e1',
+              start_time: '2030-11-12T21:00:00',
+              lat: 46.06,
+              lng: 13.23,
+              tags: [],
+              category: 'music',
+              title: 't',
+              created_at: 'c',
+            },
+          ],
+          has_more: false,
+        });
       return respond(nextStatus);
     }) as unknown as typeof fetch;
 
     const pub = new TourPublisher('http://api.test', 'PUBKEY', fakeFetch);
     const found = await pub.lookup('https://testband.example');
-    assert(found.length === 1, 'lookup returns the array');
+    assert(found.length === 1, 'lookup returns the events of the page');
     const q = new URL(calls[0].url).searchParams;
     assert(
-      q.get('pubkey') === 'PUBKEY' &&
-        q.get('act_url') === 'https://testband.example',
-      'lookup filters by pubkey + act_url'
+      !q.has('pubkey') && q.get('act_url') === 'https://testband.example',
+      'lookup filters by act_url only (no pubkey)'
     );
     assert(
       q.get('from') === '1970-01-01T00:00:00' &&
@@ -723,13 +738,13 @@ sources:
     );
 
     const badShape = new TourPublisher('http://api.test', 'PUBKEY', (async () =>
-      respond(200, { events: [] })) as unknown as typeof fetch);
+      respond(200, [])) as unknown as typeof fetch);
     assert(
       await badShape.lookup('https://x.example').then(
         () => false,
         () => true
       ),
-      'lookup rejects a non-array response'
+      'lookup rejects a response without an events array (bare array)'
     );
     const notOk = new TourPublisher('http://api.test', 'PUBKEY', (async () =>
       respond(500)) as unknown as typeof fetch);
@@ -1673,6 +1688,26 @@ sources:
       /never drop|do not drop|must not drop/i.test(prompt),
       'the prompt forbids dropping them'
     );
+    assert(
+      /infer/i.test(prompt) && /surrounding/i.test(prompt),
+      'the prompt lets the model infer region/country from the surrounding shows'
+    );
+    assert(
+      /only when|if,? and only if/i.test(prompt),
+      'and only when the context makes the place unambiguous'
+    );
+    assert(
+      /Durham/.test(prompt),
+      'with a worked example of a bare city among US cities'
+    );
+    assert(
+      /Never replace a region or country that the page prints/i.test(prompt),
+      'printed values are never replaced'
+    );
+    assert(
+      !/do not guess it/i.test(prompt),
+      'the old blanket ban on guessing the country is gone'
+    );
   }
 
   console.log(
@@ -1980,6 +2015,814 @@ sources:
     assert(
       sent[0].ev.created_at === '2030-01-01T10:00:00',
       'matched by venue before geocoding, so the update is signed with the stored created_at'
+    );
+  }
+
+  console.log('\n=== geocoder candidates and bias ===\n');
+  {
+    setGeocodeMinIntervalMs(0);
+    const realFetch = globalThis.fetch;
+    try {
+      const requested: string[] = [];
+      // A tiny fake Nominatim: query → rows (or an HTTP status number).
+      const row = (
+        lat: number,
+        lng: number,
+        importance: number,
+        cc: string,
+        name: string
+      ) => ({
+        lat: String(lat),
+        lon: String(lng),
+        display_name: name,
+        importance,
+        address: { country_code: cc },
+      });
+      const table: Record<string, unknown[] | number> = {
+        Durham: [
+          row(54.67, -1.75, 0.619, 'gb', 'County Durham, England, UK'),
+          row(36.0, -78.9, 0.619, 'us', 'Durham, North Carolina, USA'),
+          row(54.78, -1.58, 0.594, 'gb', 'Durham, England, UK'),
+          row(43.12, -70.92, 0.513, 'us', 'Durham, New Hampshire, USA'),
+        ],
+        Sydney: [
+          row(
+            -33.87,
+            151.21,
+            0.782,
+            'au',
+            'Sydney, New South Wales, Australia'
+          ),
+          row(46.14, -60.19, 0.512, 'ca', 'Sydney, Nova Scotia, Canada'),
+        ],
+        Atlanta: [row(33.75, -84.39, 0.7, 'us', 'Atlanta, Georgia, USA')],
+        Washington: [row(38.9, -77.04, 0.8, 'us', 'Washington, DC, USA')],
+        Asheville: [
+          row(35.6, -82.55, 0.6, 'us', 'Asheville, North Carolina, USA'),
+        ],
+        Nowhere: [],
+        Limited: 429,
+      };
+      const stub = () => {
+        requested.length = 0;
+        clearGeocodeCache();
+        globalThis.fetch = (async (url: any) => {
+          const q = new URL(String(url)).searchParams.get('q')!;
+          requested.push(q);
+          const hit = table[q];
+          if (typeof hit === 'number')
+            return { ok: false, status: hit, json: async () => [] } as Response;
+          return {
+            ok: true,
+            status: 200,
+            json: async () => hit ?? [],
+          } as Response;
+        }) as typeof fetch;
+      };
+
+      stub();
+      const durham = await geocodeCandidates('Durham');
+      assert(
+        durham.length === 4 &&
+          durham[0].countryCode === 'GB' &&
+          durham[1].displayName.includes('North Carolina'),
+        'candidates are parsed (importance, display name, upper-case country code)'
+      );
+      assert(
+        durham[1].importance === 0.619 &&
+          durham[1].lat === 36.0 &&
+          durham[1].lng === -78.9,
+        'with coordinates and importance as numbers'
+      );
+      await geocodeCandidates('Durham');
+      await geocodeCandidates('  durham ');
+      assert(
+        requested.length === 1,
+        'the same query is requested once per process (cached, case- and space-insensitive)'
+      );
+      assert(
+        (await geocodeCandidates('Nowhere')).length === 0,
+        'no results is an empty list'
+      );
+      assert(
+        await geocodeCandidates('Limited').then(
+          () => false,
+          e => /429/.test(String(e))
+        ),
+        'HTTP errors reject'
+      );
+      const before = requested.length;
+      await geocodeCandidates('Limited').catch(() => {});
+      assert(requested.length === before + 1, 'a failed request is not cached');
+
+      // pickCandidate
+      const cand = (
+        lat: number,
+        lng: number,
+        importance: number,
+        cc = 'xx'
+      ): GeoCandidate => ({
+        lat,
+        lng,
+        importance,
+        displayName: `${lat},${lng}`,
+        countryCode: cc,
+      });
+      const NA = { lat: 37, lng: -80 };
+      assert(pickCandidate([], NA) === undefined, 'no candidates → undefined');
+      assert(
+        pickCandidate(durham)?.countryCode === 'GB',
+        'without a bias the first candidate is used, as before'
+      );
+      assert(
+        pickCandidate(durham, NA)?.displayName.includes('North Carolina') ===
+          true,
+        'a tie (0.619 / 0.619) goes to the candidate nearest the bias'
+      );
+      const sydney = await geocodeCandidates('Sydney');
+      assert(
+        pickCandidate(sydney, NA)?.countryCode === 'AU',
+        'a clear winner (0.782 vs 0.512) is kept whatever the bias'
+      );
+      const near = [cand(10, 10, 0.5), cand(50, 50, 0.52), cand(11, 11, 0.9)];
+      assert(
+        pickCandidate(near, { lat: 50, lng: 50 })?.importance === 0.9,
+        'only candidates within the margin of the best compete'
+      );
+      assert(
+        pickCandidate(
+          [cand(10, 10, 0.5), cand(50, 50, 0.46)],
+          { lat: 50, lng: 50 },
+          0.1
+        )?.lat === 50,
+        'the margin is a parameter'
+      );
+      assert(
+        pickCandidate([cand(1, 1, 0), cand(2, 2, 0)], { lat: 2, lng: 2 })
+          ?.lat === 2,
+        'missing importance (0) ties everything: nearest wins'
+      );
+
+      // geocodeAddress
+      stub();
+      assert(
+        (await geocodeAddress('Durham'))?.lat === 54.67,
+        'geocodeAddress without a bias is unchanged (first candidate)'
+      );
+      const biased = await geocodeAddress('Durham', undefined, { bias: NA });
+      assert(
+        biased?.lat === 36.0 &&
+          !!biased?.displayName.includes('North Carolina'),
+        'with a bias the near-tie resolves to North Carolina'
+      );
+      assert(
+        requested.filter(q => q === 'Durham').length === 1,
+        'both calls share one request'
+      );
+      assert(
+        (await geocodeAddress('Sydney', undefined, { bias: NA }))?.lat ===
+          -33.87,
+        'Sydney stays in Australia with the same bias'
+      );
+      assert(
+        (await geocodeAddress('Nowhere', undefined, { bias: NA })) === null,
+        'no result stays null'
+      );
+
+      // medianBias
+      stub();
+      const bias3 = await medianBias([
+        'Atlanta',
+        'Washington',
+        'Asheville',
+        'Durham',
+      ]);
+      assert(
+        !!bias3 && bias3.lat > 33 && bias3.lat < 40 && bias3.lng < -70,
+        'the median of the first candidates is in North America (the UK Durham among four places cannot move it)'
+      );
+      stub();
+      assert(
+        (await medianBias(['Atlanta', 'Washington'])) === undefined,
+        'fewer than 3 places: no bias'
+      );
+      stub();
+      const withFailures = await medianBias([
+        'Atlanta',
+        'Limited',
+        'Nowhere',
+        'Washington',
+        'Asheville',
+        'Atlanta',
+      ]);
+      assert(
+        !!withFailures,
+        'failing and empty queries are skipped, duplicates counted once'
+      );
+      stub();
+      await medianBias(['Atlanta', 'atlanta ', 'Washington', 'Asheville']);
+      assert(
+        requested.filter(q => q.toLowerCase().trim() === 'atlanta').length ===
+          1,
+        'the same place is looked up once'
+      );
+    } finally {
+      globalThis.fetch = realFetch;
+      clearGeocodeCache();
+      setGeocodeMinIntervalMs(1100);
+    }
+  }
+
+  console.log('\n=== the normalizer passes geoBias to the geocoder ===\n');
+  {
+    setGeocodeMinIntervalMs(0);
+    clearGeocodeCache();
+    const realFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = (async () =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () => [
+            {
+              lat: '54.67',
+              lon: '-1.75',
+              display_name: 'County Durham, England, UK',
+              importance: 0.619,
+              address: { country_code: 'gb' },
+            },
+            {
+              lat: '36.0',
+              lon: '-78.9',
+              display_name: 'Durham, North Carolina, USA',
+              importance: 0.619,
+              address: { country_code: 'us' },
+            },
+          ],
+        }) as Response) as typeof fetch;
+
+      const privkey = bytesToHex(ed.utils.randomPrivateKey());
+      const pubkey = bytesToHex(
+        await ed.getPublicKeyAsync(hexToBytes(privkey))
+      );
+      const normalizer = new EventNormalizer({ keypair: { privkey, pubkey } });
+      const event = {
+        title: 'DPAC',
+        address: 'Durham',
+        start_time: '2030-10-27T20:00:00',
+        category: 'music' as const,
+      };
+
+      const plain = await normalizer.normalize(event);
+      assert(
+        plain?.lat === 54.67,
+        'without a bias: the first candidate, as before'
+      );
+      const biased = await normalizer.normalize(event, {
+        geoBias: { lat: 37, lng: -80 },
+      });
+      assert(
+        biased?.lat === 36.0 && biased?.lng === -78.9,
+        'with geoBias: North Carolina'
+      );
+      const withCoords = await normalizer.normalize(
+        { ...event, lat: 1, lng: 2 },
+        { geoBias: { lat: 37, lng: -80 } }
+      );
+      assert(
+        withCoords?.lat === 1 && withCoords?.lng === 2,
+        'coordinates already known are never overridden by the bias'
+      );
+    } finally {
+      globalThis.fetch = realFetch;
+      clearGeocodeCache();
+      setGeocodeMinIntervalMs(1100);
+    }
+  }
+
+  console.log('\n=== buildAddress / placeQuery ===\n');
+  {
+    const d = (over: Partial<TourShowDraft>): TourShowDraft => ({
+      title: 'T',
+      performers: ['A'],
+      start_time: '2030-02-12',
+      ...over,
+    });
+    assert(
+      buildAddress(d({ city: 'Durham', region: 'NC' })) === 'Durham, NC',
+      'city + region'
+    );
+    assert(
+      buildAddress(
+        d({ address: 'Via Roma 1', city: 'Udine', country: 'Italy' })
+      ) === 'Via Roma 1, Udine, Italy',
+      'street first'
+    );
+    assert(buildAddress(d({})) === undefined, 'nothing to build from');
+    assert(
+      placeQuery(d({ city: 'Durham', region: 'NC', venue_name: 'DPAC' })) ===
+        'Durham, NC',
+      'the geocoder query is the address when there is one'
+    );
+    assert(
+      placeQuery(d({ venue_name: 'DPAC' })) === 'DPAC',
+      'the venue name otherwise'
+    );
+    assert(placeQuery(d({})) === undefined, 'nothing to geocode');
+    const finalized = finalizeTourShow(
+      d({ city: 'Durham', region: 'NC' }),
+      { name: 'B', url: 'https://b.example', status: 'active' },
+      'https://p.example'
+    );
+    assert(
+      finalized.address === buildAddress(d({ city: 'Durham', region: 'NC' })),
+      'finalizeTourShow uses the same address'
+    );
+  }
+
+  console.log(
+    '\n=== source processing: page centre and shows held by another key ===\n'
+  );
+  {
+    const cfgW = parseCfg(`
+bands:
+  - { name: Test Band, url: "https://testband.example", region: none }
+sources:
+  - { url: "https://testband.example/tour", mode: band, band: Test Band }
+`);
+    const pg: FetchedPage = {
+      url: 'https://testband.example/tour',
+      title: 'T',
+      html: '',
+      text: 'x',
+    };
+    const sentBias: (GeoBias | undefined)[] = [];
+    let queries: string[] = [];
+    let applied = 0;
+    const mk = (
+      drafts: TourShowDraft[],
+      existing: ExistingShow[] = [],
+      locate?: TourSourceDeps['locate']
+    ): TourSourceDeps => ({
+      extract: async () => drafts,
+      lookup: async () => existing,
+      normalize: async (e: ExtractedEvent, opts) => {
+        sentBias.push(opts?.geoBias);
+        return {
+          pubkey: 'me',
+          signature: 's',
+          title: e.title,
+          lat: e.lat ?? 36,
+          lng: e.lng ?? -78.9,
+          start_time: String(e.start_time),
+          category: e.category,
+          created_at: opts?.createdAt ?? 'now',
+          venue_name: e.venue_name,
+          act_name: e.act_name,
+          act_url: e.act_url,
+        } as NormalizedEvent;
+      },
+      apply: async (_ev, match) => {
+        applied++;
+        return match ? 'unchanged' : 'published';
+      },
+      today: '2030-01-01',
+      ownPubkey: 'me',
+      ...(locate ? { locate } : {}),
+    });
+    const show = (over: Partial<TourShowDraft>): TourShowDraft => ({
+      title: 'Beck',
+      performers: ['Test Band'],
+      start_time: '2030-10-27',
+      venue_name: 'DPAC',
+      city: 'Durham',
+      ...over,
+    });
+
+    // locate receives the place queries of upcoming shows without coordinates
+    sentBias.length = 0;
+    await processTourSourcePage(
+      pg,
+      cfgW.sources[0],
+      cfgW,
+      mk(
+        [
+          show({}),
+          show({ start_time: '2030-10-28', city: 'Asheville', region: 'NC' }),
+          show({
+            start_time: '2030-10-29',
+            city: 'Atlanta',
+            lat: 33.7,
+            lng: -84.4,
+          }),
+          show({ start_time: '2029-12-01', city: 'Pastville' }),
+          show({
+            start_time: '2030-11-01',
+            city: undefined,
+            venue_name: 'Some Hall',
+          }),
+        ],
+        [],
+        async qs => {
+          queries = qs;
+          return { lat: 36, lng: -80 };
+        }
+      )
+    );
+    assert(
+      JSON.stringify(queries) ===
+        JSON.stringify(['Durham', 'Asheville, NC', 'Some Hall']),
+      'locate gets the query of each upcoming show that has no coordinates (not past ones, not ones with coordinates)'
+    );
+    assert(
+      sentBias.length >= 3 &&
+        sentBias.every(b => b?.lat === 36 && b?.lng === -80),
+      'the bias reaches every normalize call'
+    );
+
+    // locate failing or absent: nothing changes
+    sentBias.length = 0;
+    const res1 = await processTourSourcePage(
+      pg,
+      cfgW.sources[0],
+      cfgW,
+      mk([show({})], [], async () => {
+        throw new Error('429');
+      })
+    );
+    assert(
+      res1[0].outcome === 'published' && sentBias.every(b => b === undefined),
+      'a failing locate does not fail the shows and gives no bias'
+    );
+    sentBias.length = 0;
+    await processTourSourcePage(pg, cfgW.sources[0], cfgW, mk([show({})]));
+    assert(
+      sentBias.every(b => b === undefined),
+      'without locate there is no bias'
+    );
+    let called = 0;
+    await processTourSourcePage(
+      pg,
+      cfgW.sources[0],
+      cfgW,
+      mk([show({ lat: 1, lng: 2 })], [], async () => {
+        called++;
+        return undefined;
+      })
+    );
+    assert(
+      called === 1,
+      'locate is still called once (with an empty list when every show has coordinates)'
+    );
+
+    // a show held by another key is left alone
+    applied = 0;
+    const foreign: ExistingShow = {
+      id: 'x1',
+      title: 'Beck',
+      lat: 36,
+      lng: -78.9,
+      start_time: '2030-10-27T00:00:00',
+      category: 'music',
+      tags: [],
+      venue_name: 'DPAC',
+      created_at: 'c',
+      pubkey: 'someone-else',
+      act_url: 'https://testband.example',
+    };
+    const res2 = await processTourSourcePage(
+      pg,
+      cfgW.sources[0],
+      cfgW,
+      mk([show({})], [foreign])
+    );
+    assert(
+      res2[0].outcome === 'unchanged' && applied === 0,
+      'a show already in the database under another key is unchanged: never updated, never re-posted'
+    );
+    applied = 0;
+    const own: ExistingShow = { ...foreign, id: 'x2', pubkey: 'me' };
+    const res3 = await processTourSourcePage(
+      pg,
+      cfgW.sources[0],
+      cfgW,
+      mk([show({})], [own])
+    );
+    assert(
+      applied === 1 && res3[0].outcome === 'unchanged',
+      'our own match still goes through apply (update logic)'
+    );
+    applied = 0;
+    const noKey: ExistingShow = { ...foreign, id: 'x3', pubkey: undefined };
+    await processTourSourcePage(
+      pg,
+      cfgW.sources[0],
+      cfgW,
+      mk([show({})], [noKey])
+    );
+    assert(
+      applied === 1,
+      'a match without a pubkey (older records) is treated as ours'
+    );
+  }
+
+  console.log('\n=== adopted / duplicate outcomes ===\n');
+  {
+    const r = (outcome: ShowResult['outcome']): ShowResult => ({
+      title: 't',
+      outcome,
+    });
+    const t = tallyShows([
+      r('adopted'),
+      r('adopted'),
+      r('duplicate'),
+      r('published'),
+    ]);
+    assert(
+      t.adopted === 2 &&
+        t.duplicate === 1 &&
+        t.published === 1 &&
+        t.failed === 0,
+      'new counters'
+    );
+    assert(
+      sourceOutcome([r('adopted')]) === 'updated',
+      'a source whose best result is an adoption counts as updated (healthy)'
+    );
+    assert(
+      sourceOutcome([r('duplicate')]) === 'unchanged',
+      'a source whose shows are all duplicates is healthy, not dead'
+    );
+    assert(
+      sourceOutcome([r('duplicate'), r('failed')]) === 'unchanged',
+      'a duplicate beats a failure'
+    );
+    assert(
+      sourceOutcome([r('published'), r('adopted')]) === 'published',
+      'published still wins'
+    );
+    assert(
+      sourceOutcome([r('adopted'), r('unchanged')]) === 'updated',
+      'adopted beats unchanged'
+    );
+
+    const rec = buildTourRunRecord(
+      [
+        {
+          url: 'https://a.example/tour',
+          outcome: 'updated',
+          shows: [r('adopted'), r('duplicate')],
+        },
+      ],
+      new Date(),
+      new Date()
+    );
+    assert(
+      (rec as any).adopted === 1 && (rec as any).duplicate === 1,
+      'the run record carries the new counters'
+    );
+    assert(
+      rec.status === 'ok',
+      'adopted and duplicate shows do not make a run partial'
+    );
+  }
+
+  console.log('\n=== adopting: signature matches the worker ===\n');
+  {
+    // ACT_VECTOR from worker/src/index.test.ts: the same bytes the worker verifies.
+    const V = {
+      privkey:
+        '0101010101010101010101010101010101010101010101010101010101010101',
+      eventId:
+        'abababababababababababababababababababababababababababababababab',
+      actName: 'Test Band',
+      actUrl: 'https://testband.example',
+      signature:
+        'eb42a79e717ed8cf6a9657d1f8b426ee770dc35a6705a77f648b1b27f908d139f7481f05e916b75fc5a6c7ecf4e38ff4c1daa70dff51ce70cd19b923e9b64303',
+    };
+    assert(
+      (await signAdoption(V.privkey, V.eventId, V.actName, V.actUrl)) ===
+        V.signature,
+      'signAdoption reproduces the worker test vector byte for byte'
+    );
+    assert(
+      (await adoptMessage(V.eventId, V.actName, V.actUrl)).length === 32,
+      'the signed message is a SHA-256 digest'
+    );
+    assert(
+      (await signAdoption(V.privkey, V.eventId, 'Other', V.actUrl)) !==
+        V.signature,
+      'a different name gives a different signature'
+    );
+  }
+
+  console.log('\n=== TourPublisher: lookup by act_url only ===\n');
+  {
+    const calls: string[] = [];
+    const page = (events: unknown[], hasMore: boolean) =>
+      ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          events,
+          offset: 0,
+          count: events.length,
+          has_more: hasMore,
+        }),
+      }) as Response;
+    let n = 0;
+    const f = (async (url: string) => {
+      calls.push(String(url));
+      n++;
+      return n === 1
+        ? page(
+            [
+              { id: 'a', pubkey: 'other', act_url: 'https://x.example' },
+              { id: 'b', pubkey: 'me' },
+            ],
+            true
+          )
+        : page([{ id: 'c' }], false);
+    }) as unknown as typeof fetch;
+    const pub = new TourPublisher('http://api.test', 'me', f);
+    const found = await pub.lookup('https://x.example');
+    assert(
+      found.map(s => s.id).join() === 'a,b,c',
+      'every page is followed (has_more) and shows of other keys are included'
+    );
+    const q0 = new URL(calls[0]).searchParams;
+    assert(
+      !q0.has('pubkey') && q0.get('act_url') === 'https://x.example',
+      'the lookup is by act_url, not by pubkey'
+    );
+    assert(
+      q0.get('from') === '1970-01-01T00:00:00' &&
+        q0.get('to') === '2999-12-31T23:59:59',
+      'with the explicit wide window'
+    );
+    assert(
+      new URL(calls[1]).searchParams.get('offset') === '2',
+      'the second page starts after the first page’s events'
+    );
+    const bareArray = new TourPublisher(
+      'http://api.test',
+      'me',
+      (async () =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () => [],
+        }) as Response) as unknown as typeof fetch
+    );
+    assert(
+      await bareArray.lookup('https://x.example').then(
+        () => false,
+        () => true
+      ),
+      'a bare array is not the expected shape'
+    );
+    const bad = new TourPublisher(
+      'http://api.test',
+      'me',
+      (async () =>
+        ({ ok: false, status: 500 }) as Response) as unknown as typeof fetch
+    );
+    assert(
+      await bad.lookup('https://x.example').then(
+        () => false,
+        () => true
+      ),
+      'HTTP errors reject'
+    );
+  }
+
+  console.log('\n=== TourPublisher: a duplicate is adopted ===\n');
+  {
+    const ev = {
+      pubkey: 'me',
+      signature: 's',
+      title: 'Fatoumata',
+      lat: 49.9,
+      lng: 2.3,
+      start_time: '2030-03-13T19:00:00',
+      category: 'music',
+      created_at: 'c',
+      act_name: 'Fatoumata Diawara',
+      act_url: 'https://fd.example',
+    } as NormalizedEvent;
+    type Call = { url: string; method: string; body?: any };
+    const mk = (
+      adoptStatus: number | 'throw',
+      adoptJson: unknown = {},
+      postBody: unknown = { error: 'Duplicate event', existing_event_id: 'ex1' }
+    ) => {
+      const calls: Call[] = [];
+      const f = (async (url: string, init?: RequestInit) => {
+        const call: Call = {
+          url: String(url),
+          method: init?.method ?? 'GET',
+          body: init?.body ? JSON.parse(String(init.body)) : undefined,
+        };
+        calls.push(call);
+        if (call.url.endsWith('/events') && call.method === 'POST') {
+          return {
+            ok: false,
+            status: 409,
+            text: async () => JSON.stringify(postBody),
+            json: async () => postBody,
+          } as Response;
+        }
+        if (adoptStatus === 'throw') throw new Error('network');
+        return {
+          ok: adoptStatus >= 200 && adoptStatus < 300,
+          status: adoptStatus,
+          text: async () => JSON.stringify(adoptJson),
+          json: async () => adoptJson,
+        } as Response;
+      }) as unknown as typeof fetch;
+      const signed: string[][] = [];
+      const pub = new TourPublisher(
+        'http://api.test',
+        'me',
+        f,
+        async (id, name, url) => {
+          signed.push([id, name, url]);
+          return 'SIG';
+        }
+      );
+      return { pub, calls, signed, fetchFn: f };
+    };
+
+    let t = mk(200, { id: 'ex1', adopted: true });
+    assert(
+      (await t.pub.apply(ev, undefined)) === 'adopted',
+      '409 + adopt accepted → adopted'
+    );
+    assert(
+      t.calls.length === 2 &&
+        t.calls[1].url === 'http://api.test/events/ex1/act' &&
+        t.calls[1].method === 'POST',
+      'one adopt request to /events/<existing id>/act'
+    );
+    assert(
+      JSON.stringify(t.calls[1].body) ===
+        JSON.stringify({
+          pubkey: 'me',
+          act_name: 'Fatoumata Diawara',
+          act_url: 'https://fd.example',
+          signature: 'SIG',
+        }),
+      'with pubkey, act, and the signature'
+    );
+    assert(
+      JSON.stringify(t.signed) ===
+        JSON.stringify([['ex1', 'Fatoumata Diawara', 'https://fd.example']]),
+      'the signer is given the existing id and the act'
+    );
+
+    t = mk(200, { id: 'ex1', adopted: false, already: true });
+    assert(
+      (await t.pub.apply(ev, undefined)) === 'unchanged',
+      'already linked → unchanged'
+    );
+    for (const status of [401, 403, 404, 409, 500] as const) {
+      t = mk(status, { error: 'x' });
+      assert(
+        (await t.pub.apply(ev, undefined)) === 'duplicate',
+        `adopt refused (${status}) → duplicate, not failed`
+      );
+    }
+    t = mk('throw');
+    assert(
+      (await t.pub.apply(ev, undefined)) === 'duplicate',
+      'network error while adopting → duplicate'
+    );
+    t = mk(200, {}, { error: 'Duplicate event' });
+    assert(
+      (await t.pub.apply(ev, undefined)) === 'failed' && t.calls.length === 1,
+      '409 without an existing id stays failed (no adopt request)'
+    );
+    const noSignerCase = mk(200);
+    const noSigner = new TourPublisher(
+      'http://api.test',
+      'me',
+      noSignerCase.fetchFn
+    );
+    assert(
+      (await noSigner.apply(ev, undefined)) === 'failed' &&
+        noSignerCase.calls.length === 1,
+      'without a signer a 409 stays failed'
+    );
+    t = mk(200, { adopted: true });
+    const noAct = {
+      ...ev,
+      act_name: undefined,
+      act_url: undefined,
+    } as NormalizedEvent;
+    assert(
+      (await t.pub.apply(noAct, undefined)) === 'failed' &&
+        t.calls.length === 1,
+      'an event without act fields cannot be adopted'
     );
   }
 

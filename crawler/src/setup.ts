@@ -5,10 +5,12 @@ import { createLLMProvider } from '../../shared/llm/factory.js';
 import { LLMProvider } from '../../shared/types/llm.js';
 import { DEFAULT_LLM_PROVIDER } from '../../shared/llm/defaults.js';
 
-// Configure SHA-512 for Node.js (required by @noble/ed25519)
+// Configure SHA-512 for Node.js (required by @noble/ed25519). noble may pass
+// several arrays: hash them all (see utils/normalizer.ts).
 if (typeof crypto !== 'undefined' && crypto.subtle) {
   ed.etc.sha512Async = async (...m) => {
-    const buffer = await crypto.subtle.digest('SHA-512', m[0] as BufferSource);
+    const data = ed.etc.concatBytes(...m);
+    const buffer = await crypto.subtle.digest('SHA-512', data as BufferSource);
     return new Uint8Array(buffer);
   };
 }

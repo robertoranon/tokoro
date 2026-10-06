@@ -182,7 +182,7 @@ async function main() {
     );
   } else {
     console.log(
-      `\nTours complete: ${record.published} published, ${record.updated} updated, ${record.unchanged} unchanged, ${record.unmatched} unmatched, ${record.skipped_past} past, ${record.skipped_out_of_region} out of region, ${record.failed} failed`
+      `\nTours complete: ${record.published} published, ${record.updated} updated, ${record.unchanged} unchanged, ${record.adopted} adopted, ${record.duplicate} duplicate, ${record.unmatched} unmatched, ${record.skipped_past} past, ${record.skipped_out_of_region} out of region, ${record.failed} failed`
     );
   }
 

@@ -23,6 +23,8 @@ import {
 } from './radar/festival-entry.js';
 import { TourExtractor } from './extractors/tour-extractor.js';
 import { TourPublisher } from './tours/tour-publisher.js';
+import { signAdoption } from './tours/adopt.js';
+import { medianBias } from '../../shared/utils/geocode.js';
 import {
   processTourSourcePage,
   sourceOutcome,
@@ -260,7 +262,10 @@ export class EventCrawler {
     });
     this.tourPublisher = new TourPublisher(
       config.apiUrl,
-      config.keypair.pubkey
+      config.keypair.pubkey,
+      fetch,
+      (eventId, actName, actUrl) =>
+        signAdoption(config.keypair.privkey, eventId, actName, actUrl)
     );
   }
 
@@ -689,6 +694,8 @@ export class EventCrawler {
       return processTourSourcePage(page, source, config, {
         extract: p => this.tourExtractor.extract(p),
         lookup: async () => [],
+        locate: queries => medianBias(queries),
+        ownPubkey: this.config.keypair.pubkey,
         normalize: async (event, options) => {
           if (!this.config.normalize) {
             this.printRawEvents([event]);
@@ -715,6 +722,8 @@ export class EventCrawler {
     return processTourSourcePage(page, source, config, {
       extract: p => this.tourExtractor.extract(p),
       lookup: actUrl => this.tourPublisher.lookup(actUrl),
+      locate: queries => medianBias(queries),
+      ownPubkey: this.config.keypair.pubkey,
       normalize: (event, options) => this.normalizer.normalize(event, options),
       apply: (event, match) => this.tourPublisher.apply(event, match),
       today,
