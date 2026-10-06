@@ -2,6 +2,7 @@ import {
   verifyEventSignature,
   verifyDeleteSignature,
   verifyAdminSignature,
+  verifyActSignature,
 } from './crypto';
 import { encode as geohashEncode, neighbors } from './geohash';
 import { isDuplicate, DedupContext } from '../../shared/llm/duplicate-check';
@@ -544,6 +545,10 @@ export default {
                 'Edit an own event (requires re-signed Ed25519 signature; created_at is immutable)',
               body: 'Same shape as POST /events',
             },
+            'POST /events/:id/act': {
+              description:
+                'Attach act_name/act_url to an existing event that has none (signed by an allowlisted key)',
+            },
             'DELETE /events/:id': {
               description: 'Delete an event (requires Ed25519 signature)',
               body: {
@@ -568,6 +573,12 @@ export default {
       // Route: POST /events
       if (request.method === 'POST' && path === '/events') {
         return await handlePostEvent(request, env);
+      }
+
+      // Route: POST /events/:id/act
+      const adoptMatch = path.match(/^\/events\/([^/]+)\/act$/);
+      if (request.method === 'POST' && adoptMatch) {
+        return await handleAdoptAct(request, env, adoptMatch[1]);
       }
 
       // Route: PUT /events/:id
@@ -1193,6 +1204,74 @@ async function handlePutEvent(
     .run();
 
   return jsonResponse({ id: eventId, message: 'Event updated successfully' });
+}
+
+// POST /events/:id/act — attach act_name/act_url to an existing event.
+// Any allowlisted key may do it (the event's owner is irrelevant: the fields
+// are unsigned metadata), but only to an event that has no act yet; it never
+// overwrites, and it changes nothing else (signature, created_at, updated_at).
+async function handleAdoptAct(
+  request: Request,
+  env: Env,
+  eventId: string
+): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: 'Invalid JSON' }, 400);
+  }
+  const v = validateAdoptBody(body);
+  if (!v.ok) return jsonResponse({ error: v.error }, v.status);
+
+  if (await isBlocklisted(env, v.pubkey)) {
+    return jsonResponse({ error: 'Forbidden' }, 403);
+  }
+  if (env.ALLOWED_PUBKEYS) {
+    const allowed = env.ALLOWED_PUBKEYS.split(',')
+      .map(k => k.trim().toLowerCase())
+      .filter(Boolean);
+    if (!allowed.includes(v.pubkey.toLowerCase())) {
+      return jsonResponse(
+        { error: 'Forbidden', message: 'Public key not in allowlist' },
+        403
+      );
+    }
+  }
+
+  if (
+    !(await verifyActSignature(
+      eventId,
+      v.actName,
+      v.actUrl,
+      v.pubkey,
+      v.signature
+    ))
+  ) {
+    return jsonResponse({ error: 'Invalid signature' }, 401);
+  }
+
+  const existing = await env.DB.prepare(
+    'SELECT act_url FROM events WHERE id = ?'
+  )
+    .bind(eventId)
+    .first<{ act_url: string | null }>();
+  if (!existing) return jsonResponse({ error: 'Event not found' }, 404);
+
+  const decision = decideAdopt(existing.act_url, v.actUrl);
+  if (decision === 'conflict') {
+    return jsonResponse({ error: 'Event already belongs to another act' }, 409);
+  }
+  if (decision === 'already') {
+    return jsonResponse({ id: eventId, adopted: false, already: true });
+  }
+
+  await env.DB.prepare(
+    'UPDATE events SET act_name = ?, act_url = ? WHERE id = ?'
+  )
+    .bind(v.actName, v.actUrl, eventId)
+    .run();
+  return jsonResponse({ id: eventId, adopted: true });
 }
 
 async function handleDeleteEvent(
