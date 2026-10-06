@@ -5,6 +5,15 @@ import {
   type NewBand,
 } from '../src/tours/bands-append.js';
 import { parseBandsConfig } from '../src/tours/bands-config.js';
+import { braveSearch } from '../src/utils/brave-search.js';
+import {
+  findBand,
+  isDeniedHost,
+  type FinderDeps,
+  type SearchResult,
+} from '../src/tours/band-finder.js';
+import type { FetchedPage } from '../src/types/event.js';
+import type { LLMProvider } from '../../shared/types/llm.js';
 
 let passed = 0;
 let failed = 0;
@@ -28,6 +37,32 @@ function throws(fn: () => unknown): boolean {
   }
 }
 void throws; // used by later sections
+
+type FakeLLM = LLMProvider & { calls: number; prompts: string[] };
+
+/** `answer(system, user)` returns the raw reply for each call. */
+function fakeLLM(answer: (system: string, user: string) => string): FakeLLM {
+  const llm: FakeLLM = {
+    name: 'fake',
+    calls: 0,
+    prompts: [],
+    async complete(messages: any) {
+      llm.calls++;
+      const system = String(messages[0].content);
+      const user = String(messages[1].content);
+      llm.prompts.push(user);
+      return { content: answer(system, user), model: 'fake' };
+    },
+  };
+  return llm;
+}
+
+const page = (url: string, html: string, text = 'x'): FetchedPage => ({
+  url,
+  html,
+  text,
+  title: 'T',
+});
 
 async function main() {
   console.log('\n=== parseBandList ===\n');
@@ -323,6 +358,347 @@ sources:
     );
     assert(knownBandName(cfg, 'SR') === 'Sigur Rós', 'alias');
     assert(knownBandName(cfg, 'Nobody') === undefined, 'unknown');
+  }
+
+  console.log('\n=== braveSearch ===\n');
+  {
+    const calls: { url: string; headers: any }[] = [];
+    const fakeFetch = (async (url: string, init?: RequestInit) => {
+      calls.push({ url, headers: init?.headers });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          web: {
+            results: [
+              {
+                title: 'Test Band',
+                url: 'https://testband.example',
+                description: 'The <strong>official</strong> site',
+              },
+              { title: 'no url' },
+            ],
+          },
+        }),
+      } as Response;
+    }) as unknown as typeof fetch;
+    const results = await braveSearch(
+      'KEY',
+      fakeFetch
+    )('"Test Band" official site');
+    assert(results.length === 1, 'results without a url are dropped');
+    assert(
+      results[0].snippet === 'The official site',
+      'html tags stripped from the snippet'
+    );
+    assert(
+      calls[0].url.includes('q=%22Test%20Band%22%20official%20site'),
+      'query is url-encoded'
+    );
+    assert(
+      (calls[0].headers as any)['X-Subscription-Token'] === 'KEY',
+      'subscription token header'
+    );
+    const failing = braveSearch(
+      'KEY',
+      (async () =>
+        ({ ok: false, status: 429 }) as Response) as unknown as typeof fetch
+    );
+    assert(
+      await failing('x').then(
+        () => false,
+        e => /429/.test(String(e))
+      ),
+      'non-2xx rejects with the status'
+    );
+    const empty = braveSearch(
+      'KEY',
+      (async () =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () => ({}),
+        }) as Response) as unknown as typeof fetch
+    );
+    assert((await empty('x')).length === 0, 'no web results → empty list');
+  }
+
+  console.log('\n=== isDeniedHost ===\n');
+  {
+    for (const u of [
+      'https://www.facebook.com/testband',
+      'https://open.spotify.com/artist/1',
+      'https://testband.bandcamp.com/',
+      'https://en.wikipedia.org/wiki/Test',
+      'https://www.songkick.com/artists/1',
+      'https://x.com/testband',
+      'https://music.apple.com/it/artist/x',
+    ]) {
+      assert(isDeniedHost(u), `denied: ${u}`);
+    }
+    for (const u of [
+      'https://testband.example',
+      'https://last.example/',
+      'https://www.testband.it/live',
+      'https://notfacebook.com',
+    ]) {
+      assert(!isDeniedHost(u), `allowed: ${u}`);
+    }
+    assert(isDeniedHost('not a url'), 'unparseable urls are denied');
+  }
+
+  console.log('\n=== findBand ===\n');
+  {
+    const results: SearchResult[] = [
+      {
+        title: 'Test Band - Facebook',
+        url: 'https://www.facebook.com/testband',
+        snippet: '',
+      },
+      {
+        title: 'Test Band',
+        url: 'https://testband.example/en/home?utm=1',
+        snippet: 'official site',
+      },
+    ];
+    const homeHtml =
+      '<a href="/live">Live</a><a href="/music">Music</a><a href="https://shop.example/x">Shop</a>';
+    const llmFor = (opts: {
+      site?: string | null;
+      tour?: string | null;
+      homepageShows?: boolean;
+    }) =>
+      fakeLLM((system, _user) => {
+        if (/search results/i.test(system))
+          return JSON.stringify({ url: opts.site ?? null });
+        return JSON.stringify({
+          tour_url: opts.tour ?? null,
+          homepage_lists_shows: !!opts.homepageShows,
+        });
+      });
+    const mkDeps = (
+      llm: LLMProvider,
+      over: Partial<FinderDeps> = {}
+    ): FinderDeps => ({
+      llm,
+      search: async () => results,
+      fetchPage: async url => page(url, homeHtml, 'some text'),
+      ...over,
+    });
+
+    // happy path: search → site → tour page
+    {
+      const llm = llmFor({
+        site: 'https://testband.example/en/home?utm=1',
+        tour: 'https://testband.example/live',
+      });
+      const o = await findBand({ name: 'Test Band' }, mkDeps(llm));
+      assert(o.status === 'found', 'found');
+      if (o.status === 'found') {
+        assert(
+          o.siteUrl === 'https://testband.example/en/home',
+          'site normalised (query dropped)'
+        );
+        assert(
+          o.tourUrl === 'https://testband.example/live',
+          'tour page is the chosen link'
+        );
+        assert(
+          /search/.test(o.note) && /links/.test(o.note),
+          'note says how it was found'
+        );
+      }
+    }
+
+    // the LLM cannot invent a url that was not in the results
+    {
+      const llm = llmFor({ site: 'https://invented.example' });
+      assert(
+        (await findBand({ name: 'Test Band' }, mkDeps(llm))).status ===
+          'no_site',
+        'url outside the results is rejected'
+      );
+    }
+    // nor pick a denied host even if it is in the results
+    {
+      const llm = llmFor({ site: 'https://www.facebook.com/testband' });
+      assert(
+        (await findBand({ name: 'Test Band' }, mkDeps(llm))).status ===
+          'no_site',
+        'denied host is rejected after the LLM answer'
+      );
+    }
+    // LLM says none
+    assert(
+      (await findBand({ name: 'Test Band' }, mkDeps(llmFor({ site: null }))))
+        .status === 'no_site',
+      'LLM picks nothing → no_site'
+    );
+    // empty search results → no LLM call
+    {
+      const llm = llmFor({ site: 'x' });
+      const o = await findBand(
+        { name: 'Test Band' },
+        mkDeps(llm, { search: async () => [] })
+      );
+      assert(
+        o.status === 'no_site' && llm.calls === 0,
+        'no results → no_site without an LLM call'
+      );
+    }
+    // not searched
+    {
+      const o = await findBand(
+        { name: 'Test Band' },
+        mkDeps(llmFor({}), { search: undefined })
+      );
+      assert(
+        o.status === 'not_searched',
+        'no search configured and no hint → not_searched'
+      );
+    }
+    // hint skips the search
+    {
+      let searched = 0;
+      const llm = llmFor({ tour: 'https://hinted.example/live' });
+      const o = await findBand(
+        { name: 'Hinted', hint: 'https://hinted.example/' },
+        mkDeps(llm, {
+          search: async () => {
+            searched++;
+            return [];
+          },
+          fetchPage: async u => page(u, '<a href="/live">Live</a>'),
+        })
+      );
+      assert(searched === 0, 'a hint skips the search');
+      assert(
+        o.status === 'found' &&
+          o.siteUrl === 'https://hinted.example' &&
+          /given/.test(o.note),
+        'hint used as the site'
+      );
+    }
+    // tour link must be one of the page's links
+    {
+      const llm = llmFor({
+        site: 'https://testband.example/en/home?utm=1',
+        tour: 'https://testband.example/invented',
+      });
+      const o = await findBand({ name: 'Test Band' }, mkDeps(llm));
+      assert(
+        o.status === 'no_tour_page',
+        'a tour url that is not a link on the page is rejected'
+      );
+    }
+    // no tour link but the homepage itself lists shows
+    {
+      const llm = llmFor({
+        site: 'https://testband.example/en/home?utm=1',
+        tour: null,
+        homepageShows: true,
+      });
+      const o = await findBand({ name: 'Test Band' }, mkDeps(llm));
+      assert(
+        o.status === 'found' &&
+          o.tourUrl === 'https://testband.example/en/home',
+        'single-page site: the homepage is the tour page'
+      );
+    }
+    // no tour page at all
+    {
+      const llm = llmFor({
+        site: 'https://testband.example/en/home?utm=1',
+        tour: null,
+        homepageShows: false,
+      });
+      const o = await findBand({ name: 'Test Band' }, mkDeps(llm));
+      assert(
+        o.status === 'no_tour_page' &&
+          o.siteUrl === 'https://testband.example/en/home',
+        'site known, no tour page'
+      );
+      if (o.status === 'no_tour_page')
+        assert(
+          /by hand/.test(o.note),
+          'note tells the curator to add a source by hand'
+        );
+    }
+    // tour page that does not load / is empty
+    {
+      const llm = llmFor({
+        site: 'https://testband.example/en/home?utm=1',
+        tour: 'https://testband.example/live',
+      });
+      const o1 = await findBand(
+        { name: 'Test Band' },
+        mkDeps(llm, {
+          fetchPage: async u => {
+            if (u.endsWith('/live')) throw new Error('404');
+            return page(u, homeHtml);
+          },
+        })
+      );
+      assert(
+        o1.status === 'no_tour_page',
+        'tour page fetch failure → no_tour_page'
+      );
+      const o2 = await findBand(
+        { name: 'Test Band' },
+        mkDeps(llm, {
+          fetchPage: async u =>
+            u.endsWith('/live') ? page(u, '', '   ') : page(u, homeHtml),
+        })
+      );
+      assert(o2.status === 'no_tour_page', 'empty tour page → no_tour_page');
+    }
+    // errors are contained
+    {
+      const o = await findBand(
+        { name: 'Test Band' },
+        mkDeps(llmFor({}), {
+          search: async () => {
+            throw new Error('boom');
+          },
+        })
+      );
+      assert(
+        o.status === 'error' && /boom/.test(o.error),
+        'search error → error outcome'
+      );
+      const llmBad = fakeLLM(() => 'not json');
+      const o2 = await findBand({ name: 'Test Band' }, mkDeps(llmBad));
+      assert(o2.status === 'error', 'malformed LLM json → error outcome');
+      const o3 = await findBand(
+        { name: 'Test Band' },
+        mkDeps(llmFor({ site: 'https://testband.example/en/home?utm=1' }), {
+          fetchPage: async () => {
+            throw new Error('dns');
+          },
+        })
+      );
+      assert(
+        o3.status === 'error' && /dns/.test(o3.error),
+        'homepage fetch failure → error outcome'
+      );
+    }
+    // the LLM only ever sees fetched data
+    {
+      const llm = llmFor({
+        site: 'https://testband.example/en/home?utm=1',
+        tour: null,
+      });
+      await findBand({ name: 'Test Band' }, mkDeps(llm));
+      assert(
+        llm.prompts[0].includes('https://testband.example/en/home?utm=1') &&
+          llm.prompts[0].includes('Test Band'),
+        'site prompt carries the name and the search results'
+      );
+      assert(
+        llm.prompts[1].includes('https://testband.example/live'),
+        'tour prompt carries the homepage links'
+      );
+    }
   }
 
   console.log(`\n${passed} passed, ${failed} failed`);
