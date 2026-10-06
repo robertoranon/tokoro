@@ -20,6 +20,7 @@ export interface ExistingShow {
   act_name?: string | null;
   act_url?: string | null;
   created_at: string;
+  pubkey?: string;
 }
 
 // The pubkey-only GET path is bounded by start_time (default: now → +7 days),

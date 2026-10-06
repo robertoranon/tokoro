@@ -19,6 +19,8 @@ import {
   isPastShow,
   inRegion,
   finalizeTourShow,
+  buildAddress,
+  placeQuery,
   type TourShowDraft,
 } from '../src/tours/tour-shows.js';
 import type { BandConfig } from '../src/tours/bands-config.js';
@@ -57,6 +59,7 @@ import {
   clearGeocodeCache,
   setGeocodeMinIntervalMs,
   type GeoCandidate,
+  type GeoBias,
 } from '../../shared/utils/geocode.js';
 
 let passed = 0;
@@ -2272,6 +2275,232 @@ sources:
       clearGeocodeCache();
       setGeocodeMinIntervalMs(1100);
     }
+  }
+
+  console.log('\n=== buildAddress / placeQuery ===\n');
+  {
+    const d = (over: Partial<TourShowDraft>): TourShowDraft => ({
+      title: 'T',
+      performers: ['A'],
+      start_time: '2030-02-12',
+      ...over,
+    });
+    assert(
+      buildAddress(d({ city: 'Durham', region: 'NC' })) === 'Durham, NC',
+      'city + region'
+    );
+    assert(
+      buildAddress(
+        d({ address: 'Via Roma 1', city: 'Udine', country: 'Italy' })
+      ) === 'Via Roma 1, Udine, Italy',
+      'street first'
+    );
+    assert(buildAddress(d({})) === undefined, 'nothing to build from');
+    assert(
+      placeQuery(d({ city: 'Durham', region: 'NC', venue_name: 'DPAC' })) ===
+        'Durham, NC',
+      'the geocoder query is the address when there is one'
+    );
+    assert(
+      placeQuery(d({ venue_name: 'DPAC' })) === 'DPAC',
+      'the venue name otherwise'
+    );
+    assert(placeQuery(d({})) === undefined, 'nothing to geocode');
+    const finalized = finalizeTourShow(
+      d({ city: 'Durham', region: 'NC' }),
+      { name: 'B', url: 'https://b.example', status: 'active' },
+      'https://p.example'
+    );
+    assert(
+      finalized.address === buildAddress(d({ city: 'Durham', region: 'NC' })),
+      'finalizeTourShow uses the same address'
+    );
+  }
+
+  console.log(
+    '\n=== source processing: page centre and shows held by another key ===\n'
+  );
+  {
+    const cfgW = parseCfg(`
+bands:
+  - { name: Test Band, url: "https://testband.example", region: none }
+sources:
+  - { url: "https://testband.example/tour", mode: band, band: Test Band }
+`);
+    const pg: FetchedPage = {
+      url: 'https://testband.example/tour',
+      title: 'T',
+      html: '',
+      text: 'x',
+    };
+    const sentBias: (GeoBias | undefined)[] = [];
+    let queries: string[] = [];
+    let applied = 0;
+    const mk = (
+      drafts: TourShowDraft[],
+      existing: ExistingShow[] = [],
+      locate?: TourSourceDeps['locate']
+    ): TourSourceDeps => ({
+      extract: async () => drafts,
+      lookup: async () => existing,
+      normalize: async (e: ExtractedEvent, opts) => {
+        sentBias.push(opts?.geoBias);
+        return {
+          pubkey: 'me',
+          signature: 's',
+          title: e.title,
+          lat: e.lat ?? 36,
+          lng: e.lng ?? -78.9,
+          start_time: String(e.start_time),
+          category: e.category,
+          created_at: opts?.createdAt ?? 'now',
+          venue_name: e.venue_name,
+          act_name: e.act_name,
+          act_url: e.act_url,
+        } as NormalizedEvent;
+      },
+      apply: async (_ev, match) => {
+        applied++;
+        return match ? 'unchanged' : 'published';
+      },
+      today: '2030-01-01',
+      ownPubkey: 'me',
+      ...(locate ? { locate } : {}),
+    });
+    const show = (over: Partial<TourShowDraft>): TourShowDraft => ({
+      title: 'Beck',
+      performers: ['Test Band'],
+      start_time: '2030-10-27',
+      venue_name: 'DPAC',
+      city: 'Durham',
+      ...over,
+    });
+
+    // locate receives the place queries of upcoming shows without coordinates
+    sentBias.length = 0;
+    await processTourSourcePage(
+      pg,
+      cfgW.sources[0],
+      cfgW,
+      mk(
+        [
+          show({}),
+          show({ start_time: '2030-10-28', city: 'Asheville', region: 'NC' }),
+          show({
+            start_time: '2030-10-29',
+            city: 'Atlanta',
+            lat: 33.7,
+            lng: -84.4,
+          }),
+          show({ start_time: '2029-12-01', city: 'Pastville' }),
+          show({
+            start_time: '2030-11-01',
+            city: undefined,
+            venue_name: 'Some Hall',
+          }),
+        ],
+        [],
+        async qs => {
+          queries = qs;
+          return { lat: 36, lng: -80 };
+        }
+      )
+    );
+    assert(
+      JSON.stringify(queries) ===
+        JSON.stringify(['Durham', 'Asheville, NC', 'Some Hall']),
+      'locate gets the query of each upcoming show that has no coordinates (not past ones, not ones with coordinates)'
+    );
+    assert(
+      sentBias.length >= 3 &&
+        sentBias.every(b => b?.lat === 36 && b?.lng === -80),
+      'the bias reaches every normalize call'
+    );
+
+    // locate failing or absent: nothing changes
+    sentBias.length = 0;
+    const res1 = await processTourSourcePage(
+      pg,
+      cfgW.sources[0],
+      cfgW,
+      mk([show({})], [], async () => {
+        throw new Error('429');
+      })
+    );
+    assert(
+      res1[0].outcome === 'published' && sentBias.every(b => b === undefined),
+      'a failing locate does not fail the shows and gives no bias'
+    );
+    sentBias.length = 0;
+    await processTourSourcePage(pg, cfgW.sources[0], cfgW, mk([show({})]));
+    assert(
+      sentBias.every(b => b === undefined),
+      'without locate there is no bias'
+    );
+    let called = 0;
+    await processTourSourcePage(
+      pg,
+      cfgW.sources[0],
+      cfgW,
+      mk([show({ lat: 1, lng: 2 })], [], async () => {
+        called++;
+        return undefined;
+      })
+    );
+    assert(
+      called === 1,
+      'locate is still called once (with an empty list when every show has coordinates)'
+    );
+
+    // a show held by another key is left alone
+    applied = 0;
+    const foreign: ExistingShow = {
+      id: 'x1',
+      title: 'Beck',
+      lat: 36,
+      lng: -78.9,
+      start_time: '2030-10-27T00:00:00',
+      category: 'music',
+      tags: [],
+      venue_name: 'DPAC',
+      created_at: 'c',
+      pubkey: 'someone-else',
+      act_url: 'https://testband.example',
+    };
+    const res2 = await processTourSourcePage(
+      pg,
+      cfgW.sources[0],
+      cfgW,
+      mk([show({})], [foreign])
+    );
+    assert(
+      res2[0].outcome === 'unchanged' && applied === 0,
+      'a show already in the database under another key is unchanged: never updated, never re-posted'
+    );
+    applied = 0;
+    const own: ExistingShow = { ...foreign, id: 'x2', pubkey: 'me' };
+    const res3 = await processTourSourcePage(
+      pg,
+      cfgW.sources[0],
+      cfgW,
+      mk([show({})], [own])
+    );
+    assert(
+      applied === 1 && res3[0].outcome === 'unchanged',
+      'our own match still goes through apply (update logic)'
+    );
+    applied = 0;
+    const noKey: ExistingShow = { ...foreign, id: 'x3', pubkey: undefined };
+    await processTourSourcePage(
+      pg,
+      cfgW.sources[0],
+      cfgW,
+      mk([show({})], [noKey])
+    );
+    assert(
+      applied === 1,
+      'a match without a pubkey (older records) is treated as ours'
+    );
   }
 
   // (later tasks append their sections above this line)
