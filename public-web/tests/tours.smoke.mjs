@@ -295,6 +295,94 @@ try {
     await context.close();
   }
 
+  // 12. saved queries: "Copy link" and restoring from the link
+  {
+    const { page, context, errors } = await newPage(browser);
+    // Capture what the page copies (the real clipboard needs permissions).
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        value: {
+          writeText: async t => {
+            window.__copied = t;
+          },
+        },
+        configurable: true,
+      });
+    });
+    await page.goto(base + '/tours.html');
+    await settleNames(page, ['Alpha', 'Beta']);
+    await page.fill('#keywordFilter', 'alph');
+    await settleNames(page, ['Alpha']);
+    await page.click('#copyLinkBtn');
+    const copied = await page.evaluate(() => window.__copied);
+    check(
+      'copy link: the link carries the keyword',
+      typeof copied === 'string' &&
+        copied.startsWith(base + '/tours.html?') &&
+        new URL(copied).searchParams.get('q') === 'alph',
+      copied
+    );
+    check(
+      'copy link: the button confirms',
+      (await page.textContent('#copyLinkBtn')).includes('copied')
+    );
+
+    // A page with no filters copies the bare page url.
+    await page.fill('#keywordFilter', '');
+    await settleNames(page, ['Alpha', 'Beta']);
+    await page.click('#copyLinkBtn');
+    check(
+      'copy link: no filters → no query string',
+      (await page.evaluate(() => window.__copied)) === base + '/tours.html'
+    );
+
+    // Opening the saved link restores the filters.
+    await page.goto(copied);
+    const restored = await settleNames(page, ['Alpha']);
+    check(
+      'saved link: the keyword is restored and applied',
+      JSON.stringify(restored) === JSON.stringify(['Alpha']) &&
+        (await page.inputValue('#keywordFilter')) === 'alph',
+      restored
+    );
+
+    // A saved place (origin + radius + label).
+    await page.goto(
+      base + '/tours.html?lat=46.0637&lng=13.2353&radius=25&place=Udine'
+    );
+    const udine = await settleNames(page, ['Alpha']);
+    check(
+      'saved link: place, radius and origin restored (only Alpha is within 25 km of Udine)',
+      JSON.stringify(udine) === JSON.stringify(['Alpha']) &&
+        (await page.inputValue('#placeInput')) === 'Udine' &&
+        (await page.inputValue('#radiusFilter')) === '25',
+      udine
+    );
+
+    // A saved range that excludes everything shows the empty state.
+    await page.goto(base + '/tours.html?to=2000-01-01');
+    await page.waitForSelector('.empty-state');
+    check(
+      'saved link: a saved date range is applied',
+      (await page.textContent('.empty-state')).includes('No shows match') &&
+        (await page.inputValue('#toDate')) === '2000-01-01'
+    );
+
+    // Garbage parameters are ignored, not fatal.
+    await page.goto(
+      base + '/tours.html?from=zzz&to=2030-99-99&lat=999&lng=1&radius=7&q='
+    );
+    const garbage = await settleNames(page, ['Alpha', 'Beta']);
+    check(
+      'saved link: invalid parameters are ignored',
+      JSON.stringify(garbage) === JSON.stringify(['Alpha', 'Beta']) &&
+        (await page.inputValue('#radiusFilter')) === '100',
+      garbage
+    );
+    check('saved links: no uncaught page errors', errors.length === 0, errors);
+    await context.close();
+  }
+
   // 9. API error → retry
   {
     state.failApi = true;

@@ -292,6 +292,12 @@ A read-only, band-first browse page for the shows published by the crawler's `np
 - MUST offer an area filter: a place typed into the input and geocoded with `geocode()` on Enter (Nominatim), or a "Near me" toggle using browser geolocation, plus a radius select (25 / 50 / 100 / 250 / 500 km, default 100); with an origin set, shows farther than the radius are hidden and each show gets its distance
 - MUST, when geocoding or geolocation fails, show a notice and keep all shows visible
 
+**FR-8.4a: Saved queries**
+
+- MUST offer a "Copy link" button that copies a link to the page carrying the current filters, so a query can be saved or shared (the events page's "Copy link" works the same way). Query parameters: `q` (keyword), `from`, `to` (`YYYY-MM-DD`), and, only when an area filter is active, `lat`, `lng` (rounded to 4 decimals), `radius` and `place` (the typed place name; absent for "Near me"). Empty filters are omitted, so a page with no filters copies the bare page url. If the clipboard is unavailable the link is shown in a prompt.
+- MUST restore the filters from these parameters on load and apply them: the inputs are filled, an area filter is active (a typed place shows as that text, otherwise as `lat, lng`), and the list is filtered once the shows have loaded. Invalid values are ignored without error: a date that is not a real calendar date, a latitude/longitude outside the valid range or missing one of the pair, a radius that is not one of the select's options (default 100), a keyword longer than 200 characters (truncated).
+- Open band cards and the mapped band are not saved.
+
 **FR-8.5: Map**
 
 - MUST offer an optional Leaflet map: hidden until "Show on map" is pressed on a band; it then shows one pin per distinct location of that band's visible shows (popup: band, date, venue and address) and fits to them (Europe outliers ignored for the fit, as on the radar)
@@ -308,7 +314,7 @@ A read-only, band-first browse page for the shows published by the crawler's `np
 - MUST be listed in `inject-worker-url.js` (`ALL_FILES`); `tests/inject.test.mjs` enforces this
 - Logic lives in `tours.js` (pure, unit-tested in `tests/tours.test.mjs`); `tests/tours.smoke.mjs` runs the page offline in headless Chromium against a fake API (set `TOURS_SMOKE_MAP=1` to add the Leaflet checks, which need internet for the Leaflet CDN)
 
-**Known limitations:** no URL state for the filters; the no-geo path returns 100 shows per page, so a very large data set takes several requests; one band per `act_url`; the page does not paginate the rendered list.
+**Known limitations:** which band cards are open is not part of a saved link; the no-geo path returns 100 shows per page, so a very large data set takes several requests; one band per `act_url`; the page does not paginate the rendered list.
 
 ---
 

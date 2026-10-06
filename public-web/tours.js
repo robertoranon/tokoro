@@ -273,6 +273,70 @@ function fitPoints(points) {
   return inside.length ? inside : points;
 }
 
+// ── Saved queries ─────────────────────────────────────────────────────────────
+// A query is saved as a shareable link: the filters travel in the URL and the
+// page restores them on load (same idea as the events page's "Copy link").
+
+const RADII_KM = [25, 50, 100, 250, 500]; // the radius <select> options
+const DEFAULT_RADIUS_KM = 100;
+const MAX_KEYWORD_LENGTH = 200;
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+
+function validYmd(v) {
+  if (typeof v !== 'string' || !YMD.test(v)) return '';
+  const d = new Date(v + 'T12:00:00Z');
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v ? v : '';
+}
+
+/**
+ * Filters → query string (no leading "?"). Empty filters are omitted; the
+ * radius and the place label only travel together with an origin.
+ */
+function buildTourQuery({
+  keyword = '',
+  from = '',
+  to = '',
+  origin = null,
+  radius = DEFAULT_RADIUS_KM,
+  place = '',
+} = {}) {
+  const p = new URLSearchParams();
+  const q = String(keyword).trim();
+  if (q) p.set('q', q);
+  if (from) p.set('from', from);
+  if (to) p.set('to', to);
+  if (origin && isFinite(origin.lat) && isFinite(origin.lng)) {
+    p.set('lat', Number(origin.lat).toFixed(4));
+    p.set('lng', Number(origin.lng).toFixed(4));
+    p.set('radius', String(radius));
+    if (place) p.set('place', place);
+  }
+  return p.toString();
+}
+
+/** Query string (with or without "?") → validated filters; bad values are dropped. */
+function parseTourQuery(search) {
+  const p = new URLSearchParams(String(search || '').replace(/^\?/, ''));
+  const lat = p.has('lat') ? Number(p.get('lat')) : NaN;
+  const lng = p.has('lng') ? Number(p.get('lng')) : NaN;
+  const origin =
+    isFinite(lat) &&
+    isFinite(lng) &&
+    Math.abs(lat) <= 90 &&
+    Math.abs(lng) <= 180
+      ? { lat, lng }
+      : null;
+  const radius = Number(p.get('radius'));
+  return {
+    keyword: (p.get('q') || '').trim().slice(0, MAX_KEYWORD_LENGTH),
+    from: validYmd(p.get('from')),
+    to: validYmd(p.get('to')),
+    origin,
+    radius: RADII_KM.includes(radius) ? radius : DEFAULT_RADIUS_KM,
+    place: origin ? (p.get('place') || '').slice(0, 120) : '',
+  };
+}
+
 const api = {
   TOUR_TAG,
   addDays,
@@ -291,6 +355,10 @@ const api = {
   fmtDistance,
   groupPins,
   fitPoints,
+  RADII_KM,
+  DEFAULT_RADIUS_KM,
+  buildTourQuery,
+  parseTourQuery,
 };
 
 // Node.js / browser compatibility

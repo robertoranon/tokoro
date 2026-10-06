@@ -390,6 +390,11 @@
             Near me
           </button>
         </div>
+        <div class="filter-row">
+          <button id="copyLinkBtn" class="toggle" type="button">
+            🔗 Copy link
+          </button>
+        </div>
         <p
           id="statusLine"
           class="status-line"
@@ -432,6 +437,7 @@
           to: '',
           origin: null, // { lat, lng }
           originSource: '', // 'gps' | 'place' | ''
+          place: '', // label of a typed place (saved in links)
           radius: 100,
           open: new Set(), // band keys currently expanded
           mapBand: null, // band key shown on the map
@@ -710,6 +716,7 @@
         function clearOrigin() {
           state.origin = null;
           state.originSource = '';
+          state.place = '';
           syncNearToggle();
         }
         el('placeInput').addEventListener('keydown', async e => {
@@ -728,6 +735,7 @@
             if (req !== geoReq) return;
             state.origin = { lat: Number(g.lat), lng: Number(g.lng) };
             state.originSource = 'place';
+            state.place = text;
             syncNearToggle();
             setNotice('');
           } catch (err) {
@@ -760,6 +768,7 @@
                 lng: pos.coords.longitude,
               };
               state.originSource = 'gps';
+              state.place = '';
               el('placeInput').value = '';
               syncNearToggle();
               setNotice('');
@@ -806,6 +815,53 @@
             el('retryBtn').addEventListener('click', load);
           }
         }
+
+        // ── Saved queries: the filters live in the link ────────────────
+        el('copyLinkBtn').addEventListener('click', async () => {
+          const query = T.buildTourQuery({
+            keyword: state.keyword,
+            from: state.from,
+            to: state.to,
+            origin: state.origin,
+            radius: state.radius,
+            place: state.originSource === 'place' ? state.place : '',
+          });
+          const url =
+            window.location.origin +
+            window.location.pathname +
+            (query ? '?' + query : '');
+          const btn = el('copyLinkBtn');
+          try {
+            await navigator.clipboard.writeText(url);
+            btn.textContent = '✓ Link copied';
+            setTimeout(() => {
+              btn.textContent = '🔗 Copy link';
+            }, 2000);
+          } catch (err) {
+            window.prompt('Copy this link:', url);
+          }
+        });
+
+        // Restore a saved query from the link (invalid values are ignored).
+        (function restoreFromLink() {
+          const saved = T.parseTourQuery(window.location.search);
+          state.keyword = saved.keyword;
+          state.from = saved.from;
+          state.to = saved.to;
+          state.radius = saved.radius;
+          el('keywordFilter').value = saved.keyword;
+          el('fromDate').value = saved.from;
+          el('toDate').value = saved.to;
+          el('radiusFilter').value = String(saved.radius);
+          if (saved.origin) {
+            state.origin = saved.origin;
+            state.originSource = 'place';
+            state.place = saved.place;
+            el('placeInput').value =
+              saved.place ||
+              saved.origin.lat.toFixed(4) + ', ' + saved.origin.lng.toFixed(4);
+          }
+        })();
 
         load();
       })();

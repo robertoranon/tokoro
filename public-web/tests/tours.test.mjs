@@ -18,6 +18,9 @@ const {
   fmtDistance,
   groupPins,
   fitPoints,
+  buildTourQuery,
+  parseTourQuery,
+  DEFAULT_RADIUS_KM,
 } = createRequire(import.meta.url)('../tours.js');
 
 const TODAY = '2030-10-01';
@@ -292,6 +295,72 @@ const ev = over => ({
     '✅ fitPoints: ignores points outside Europe unless none is inside'
   );
 }
+
+
+// ── saved queries (shareable link) ───────────────────────────────────────────
+{ const q = buildTourQuery({
+    keyword: 'sigur',
+    from: '2030-11-01',
+    to: '2030-12-31',
+    origin: { lat: 46.06371234, lng: 13.23531234 },
+    radius: 50,
+    place: 'Udine',
+  });
+  const p = new URLSearchParams(q);
+  assert.equal(p.get('q'), 'sigur');
+  assert.equal(p.get('from'), '2030-11-01');
+  assert.equal(p.get('to'), '2030-12-31');
+  assert.equal(p.get('lat'), '46.0637');
+  assert.equal(p.get('lng'), '13.2353');
+  assert.equal(p.get('radius'), '50');
+  assert.equal(p.get('place'), 'Udine');
+  assert.ok(!q.startsWith('?'));
+  console.log('✅ buildTourQuery: filters → query string (coordinates rounded to 4 decimals)'); }
+
+{ assert.equal(buildTourQuery({}), '');
+  assert.equal(buildTourQuery({ keyword: '  ', from: '', to: '' }), '');
+  const noOrigin = new URLSearchParams(buildTourQuery({ keyword: 'a', radius: 250, place: 'Udine' }));
+  assert.equal(noOrigin.get('q'), 'a');
+  assert.ok(!noOrigin.has('radius') && !noOrigin.has('place') && !noOrigin.has('lat'));
+  const noPlace = new URLSearchParams(buildTourQuery({ origin: { lat: 1, lng: 2 }, radius: 100 }));
+  assert.ok(!noPlace.has('place'));
+  console.log('✅ buildTourQuery: empty filters are omitted; radius and place only travel with an origin'); }
+
+{ const r = parseTourQuery('?q=sigur&from=2030-11-01&to=2030-12-31&lat=46.0637&lng=13.2353&radius=50&place=Udine');
+  assert.deepEqual(r, {
+    keyword: 'sigur',
+    from: '2030-11-01',
+    to: '2030-12-31',
+    origin: { lat: 46.0637, lng: 13.2353 },
+    radius: 50,
+    place: 'Udine',
+  });
+  assert.deepEqual(parseTourQuery('q=a'), { keyword: 'a', from: '', to: '', origin: null, radius: DEFAULT_RADIUS_KM, place: '' });
+  assert.deepEqual(parseTourQuery(''), { keyword: '', from: '', to: '', origin: null, radius: DEFAULT_RADIUS_KM, place: '' });
+  console.log('✅ parseTourQuery: query string → filters, with or without the leading ?'); }
+
+{ const bad = parseTourQuery('?from=bad&to=2030-13-45&lat=999&lng=13&radius=7&place=X');
+  assert.equal(bad.from, '');
+  assert.equal(bad.to, '');
+  assert.equal(bad.origin, null);
+  assert.equal(bad.radius, DEFAULT_RADIUS_KM);
+  assert.equal(bad.place, '', 'place is ignored without a valid origin');
+  assert.equal(parseTourQuery('?lat=46').origin, null);
+  assert.equal(parseTourQuery('?lat=a&lng=b').origin, null);
+  assert.equal(parseTourQuery('?lat=46&lng=13&radius=100000').radius, DEFAULT_RADIUS_KM);
+  assert.equal(parseTourQuery('?q=' + 'x'.repeat(500)).keyword.length, 200, 'keyword is capped');
+  console.log('✅ parseTourQuery: invalid dates, coordinates, radii are dropped; keyword capped'); }
+
+{ const state = {
+    keyword: 'Sigur Rós & friends',
+    from: '2030-11-01',
+    to: '',
+    origin: { lat: 46.0637, lng: 13.2353 },
+    radius: 250,
+    place: 'Udine, Italy',
+  };
+  assert.deepEqual(parseTourQuery('?' + buildTourQuery(state)), state);
+  console.log('✅ saved query: round trip, including special characters'); }
 
 // ── loadTourEvents ───────────────────────────────────────────────────────────
 {
