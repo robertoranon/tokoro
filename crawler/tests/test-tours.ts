@@ -8,6 +8,17 @@ import {
   activeSources,
   effectiveRegion,
 } from '../src/tours/bands-config.js';
+import {
+  parseTourShows,
+  normalizeName,
+  matchBand,
+  toLocalDateTime,
+  isPastShow,
+  inRegion,
+  finalizeTourShow,
+  type TourShowDraft,
+} from '../src/tours/tour-shows.js';
+import type { BandConfig } from '../src/tours/bands-config.js';
 
 let passed = 0;
 let failed = 0;
@@ -220,6 +231,216 @@ sources:
         'bands: [{name: A, url: "https://a.example", status: sleepy}]\nsources: []'
       ),
       'invalid status rejected'
+    );
+  }
+
+  console.log('\n=== normalizeName / matchBand ===\n');
+  {
+    assert(normalizeName('  The  Cure ') === 'the cure', 'case and spaces');
+    assert(normalizeName('Sigur Rós') === 'sigur ros', 'accents stripped');
+    assert(normalizeName('AC/DC') === 'ac dc', 'punctuation → space');
+    assert(
+      normalizeName("Guns N' Roses") === 'guns n roses',
+      'apostrophe dropped'
+    );
+
+    const bands: BandConfig[] = [
+      { name: 'Sigur Rós', url: 'https://sigur.example', status: 'active' },
+      {
+        name: 'Test Band',
+        url: 'https://testband.example',
+        aliases: ['TB', 'The Test Band'],
+        status: 'active',
+      },
+      { name: 'Cure', url: 'https://cure.example', status: 'active' },
+    ];
+    assert(
+      matchBand(['sigur ros'], bands)?.name === 'Sigur Rós',
+      'accent-insensitive match'
+    );
+    assert(
+      matchBand(['Support Act', 'the test band'], bands)?.name === 'Test Band',
+      'alias match among several performers'
+    );
+    assert(matchBand(['TB'], bands)?.name === 'Test Band', 'short alias match');
+    assert(
+      matchBand(['Cured Meat Orchestra'], bands) === undefined,
+      'no partial/substring match'
+    );
+    assert(matchBand([], bands) === undefined, 'empty bill → no match');
+    assert(
+      matchBand(['Test Band'], []) === undefined,
+      'empty registry → no match'
+    );
+  }
+
+  console.log('\n=== parseTourShows ===\n');
+  {
+    const page = 'https://testband.example/live';
+    const shows = parseTourShows(
+      {
+        shows: [
+          {
+            title: 'Test Band live',
+            performers: ['Test Band', 'Opener'],
+            start_time: '2030-11-12T21:00:00',
+            venue_name: 'Club X',
+            address: 'Via Roma 1, Udine',
+            city: 'Udine',
+            url: 'https://tickets.example/1',
+          },
+          { title: 'No date', performers: ['Test Band'] },
+          { title: '', performers: ['x'], start_time: '2030-11-13' },
+          {
+            title: 'Date only',
+            start_time: '2030-11-14',
+            performers: 'Test Band, Guest',
+            lat: '46.1',
+            lng: 13.2,
+            url: 'not a url',
+          },
+        ],
+      },
+      page
+    );
+    assert(
+      shows.length === 2,
+      'invalid shows dropped (no date / empty title), others kept'
+    );
+    assert(
+      shows[0].performers.join('|') === 'Test Band|Opener',
+      'performers list kept'
+    );
+    assert(
+      shows[1].performers.join('|') === 'Test Band|Guest',
+      'performers string split on commas'
+    );
+    assert(
+      shows[1].lat === 46.1 && shows[1].lng === 13.2,
+      'numeric strings coerced'
+    );
+    assert(shows[1].url === undefined, 'invalid url dropped');
+    assert(
+      parseTourShows([{ title: 'A', start_time: '2030-01-01' }], page)
+        .length === 1,
+      'bare array accepted'
+    );
+    assert(
+      parseTourShows({ shows: 'oops' }, page).length === 0,
+      'junk → empty'
+    );
+    assert(parseTourShows(null, page).length === 0, 'null → empty');
+    assert(
+      parseTourShows(
+        { shows: [{ title: 'Impossible', start_time: '2030-02-31' }] },
+        page
+      ).length === 0,
+      'impossible calendar date dropped'
+    );
+  }
+
+  console.log('\n=== toLocalDateTime / isPastShow ===\n');
+  {
+    assert(
+      toLocalDateTime('2030-11-12') === '2030-11-12T00:00:00',
+      'date-only → midnight'
+    );
+    assert(
+      toLocalDateTime('2030-11-12T21:00') === '2030-11-12T21:00:00',
+      'minutes-only padded'
+    );
+    assert(
+      toLocalDateTime('2030-11-12T21:00:00Z') === '2030-11-12T21:00:00',
+      'timezone suffix stripped'
+    );
+    assert(
+      toLocalDateTime('2030-11-12 21:00:00') === '2030-11-12T21:00:00',
+      'space separator accepted'
+    );
+    assert(toLocalDateTime('garbage') === undefined, 'garbage → undefined');
+    assert(
+      isPastShow('2030-11-12T21:00:00', '2030-11-13') === true,
+      'day before today is past'
+    );
+    assert(
+      isPastShow('2030-11-13T21:00:00', '2030-11-13') === false,
+      'today is not past'
+    );
+  }
+
+  console.log('\n=== inRegion ===\n');
+  {
+    const europe = { south: 34, west: -11, north: 72, east: 45 };
+    assert(inRegion(46.06, 13.23, europe), 'Udine inside Europe box');
+    assert(!inRegion(40.7, -74, europe), 'New York outside');
+    assert(inRegion(40.7, -74, undefined), 'no region → everything inside');
+    assert(inRegion(34, -11, europe), 'bounds are inclusive');
+  }
+
+  console.log('\n=== finalizeTourShow ===\n');
+  {
+    const band: BandConfig = {
+      name: 'Test Band',
+      url: 'https://testband.example',
+      status: 'active',
+    };
+    const draft: TourShowDraft = {
+      title: 'Test Band live',
+      performers: ['Test Band', 'Opener'],
+      start_time: '2030-11-12',
+      venue_name: 'Club X',
+      city: 'Udine',
+      address: 'Via Roma 1',
+      tags: ['Rock', ' indie '],
+    };
+    const e = finalizeTourShow(draft, band, 'https://testband.example/live');
+    assert(
+      e.act_name === 'Test Band' && e.act_url === 'https://testband.example',
+      'act fields from the band'
+    );
+    assert(e.start_time === '2030-11-12T00:00:00', 'date normalised');
+    assert(e.category === 'music', 'category fixed to music');
+    assert(
+      e.tags!.includes('band-tour') &&
+        e.tags!.includes('rock') &&
+        e.tags!.includes('indie'),
+      'tags lowercased, trimmed, band-tour added'
+    );
+    assert(
+      !e.tags!.includes('test band'),
+      'band name is not duplicated into tags'
+    );
+    assert(
+      e.url === 'https://testband.example/live',
+      'page url fallback when the show has none'
+    );
+    assert(
+      e.address === 'Via Roma 1, Udine',
+      'city appended to address when missing from it'
+    );
+    assert(
+      finalizeTourShow(
+        { ...draft, address: 'Via Roma 1, Udine' },
+        band,
+        'https://x.example'
+      ).address === 'Via Roma 1, Udine',
+      'city not appended twice'
+    );
+    assert(
+      finalizeTourShow(
+        { ...draft, address: undefined },
+        band,
+        'https://x.example'
+      ).address === 'Udine',
+      'city alone becomes the address'
+    );
+    assert(
+      finalizeTourShow(
+        { ...draft, description: undefined },
+        band,
+        'https://x.example'
+      ).description === 'With Opener.',
+      'support acts summarised into a description'
     );
   }
 
