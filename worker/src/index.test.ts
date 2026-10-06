@@ -16,6 +16,7 @@ import {
   buildHasActFilter,
   validatePutRequest,
 } from './index';
+import { verifyActSignature, actMessage } from './crypto';
 import { isDuplicate } from '../../shared/llm/duplicate-check';
 import { encode as geohashEncode, neighbors } from './geohash';
 import type { LLMProvider } from '../../shared/types/llm';
@@ -693,5 +694,95 @@ describe('validatePutRequest', () => {
         existing
       )
     ).toEqual({ ok: false, status: 400, error: 'created_at mismatch' });
+  });
+});
+
+// Shared with crawler/tests/test-tours.ts: both sides must agree on these bytes.
+const ACT_VECTOR = {
+  privkey: '0101010101010101010101010101010101010101010101010101010101010101',
+  pubkey: '8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c',
+  eventId: 'abababababababababababababababababababababababababababababababab',
+  actName: 'Test Band',
+  actUrl: 'https://testband.example',
+  signature:
+    'eb42a79e717ed8cf6a9657d1f8b426ee770dc35a6705a77f648b1b27f908d139f7481f05e916b75fc5a6c7ecf4e38ff4c1daa70dff51ce70cd19b923e9b64303',
+};
+
+describe('verifyActSignature', () => {
+  const v = ACT_VECTOR;
+
+  it('accepts the fixed vector', async () => {
+    expect(
+      await verifyActSignature(
+        v.eventId,
+        v.actName,
+        v.actUrl,
+        v.pubkey,
+        v.signature
+      )
+    ).toBe(true);
+  });
+
+  it('rejects any change to the id, name, url or key', async () => {
+    expect(
+      await verifyActSignature(
+        'cd'.repeat(32),
+        v.actName,
+        v.actUrl,
+        v.pubkey,
+        v.signature
+      )
+    ).toBe(false);
+    expect(
+      await verifyActSignature(
+        v.eventId,
+        'Other Band',
+        v.actUrl,
+        v.pubkey,
+        v.signature
+      )
+    ).toBe(false);
+    expect(
+      await verifyActSignature(
+        v.eventId,
+        v.actName,
+        'https://other.example',
+        v.pubkey,
+        v.signature
+      )
+    ).toBe(false);
+    expect(
+      await verifyActSignature(
+        v.eventId,
+        v.actName,
+        v.actUrl,
+        '02'.repeat(32),
+        v.signature
+      )
+    ).toBe(false);
+  });
+
+  it('rejects malformed input instead of throwing', async () => {
+    expect(
+      await verifyActSignature(
+        v.eventId,
+        v.actName,
+        v.actUrl,
+        'zz',
+        v.signature
+      )
+    ).toBe(false);
+    expect(
+      await verifyActSignature(v.eventId, v.actName, v.actUrl, v.pubkey, '')
+    ).toBe(false);
+  });
+
+  it('uses a domain separator: the raw event id is not a valid message', async () => {
+    const message = await actMessage(v.eventId, v.actName, v.actUrl);
+    expect(message.length).toBe(32);
+    const rawId = new Uint8Array(
+      v.eventId.match(/.{2}/g)!.map(h => parseInt(h, 16))
+    );
+    expect(Array.from(message)).not.toEqual(Array.from(rawId));
   });
 });
