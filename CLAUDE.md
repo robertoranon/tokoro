@@ -30,7 +30,7 @@ API Endpoints:
 
 **Events**
 
-- `GET /events?lat=&lng=&radius=&from=&to=&category=&tags=&festival_url=` - Query events (max 100 results; `festival_url` filters to a specific festival; `has_festival=1` returns only festival entries)
+- `GET /events?lat=&lng=&radius=&from=&to=&category=&tags=&festival_url=&act_url=` - Query events (max 100 results; `festival_url` filters to a specific festival; `has_festival=1` returns only festival entries; `act_url` filters to a specific band; `has_act=1` returns only band shows, `0` excludes them)
 - `POST /events` - Publish signed event
 - `PUT /events/:id` - Edit own event (new signature required)
 - `DELETE /events/:id` - Delete own event (signature required)
@@ -86,6 +86,8 @@ CREATE TABLE events (
   tags        TEXT,                   -- JSON array of free-form tags (e.g. ["jazz", "outdoor"])
   festival_name TEXT,                 -- optional festival this event belongs to (unsigned metadata)
   festival_url  TEXT,                 -- optional festival homepage URL (unsigned metadata; used for grouping/filtering)
+  act_name      TEXT,                 -- optional band name (unsigned metadata; used for grouping)
+  act_url       TEXT,                 -- optional band canonical site URL (unsigned metadata; used for grouping/filtering)
   created_at  TEXT NOT NULL,          -- ISO 8601 format
   updated_at  TEXT                    -- ISO 8601 format, updated on edit
 );

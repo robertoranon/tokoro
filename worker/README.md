@@ -260,7 +260,8 @@ worker/
 │   ├── 0002_add_address_field.sql
 │   ├── 0003_convert_timestamps_to_text.sql
 │   ├── 0004_add_festival_fields.sql
-│   └── 0005_add_blocklist.sql
+│   ├── 0005_add_blocklist.sql
+│   └── 0006_add_act_fields.sql
 ├── scripts/
 │   └── check-duplicate.ts  # Duplicate detection diagnostics
 ├── wrangler.toml      # Cloudflare Workers config
