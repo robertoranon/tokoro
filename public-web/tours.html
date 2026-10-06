@@ -285,6 +285,39 @@
         color: var(--ink);
         border: 1px solid var(--ink);
       }
+      .tracked-pane {
+        margin: 0 0 18px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+      }
+      .tracked-pane > summary {
+        cursor: pointer;
+        padding: 12px 16px;
+        font-weight: 700;
+      }
+      .tracked-list {
+        list-style: none;
+        margin: 0;
+        padding: 0 16px 12px;
+        columns: 2 260px;
+        column-gap: 24px;
+      }
+      .tracked-band {
+        break-inside: avoid;
+        padding: 4px 0;
+        font-size: 14px;
+      }
+      .tracked-band__count {
+        margin-left: 8px;
+        font-size: 12px;
+        color: var(--text-2);
+      }
+      .tracked-note {
+        padding: 0 16px 12px;
+        font-size: 12px;
+        color: var(--text-2);
+      }
       .band-card__body {
         padding: 0 20px 16px;
         border-top: 1px solid var(--border);
@@ -438,6 +471,12 @@
         ></p>
       </section>
 
+      <details class="tracked-pane" id="trackedPane" hidden>
+        <summary id="trackedSummary">Tracked bands</summary>
+        <ul class="tracked-list" id="trackedList"></ul>
+        <p class="tracked-note" id="trackedNote"></p>
+      </details>
+
       <section class="map-panel" id="mapPanel" aria-label="Map of shows" hidden>
         <div id="map"></div>
         <div class="result-actions">
@@ -472,6 +511,7 @@
           open: new Set(), // band keys currently expanded
           mapBand: null, // band key shown on the map
           ready: false,
+          tracked: null, // { generated, bands } from tracked-bands.json, or null
         };
         let keywordTimer = null;
         let geoReq = 0;
@@ -822,6 +862,59 @@
           );
         });
 
+        // ── Tracked bands: which bands the crawler follows ─────────────
+        async function fetchTracked() {
+          try {
+            const res = await fetch('./tracked-bands.json');
+            if (!res.ok) return null;
+            return T.parseTracked(await res.json());
+          } catch (err) {
+            return null; // missing or invalid: the pane falls back to the shows
+          }
+        }
+        function renderTracked() {
+          const rows = T.mergeTracked(
+            state.tracked ? state.tracked.bands : [],
+            state.all
+          );
+          const pane = el('trackedPane');
+          if (!rows.length) {
+            pane.hidden = true;
+            return;
+          }
+          pane.hidden = false;
+          el('trackedSummary').textContent =
+            'Tracked bands (' + rows.length + ')';
+          el('trackedList').innerHTML = rows
+            .map(r => {
+              const url = safeUrl(r.url);
+              const count = state.ready
+                ? r.upcoming
+                  ? r.upcoming +
+                    (r.upcoming === 1 ? ' upcoming show' : ' upcoming shows')
+                  : 'no upcoming shows'
+                : '';
+              return (
+                '<li class="tracked-band">' +
+                (url
+                  ? '<a href="' +
+                    escHtml(url) +
+                    '" target="_blank" rel="noopener noreferrer">' +
+                    escHtml(r.name) +
+                    ' ↗</a>'
+                  : escHtml(r.name)) +
+                '<span class="tracked-band__count">' +
+                escHtml(count) +
+                '</span></li>'
+              );
+            })
+            .join('');
+          el('trackedNote').textContent =
+            state.tracked && state.tracked.generated
+              ? 'List updated ' + state.tracked.generated
+              : '';
+        }
+
         // ── Load ────────────────────────────────────────────────────────
         async function load() {
           state.ready = false;
@@ -833,6 +926,7 @@
               '<p class="error-state">The API address is not configured (the deploy step replaces the placeholder).</p>';
             return;
           }
+          const trackedPromise = fetchTracked();
           setStatus('Loading tour dates…');
           try {
             const { events, truncated } = await T.loadTourEvents(
@@ -842,12 +936,16 @@
             );
             state.all = T.toShows(events, today);
             state.ready = true;
+            state.tracked = await trackedPromise;
+            renderTracked();
             render();
             if (truncated)
               setNotice(
                 'Showing the first results only — there are more shows than one page load.'
               );
           } catch (err) {
+            state.tracked = await trackedPromise;
+            renderTracked();
             setStatus('');
             el('bandList').innerHTML =
               '<p class="error-state">Could not load tour dates right now. ' +
