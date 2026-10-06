@@ -601,7 +601,42 @@ try {
       errors
     );
     await context.close();
-    state.tracked = undefined;
+
+    // API down but the file is available: bands listed without counts
+    try {
+      state.tracked = trackedFile([
+        { name: 'Alpha', url: 'https://alpha.example' },
+        { name: 'Gamma', url: 'https://gamma.example' },
+      ]);
+      state.failApi = true;
+      ({ page, context, errors } = await newPage(browser));
+      await page.goto(base + '/tours.html');
+      await page.waitForSelector('.error-state');
+      check(
+        'tracked: with the shows failing, the pane still counts the tracked bands',
+        (await page.textContent('#trackedSummary')).includes(
+          'Tracked bands (2)'
+        ),
+        await page.textContent('#trackedSummary')
+      );
+      await page.click('#trackedSummary');
+      const rows = await rowsOf(page);
+      check(
+        'tracked: with the shows failing, rows are listed without counts',
+        JSON.stringify(rows.map(r => r.name)) ===
+          JSON.stringify(['Alpha', 'Gamma']) && rows.every(r => r.count === ''),
+        rows
+      );
+      check(
+        'tracked: no uncaught page errors (API down)',
+        errors.length === 0,
+        errors
+      );
+      await context.close();
+    } finally {
+      state.failApi = false;
+      state.tracked = undefined;
+    }
   }
 
   // 9. API error → retry
