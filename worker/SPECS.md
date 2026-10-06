@@ -167,6 +167,20 @@ The prefix `"blocklist:"` is a **domain separator** that prevents reuse of event
 4. Verify: `ed25519.verify(signature_bytes, message_bytes, pubkey_bytes)`
 5. Additionally verify that `pubkey === ADMIN_PUBKEY`
 
+### 3.5 Act Signature Verification (POST /events/:id/act)
+
+**Signed Message:** `SHA-256("act:" + event_id + "\n" + act_name + "\n" + act_url)` (UTF-8, `\n` is a single line feed)
+
+The prefix `"act:"` is a **domain separator**: an act signature can never be replayed as an event, delete or blocklist signature (those sign a canonical JSON hash, the bare event ID, or a `"blocklist:"`-prefixed string). Binding the event ID, name and URL into the message means a signature authorizes exactly one (event, act) pair.
+
+**Verification Steps:**
+
+1. Take `event_id` from the URL path; take `pubkey`, `signature`, `act_name` and `act_url` from the request body, **exactly as sent** (no trimming or normalization before signing or verifying)
+2. Compute `message = SHA-256(encode_utf8("act:" + event_id + "\n" + act_name + "\n" + act_url))`
+3. Verify: `ed25519.verify(signature_bytes, message_bytes, pubkey_bytes)`; any decoding error counts as a failed verification
+
+The reference implementation pins this format with a fixed cross-package test vector so the crawler (the signer) and the worker cannot drift apart.
+
 ---
 
 ## 4. Geospatial Query Algorithm
@@ -780,6 +794,63 @@ DELETE /events/<event_id>
 ```json
 { "id": "<event id>", "message": "Event updated successfully" }
 ```
+
+### 7.7.1 POST /events/:id/act (Attach an act to an existing event)
+
+**Purpose:** lets the band-tours crawler link a show to its band (`act_name`, `act_url`) when the duplicate check rejected the show's own publication because an equivalent event already exists. The event may belong to a different key; `act_name` and `act_url` are unsigned metadata, so tagging does not touch the owner's signed data. (Numbered 7.7.1 to avoid renumbering the sections that follow.)
+
+**Request:**
+
+```json
+POST /events/<event_id>/act
+
+{
+  "pubkey": "<64 hex chars>",
+  "signature": "<128 hex chars>",
+  "act_name": "<band name>",
+  "act_url": "<band page URL>"
+}
+```
+
+The signature is described in section 3.5. The CORS methods in section 7.1 already include `POST`; no change was needed.
+
+**Validation (no I/O, all `400 Bad Request`):**
+
+1. Body must be a JSON object (`Invalid JSON` if it cannot be parsed, `Invalid body` if not an object)
+2. `pubkey` is 64 hex characters and `signature` is 128 hex characters (`Missing or malformed pubkey or signature`)
+3. `act_name` is a string that is non-empty after trimming, at most 200 characters
+4. `act_url` is a non-empty string of at most 500 characters that parses as an absolute `http:` or `https:` URL
+5. Values are used exactly as sent (not trimmed or rewritten), because the signature covers those exact strings
+
+**Check order:**
+
+1. Body validation → `400`
+2. `pubkey` in the `blocklist` table → `403 {"error": "Forbidden"}`
+3. If `ALLOWED_PUBKEYS` is configured and `pubkey` is not in it (comparison trimmed and case-insensitive) → `403 {"error": "Forbidden", "message": "Public key not in allowlist"}`
+4. Act signature verification → `401 {"error": "Invalid signature"}`
+5. Event lookup by `:id` → `404 {"error": "Event not found"}`
+6. Decision on the event's current `act_url` (compared after trimming and ignoring one trailing `/`):
+   - empty or null → adopt
+   - equal to the request's `act_url` → already adopted
+   - different → `409 {"error": "Event already belongs to another act"}`
+
+Signature verification precedes the event lookup, so an unauthenticated caller cannot probe which event IDs exist.
+
+**Success Responses (200):**
+
+```json
+{ "id": "<event id>", "adopted": true }
+```
+
+```json
+{ "id": "<event id>", "adopted": false, "already": true }
+```
+
+The second form is returned when the event already carries the same act (repeat requests are idempotent and write nothing).
+
+**What changes:** only `act_name` and `act_url` are written. The endpoint never overwrites an existing act. `signature`, `created_at` and `updated_at` are left untouched, and the event remains valid because these fields are not part of the signed event data.
+
+**Trust model:** any allowlisted key may tag any untagged event, regardless of who published it, so the allowlist is the access control. `ALLOWED_PUBKEYS` MUST be set in production; when it is not set, any non-blocklisted key with a valid signature can attach an act to any event that has none.
 
 ### 7.8 GET /admin/blocklist (List Blocklisted Pubkeys)
 
