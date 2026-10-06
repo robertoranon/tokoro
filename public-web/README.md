@@ -9,7 +9,7 @@ A simple web interface for querying events from the Tokoro API.
 - Geocoding support via OpenStreetMap Nominatim API
 - Mobile-responsive design
 - `festivals.html`: Festival radar. Browse under-the-radar festivals by month on a map; independent of the event pages
-- `tours.html`: Band tours. Upcoming shows of the followed bands, band by band, with filters, a NEW badge for shows first published in the last 7 days (and a "New only" filter), saved queries via "Copy link", and an optional map; independent of the other pages. Band shows are excluded from the other pages (`has_act=0`)
+- `tours.html`: Band tours. Upcoming shows of the followed bands, band by band, with filters, a NEW badge for shows first published in the last 7 days (and a "New only" filter), saved queries via "Copy link", an optional map, and a tracked-bands pane (list generated from `crawler/bands.yaml` at deploy time); independent of the other pages. Band shows are excluded from the other pages (`has_act=0`)
 
 ## Deployment to Cloudflare Pages
 
@@ -21,7 +21,7 @@ From the repo root:
 ./scripts/deploy-public-web.sh
 ```
 
-This builds the bookmarklet, injects the real worker and crawler URLs into the HTML files, deploys to Cloudflare Pages, then restores the source files to their placeholder state so the repo stays clean. Use `--dry-run` to preview without deploying.
+This builds the bookmarklet, injects the real worker and crawler URLs into the HTML files, deploys to Cloudflare Pages, then restores the source files to their placeholder state so the repo stays clean. Use `--dry-run` to preview without deploying. When `crawler/bands.yaml` exists, the script also exports `tracked-bands.json` (names and site urls of the active bands) for the tours page; redeploy after editing `bands.yaml` to refresh the tracked-bands pane.
 
 ### Option 2: Via Cloudflare Dashboard
 

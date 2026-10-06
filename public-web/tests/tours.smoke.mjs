@@ -69,7 +69,8 @@ const EVENTS = [
 ];
 
 // ── one local server: static page files + fake paged API ──────────────────────
-const state = { requests: [], failApi: false };
+// tracked: undefined → 404; a string → served verbatim as JSON
+const state = { requests: [], failApi: false, tracked: undefined };
 let base = '';
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -97,6 +98,16 @@ const server = http.createServer(async (req, res) => {
         has_more: offset + PAGE_SIZE < EVENTS.length,
       })
     );
+    return;
+  }
+  if (url.pathname === '/tracked-bands.json') {
+    if (state.tracked === undefined) {
+      res.writeHead(404);
+      res.end('not found');
+    } else {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(state.tracked);
+    }
     return;
   }
   const name = url.pathname.replace(/^\//, '');
@@ -486,6 +497,146 @@ try {
     );
     check('new: no uncaught page errors', errors.length === 0, errors);
     await context.close();
+  }
+
+  // 14. tracked-bands pane
+  {
+    const trackedFile = bands =>
+      JSON.stringify({ generated: '2030-10-07', bands });
+    const rowsOf = page =>
+      page.$$eval('#trackedList li', lis =>
+        lis.map(li => ({
+          name: li.querySelector('a').textContent.replace(/↗/, '').trim(),
+          href: li.querySelector('a').getAttribute('href'),
+          target: li.querySelector('a').getAttribute('target'),
+          count: li.querySelector('.tracked-band__count').textContent.trim(),
+        }))
+      );
+
+    // all three tracked bands, one without shows
+    state.tracked = trackedFile([
+      { name: 'Gamma', url: 'https://gamma.example' },
+      { name: 'Alpha', url: 'https://alpha.example' },
+      { name: 'Beta', url: 'https://beta.example/' },
+    ]);
+    let { page, context, errors } = await newPage(browser);
+    await page.goto(base + '/tours.html');
+    await settleNames(page, ['Alpha', 'Beta']);
+    check(
+      'tracked: the pane is collapsed and counts the tracked bands',
+      (await page.isVisible('#trackedPane')) &&
+        (await page.evaluate(
+          () => document.querySelector('#trackedPane').open
+        )) === false &&
+        (await page.textContent('#trackedSummary')).includes(
+          'Tracked bands (3)'
+        ),
+      await page.textContent('#trackedSummary')
+    );
+    await page.click('#trackedSummary');
+    const rows = await rowsOf(page);
+    check(
+      'tracked: alphabetical rows with links to the band sites and upcoming counts',
+      JSON.stringify(rows.map(r => [r.name, r.count])) ===
+        JSON.stringify([
+          ['Alpha', '3 upcoming shows'],
+          ['Beta', '1 upcoming show'],
+          ['Gamma', 'no upcoming shows'],
+        ]) &&
+        rows[0].href === 'https://alpha.example' &&
+        rows.every(r => r.target === '_blank'),
+      rows
+    );
+    await page.fill('#keywordFilter', 'beta');
+    await settleNames(page, ['Beta']);
+    check(
+      'tracked: the pane ignores the filters',
+      (await rowsOf(page)).length === 3
+    );
+    check('tracked: no uncaught page errors', errors.length === 0, errors);
+    await context.close();
+
+    // a band with shows that the file does not list is added
+    state.tracked = trackedFile([
+      { name: 'Alpha', url: 'https://alpha.example' },
+    ]);
+    ({ page, context } = await newPage(browser));
+    await page.goto(base + '/tours.html');
+    await settleNames(page, ['Alpha', 'Beta']);
+    await page.click('#trackedSummary');
+    check(
+      'tracked: a band that has shows but is not in the file is still listed',
+      JSON.stringify((await rowsOf(page)).map(r => r.name)) ===
+        JSON.stringify(['Alpha', 'Beta']) &&
+        (await page.textContent('#trackedSummary')).includes('(2)')
+    );
+    await context.close();
+
+    // no file: the pane lists the bands that have shows
+    state.tracked = undefined;
+    ({ page, context, errors } = await newPage(browser));
+    await page.goto(base + '/tours.html');
+    await settleNames(page, ['Alpha', 'Beta']);
+    check(
+      'tracked: without the file the pane lists the bands that have shows',
+      (await page.textContent('#trackedSummary')).includes('(2)'),
+      await page.textContent('#trackedSummary')
+    );
+    check(
+      'tracked: a missing file is not an error',
+      errors.length === 0,
+      errors
+    );
+    await context.close();
+
+    // garbage file: treated as missing
+    state.tracked = 'this is not json';
+    ({ page, context, errors } = await newPage(browser));
+    await page.goto(base + '/tours.html');
+    await settleNames(page, ['Alpha', 'Beta']);
+    check(
+      'tracked: an invalid file is ignored',
+      (await page.textContent('#trackedSummary')).includes('(2)') &&
+        errors.length === 0,
+      errors
+    );
+    await context.close();
+
+    // API down but the file is available: bands listed without counts
+    try {
+      state.tracked = trackedFile([
+        { name: 'Alpha', url: 'https://alpha.example' },
+        { name: 'Gamma', url: 'https://gamma.example' },
+      ]);
+      state.failApi = true;
+      ({ page, context, errors } = await newPage(browser));
+      await page.goto(base + '/tours.html');
+      await page.waitForSelector('.error-state');
+      check(
+        'tracked: with the shows failing, the pane still counts the tracked bands',
+        (await page.textContent('#trackedSummary')).includes(
+          'Tracked bands (2)'
+        ),
+        await page.textContent('#trackedSummary')
+      );
+      await page.click('#trackedSummary');
+      const rows = await rowsOf(page);
+      check(
+        'tracked: with the shows failing, rows are listed without counts',
+        JSON.stringify(rows.map(r => r.name)) ===
+          JSON.stringify(['Alpha', 'Gamma']) && rows.every(r => r.count === ''),
+        rows
+      );
+      check(
+        'tracked: no uncaught page errors (API down)',
+        errors.length === 0,
+        errors
+      );
+      await context.close();
+    } finally {
+      state.failApi = false;
+      state.tracked = undefined;
+    }
   }
 
   // 9. API error → retry

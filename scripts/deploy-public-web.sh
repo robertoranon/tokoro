@@ -55,6 +55,18 @@ echo "Build version: ${BUILD_VERSION}"
 echo "Injecting URLs into temp copy..."
 node "${PUBLIC_WEB}/inject-worker-url.js" "$WORKER_URL" "$CRAWLER_URL" "$RELAY_URL" "${DEPLOY_DIR}" "${BUILD_VERSION}" "$SHORTCUT_URL"
 
+# Public list of tracked bands for the tours page (names and site urls only).
+BANDS_FILE="${REPO_ROOT}/crawler/bands.yaml"
+if [[ -f "$BANDS_FILE" ]]; then
+  echo "Exporting tracked bands..."
+  if ! (cd "${REPO_ROOT}/crawler" && npx tsx src/export-tracked-bands.ts --bands "$BANDS_FILE" --out "${DEPLOY_DIR}/tracked-bands.json"); then
+    echo "Warning: could not export tracked bands; the tours page will list only bands that have shows." >&2
+    rm -f "${DEPLOY_DIR}/tracked-bands.json"
+  fi
+else
+  echo "No crawler/bands.yaml: skipping tracked-bands.json (the tours page will list only bands that have shows)."
+fi
+
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "[dry-run] Would deploy public-web to Cloudflare Pages (project: tokoro-query)"
   echo "[dry-run] Skipping deploy."
