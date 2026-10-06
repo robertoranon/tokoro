@@ -35,6 +35,15 @@ import {
   type RunRecord,
 } from '../src/utils/run-log.js';
 import type { FetchedPage } from '../src/types/event.js';
+import {
+  processTourSourcePage,
+  tallyShows,
+  sourceOutcome,
+  type TourSourceDeps,
+  type ShowResult,
+} from '../src/tours/tour-source.js';
+import { parseBandsConfig as parseCfg } from '../src/tours/bands-config.js';
+import type { ExtractedEvent } from '../src/types/event.js';
 
 let passed = 0;
 let failed = 0;
@@ -835,6 +844,415 @@ sources:
         ['https://s.example/live']
       ).length === 1,
       'findStaleFestivals still works (radar kind)'
+    );
+  }
+
+  console.log('\n=== processTourSourcePage ===\n');
+  {
+    const cfg = parseCfg(`
+defaults:
+  region: { south: 34, west: -11, north: 72, east: 45 }
+bands:
+  - name: Test Band
+    url: https://testband.example
+    aliases: ["The Test Band"]
+  - name: Other Band
+    url: https://other.example
+  - name: Far Band
+    url: https://far.example
+    region: none
+sources:
+  - { url: "https://testband.example/live", mode: band, band: Test Band }
+  - { url: "https://venue.example/programme", mode: listing }
+  - { url: "https://venue.example/only-other", mode: listing, only: [Other Band] }
+`);
+    const page: FetchedPage = {
+      url: 'https://venue.example/programme',
+      title: 'P',
+      html: '',
+      text: 'x',
+    };
+    const draft = (over: Partial<TourShowDraft>): TourShowDraft => ({
+      title: 'Show',
+      performers: ['Test Band'],
+      start_time: '2030-11-12T21:00:00',
+      venue_name: 'Club X',
+      city: 'Udine',
+      lat: 46.06,
+      lng: 13.23,
+      ...over,
+    });
+
+    const published: NormalizedEvent[] = [];
+    const mkDeps = (
+      drafts: TourShowDraft[],
+      existing: ExistingShow[] = []
+    ): TourSourceDeps => ({
+      extract: async () => drafts,
+      lookup: async () => existing,
+      normalize: async (e: ExtractedEvent, opts) =>
+        ({
+          pubkey: 'p',
+          signature: 's',
+          title: e.title,
+          lat: e.lat!,
+          lng: e.lng!,
+          start_time: String(e.start_time),
+          category: e.category,
+          created_at: opts?.createdAt ?? 'now',
+          act_name: e.act_name,
+          act_url: e.act_url,
+          tags: e.tags,
+          url: e.url,
+          venue_name: e.venue_name,
+          address: e.address,
+          description: e.description,
+        }) as NormalizedEvent,
+      // A matched show is "unchanged" (what TourPublisher does when nothing
+      // meaningful differs); only unmatched shows are posted.
+      apply: async (ev, match) => {
+        if (match) return 'unchanged';
+        published.push(ev);
+        return 'published';
+      },
+      today: '2030-10-01',
+    });
+
+    // band mode: every show belongs to the band, whatever the bill says
+    published.length = 0;
+    let res = await processTourSourcePage(
+      page,
+      cfg.sources[0],
+      cfg,
+      mkDeps([
+        draft({}),
+        draft({
+          performers: ['Somebody Else'],
+          start_time: '2030-11-13T21:00:00',
+        }),
+      ])
+    );
+    assert(
+      res.length === 2 && res.every(r => r.outcome === 'published'),
+      'band mode: all shows published'
+    );
+    assert(
+      published.every(p => p.act_url === 'https://testband.example'),
+      'band mode: attributed to the source band'
+    );
+
+    // listing mode: only registry bands (alias counts), others counted as unmatched
+    published.length = 0;
+    res = await processTourSourcePage(
+      page,
+      cfg.sources[1],
+      cfg,
+      mkDeps([
+        draft({ performers: ['The Test Band'] }),
+        draft({
+          performers: ['Unknown Act'],
+          start_time: '2030-11-14T21:00:00',
+        }),
+        draft({
+          performers: ['Support', 'Other Band'],
+          start_time: '2030-11-15T21:00:00',
+        }),
+      ])
+    );
+    assert(
+      res.filter(r => r.outcome === 'published').length === 2,
+      'listing: two registry bands published'
+    );
+    assert(
+      res.filter(r => r.outcome === 'unmatched').length === 1,
+      'listing: unknown act counted as unmatched'
+    );
+    assert(
+      published
+        .map(p => p.act_name)
+        .sort()
+        .join() === 'Other Band,Test Band',
+      'listing: act attributed per show'
+    );
+
+    // listing with `only`
+    published.length = 0;
+    res = await processTourSourcePage(
+      page,
+      cfg.sources[2],
+      cfg,
+      mkDeps([
+        draft({ performers: ['Test Band'] }),
+        draft({
+          performers: ['Other Band'],
+          start_time: '2030-11-15T21:00:00',
+        }),
+      ])
+    );
+    assert(
+      published.length === 1 && published[0].act_name === 'Other Band',
+      'listing "only" restricts matching to the subset'
+    );
+    assert(
+      res.filter(r => r.outcome === 'unmatched').length === 1,
+      'registry band outside "only" counts as unmatched'
+    );
+
+    // past, region, no-location
+    published.length = 0;
+    res = await processTourSourcePage(
+      page,
+      cfg.sources[0],
+      cfg,
+      mkDeps([
+        draft({ start_time: '2030-09-01T21:00:00' }),
+        draft({
+          lat: 40.7,
+          lng: -74,
+          city: 'New York',
+          start_time: '2030-11-16T21:00:00',
+        }),
+      ])
+    );
+    assert(
+      res
+        .map(r => r.outcome)
+        .sort()
+        .join() === 'skipped_out_of_region,skipped_past',
+      'past and out-of-region shows skipped'
+    );
+    assert(published.length === 0, 'nothing published for skipped shows');
+
+    // region: none → worldwide for that band
+    published.length = 0;
+    const farCfg = parseCfg(`
+defaults:
+  region: { south: 34, west: -11, north: 72, east: 45 }
+bands:
+  - { name: Far Band, url: "https://far.example", region: none }
+sources:
+  - { url: "https://far.example/live", mode: band, band: Far Band }
+`);
+    res = await processTourSourcePage(
+      page,
+      farCfg.sources[0],
+      farCfg,
+      mkDeps([draft({ performers: ['Far Band'], lat: 40.7, lng: -74 })])
+    );
+    assert(
+      published.length === 1,
+      'region: none lets a worldwide band through the default region'
+    );
+
+    // existing match → created_at preserved, update path
+    published.length = 0;
+    const existing: ExistingShow[] = [
+      {
+        id: 'e1',
+        title: 'Show',
+        lat: 46.06,
+        lng: 13.23,
+        start_time: '2030-11-12T20:00:00',
+        category: 'music',
+        tags: [],
+        created_at: '2030-01-01T10:00:00',
+      },
+    ];
+    const updating = mkDeps([draft({})], existing);
+    updating.apply = async (ev, match) => {
+      if (!match) return 'published';
+      published.push(ev);
+      return 'updated';
+    };
+    await processTourSourcePage(page, cfg.sources[0], cfg, updating);
+    assert(
+      published[0]?.created_at === '2030-01-01T10:00:00',
+      'update re-signs with the stored created_at'
+    );
+
+    // normalizer returning null → failed (no location); but reuse stored coords when matched
+    const nullNorm = mkDeps([draft({})]);
+    nullNorm.normalize = async () => null;
+    res = await processTourSourcePage(page, cfg.sources[0], cfg, nullNorm);
+    assert(
+      res[0].outcome === 'failed',
+      'no usable location and no match → failed'
+    );
+
+    // one lookup per band, not per show
+    let lookups = 0;
+    const counting = mkDeps([
+      draft({}),
+      draft({ start_time: '2030-11-13T21:00:00' }),
+      draft({ start_time: '2030-11-14T21:00:00' }),
+    ]);
+    counting.lookup = async () => {
+      lookups++;
+      return [];
+    };
+    await processTourSourcePage(page, cfg.sources[0], cfg, counting);
+    assert(lookups === 1, 'band existing shows looked up once per source run');
+
+    // two drafts for the same show (listed twice on the page) → published once
+    published.length = 0;
+    await processTourSourcePage(
+      page,
+      cfg.sources[0],
+      cfg,
+      mkDeps([draft({}), draft({ title: 'Show (dup)' })])
+    );
+    assert(
+      published.length === 1,
+      'duplicate listing of one show published once'
+    );
+
+    // Same, with an apply that behaves like the real TourPublisher: a match
+    // that differs is PUT, and a PUT to an id the API does not know 404s and
+    // falls back to POST. The second listing carries more detail (a support
+    // act → generated description), so it "differs" from the first; it must
+    // still not be POSTed a second time.
+    published.length = 0;
+    const realish = mkDeps([
+      draft({}),
+      draft({
+        performers: ['Test Band', 'Support Act'],
+        start_time: '2030-11-12T21:30:00',
+      }),
+    ]);
+    realish.apply = async (ev, match) => {
+      if (match && !differs(match, ev)) return 'unchanged';
+      published.push(ev); // POST, or a PUT to an unknown id → 404 → POST
+      return 'published';
+    };
+    res = await processTourSourcePage(page, cfg.sources[0], cfg, realish);
+    assert(
+      published.length === 1,
+      'duplicate listing with extra detail is not POSTed twice'
+    );
+    assert(
+      res.length === 2 && res[0].outcome === 'published',
+      'first listing published, second reported once'
+    );
+
+    // an existing show listed twice is updated once, not PUT twice
+    published.length = 0;
+    const twiceUpdated = mkDeps(
+      [draft({}), draft({ title: 'Show (dup)' })],
+      existing
+    );
+    twiceUpdated.apply = async (ev, match) => {
+      published.push(ev);
+      return match ? 'updated' : 'published';
+    };
+    res = await processTourSourcePage(page, cfg.sources[0], cfg, twiceUpdated);
+    assert(
+      published.length === 1 &&
+        res.map(r => r.outcome).join() === 'updated,unchanged',
+      'existing show listed twice is updated once'
+    );
+
+    // a geocoded show (no draft coordinates) outside the region is skipped
+    published.length = 0;
+    const geocoded = mkDeps([draft({ lat: undefined, lng: undefined })]);
+    geocoded.normalize = async (e, opts) => ({
+      pubkey: 'p',
+      signature: 's',
+      title: e.title,
+      lat: 40.7,
+      lng: -74,
+      start_time: String(e.start_time),
+      category: e.category,
+      created_at: opts?.createdAt ?? 'now',
+    });
+    res = await processTourSourcePage(page, cfg.sources[0], cfg, geocoded);
+    assert(
+      res[0].outcome === 'skipped_out_of_region' && published.length === 0,
+      'region checked on geocoded coordinates too'
+    );
+
+    // no draft coordinates: matched after geocoding, re-signed with created_at
+    published.length = 0;
+    const normCalls: (string | undefined)[] = [];
+    const lateMatch = mkDeps(
+      [draft({ lat: undefined, lng: undefined })],
+      existing
+    );
+    lateMatch.normalize = async (e, opts) => {
+      normCalls.push(opts?.createdAt);
+      return {
+        pubkey: 'p',
+        signature: 's',
+        title: e.title,
+        lat: 46.0601,
+        lng: 13.2301,
+        start_time: String(e.start_time),
+        category: e.category,
+        created_at: opts?.createdAt ?? 'now',
+      };
+    };
+    lateMatch.apply = async (ev, match) => {
+      published.push(ev);
+      return match ? 'updated' : 'published';
+    };
+    res = await processTourSourcePage(page, cfg.sources[0], cfg, lateMatch);
+    assert(
+      res[0].outcome === 'updated',
+      'show without draft coordinates matched on geocoded position'
+    );
+    assert(
+      published[0]?.created_at === '2030-01-01T10:00:00' &&
+        normCalls.join() === ',2030-01-01T10:00:00',
+      'late match re-normalized with stored created_at'
+    );
+  }
+
+  console.log('\n=== tallyShows / sourceOutcome ===\n');
+  {
+    const r = (outcome: ShowResult['outcome']): ShowResult => ({
+      title: 't',
+      outcome,
+    });
+    const t = tallyShows([
+      r('published'),
+      r('updated'),
+      r('unchanged'),
+      r('unmatched'),
+      r('skipped_past'),
+      r('skipped_out_of_region'),
+      r('failed'),
+      r('published'),
+    ]);
+    assert(
+      t.published === 2 &&
+        t.updated === 1 &&
+        t.unchanged === 1 &&
+        t.unmatched === 1 &&
+        t.skipped_past === 1 &&
+        t.skipped_out_of_region === 1 &&
+        t.failed === 1,
+      'counters'
+    );
+    assert(
+      sourceOutcome([r('unchanged'), r('published')]) === 'published',
+      'published beats unchanged'
+    );
+    assert(
+      sourceOutcome([r('unchanged'), r('updated')]) === 'updated',
+      'updated beats unchanged'
+    );
+    assert(sourceOutcome([r('unchanged')]) === 'unchanged', 'unchanged');
+    assert(
+      sourceOutcome([r('unmatched'), r('skipped_past')]) === 'no_shows',
+      'nothing publishable → no_shows'
+    );
+    assert(sourceOutcome([]) === 'no_shows', 'empty → no_shows');
+    assert(
+      sourceOutcome([r('failed'), r('failed')]) === 'failed',
+      'only failures → failed'
+    );
+    assert(
+      sourceOutcome([r('failed'), r('published')]) === 'published',
+      'some success → that outcome'
     );
   }
 
