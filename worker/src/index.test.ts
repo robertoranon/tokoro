@@ -12,6 +12,8 @@ import {
   buildTextFilter,
   buildFestivalUrlFilter,
   buildHasFestivalFilter,
+  buildActUrlFilter,
+  buildHasActFilter,
   validatePutRequest,
 } from './index';
 import { isDuplicate } from '../../shared/llm/duplicate-check';
@@ -598,6 +600,47 @@ describe('buildHasFestivalFilter', () => {
     expect(buildHasFestivalFilter('')).toBe('');
     expect(buildHasFestivalFilter('0')).toBe('');
     expect(buildHasFestivalFilter('true')).toBe('');
+  });
+});
+
+describe('buildActUrlFilter', () => {
+  it('returns empty filter for empty or blank input', () => {
+    expect(buildActUrlFilter('')).toEqual({ sql: '', params: [] });
+    expect(buildActUrlFilter('   ')).toEqual({ sql: '', params: [] });
+  });
+
+  it('strips a single trailing slash', () => {
+    expect(buildActUrlFilter('https://band.example/')).toEqual({
+      sql: ' AND act_url = ?',
+      params: ['https://band.example'],
+    });
+  });
+
+  it('passes a clean URL through unchanged', () => {
+    expect(buildActUrlFilter('https://band.example/live')).toEqual({
+      sql: ' AND act_url = ?',
+      params: ['https://band.example/live'],
+    });
+  });
+});
+
+describe('buildHasActFilter', () => {
+  it("returns the presence clause for '1'", () => {
+    expect(buildHasActFilter('1')).toBe(
+      " AND act_url IS NOT NULL AND act_url != ''"
+    );
+  });
+
+  it("returns the absence clause for '0'", () => {
+    expect(buildHasActFilter('0')).toBe(
+      " AND (act_url IS NULL OR act_url = '')"
+    );
+  });
+
+  it('returns empty string for anything else', () => {
+    expect(buildHasActFilter('')).toBe('');
+    expect(buildHasActFilter('true')).toBe('');
+    expect(buildHasActFilter('2')).toBe('');
   });
 });
 

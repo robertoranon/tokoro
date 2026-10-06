@@ -39,6 +39,8 @@ interface Event {
   tags?: string[];
   festival_name?: string;
   festival_url?: string;
+  act_name?: string;
+  act_url?: string;
   created_at: string; // ISO 8601 format
 }
 
@@ -292,6 +294,22 @@ export function buildHasFestivalFilter(hasFestival: string): string {
     : '';
 }
 
+export function buildActUrlFilter(actUrl: string): {
+  sql: string;
+  params: string[];
+} {
+  const normalized = actUrl.trim().replace(/\/$/, '');
+  if (!normalized) return { sql: '', params: [] };
+  return { sql: ' AND act_url = ?', params: [normalized] };
+}
+
+// '1' keeps only band shows, '0' excludes them; anything else is ignored.
+export function buildHasActFilter(hasAct: string): string {
+  if (hasAct === '1') return " AND act_url IS NOT NULL AND act_url != ''";
+  if (hasAct === '0') return " AND (act_url IS NULL OR act_url = '')";
+  return '';
+}
+
 export type PutValidation =
   | { ok: true }
   | { ok: false; status: number; error: string };
@@ -426,6 +444,10 @@ export default {
                 category: 'Filter by category (optional)',
                 has_festival:
                   'Set to 1 to return only festival entries (optional)',
+                act_url:
+                  'Filter to one band by its canonical site URL (optional)',
+                has_act:
+                  'Set to 1 to return only band shows, 0 to exclude them (optional)',
               },
               example:
                 '/events?lat=45.464&lng=9.189&radius=100&from=2026-03-04T00:00:00&to=2026-06-04T00:00:00',
@@ -581,6 +603,8 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
   const hasFestivalFilter = buildHasFestivalFilter(
     url.searchParams.get('has_festival') || ''
   );
+  const actFilter = buildActUrlFilter(url.searchParams.get('act_url') || '');
+  const hasActFilter = buildHasActFilter(url.searchParams.get('has_act') || '');
   const pubkeyFilter = url.searchParams.get('pubkey') || '';
   const q = url.searchParams.get('q') || '';
   const textFilter = buildTextFilter(q);
@@ -616,6 +640,11 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
       allParams.push(...festivalFilter.params);
     }
     allQuery += hasFestivalFilter;
+    if (actFilter.sql) {
+      allQuery += actFilter.sql;
+      allParams.push(...actFilter.params);
+    }
+    allQuery += hasActFilter;
     allQuery += ' ORDER BY start_time ASC LIMIT 100 OFFSET ?';
     allParams.push(offset);
 
@@ -662,6 +691,11 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
       pubkeyParams.push(...festivalFilter.params);
     }
     pubkeyQuery += hasFestivalFilter;
+    if (actFilter.sql) {
+      pubkeyQuery += actFilter.sql;
+      pubkeyParams.push(...actFilter.params);
+    }
+    pubkeyQuery += hasActFilter;
     pubkeyQuery += ' ORDER BY start_time ASC LIMIT 100';
 
     const pubkeyResult = await env.DB.prepare(pubkeyQuery)
@@ -758,6 +792,11 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
     params.push(...festivalFilter.params);
   }
   query += hasFestivalFilter;
+  if (actFilter.sql) {
+    query += actFilter.sql;
+    params.push(...actFilter.params);
+  }
+  query += hasActFilter;
 
   if (pubkeyFilter) {
     query += ' AND pubkey = ?';
@@ -966,8 +1005,9 @@ async function handlePostEvent(request: Request, env: Env): Promise<Response> {
 		INSERT INTO events (
 			id, pubkey, signature, title, description, url, venue_name, address,
 			lat, lng, geohash5, geohash6, start_time, end_time,
-			category, tags, created_at, festival_name, festival_url
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			category, tags, created_at, festival_name, festival_url,
+			act_name, act_url
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
   )
     .bind(
@@ -989,7 +1029,9 @@ async function handlePostEvent(request: Request, env: Env): Promise<Response> {
       tagsJson,
       event.created_at,
       event.festival_name || null,
-      event.festival_url || null
+      event.festival_url || null,
+      event.act_name || null,
+      event.act_url || null
     )
     .run();
 
@@ -1053,7 +1095,8 @@ async function handlePutEvent(
 			signature = ?, title = ?, description = ?, url = ?, venue_name = ?,
 			address = ?, lat = ?, lng = ?, geohash5 = ?, geohash6 = ?,
 			start_time = ?, end_time = ?, category = ?, tags = ?,
-			festival_name = ?, festival_url = ?, updated_at = ?
+			festival_name = ?, festival_url = ?, act_name = ?, act_url = ?,
+			updated_at = ?
 		WHERE id = ?
 	`
   )
@@ -1074,6 +1117,8 @@ async function handlePutEvent(
       JSON.stringify(event.tags || []),
       event.festival_name || null,
       event.festival_url || null,
+      event.act_name || null,
+      event.act_url || null,
       updatedAt,
       eventId
     )

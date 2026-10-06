@@ -47,6 +47,8 @@ CREATE TABLE events (
   tags        TEXT,                   -- JSON array of strings (e.g. ["jazz", "outdoor"])
   festival_name TEXT,                   -- optional festival name (e.g. "Flow Festival 2026")
   festival_url  TEXT,                   -- optional festival homepage URL (used as festival ID)
+  act_name      TEXT,                   -- optional band name (unsigned metadata, band tours)
+  act_url       TEXT,                   -- optional band canonical site URL (unsigned metadata; grouping/filter key)
   created_at  TEXT NOT NULL,          -- ISO 8601 format
   updated_at  TEXT                    -- ISO 8601 format, updated on edit
 );
@@ -55,6 +57,7 @@ CREATE INDEX idx_geohash6_time ON events (geohash6, start_time);
 CREATE INDEX idx_geohash5_time ON events (geohash5, start_time);
 CREATE INDEX idx_category_time ON events (category, start_time);
 CREATE INDEX idx_festival_url ON events (festival_url);
+CREATE INDEX idx_act_url ON events (act_url);
 ```
 
 #### Blocklist Table
@@ -559,6 +562,8 @@ GET /events?lat=45.464&lng=9.189&radius=10&from=2026-03-06T00:00:00&to=2026-03-1
 | `category`     | No       | string | —                    | Filter by category                   |
 | `festival_url` | No       | string | —                    | Filter by festival (returns all events linked to this festival URL) |
 | `has_festival` | No       | string | —                    | `1` restricts results to events with a non-empty `festival_url` (radar entries). Any other value is ignored. |
+| `act_url`      | No       | string | —                    | Filter to one band by canonical site URL (one trailing slash stripped; exact match) |
+| `has_act`      | No       | string | —                    | `1` keeps only band shows (non-empty `act_url`); `0` excludes them. Any other value is ignored. |
 | `q`            | No       | string | —                    | Keyword; filters to events whose title, description, or tags contain the value (case-insensitive substring match); absent or empty means no text filter |
 | `pubkey`       | No       | string | —                    | Filter by author public key (64 hex chars) |
 | `format`       | No       | string | —                    | `ical` to return iCal feed instead of JSON |
@@ -571,6 +576,7 @@ GET /events?lat=45.464&lng=9.189&radius=10&from=2026-03-06T00:00:00&to=2026-03-1
 - When `pubkey` is provided **without** `lat`/`lng`, all events by that author are returned (no geo filtering), ordered by `start_time ASC`, up to 100 results.
 - `pubkey` can be combined with geo params (`lat`/`lng`/`radius`) and time/category filters.
 - `festival_url` and `has_festival` compose with every path (geo, pubkey-only, and no-geo browse) and with all other filters (AND semantics). The `pubkey` + `festival_url` combination is the radar crawler's update lookup.
+- `act_url` and `has_act` compose with every path and with all other filters (AND semantics). The tour crawler's lookup is `pubkey` + `act_url`. `has_act=0` is passed by the general browse pages so band shows stay out of their results. `idx_act_url` covers `act_url` lookups; no index is needed for `has_act`.
 - `has_festival` needs no dedicated index at radar scale (hundreds of rows); `idx_festival_url` already covers `festival_url` lookups. If `has_festival` ever slows, the remedy is a partial index: `CREATE INDEX idx_festival_time ON events (festival_url, start_time) WHERE festival_url IS NOT NULL`.
 
 **Time overlap semantics:** Returns all events that overlap with the `[from, to]` window. Specifically:
@@ -659,6 +665,8 @@ POST /events
   "created_at": "2026-03-01T10:30:00"
 }
 ```
+
+Optional unsigned metadata fields `festival_name`, `festival_url`, `act_name` and `act_url` may also be supplied. They are stored as given, are not part of the signed canonical object, and are not included in the event id.
 
 **Processing Steps:**
 
@@ -765,7 +773,7 @@ DELETE /events/<event_id>
 5. Blocklist and allowlist checks, as on POST → `403`.
 6. Ed25519 signature verification → `401 Unauthorized`.
 
-**Behavior:** all mutable columns are updated (`signature`, `title`, `description`, `url`, `venue_name`, `address`, `lat`, `lng`, `geohash5`/`geohash6` recomputed, `start_time`, `end_time`, `category`, `tags`, `festival_name`, `festival_url`); `updated_at` is set server-side to the current time. `id` and `created_at` never change. **No duplicate detection runs on PUT** — the event already exists and is being edited by its owner.
+**Behavior:** all mutable columns are updated (`signature`, `title`, `description`, `url`, `venue_name`, `address`, `lat`, `lng`, `geohash5`/`geohash6` recomputed, `start_time`, `end_time`, `category`, `tags`, `festival_name`, `festival_url`, `act_name`, `act_url`); `updated_at` is set server-side to the current time. `id` and `created_at` never change. `festival_name`, `festival_url`, `act_name` and `act_url` are unsigned metadata and are not included in the event id. **No duplicate detection runs on PUT** — the event already exists and is being edited by its owner.
 
 **Success Response (200):**
 
