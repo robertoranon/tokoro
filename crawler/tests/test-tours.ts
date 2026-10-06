@@ -1,4 +1,5 @@
 import * as ed from '@noble/ed25519';
+import { getTourShowsPrompt } from '../../shared/extractors/tour-prompt.js';
 import { selectRetrySources } from '../src/tours/retry.js';
 import { looksBlocked, assertNotBlocked } from '../src/utils/block-page.js';
 import { EventNormalizer } from '../src/utils/normalizer.js';
@@ -1500,6 +1501,139 @@ sources:
     assert(
       old.sources.length === 1,
       'records from before failed_shows existed still work'
+    );
+  }
+
+  console.log('\n=== region and country reach the geocoder ===\n');
+  {
+    const band: BandConfig = {
+      name: 'Gillian Welch',
+      url: 'https://gw.example',
+      status: 'active',
+    };
+    const base: TourShowDraft = {
+      title: 'Gillian Welch',
+      performers: ['Gillian Welch'],
+      start_time: '2030-02-12',
+      venue_name: 'Forth Pub',
+      city: 'Forth',
+    };
+    const addr = (over: Partial<TourShowDraft>) =>
+      finalizeTourShow({ ...base, ...over }, band, 'https://gw.example/tour')
+        .address;
+
+    assert(
+      addr({ region: 'TAS', country: 'Australia' }) === 'Forth, TAS, Australia',
+      'city, region and country are all passed on'
+    );
+    assert(addr({ region: 'TN' }) === 'Forth, TN', 'region alone');
+    assert(
+      addr({ country: 'New Zealand', city: 'Auckland' }) ===
+        'Auckland, New Zealand',
+      'country alone'
+    );
+    assert(
+      addr({
+        address: 'Via Roma 1',
+        city: 'Udine',
+        region: 'UD',
+        country: 'Italy',
+      }) === 'Via Roma 1, Udine, UD, Italy',
+      'street address first, then city, region, country'
+    );
+    assert(
+      addr({
+        address: 'Via Roma 1, Udine, Italy',
+        city: 'Udine',
+        country: 'Italy',
+      }) === 'Via Roma 1, Udine, Italy',
+      'parts already in the address are not repeated'
+    );
+    assert(
+      addr({
+        address: 'Perth, WA, Australia',
+        city: 'Perth',
+        region: 'WA',
+        country: 'Australia',
+      }) === 'Perth, WA, Australia',
+      'a full address is left alone'
+    );
+    assert(
+      addr({
+        address: 'Warner Theatre, 513 13th St',
+        city: 'Washington',
+        region: 'WA',
+      }) === 'Warner Theatre, 513 13th St, Washington, WA',
+      'a region code is not mistaken for a part of another word'
+    );
+    assert(
+      addr({ city: undefined, region: 'TAS', country: 'Australia' }) ===
+        'TAS, Australia',
+      'no city: what exists is still passed on'
+    );
+    assert(
+      addr({ city: undefined }) === undefined,
+      'nothing to geocode from stays undefined'
+    );
+
+    const parsed = parseTourShows(
+      {
+        shows: [
+          {
+            title: 'T',
+            performers: ['A'],
+            start_time: '2030-02-12',
+            city: 'Forth',
+            region: ' TAS ',
+            country: 'Australia',
+          },
+        ],
+      },
+      'https://gw.example/tour'
+    );
+    assert(
+      parsed[0].region === 'TAS' && parsed[0].country === 'Australia',
+      'region and country survive parsing (trimmed)'
+    );
+    const noExtras = parseTourShows(
+      {
+        shows: [
+          {
+            title: 'T',
+            performers: ['A'],
+            start_time: '2030-02-12',
+            region: null,
+            country: '',
+          },
+        ],
+      },
+      'https://gw.example/tour'
+    );
+    assert(
+      noExtras[0].region === undefined && noExtras[0].country === undefined,
+      'null or empty region/country are dropped'
+    );
+
+    const finalized = finalizeTourShow(
+      { ...base, region: 'TAS', country: 'Australia' },
+      band,
+      'https://gw.example/tour'
+    ) as unknown as Record<string, unknown>;
+    assert(
+      !('region' in finalized) &&
+        !('country' in finalized) &&
+        !('city' in finalized),
+      'region, country and city are not sent to the API'
+    );
+
+    const prompt = getTourShowsPrompt();
+    assert(
+      /"region"|\*\*region\*\*/.test(prompt) && /country/.test(prompt),
+      'the extraction prompt asks for region and country'
+    );
+    assert(
+      /never drop|do not drop|must not drop/i.test(prompt),
+      'the prompt forbids dropping them'
     );
   }
 

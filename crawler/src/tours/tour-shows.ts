@@ -13,6 +13,9 @@ export const TourShowDraftSchema = z.object({
   venue_name: z.string().optional(),
   address: z.string().optional(),
   city: z.string().optional(),
+  /** State, province or county exactly as the page writes it ("TN", "TAS", "Bavaria"). */
+  region: z.string().optional(),
+  country: z.string().optional(),
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
   tags: z.array(z.string()).optional(),
@@ -136,6 +139,12 @@ function cleanShow(raw: unknown): Record<string, unknown> | null {
     if (isNaN(n) || n < min || n > max) delete c[key];
     else c[key] = n;
   }
+  for (const key of ['city', 'region', 'country']) {
+    if (typeof c[key] !== 'string') continue;
+    const t = (c[key] as string).trim();
+    if (t) c[key] = t;
+    else delete c[key];
+  }
   for (const key of ['start_time', 'end_time']) {
     if (typeof c[key] === 'number') c[key] = String(c[key]);
   }
@@ -187,6 +196,15 @@ export function parseTourShows(raw: unknown, pageUrl: string): TourShowDraft[] {
 
 const BAND_TOUR_TAG = 'band-tour';
 
+/** All words of `part` occur as whole words in `text` (accent/case-insensitive). */
+function containsWords(text: string, part: string): boolean {
+  const have = new Set(normalizeName(text).split(' '));
+  return normalizeName(part)
+    .split(' ')
+    .filter(w => w !== '')
+    .every(w => have.has(w));
+}
+
 /** Apply the tour show conventions (spec §2.3) to a draft for a known band. */
 export function finalizeTourShow(
   d: TourShowDraft,
@@ -201,15 +219,16 @@ export function finalizeTourShow(
     ]),
   ].filter(t => normalizeName(t) !== bandKey);
 
-  // Geocoding works best with "street, city"; add the city when the address
-  // does not already mention it.
+  // The geocoder (Nominatim) picks the most prominent place with a given name,
+  // so "Forth" alone lands in Scotland. Hand it everything the page says:
+  // street address, then city, region and country, skipping any part the
+  // address already contains.
   let address = d.address?.trim() || undefined;
-  const city = d.city?.trim();
-  if (city) {
-    if (!address) address = city;
-    else if (!normalizeName(address).includes(normalizeName(city))) {
-      address = `${address}, ${city}`;
-    }
+  for (const part of [d.city, d.region, d.country]) {
+    const p = part?.trim();
+    if (!p) continue;
+    if (!address) address = p;
+    else if (!containsWords(address, p)) address = `${address}, ${p}`;
   }
 
   const support = d.performers.filter(p => normalizeName(p) !== bandKey);
@@ -217,7 +236,7 @@ export function finalizeTourShow(
     d.description?.trim() ||
     (support.length ? `With ${support.join(', ')}.` : undefined);
 
-  const { performers: _p, city: _c, ...rest } = d;
+  const { performers: _p, city: _c, region: _r, country: _co, ...rest } = d;
   return {
     ...rest,
     ...(address !== undefined ? { address } : {}),

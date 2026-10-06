@@ -14,6 +14,8 @@ Return a JSON object {"shows": [ ... ]}. Each show has:
 - **end_time**: only if the page states it, same format
 - **venue_name**: the venue name only
 - **city**: the city or town of the venue
+- **region**: the state, province or county the page prints next to the city, EXACTLY as written ("TN", "TAS", "WA", "Bavaria"). Omit it if the page gives none.
+- **country**: the country the page prints, as written ("Australia", "New Zealand", "UK"). Omit it if the page gives none; do not guess it.
 - **address**: street address if the page gives one (never invent or guess)
 - **lat, lng**: only if explicitly stated
 - **url**: the show's own page or ticket link if it has one
@@ -21,6 +23,7 @@ Return a JSON object {"shows": [ ... ]}. Each show has:
 - **tags**: lowercase genre tags only if the page states them
 
 RULES:
+- The place qualifiers shown next to a city are essential: NEVER drop the region or country. "Forth Pub · Forth, TAS, Australia" is city "Forth", region "TAS", country "Australia" (there are other towns called Forth); "Pelham, TN" is city "Pelham", region "TN".
 - Include only shows on or after today's date (given in the user message). Skip past shows.
 - Use the exact dates shown. If a date shows no year, assume the current year, or next year if the current-year date is more than a few months in the past. If the page URL or title contains a year, use it.
 - Several dates in the same city are separate shows. A multi-day festival appearance is one show per day the act plays if the page says so, otherwise one show on the first day.
@@ -36,6 +39,7 @@ Example output:
       "start_time": "2030-11-12T21:00:00",
       "venue_name": "Club X",
       "city": "Udine",
+      "country": "Italy",
       "address": "Via Roma 1, Udine",
       "url": "https://tickets.example/test-band-udine"
     },
@@ -44,7 +48,8 @@ Example output:
       "performers": ["Test Band"],
       "start_time": "2030-11-20",
       "venue_name": "Kino Šiška",
-      "city": "Ljubljana"
+      "city": "Ljubljana",
+      "country": "Slovenia"
     }
   ]
 }`;
