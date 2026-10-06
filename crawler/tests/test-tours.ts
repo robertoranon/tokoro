@@ -1384,6 +1384,44 @@ sources:
     );
   }
 
+  console.log('\n=== run record: stale events ===\n');
+  {
+    const stale = { id: 'old1', band: 'Gillian Welch', lat: 55.7, lng: -3.7 };
+    const withStale: TourSourceResult[] = [
+      {
+        url: 'https://a.example/tour',
+        outcome: 'no_shows',
+        shows: [
+          { title: 'Forth Pub', outcome: 'skipped_out_of_region', stale },
+          { title: 'Perth', outcome: 'skipped_out_of_region' },
+        ],
+      },
+    ];
+    const rec = buildTourRunRecord(withStale, new Date(), new Date());
+    assert(
+      Array.isArray((rec as any).stale) && (rec as any).stale.length === 1,
+      'stale events are recorded'
+    );
+    assert(
+      (rec as any).stale[0].id === 'old1' &&
+        (rec as any).stale[0].title === 'Forth Pub' &&
+        (rec as any).stale[0].source === 'https://a.example/tour',
+      'with id, title and source'
+    );
+    const clean = buildTourRunRecord(
+      [
+        {
+          url: 'u',
+          outcome: 'published',
+          shows: [{ title: 't', outcome: 'published' }],
+        },
+      ],
+      new Date(),
+      new Date()
+    );
+    assert(!('stale' in clean), 'no stale key when there are none');
+  }
+
   console.log('\n=== run record: failed shows per source ===\n');
   {
     const results: TourSourceResult[] = [
@@ -1634,6 +1672,314 @@ sources:
     assert(
       /never drop|do not drop|must not drop/i.test(prompt),
       'the prompt forbids dropping them'
+    );
+  }
+
+  console.log(
+    '\n=== matchShow: same date and venue, different coordinates ===\n'
+  );
+  {
+    const mk = (over: Partial<ExistingShow> = {}): ExistingShow => ({
+      id: 'old',
+      title: 'Show',
+      lat: 55.7,
+      lng: -3.7, // wrongly placed in Scotland
+      start_time: '2030-02-12T00:00:00',
+      category: 'music',
+      tags: [],
+      venue_name: 'Forth Pub',
+      created_at: '2030-01-01T10:00:00',
+      ...over,
+    });
+    const tas = { lat: -41.18, lng: 146.2 };
+    assert(
+      matchShow([mk()], '2030-02-12T20:00:00', tas.lat, tas.lng, 'Forth Pub')
+        ?.id === 'old',
+      'same day + same venue matches although the coordinates are far apart'
+    );
+    assert(
+      matchShow([mk()], '2030-02-12T20:00:00', tas.lat, tas.lng, 'forth PUB!')
+        ?.id === 'old',
+      'venue names compare case-, accent- and punctuation-insensitively'
+    );
+    assert(
+      matchShow(
+        [mk()],
+        '2030-02-12T20:00:00',
+        undefined,
+        undefined,
+        'Forth Pub'
+      )?.id === 'old',
+      'without coordinates the venue alone can match'
+    );
+    assert(
+      matchShow(
+        [mk()],
+        '2030-02-13T20:00:00',
+        tas.lat,
+        tas.lng,
+        'Forth Pub'
+      ) === undefined,
+      'another day does not match'
+    );
+    assert(
+      matchShow(
+        [mk()],
+        '2030-02-12T20:00:00',
+        tas.lat,
+        tas.lng,
+        'Albert Hall'
+      ) === undefined,
+      'another venue does not match'
+    );
+    assert(
+      matchShow([mk()], '2030-02-12T20:00:00', tas.lat, tas.lng) === undefined,
+      'no venue given: coordinates only, as before'
+    );
+    assert(
+      matchShow(
+        [mk({ venue_name: null })],
+        '2030-02-12T20:00:00',
+        tas.lat,
+        tas.lng,
+        'Forth Pub'
+      ) === undefined,
+      'a stored show without a venue is never matched by venue'
+    );
+    assert(
+      matchShow(
+        [mk({ venue_name: '' })],
+        '2030-02-12T20:00:00',
+        undefined,
+        undefined,
+        ''
+      ) === undefined,
+      'empty venue names never match each other'
+    );
+    const near = mk({
+      id: 'near',
+      lat: -41.1,
+      lng: 146.2,
+      venue_name: 'Other',
+    });
+    assert(
+      matchShow(
+        [mk(), near],
+        '2030-02-12T20:00:00',
+        -41.1001,
+        146.2001,
+        'Forth Pub'
+      )?.id === 'near',
+      'a match by coordinates wins over a match by venue'
+    );
+    const far = mk({ id: 'far' });
+    const closer = mk({ id: 'closer', lat: -30, lng: 140 });
+    assert(
+      matchShow(
+        [far, closer],
+        '2030-02-12T20:00:00',
+        tas.lat,
+        tas.lng,
+        'Forth Pub'
+      )?.id === 'closer',
+      'among several same-venue matches the nearest wins'
+    );
+  }
+
+  console.log(
+    '\n=== a wrongly placed show is corrected, or reported when it leaves the region ===\n'
+  );
+  {
+    const cfgEurope = parseCfg(`
+defaults:
+  region: { south: 34, west: -11, north: 72, east: 45 }
+bands:
+  - name: Test Band
+    url: https://testband.example
+sources:
+  - { url: "https://testband.example/tour", mode: band, band: Test Band }
+`);
+    const cfgWorld = parseCfg(`
+bands:
+  - { name: Test Band, url: "https://testband.example", region: none }
+sources:
+  - { url: "https://testband.example/tour", mode: band, band: Test Band }
+`);
+    const pg: FetchedPage = {
+      url: 'https://testband.example/tour',
+      title: 'T',
+      html: '',
+      text: 'x',
+    };
+    const sent: { ev: NormalizedEvent; matched?: string }[] = [];
+    const deps = (
+      drafts: TourShowDraft[],
+      existing: ExistingShow[],
+      geocodeTo?: { lat: number; lng: number }
+    ): TourSourceDeps => ({
+      extract: async () => drafts,
+      lookup: async () => existing,
+      normalize: async (e: ExtractedEvent, opts) => {
+        const lat = e.lat ?? geocodeTo?.lat;
+        const lng = e.lng ?? geocodeTo?.lng;
+        if (lat === undefined || lng === undefined) return null;
+        return {
+          pubkey: 'p',
+          signature: 's',
+          title: e.title,
+          lat,
+          lng,
+          start_time: String(e.start_time),
+          category: e.category,
+          created_at: opts?.createdAt ?? 'now',
+          venue_name: e.venue_name,
+          act_name: e.act_name,
+          act_url: e.act_url,
+        } as NormalizedEvent;
+      },
+      apply: async (ev, match) => {
+        sent.push({ ev, matched: match?.id });
+        if (!match) return 'published';
+        return Math.abs(match.lat - ev.lat) > 0.005 ||
+          Math.abs(match.lng - ev.lng) > 0.005
+          ? 'updated'
+          : 'unchanged';
+      },
+      today: '2030-01-01',
+    });
+    const wrong: ExistingShow = {
+      id: 'old1',
+      title: 'Gillian Welch',
+      lat: 55.7,
+      lng: -3.7,
+      start_time: '2030-02-12T00:00:00',
+      category: 'music',
+      tags: [],
+      venue_name: 'Forth Pub',
+      created_at: '2030-01-01T10:00:00',
+    };
+    const forth = (over: Partial<TourShowDraft> = {}): TourShowDraft => ({
+      title: 'Gillian Welch',
+      performers: ['Test Band'],
+      start_time: '2030-02-12',
+      venue_name: 'Forth Pub',
+      city: 'Forth',
+      region: 'TAS',
+      country: 'Australia',
+      ...over,
+    });
+
+    // worldwide band: the wrong event is corrected in place (PUT, created_at kept)
+    sent.length = 0;
+    let res = await processTourSourcePage(
+      pg,
+      cfgWorld.sources[0],
+      cfgWorld,
+      deps([forth()], [wrong], { lat: -41.18, lng: 146.2 })
+    );
+    assert(
+      res.length === 1 && res[0].outcome === 'updated',
+      'wrongly placed show is updated, not duplicated'
+    );
+    assert(
+      sent.length === 1 &&
+        sent[0].matched === 'old1' &&
+        sent[0].ev.created_at === '2030-01-01T10:00:00',
+      'it updates the existing event and re-signs with its created_at'
+    );
+    assert(
+      Math.abs(sent[0].ev.lat + 41.18) < 0.001,
+      'with the corrected coordinates'
+    );
+
+    // Europe-only band: the correct place is outside the region; nothing is sent, the old event is reported
+    sent.length = 0;
+    res = await processTourSourcePage(
+      pg,
+      cfgEurope.sources[0],
+      cfgEurope,
+      deps([forth()], [wrong], { lat: -41.18, lng: 146.2 })
+    );
+    assert(
+      res[0].outcome === 'skipped_out_of_region' && sent.length === 0,
+      'outside the region: nothing is published or updated'
+    );
+    assert(
+      res[0].stale?.id === 'old1' && res[0].stale?.band === 'Test Band',
+      'the published event that is now wrong is reported (id and band)'
+    );
+
+    // out of region with nothing published before: no stale report
+    res = await processTourSourcePage(
+      pg,
+      cfgEurope.sources[0],
+      cfgEurope,
+      deps([forth()], [], { lat: -41.18, lng: 146.2 })
+    );
+    assert(
+      res[0].outcome === 'skipped_out_of_region' && res[0].stale === undefined,
+      'nothing to report when nothing was published'
+    );
+
+    // a stored event that already sits at the right place is not reported
+    res = await processTourSourcePage(
+      pg,
+      cfgEurope.sources[0],
+      cfgEurope,
+      deps([forth()], [{ ...wrong, lat: -41.18, lng: 146.2 }], {
+        lat: -41.18,
+        lng: 146.2,
+      })
+    );
+    assert(
+      res[0].outcome === 'skipped_out_of_region' && res[0].stale === undefined,
+      'same place as stored: not stale'
+    );
+
+    // corrected place inside the region: updated in place, no stale report
+    sent.length = 0;
+    const boiler: ExistingShow = {
+      ...wrong,
+      id: 'old2',
+      lat: -33.9,
+      lng: 151.2,
+      venue_name: 'Boiler Shop',
+    };
+    res = await processTourSourcePage(
+      pg,
+      cfgEurope.sources[0],
+      cfgEurope,
+      deps(
+        [
+          forth({
+            venue_name: 'Boiler Shop',
+            city: 'Newcastle',
+            region: undefined,
+            country: 'UK',
+          }),
+        ],
+        [boiler],
+        { lat: 54.97, lng: -1.61 }
+      )
+    );
+    assert(
+      res[0].outcome === 'updated' &&
+        res[0].stale === undefined &&
+        sent[0].matched === 'old2',
+      'a wrongly placed show whose correct place is in the region is updated'
+    );
+
+    // no coordinates in the draft: matched by venue before geocoding, created_at kept
+    sent.length = 0;
+    res = await processTourSourcePage(
+      pg,
+      cfgWorld.sources[0],
+      cfgWorld,
+      deps([forth()], [wrong], { lat: -41.18, lng: 146.2 })
+    );
+    assert(
+      sent[0].ev.created_at === '2030-01-01T10:00:00',
+      'matched by venue before geocoding, so the update is signed with the stored created_at'
     );
   }
 

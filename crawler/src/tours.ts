@@ -33,6 +33,13 @@ export function buildTourRunRecord(
   finishedAt: Date
 ) {
   const counters = tallyShows(results.flatMap(r => r.shows));
+  // Published events that were geocoded to the wrong place and whose correct
+  // place is outside the region: they cannot be fixed by an update.
+  const staleShows = results.flatMap(r =>
+    r.shows
+      .filter(x => x.stale)
+      .map(x => ({ source: r.url, title: x.title, ...x.stale! }))
+  );
   const failedSources = results.filter(r => r.outcome === 'failed').length;
   const status =
     failedSources === 0
@@ -50,6 +57,7 @@ export function buildTourRunRecord(
     sources_total: results.length,
     status,
     ...counters,
+    ...(staleShows.length > 0 ? { stale: staleShows } : {}),
     entries: results.map(r => {
       const failedShows = r.shows.filter(x => x.outcome === 'failed').length;
       return failedShows > 0
@@ -176,6 +184,17 @@ async function main() {
     console.log(
       `\nTours complete: ${record.published} published, ${record.updated} updated, ${record.unchanged} unchanged, ${record.unmatched} unmatched, ${record.skipped_past} past, ${record.skipped_out_of_region} out of region, ${record.failed} failed`
     );
+  }
+
+  if (record.stale && record.stale.length > 0) {
+    console.log(
+      `\n${record.stale.length} published event(s) are in the wrong place and the right place is outside the region, so they cannot be corrected by an update. The crawler never deletes: remove them in the admin page.`
+    );
+    for (const x of record.stale) {
+      console.log(
+        `  - ${x.band}: ${x.title} (event ${x.id}, stored at ${x.lat.toFixed(3)}, ${x.lng.toFixed(3)})`
+      );
+    }
   }
 
   if (!debug) {

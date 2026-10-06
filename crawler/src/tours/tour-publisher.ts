@@ -1,4 +1,5 @@
 import type { NormalizedEvent } from '../types/event.js';
+import { normalizeName } from './tour-shows.js';
 
 export type TourOutcome = 'published' | 'updated' | 'unchanged' | 'failed';
 
@@ -33,31 +34,55 @@ const COORD_TOLERANCE = 0.005;
 const text = (v: string | null | undefined) => v ?? '';
 
 /**
- * The existing show of the same band on the same local date at (roughly) the
- * same place. The lookup is already scoped to one act_url and this crawler's
- * pubkey. A changed start time on the same day still matches (→ update).
+ * The existing show of the same band on the same local date. The lookup is
+ * already scoped to one act_url and this crawler's pubkey. A changed start
+ * time on the same day still matches (→ update).
+ *
+ * 1. At (roughly) the same place, when coordinates are known.
+ * 2. Otherwise the same venue name (normalized) on that date, even if the
+ *    stored coordinates are far away: that is a show that was geocoded to the
+ *    wrong place earlier, and the update corrects it instead of duplicating it.
  */
 export function matchShow(
   existing: ExistingShow[],
   startTime: string,
-  lat: number,
-  lng: number
+  lat: number | undefined,
+  lng: number | undefined,
+  venueName?: string
 ): ExistingShow | undefined {
   const day = startTime.slice(0, 10);
-  let best: ExistingShow | undefined;
-  let bestDist = Infinity;
-  for (const e of existing) {
-    if (e.start_time.slice(0, 10) !== day) continue;
-    const dLat = Math.abs(e.lat - lat);
-    const dLng = Math.abs(e.lng - lng);
-    if (dLat > COORD_TOLERANCE || dLng > COORD_TOLERANCE) continue;
-    const dist = dLat + dLng;
-    if (dist < bestDist) {
-      best = e;
-      bestDist = dist;
+  const sameDay = existing.filter(e => e.start_time.slice(0, 10) === day);
+
+  if (lat !== undefined && lng !== undefined) {
+    let best: ExistingShow | undefined;
+    let bestDist = Infinity;
+    for (const e of sameDay) {
+      const dLat = Math.abs(e.lat - lat);
+      const dLng = Math.abs(e.lng - lng);
+      if (dLat > COORD_TOLERANCE || dLng > COORD_TOLERANCE) continue;
+      const dist = dLat + dLng;
+      if (dist < bestDist) {
+        best = e;
+        bestDist = dist;
+      }
     }
+    if (best) return best;
   }
-  return best;
+
+  const venue = normalizeName(venueName ?? '');
+  if (venue === '') return undefined;
+  const sameVenue = sameDay.filter(
+    e => normalizeName(e.venue_name ?? '') === venue
+  );
+  if (sameVenue.length <= 1 || lat === undefined || lng === undefined) {
+    return sameVenue[0];
+  }
+  return sameVenue.reduce((a, b) =>
+    Math.abs(a.lat - lat) + Math.abs(a.lng - lng) <=
+    Math.abs(b.lat - lat) + Math.abs(b.lng - lng)
+      ? a
+      : b
+  );
 }
 
 /**

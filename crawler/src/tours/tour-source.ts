@@ -31,6 +31,13 @@ export type ShowOutcome =
 export interface ShowResult {
   title: string;
   outcome: ShowOutcome;
+  /**
+   * Set on `skipped_out_of_region` when an event published earlier for this
+   * show sits somewhere else: it was geocoded to the wrong place, and the
+   * correct place is outside the region, so it cannot be corrected by an
+   * update. The crawler never deletes; the curator removes it.
+   */
+  stale?: { id: string; band: string; lat: number; lng: number };
 }
 
 export interface TourCounters {
@@ -166,8 +173,21 @@ export async function processTourSourcePage(
       // normalize first when needed, matching on the geocoded position.
       let match =
         entry.lat !== undefined && entry.lng !== undefined
-          ? matchShow(pool, String(entry.start_time), entry.lat, entry.lng)
-          : undefined;
+          ? matchShow(
+              pool,
+              String(entry.start_time),
+              entry.lat,
+              entry.lng,
+              entry.venue_name
+            )
+          : // No coordinates yet: the same venue on the same date still identifies the show.
+            matchShow(
+              pool,
+              String(entry.start_time),
+              undefined,
+              undefined,
+              entry.venue_name
+            );
       let normalized = await deps.normalize(entry, {
         createdAt: match?.created_at,
       });
@@ -176,7 +196,8 @@ export async function processTourSourcePage(
           pool,
           normalized.start_time,
           normalized.lat,
-          normalized.lng
+          normalized.lng,
+          entry.venue_name
         );
         if (match) {
           normalized = await deps.normalize(
@@ -203,7 +224,24 @@ export async function processTourSourcePage(
 
       // Region check on geocoded coordinates too (drafts often lack lat/lng).
       if (region && !inRegion(normalized.lat, normalized.lng, region)) {
-        results.push({ title: draft.title, outcome: 'skipped_out_of_region' });
+        const moved =
+          match &&
+          (Math.abs(match.lat - normalized.lat) > 0.005 ||
+            Math.abs(match.lng - normalized.lng) > 0.005);
+        results.push({
+          title: draft.title,
+          outcome: 'skipped_out_of_region',
+          ...(match && moved
+            ? {
+                stale: {
+                  id: match.id,
+                  band: band.name,
+                  lat: match.lat,
+                  lng: match.lng,
+                },
+              }
+            : {}),
+        });
         continue;
       }
 
