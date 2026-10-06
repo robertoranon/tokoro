@@ -10,7 +10,7 @@ Tokoro is a project that helps in discovering physical, real-world events based 
 2. **Cloudflare Worker (TypeScript)** - Serverless API backend handling events, social graph, and recommendations
 3. **Web Publisher (Static HTML/JS)** - Browser-based event publishing interface hosted on Cloudflare Pages
 4. **Public Web (Static HTML/JS)** - Read-only event query/browse interface hosted on Cloudflare Pages. Includes bookmarklet code that performs web page crawling as the Chrome extension. Also includes `festivals.html`, the festival radar browse page (map + month timeline).
-5. **Crawler and Crawler-Worker (TypeScript)** - LLM-powered semantic crawler for extracting structured event data from web pages and its combination with the worker (for easier integration into free Cloudflare services)
+5. **Crawler and Crawler-Worker (TypeScript)** - LLM-powered semantic crawler for extracting structured event data from web pages and its combination with the worker (for easier integration into free Cloudflare services). Also includes the band-tours runner (`npm run tours`), which watches band sites and venue listings for new shows.
 6. **Shared** - Common utilities and TypeScript types shared across components
 
 **IMPORTANT:**: each of these components has a SPECS.md file describing the specification in a language-agnostic fashion. You **NEED TO READ** it to understand how the component works. Remember to keep each spec in sync with code changes.
