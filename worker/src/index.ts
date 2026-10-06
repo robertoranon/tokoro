@@ -310,6 +310,74 @@ export function buildHasActFilter(hasAct: string): string {
   return '';
 }
 
+export type AdoptValidation =
+  | {
+      ok: true;
+      pubkey: string;
+      signature: string;
+      actName: string;
+      actUrl: string;
+    }
+  | { ok: false; status: number; error: string };
+
+const HEX_64 = /^[0-9a-f]{64}$/i;
+const HEX_128 = /^[0-9a-f]{128}$/i;
+
+// Field checks for POST /events/:id/act that need no I/O. The values are used
+// exactly as sent: the signature covers those exact strings.
+export function validateAdoptBody(body: unknown): AdoptValidation {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { ok: false, status: 400, error: 'Invalid body' };
+  }
+  const b = body as Record<string, unknown>;
+  const pubkey = typeof b.pubkey === 'string' ? b.pubkey : '';
+  const signature = typeof b.signature === 'string' ? b.signature : '';
+  if (!HEX_64.test(pubkey) || !HEX_128.test(signature)) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'Missing or malformed pubkey or signature',
+    };
+  }
+  const actName = typeof b.act_name === 'string' ? b.act_name : '';
+  if (actName.trim() === '' || actName.length > 200) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'act_name is required (max 200 characters)',
+    };
+  }
+  const actUrl = typeof b.act_url === 'string' ? b.act_url : '';
+  if (actUrl === '' || actUrl.length > 500) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'act_url is required (max 500 characters)',
+    };
+  }
+  try {
+    const u = new URL(actUrl);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error();
+  } catch {
+    return { ok: false, status: 400, error: 'act_url must be an http(s) URL' };
+  }
+  return { ok: true, pubkey, signature, actName, actUrl };
+}
+
+export type AdoptDecision = 'adopt' | 'already' | 'conflict';
+
+const stripSlash = (s: string) => s.trim().replace(/\/$/, '');
+
+// What to do with an event that someone wants to attach an act to.
+export function decideAdopt(
+  existingActUrl: string | null | undefined,
+  actUrl: string
+): AdoptDecision {
+  const current = stripSlash(existingActUrl ?? '');
+  if (current === '') return 'adopt';
+  return current === stripSlash(actUrl) ? 'already' : 'conflict';
+}
+
 export type PutValidation =
   | { ok: true }
   | { ok: false; status: number; error: string };

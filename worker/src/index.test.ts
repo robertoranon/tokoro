@@ -15,6 +15,8 @@ import {
   buildActUrlFilter,
   buildHasActFilter,
   validatePutRequest,
+  validateAdoptBody,
+  decideAdopt,
 } from './index';
 import { verifyActSignature, actMessage } from './crypto';
 import { isDuplicate } from '../../shared/llm/duplicate-check';
@@ -784,5 +786,106 @@ describe('verifyActSignature', () => {
       v.eventId.match(/.{2}/g)!.map(h => parseInt(h, 16))
     );
     expect(Array.from(message)).not.toEqual(Array.from(rawId));
+  });
+});
+
+describe('validateAdoptBody', () => {
+  const good = {
+    pubkey: 'a'.repeat(64),
+    signature: 'b'.repeat(128),
+    act_name: 'Test Band',
+    act_url: 'https://testband.example',
+  };
+
+  it('accepts a well-formed body and returns the fields as given', () => {
+    const r = validateAdoptBody(good);
+    expect(r).toEqual({
+      ok: true,
+      pubkey: good.pubkey,
+      signature: good.signature,
+      actName: 'Test Band',
+      actUrl: 'https://testband.example',
+    });
+  });
+
+  it('rejects non-objects', () => {
+    for (const b of [null, undefined, 'x', 3, []]) {
+      const r = validateAdoptBody(b);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.status).toBe(400);
+    }
+  });
+
+  it('rejects a malformed pubkey or signature', () => {
+    expect(validateAdoptBody({ ...good, pubkey: 'abc' }).ok).toBe(false);
+    expect(validateAdoptBody({ ...good, pubkey: 'g'.repeat(64) }).ok).toBe(
+      false
+    );
+    expect(validateAdoptBody({ ...good, signature: 'b'.repeat(64) }).ok).toBe(
+      false
+    );
+    expect(validateAdoptBody({ ...good, signature: undefined }).ok).toBe(false);
+  });
+
+  it('rejects an empty or too long act_name', () => {
+    expect(validateAdoptBody({ ...good, act_name: '' }).ok).toBe(false);
+    expect(validateAdoptBody({ ...good, act_name: '   ' }).ok).toBe(false);
+    expect(validateAdoptBody({ ...good, act_name: 'x'.repeat(201) }).ok).toBe(
+      false
+    );
+    expect(validateAdoptBody({ ...good, act_name: 'x'.repeat(200) }).ok).toBe(
+      true
+    );
+    expect(validateAdoptBody({ ...good, act_name: 42 }).ok).toBe(false);
+  });
+
+  it('requires act_url to be an http(s) url of at most 500 characters', () => {
+    expect(validateAdoptBody({ ...good, act_url: '' }).ok).toBe(false);
+    expect(validateAdoptBody({ ...good, act_url: 'not a url' }).ok).toBe(false);
+    expect(
+      validateAdoptBody({ ...good, act_url: 'ftp://band.example' }).ok
+    ).toBe(false);
+    expect(
+      validateAdoptBody({ ...good, act_url: 'javascript:alert(1)' }).ok
+    ).toBe(false);
+    expect(
+      validateAdoptBody({
+        ...good,
+        act_url: 'https://band.example/' + 'x'.repeat(500),
+      }).ok
+    ).toBe(false);
+    expect(
+      validateAdoptBody({ ...good, act_url: 'http://band.example/live' }).ok
+    ).toBe(true);
+  });
+});
+
+describe('decideAdopt', () => {
+  it('adopts an event that has no act yet', () => {
+    expect(decideAdopt(null, 'https://testband.example')).toBe('adopt');
+    expect(decideAdopt(undefined, 'https://testband.example')).toBe('adopt');
+    expect(decideAdopt('', 'https://testband.example')).toBe('adopt');
+    expect(decideAdopt('  ', 'https://testband.example')).toBe('adopt');
+  });
+
+  it('is idempotent for the same act (a trailing slash does not matter)', () => {
+    expect(
+      decideAdopt('https://testband.example', 'https://testband.example')
+    ).toBe('already');
+    expect(
+      decideAdopt('https://testband.example/', 'https://testband.example')
+    ).toBe('already');
+    expect(
+      decideAdopt('https://testband.example', 'https://testband.example/')
+    ).toBe('already');
+  });
+
+  it('never overwrites a different act', () => {
+    expect(
+      decideAdopt('https://other.example', 'https://testband.example')
+    ).toBe('conflict');
+    expect(
+      decideAdopt('https://testband.example/live', 'https://testband.example')
+    ).toBe('conflict');
   });
 });
