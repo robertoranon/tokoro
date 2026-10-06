@@ -377,6 +377,72 @@ function parseTourQuery(search) {
   };
 }
 
+// ── Tracked bands ─────────────────────────────────────────────────────────────
+
+/** Validate tracked-bands.json: { generated, bands: [{ name, url }] } → same shape with only good bands, or null. */
+function parseTracked(json) {
+  if (!json || typeof json !== 'object' || !Array.isArray(json.bands))
+    return null;
+  const bands = [];
+  for (const b of json.bands) {
+    if (!b || typeof b.name !== 'string' || typeof b.url !== 'string') continue;
+    const name = b.name.trim();
+    if (!name || !/^https?:\/\//i.test(b.url)) continue;
+    bands.push({ name, url: b.url });
+  }
+  return {
+    generated: typeof json.generated === 'string' ? json.generated : '',
+    bands,
+  };
+}
+
+const siteKey = u =>
+  String(u || '')
+    .trim()
+    .replace(/\/+$/, '')
+    .toLowerCase();
+
+/**
+ * Rows for the tracked-bands pane: every tracked band plus any band that has
+ * shows but is not in the file (for example removed since the last deploy),
+ * each with its number of upcoming shows, alphabetically. Bands are matched by
+ * site url (case-insensitive, trailing slash ignored); the same site listed
+ * twice appears once.
+ */
+function mergeTracked(tracked, shows) {
+  const counts = new Map();
+  const fromShows = new Map();
+  for (const s of shows || []) {
+    const k = siteKey(s.bandUrl);
+    counts.set(k, (counts.get(k) || 0) + 1);
+    if (!fromShows.has(k))
+      fromShows.set(k, { name: s.bandName, url: s.bandUrl });
+  }
+  const rows = new Map();
+  for (const b of tracked || []) {
+    const k = siteKey(b.url);
+    if (!k || rows.has(k)) continue;
+    rows.set(k, {
+      name: b.name,
+      url: b.url,
+      upcoming: counts.get(k) || 0,
+      tracked: true,
+    });
+  }
+  for (const [k, b] of fromShows) {
+    if (!rows.has(k))
+      rows.set(k, {
+        name: b.name,
+        url: b.url,
+        upcoming: counts.get(k),
+        tracked: false,
+      });
+  }
+  return [...rows.values()].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+  );
+}
+
 const api = {
   TOUR_TAG,
   addDays,
@@ -398,6 +464,8 @@ const api = {
   NEW_DAYS,
   isNewShow,
   fmtNewBadge,
+  parseTracked,
+  mergeTracked,
   RADII_KM,
   DEFAULT_RADIUS_KM,
   buildTourQuery,

@@ -24,6 +24,8 @@ const {
   isNewShow,
   NEW_DAYS,
   fmtNewBadge,
+  parseTracked,
+  mergeTracked,
 } = createRequire(import.meta.url)('../tours.js');
 
 const TODAY = '2030-10-01';
@@ -439,6 +441,56 @@ const ev = over => ({
   assert.equal(fmtNewBadge(1), 'NEW');
   assert.equal(fmtNewBadge(3), 'NEW · 3');
   console.log('✅ fmtNewBadge: NEW, or NEW · n for several, nothing for none'); }
+
+// ── tracked bands ────────────────────────────────────────────────────────────
+{ assert.equal(parseTracked(null), null);
+  assert.equal(parseTracked({}), null);
+  assert.equal(parseTracked({ bands: 'x' }), null);
+  assert.equal(parseTracked([]), null);
+  const ok = parseTracked({
+    generated: '2030-10-07',
+    bands: [
+      { name: ' Alpha ', url: 'https://alpha.example' },
+      { name: 'No url' },
+      { name: '', url: 'https://empty.example' },
+      { name: 'Bad scheme', url: 'javascript:alert(1)' },
+      null,
+      { name: 'Beta', url: 'http://beta.example/live' },
+    ],
+  });
+  assert.equal(ok.generated, '2030-10-07');
+  assert.deepEqual(ok.bands.map(b => b.name), ['Alpha', 'Beta']);
+  assert.equal(parseTracked({ bands: [] }).generated, '');
+  console.log('✅ parseTracked: validates the file; keeps only well-formed http(s) bands, trimmed'); }
+
+{ const shows = toShows(
+    [
+      ev({ id: '1', start_time: '2030-11-12T21:00:00' }),
+      ev({ id: '2', start_time: '2030-11-13T21:00:00' }),
+      ev({ id: '3', act_name: 'Beta', act_url: 'https://beta.example', start_time: '2030-11-14T21:00:00' }),
+      ev({ id: '4', act_name: 'Stranger', act_url: 'https://stranger.example', start_time: '2030-11-15T21:00:00' }),
+    ],
+    TODAY
+  );
+  const tracked = [
+    { name: 'Zed', url: 'https://zed.example' },
+    { name: 'Test Band', url: 'https://testband.example/' }, // trailing slash in the file
+    { name: 'Beta', url: 'https://BETA.example' }, // case in the host
+  ];
+  const rows = mergeTracked(tracked, shows);
+  assert.deepEqual(rows.map(r => r.name), ['Beta', 'Stranger', 'Test Band', 'Zed'], 'alphabetical, tracked bands plus bands that only have shows');
+  const by = Object.fromEntries(rows.map(r => [r.name, r]));
+  assert.equal(by['Test Band'].upcoming, 2);
+  assert.equal(by['Beta'].upcoming, 1);
+  assert.equal(by['Zed'].upcoming, 0);
+  assert.equal(by['Stranger'].upcoming, 1);
+  assert.equal(by['Stranger'].tracked, false);
+  assert.equal(by['Zed'].tracked, true);
+  assert.equal(by['Test Band'].url, 'https://testband.example/', 'the link is the url from the file');
+  assert.deepEqual(mergeTracked(null, shows).map(r => r.name), ['Beta', 'Stranger', 'Test Band'], 'without a file: bands from the shows');
+  assert.deepEqual(mergeTracked([], []), []);
+  assert.deepEqual(mergeTracked([{ name: 'A', url: 'https://a.example' }, { name: 'A again', url: 'https://a.example/' }], []).map(r => r.name), ['A'], 'the same site twice appears once');
+  console.log('✅ mergeTracked: matches shows to tracked bands by site (case, trailing slash), adds the others, sorted'); }
 
 // ── loadTourEvents ───────────────────────────────────────────────────────────
 {
