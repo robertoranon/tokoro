@@ -12,6 +12,11 @@ import {
   type FinderDeps,
   type SearchResult,
 } from '../src/tours/band-finder.js';
+import {
+  parseArgs,
+  formatReport,
+  type ScoutReport,
+} from '../src/bands-scout.js';
 import type { FetchedPage } from '../src/types/event.js';
 import type { LLMProvider } from '../../shared/types/llm.js';
 
@@ -699,6 +704,86 @@ sources:
         'tour prompt carries the homepage links'
       );
     }
+  }
+
+  console.log('\n=== parseArgs ===\n');
+  {
+    const a = parseArgs(['node', 'x', 'list.txt']);
+    assert(
+      a.inputFile === 'list.txt' && a.bandsFile === 'bands.yaml' && !a.dryRun,
+      'defaults'
+    );
+    const b = parseArgs([
+      'node',
+      'x',
+      '--dry-run',
+      '--bands',
+      'my.yaml',
+      'in.txt',
+      '--fetcher',
+      'jina',
+    ]);
+    assert(
+      b.inputFile === 'in.txt' &&
+        b.bandsFile === 'my.yaml' &&
+        b.dryRun &&
+        b.fetcher === 'jina',
+      'flags and positional in any order'
+    );
+    assert(parseArgs(['node', 'x']).inputFile === undefined, 'no input file');
+    assert(
+      throws(() => parseArgs(['node', 'x', 'a.txt', '--fetcher', 'weird'])),
+      'invalid fetcher rejected'
+    );
+    assert(
+      throws(() => parseArgs(['node', 'x', 'a.txt', '--nope'])),
+      'unknown flag rejected'
+    );
+  }
+
+  console.log('\n=== formatReport ===\n');
+  {
+    const report: ScoutReport = {
+      dryRun: false,
+      added: [
+        {
+          name: 'A Band',
+          url: 'https://a.example',
+          tourUrl: 'https://a.example/live',
+          note: 'n',
+        },
+        { name: 'B Band', url: 'https://b.example', note: 'n' },
+      ],
+      alreadyPresent: [{ name: 'C Band', existing: 'C Band (alias)' }],
+      noSite: ['D Band'],
+      notSearched: ['E Band'],
+      errors: [{ name: 'F Band', error: 'boom' }],
+      sourceSkipped: [{ name: 'A Band', tourUrl: 'https://a.example/live' }],
+      invalidLines: ['!!!'],
+    };
+    const out = formatReport(report);
+    assert(
+      out.includes('A Band') && out.includes('https://a.example/live'),
+      'added band with its tour page'
+    );
+    assert(
+      /B Band.*no tour page/s.test(out),
+      'band without a tour page is flagged'
+    );
+    assert(out.includes('C Band'), 'already present listed');
+    assert(out.includes('D Band') && /no site/i.test(out), 'no site listed');
+    assert(
+      out.includes('E Band') && /BRAVE_SEARCH_API_KEY/.test(out),
+      'not searched explains the missing key'
+    );
+    assert(out.includes('F Band') && out.includes('boom'), 'errors listed');
+    assert(out.includes('!!!'), 'invalid input lines listed');
+    assert(!/dry run/i.test(out), 'no dry-run banner on a real run');
+    assert(
+      /dry run/i.test(formatReport({ ...report, dryRun: true })),
+      'dry-run banner on a dry run'
+    );
+    assert(/2 added/.test(out), 'totals');
   }
 
   console.log(`\n${passed} passed, ${failed} failed`);
