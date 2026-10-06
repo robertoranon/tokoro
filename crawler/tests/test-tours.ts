@@ -51,6 +51,8 @@ import {
   type ShowResult,
 } from '../src/tours/tour-source.js';
 import { parseBandsConfig as parseCfg } from '../src/tours/bands-config.js';
+import { buildTrackedBands } from '../src/tours/tracked-bands.js';
+import { parseExportArgs } from '../src/export-tracked-bands.js';
 import type { ExtractedEvent } from '../src/types/event.js';
 import {
   geocodeCandidates,
@@ -2823,6 +2825,67 @@ sources:
       (await t.pub.apply(noAct, undefined)) === 'failed' &&
         t.calls.length === 1,
       'an event without act fields cannot be adopted'
+    );
+  }
+
+  console.log('\n=== tracked bands export ===\n');
+  {
+    const cfg = parseCfg(`
+bands:
+  - { name: Zed Band, url: "https://zed.example/", aliases: ["ZB"], notes: "private note", region: none }
+  - { name: alpha band, url: "https://Alpha.example" }
+  - { name: Paused Band, url: "https://paused.example", status: paused }
+  - { name: Édith, url: "https://edith.example" }
+sources: []
+`);
+    const out = buildTrackedBands(cfg, '2030-10-07');
+    assert(out.generated === '2030-10-07', 'carries the generation date');
+    assert(
+      out.bands.map(b => b.name).join('|') === 'alpha band|Édith|Zed Band',
+      'active bands only, sorted by name (accent- and case-insensitively)'
+    );
+    assert(
+      out.bands[0].url === 'https://alpha.example' &&
+        out.bands[2].url === 'https://zed.example',
+      'urls are the normalized act_url form'
+    );
+    const text = JSON.stringify(out);
+    assert(
+      !/private note|ZB|region|status|aliases|notes/.test(text),
+      'nothing but name and url is exported (no notes, aliases, regions, status)'
+    );
+    assert(
+      Object.keys(out.bands[0]).sort().join() === 'name,url',
+      'each band has exactly name and url'
+    );
+    assert(
+      buildTrackedBands(parseCfg('bands: []\nsources: []\n'), '2030-10-07')
+        .bands.length === 0,
+      'an empty registry exports an empty list'
+    );
+
+    const a = parseExportArgs(['node', 'x', '--out', 'o.json']);
+    assert(a.out === 'o.json' && a.bands === 'bands.yaml', 'defaults');
+    const b = parseExportArgs([
+      'node',
+      'x',
+      '--bands',
+      'b.yaml',
+      '--out',
+      'o.json',
+    ]);
+    assert(b.bands === 'b.yaml' && b.out === 'o.json', 'flags');
+    assert(
+      throws(() => parseExportArgs(['node', 'x'])),
+      '--out is required'
+    );
+    assert(
+      throws(() => parseExportArgs(['node', 'x', '--out'])),
+      '--out needs a value'
+    );
+    assert(
+      throws(() => parseExportArgs(['node', 'x', '--out', 'o.json', '--nope'])),
+      'unknown flags are rejected'
     );
   }
 
