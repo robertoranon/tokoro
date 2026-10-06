@@ -45,6 +45,8 @@ export const ExtractedEventSchema = z.object({
   tags: z.array(z.string()).optional(),
   festival_name: z.string().optional(),
   festival_url: z.string().url().optional(),
+  act_name: z.string().optional(),
+  act_url: z.string().url().optional(),
 });
 
 export type ExtractedEvent = z.infer<typeof ExtractedEventSchema>;
@@ -66,6 +68,8 @@ export interface NormalizedEvent {
   tags?: string[];
   festival_name?: string;
   festival_url?: string;
+  act_name?: string;
+  act_url?: string;
   created_at: string; // ISO 8601 format
 }
 
@@ -86,6 +90,8 @@ export interface PreparedEvent {
   tags?: string[];
   festival_name?: string;
   festival_url?: string;
+  act_name?: string;
+  act_url?: string;
   created_at: string; // ISO 8601, set at normalisation time
 }
 

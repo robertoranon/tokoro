@@ -161,6 +161,8 @@ export class EventNormalizer {
     };
     if (event.festival_name) normalized.festival_name = event.festival_name;
     if (event.festival_url) normalized.festival_url = event.festival_url;
+    if (event.act_name) normalized.act_name = event.act_name;
+    if (event.act_url) normalized.act_url = event.act_url;
     return normalized;
   }
 
