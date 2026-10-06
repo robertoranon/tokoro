@@ -9,11 +9,16 @@ function formatLocalDateTime(date) {
   const pad = n => String(n).padStart(2, '0');
   return (
     date.getFullYear() +
-    '-' + pad(date.getMonth() + 1) +
-    '-' + pad(date.getDate()) +
-    'T' + pad(date.getHours()) +
-    ':' + pad(date.getMinutes()) +
-    ':' + pad(date.getSeconds())
+    '-' +
+    pad(date.getMonth() + 1) +
+    '-' +
+    pad(date.getDate()) +
+    'T' +
+    pad(date.getHours()) +
+    ':' +
+    pad(date.getMinutes()) +
+    ':' +
+    pad(date.getSeconds())
   );
 }
 
@@ -25,11 +30,14 @@ function formatLocalDateTime(date) {
  * @returns {string}
  */
 function fmtRange(sv, ev) {
-  const sht = typeof sv === 'string' ? sv.includes('T') : typeof sv === 'number';
-  const eht = typeof ev === 'string' ? ev.includes('T') : typeof ev === 'number';
+  const sht =
+    typeof sv === 'string' ? sv.includes('T') : typeof sv === 'number';
+  const eht =
+    typeof ev === 'string' ? ev.includes('T') : typeof ev === 'number';
   function pv(v) {
     if (!v) return null;
-    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) v = v + 'T12:00:00';
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v))
+      v = v + 'T12:00:00';
     const d = typeof v === 'number' ? new Date(v * 1000) : new Date(v);
     return isNaN(d.getTime()) ? null : d;
   }
@@ -37,14 +45,20 @@ function fmtRange(sv, ev) {
   if (!s) return 'Date not specified';
   const e = pv(ev);
   const dp = d =>
-    String(d.getDate()).padStart(2, '0') + '.' +
-    String(d.getMonth() + 1).padStart(2, '0') + '.' +
+    String(d.getDate()).padStart(2, '0') +
+    '.' +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    '.' +
     d.getFullYear();
   const ds = d =>
-    String(d.getDate()).padStart(2, '0') + '.' +
+    String(d.getDate()).padStart(2, '0') +
+    '.' +
     String(d.getMonth() + 1).padStart(2, '0');
   const tp = d => {
-    const h = d.getHours(), m = d.getMinutes(), ap = h >= 12 ? 'pm' : 'am', h12 = h % 12 || 12;
+    const h = d.getHours(),
+      m = d.getMinutes(),
+      ap = h >= 12 ? 'pm' : 'am',
+      h12 = h % 12 || 12;
     return m ? h12 + ':' + String(m).padStart(2, '0') + ap : h12 + ap;
   };
   if (!e) return sht ? dp(s) + ' ' + tp(s) : dp(s);
@@ -89,18 +103,29 @@ function safeUrl(s) {
 
 /**
  * Build a Tokoro /events query URL.
+ * Band shows (events with an act_url) are always excluded via has_act=0.
  * @param {string} apiBase - Base API URL, no trailing slash
  * @param {{ lat: string|number, lng: string|number, radius: string|number, from: string, to: string, category?: string, tags?: string }} params
  * @returns {string}
  */
-function buildQueryUrl(apiBase, { lat, lng, radius, from, to, category, tags }) {
+function buildQueryUrl(
+  apiBase,
+  { lat, lng, radius, from, to, category, tags }
+) {
   let url =
-    apiBase + '/events' +
-    '?lat=' + encodeURIComponent(lat) +
-    '&lng=' + encodeURIComponent(lng) +
-    '&radius=' + encodeURIComponent(radius) +
-    '&from=' + encodeURIComponent(from) +
-    '&to=' + encodeURIComponent(to);
+    apiBase +
+    '/events' +
+    '?lat=' +
+    encodeURIComponent(lat) +
+    '&lng=' +
+    encodeURIComponent(lng) +
+    '&radius=' +
+    encodeURIComponent(radius) +
+    '&from=' +
+    encodeURIComponent(from) +
+    '&to=' +
+    encodeURIComponent(to) +
+    '&has_act=0';
   if (category) url += '&category=' + encodeURIComponent(category);
   if (tags) url += '&tags=' + encodeURIComponent(tags);
   return url;
@@ -131,7 +156,14 @@ async function geocode(address) {
 
 // Node.js / browser compatibility
 if (typeof module !== 'undefined') {
-  module.exports = { formatLocalDateTime, fmtRange, escHtml, safeUrl, buildQueryUrl, geocode };
+  module.exports = {
+    formatLocalDateTime,
+    fmtRange,
+    escHtml,
+    safeUrl,
+    buildQueryUrl,
+    geocode,
+  };
 }
 if (typeof window !== 'undefined') {
   window.formatLocalDateTime = formatLocalDateTime;

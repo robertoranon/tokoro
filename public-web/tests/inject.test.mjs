@@ -36,6 +36,11 @@ try {
   assert.ok(festivals.includes("const API_URL = 'https://worker.example';"));
   assert.ok(festivals.includes('<!-- build: test-build -->'));
   console.log('✅ inject: festivals.html gets the worker URL and the build version');
+
+  const tours = fs.readFileSync(path.join(tmp, 'tours.html'), 'utf8');
+  assert.ok(tours.includes("const API_URL = 'https://worker.example';"));
+  assert.ok(tours.includes('<!-- build: test-build -->'));
+  console.log('✅ inject: tours.html gets the worker URL and the build version');
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }

@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tokoro Tours – bands on the road</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,800..900&family=Poppins:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      body {
+        font-family:
+          'Poppins',
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+      }
+      a {
+        color: var(--link);
+      }
+
+      /* ── Header ─────────────────────────────────────────────────────── */
+      .site-header {
+        background: linear-gradient(
+          135deg,
+          var(--header-dark) 0%,
+          var(--bg) 50%,
+          var(--bg) 100%
+        );
+        color: white;
+        position: relative;
+        overflow: hidden;
+      }
+      .header-inner {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 28px 24px 24px;
+        position: relative;
+      }
+      .header-title {
+        font-family: 'Fraunces', serif;
+        font-size: clamp(2.2rem, 6vw, 3.4rem);
+        font-weight: 800;
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+      }
+      .header-title em {
+        font-style: italic;
+        color: var(--accent-2);
+      }
+      .header-sub {
+        font-size: 15px;
+        color: rgba(255, 255, 255, 0.6);
+        margin-top: 10px;
+        font-weight: 300;
+        max-width: 560px;
+      }
+      .experimental-badge {
+        position: absolute;
+        top: 16px;
+        right: 24px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: var(--radius-sm);
+        padding: 8px 14px;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.8);
+        line-height: 1.5;
+        text-align: right;
+      }
+      .experimental-badge strong {
+        display: block;
+        color: #fbbf24;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        font-size: 10px;
+      }
+      /* On phones the badge would overlap the title: put it above it. */
+      @media (max-width: 560px) {
+        .experimental-badge {
+          position: static;
+          display: inline-block;
+          margin: 14px 0 0 24px;
+        }
+        .header-inner {
+          padding-top: 12px;
+        }
+      }
+
+      /* ── Layout ─────────────────────────────────────────────────────── */
+      .radar-main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 20px 24px 60px;
+      }
+      .filter-bar {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .chip-row {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+      .chip,
+      .toggle {
+        flex-shrink: 0;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-2);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 100px;
+        padding: 7px 14px;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          color 0.15s,
+          border-color 0.15s;
+      }
+      .chip:hover,
+      .toggle:hover {
+        border-color: var(--accent-2);
+        color: var(--text);
+      }
+      .chip[aria-pressed='true'],
+      .toggle[aria-pressed='true'] {
+        background: var(--accent);
+        border-color: var(--accent-2);
+        color: var(--header-dark);
+      }
+      .filter-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+      .filter-row select,
+      .filter-row input {
+        font: inherit;
+        font-size: 14px;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 8px 12px;
+      }
+      .filter-row input {
+        flex: 1 1 200px;
+        min-width: 160px;
+      }
+      .status-line,
+      .notice-line {
+        font-size: 13px;
+        color: var(--text-2);
+        min-height: 1.2em;
+      }
+      .notice-line {
+        color: #fbbf24;
+      }
+      .map-panel {
+        height: 340px;
+        border-radius: var(--radius);
+        overflow: hidden;
+        border: 1px solid var(--border);
+        margin-bottom: 24px;
+        /* the map fills the panel above the "Hide map" row */
+        display: flex;
+        flex-direction: column;
+      }
+      #map {
+        flex: 1;
+        min-height: 0;
+        width: 100%;
+        background: var(--surface);
+      }
+      .map-panel .result-actions {
+        padding: 8px 12px;
+      }
+      .leaflet-popup-content-wrapper,
+      .leaflet-popup-tip {
+        background: var(--surface);
+        color: var(--text);
+      }
+      .pin-popup__item + .pin-popup__item {
+        border-top: 1px solid var(--border);
+        margin-top: 6px;
+        padding-top: 6px;
+      }
+      .pin-popup__item div {
+        font-size: 12px;
+        color: var(--text-2);
+      }
+
+      /* ── Band cards ─────────────────────────────────────────────────── */
+      .band-list {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+        align-items: start;
+      }
+      .band-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      .band-card__summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 16px 20px;
+        display: grid;
+        gap: 4px;
+      }
+      .band-card__summary::-webkit-details-marker {
+        display: none;
+      }
+      .band-card__name {
+        font-family: 'Fraunces', serif;
+        font-size: 1.2rem;
+        font-weight: 700;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+      }
+      .band-card__name::after {
+        content: ' ▾';
+        font-size: 0.8em;
+      }
+      .band-card[open] .band-card__name::after {
+        content: ' ▴';
+      }
+      .band-card__count,
+      .band-card__next {
+        font-size: 13px;
+        color: var(--text-2);
+      }
+      .band-card__next {
+        font-weight: 600;
+        color: var(--link);
+      }
+      .band-card__body {
+        padding: 0 20px 16px;
+        border-top: 1px solid var(--border);
+      }
+      .band-shows {
+        list-style: none;
+        margin: 12px 0;
+        display: grid;
+        gap: 12px;
+      }
+      .band-show__date {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--link);
+      }
+      .band-show__place {
+        font-size: 13px;
+        color: var(--text-2);
+        overflow-wrap: anywhere;
+      }
+      .band-show__distance {
+        color: var(--link);
+        font-weight: 600;
+      }
+      .band-show__link {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .filter-row input[type='date'] {
+        min-width: 0;
+      }
+      .result-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: center;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .result-actions button {
+        font: inherit;
+        font-weight: 600;
+        color: var(--link);
+        background: none;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+      }
+      .empty-state,
+      .error-state {
+        color: var(--text-2);
+        padding: 32px 0;
+        text-align: center;
+        font-size: 15px;
+      }
+      .error-state button {
+        margin-left: 8px;
+        font: inherit;
+        font-weight: 600;
+        color: var(--header-dark);
+        background: var(--accent);
+        border: none;
+        border-radius: var(--radius-sm);
+        padding: 6px 14px;
+        cursor: pointer;
+      }
+    </style>
+    <link rel="stylesheet" href="theme.css" />
+  </head>
+  <body data-page="tours">
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker__track">
+        <span>Bands on the road</span><span>Tour dates, band by band</span
+        ><span>New shows every week</span><span>Bands on the road</span
+        ><span>Tour dates, band by band</span><span>New shows every week</span>
+      </div>
+    </div>
+    <nav class="site-bar" aria-label="Tours">
+      <a class="site-bar__logo" href="tours.html">Tokoro Tours</a>
+    </nav>
+    <header class="site-header">
+      <div class="experimental-badge"><strong>⚠ Experimental</strong></div>
+      <div class="header-inner">
+        <h1 class="header-title">Tokoro <em>Tours</em></h1>
+        <p class="header-sub">
+          Upcoming shows of the bands we follow — open a band to see where it
+          plays next
+        </p>
+      </div>
+    </header>
+
+    <main class="radar-main">
+      <section class="filter-bar" aria-label="Filters">
+        <div class="filter-row">
+          <input
+            id="keywordFilter"
+            type="search"
+            placeholder="Search band, venue, place…"
+            aria-label="Search bands and shows"
+          />
+          <input id="fromDate" type="date" aria-label="From date" />
+          <input id="toDate" type="date" aria-label="To date" />
+        </div>
+        <div class="filter-row">
+          <input
+            id="placeInput"
+            type="search"
+            placeholder="Near a place… (press Enter)"
+            aria-label="Near a place"
+          />
+          <select id="radiusFilter" aria-label="Radius">
+            <option value="25">25 km</option>
+            <option value="50">50 km</option>
+            <option value="100" selected>100 km</option>
+            <option value="250">250 km</option>
+            <option value="500">500 km</option>
+          </select>
+          <button
+            id="nearToggle"
+            class="toggle"
+            type="button"
+            aria-pressed="false"
+          >
+            Near me
+          </button>
+        </div>
+        <p
+          id="statusLine"
+          class="status-line"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <p
+          id="noticeLine"
+          class="notice-line"
+          role="status"
+          aria-live="polite"
+        ></p>
+      </section>
+
+      <section class="map-panel" id="mapPanel" aria-label="Map of shows" hidden>
+        <div id="map"></div>
+        <div class="result-actions">
+          <button type="button" id="hideMapBtn">Hide map</button>
+        </div>
+      </section>
+
+      <section id="bandList" aria-label="Bands"></section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="./shared.js"></script>
+    <script src="./tours.js"></script>
+    <script>
+      (function () {
+        'use strict';
+
+        const API_URL = '__TOKORO_WORKER_URL__';
+        const T = window.TokoroTours;
+        const today = formatLocalDateTime(new Date()).slice(0, 10);
+
+        const state = {
+          all: [],
+          keyword: '',
+          from: '',
+          to: '',
+          origin: null, // { lat, lng }
+          originSource: '', // 'gps' | 'place' | ''
+          radius: 100,
+          open: new Set(), // band keys currently expanded
+          mapBand: null, // band key shown on the map
+          ready: false,
+        };
+        let keywordTimer = null;
+        let geoReq = 0;
+        let lastFitKey = null;
+
+        const el = id => document.getElementById(id);
+
+        function setStatus(text) {
+          el('statusLine').textContent = text;
+        }
+        function setNotice(text) {
+          el('noticeLine').textContent = text || '';
+        }
+
+        // ── Filtering ───────────────────────────────────────────────────
+        function visibleShows() {
+          let list = T.filterShows(state.all, {
+            keyword: state.keyword,
+            from: state.from,
+            to: state.to,
+            origin: state.origin,
+            radiusKm: state.origin ? state.radius : 0,
+          });
+          if (state.origin) list = T.withDistance(list, state.origin);
+          return list;
+        }
+
+        // ── Cards ───────────────────────────────────────────────────────
+        function showHtml(s) {
+          const url = safeUrl(s.url);
+          const place = [s.venue, s.address].filter(Boolean).join(' · ');
+          const distance =
+            typeof s.distanceKm === 'number'
+              ? ' <span class="band-show__distance">' +
+                escHtml(T.fmtDistance(s.distanceKm)) +
+                ' away</span>'
+              : '';
+          return (
+            '<li class="band-show">' +
+            '<div class="band-show__date">' +
+            escHtml(T.fmtShowDate(s.start, s.time, today)) +
+            '</div>' +
+            '<div class="band-show__place">' +
+            escHtml(place) +
+            distance +
+            '</div>' +
+            (url
+              ? '<a class="band-show__link" href="' +
+                escHtml(url) +
+                '" target="_blank" rel="noopener noreferrer">Show page ↗</a>'
+              : '') +
+            '</li>'
+          );
+        }
+
+        function bandHtml(b) {
+          const bandUrl = safeUrl(b.url);
+          const n = b.shows.length;
+          return (
+            '<details class="band-card" data-key="' +
+            escHtml(b.key) +
+            '"' +
+            (state.open.has(b.key) ? ' open' : '') +
+            '>' +
+            '<summary class="band-card__summary">' +
+            '<span class="band-card__name">' +
+            escHtml(b.name) +
+            '</span>' +
+            '<span class="band-card__count">' +
+            n +
+            (n === 1 ? ' upcoming show' : ' upcoming shows') +
+            '</span>' +
+            '<span class="band-card__next">' +
+            escHtml(T.fmtNext(b, today)) +
+            '</span>' +
+            '</summary>' +
+            '<div class="band-card__body">' +
+            '<ul class="band-shows">' +
+            b.shows.map(showHtml).join('') +
+            '</ul>' +
+            '<div class="result-actions">' +
+            (bandUrl
+              ? '<a href="' +
+                escHtml(bandUrl) +
+                '" target="_blank" rel="noopener noreferrer">Band website ↗</a>'
+              : '') +
+            (hasMap
+              ? '<button type="button" data-show-on-map="' +
+                escHtml(b.key) +
+                '">Show on map</button>'
+              : '') +
+            '</div>' +
+            '</div></details>'
+          );
+        }
+
+        function render() {
+          if (!state.ready) return;
+          const list = visibleShows();
+          const bands = T.groupByBand(list);
+          const totalBands = T.groupByBand(state.all).length;
+
+          if (!state.all.length) {
+            el('bandList').innerHTML =
+              '<p class="empty-state">No upcoming shows yet.</p>';
+          } else if (!bands.length) {
+            el('bandList').innerHTML =
+              '<p class="empty-state">No shows match your filters.</p>';
+          } else {
+            el('bandList').innerHTML =
+              '<div class="band-list">' +
+              bands.map(bandHtml).join('') +
+              '</div>';
+          }
+
+          setStatus(
+            state.all.length
+              ? bands.length +
+                  ' of ' +
+                  totalBands +
+                  ' bands · ' +
+                  list.length +
+                  (list.length === 1 ? ' show' : ' shows')
+              : ''
+          );
+          renderPins(bands);
+        }
+
+        // ── Map (optional: the list works without Leaflet) ─────────────
+        const hasMap = typeof L !== 'undefined';
+        let map = null;
+        let pinLayer = null;
+
+        function ensureMap() {
+          if (map || !hasMap) return;
+          map = L.map('map', {
+            scrollWheelZoom: false,
+            dragging: !L.Browser.mobile,
+          }).setView([50, 12], 4);
+          const tileOpts = {
+            attribution:
+              'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, OpenStreetMap contributors',
+            maxNativeZoom: 16,
+            maxZoom: 18,
+          };
+          L.tileLayer(
+            'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+            tileOpts
+          ).addTo(map);
+          L.tileLayer(
+            'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+            { ...tileOpts, attribution: '' }
+          ).addTo(map);
+          pinLayer = L.layerGroup().addTo(map);
+        }
+
+        function popupHtml(items) {
+          return (
+            '<div class="pin-popup">' +
+            items
+              .map(
+                s =>
+                  '<div class="pin-popup__item"><strong>' +
+                  escHtml(s.bandName) +
+                  '</strong><div>' +
+                  escHtml(T.fmtShowDate(s.start, s.time, today)) +
+                  '</div><div>' +
+                  escHtml([s.venue, s.address].filter(Boolean).join(' · ')) +
+                  '</div></div>'
+              )
+              .join('') +
+            '</div>'
+          );
+        }
+
+        function renderPins(bands) {
+          if (!map || !state.mapBand) return;
+          const band = bands.find(b => b.key === state.mapBand);
+          pinLayer.clearLayers();
+          if (!band) {
+            el('mapPanel').hidden = true;
+            state.mapBand = null;
+            return;
+          }
+          const points = [];
+          for (const pin of T.groupPins(band.shows)) {
+            L.circleMarker([pin.lat, pin.lng], {
+              radius: 9,
+              fillColor: '#00d6b4',
+              color: '#000000',
+              weight: 3,
+              opacity: 1,
+              fillOpacity: 1,
+            })
+              .bindPopup(popupHtml(pin.items))
+              .addTo(pinLayer);
+            points.push([pin.lat, pin.lng]);
+          }
+          const fitKey = band.key + '|' + band.shows.map(s => s.id).join('|');
+          if (points.length && fitKey !== lastFitKey) {
+            lastFitKey = fitKey;
+            map.fitBounds(T.fitPoints(points), {
+              padding: [30, 30],
+              maxZoom: 9,
+            });
+          }
+        }
+
+        function showBandOnMap(key) {
+          if (!hasMap) return;
+          state.mapBand = key;
+          lastFitKey = null;
+          el('mapPanel').hidden = false;
+          ensureMap();
+          map.invalidateSize();
+          renderPins(T.groupByBand(visibleShows()));
+          el('mapPanel').scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+          });
+        }
+
+        // ── Events ──────────────────────────────────────────────────────
+        el('keywordFilter').addEventListener('input', e => {
+          state.keyword = e.target.value;
+          clearTimeout(keywordTimer);
+          keywordTimer = setTimeout(render, 150);
+        });
+        el('fromDate').addEventListener('change', e => {
+          state.from = e.target.value;
+          render();
+        });
+        el('toDate').addEventListener('change', e => {
+          state.to = e.target.value;
+          render();
+        });
+        el('radiusFilter').addEventListener('change', e => {
+          state.radius = Number(e.target.value) || 100;
+          render();
+        });
+        // <details> "toggle" does not bubble; capture it so open cards stay
+        // open across re-renders.
+        el('bandList').addEventListener(
+          'toggle',
+          e => {
+            const card = e.target.closest
+              ? e.target.closest('.band-card')
+              : null;
+            if (!card) return;
+            const key = card.getAttribute('data-key');
+            if (card.open) state.open.add(key);
+            else state.open.delete(key);
+          },
+          true
+        );
+        el('bandList').addEventListener('click', e => {
+          const btn = e.target.closest('[data-show-on-map]');
+          if (btn) showBandOnMap(btn.getAttribute('data-show-on-map'));
+        });
+        el('hideMapBtn').addEventListener('click', () => {
+          state.mapBand = null;
+          el('mapPanel').hidden = true;
+        });
+
+        // ── Area: a place (geocoded) or "Near me" (geolocation) ────────
+        function syncNearToggle() {
+          el('nearToggle').setAttribute(
+            'aria-pressed',
+            String(state.originSource === 'gps')
+          );
+        }
+        function clearOrigin() {
+          state.origin = null;
+          state.originSource = '';
+          syncNearToggle();
+        }
+        el('placeInput').addEventListener('keydown', async e => {
+          if (e.key !== 'Enter') return;
+          const text = e.target.value.trim();
+          const req = ++geoReq;
+          if (!text) {
+            if (state.originSource === 'place') clearOrigin();
+            setNotice('');
+            render();
+            return;
+          }
+          setNotice('Looking up ' + text + '…');
+          try {
+            const g = await geocode(text);
+            if (req !== geoReq) return;
+            state.origin = { lat: Number(g.lat), lng: Number(g.lng) };
+            state.originSource = 'place';
+            syncNearToggle();
+            setNotice('');
+          } catch (err) {
+            if (req !== geoReq) return;
+            setNotice('Could not find "' + text + '" — showing all shows.');
+            if (state.originSource === 'place') clearOrigin();
+          }
+          render();
+        });
+        el('nearToggle').addEventListener('click', () => {
+          if (state.originSource === 'gps') {
+            clearOrigin();
+            setNotice('');
+            render();
+            return;
+          }
+          if (!navigator.geolocation) {
+            setNotice(
+              'Location unavailable in this browser — showing all shows.'
+            );
+            return;
+          }
+          setNotice('Finding your location…');
+          const req = ++geoReq;
+          navigator.geolocation.getCurrentPosition(
+            pos => {
+              if (req !== geoReq) return;
+              state.origin = {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+              };
+              state.originSource = 'gps';
+              el('placeInput').value = '';
+              syncNearToggle();
+              setNotice('');
+              render();
+            },
+            () => {
+              if (req !== geoReq) return;
+              setNotice('Location unavailable — showing all shows.');
+            },
+            { timeout: 10000, maximumAge: 600000 }
+          );
+        });
+
+        // ── Load ────────────────────────────────────────────────────────
+        async function load() {
+          state.ready = false;
+          el('bandList').innerHTML = '';
+          setNotice('');
+          if (API_URL.indexOf('__TOKORO') === 0) {
+            setStatus('');
+            el('bandList').innerHTML =
+              '<p class="error-state">The API address is not configured (the deploy step replaces the placeholder).</p>';
+            return;
+          }
+          setStatus('Loading tour dates…');
+          try {
+            const { events, truncated } = await T.loadTourEvents(
+              window.fetch.bind(window),
+              API_URL,
+              T.tourWindow(today)
+            );
+            state.all = T.toShows(events, today);
+            state.ready = true;
+            render();
+            if (truncated)
+              setNotice(
+                'Showing the first results only — there are more shows than one page load.'
+              );
+          } catch (err) {
+            setStatus('');
+            el('bandList').innerHTML =
+              '<p class="error-state">Could not load tour dates right now. ' +
+              '<button type="button" id="retryBtn">Try again</button></p>';
+            el('retryBtn').addEventListener('click', load);
+          }
+        }
+
+        load();
+      })();
+    </script>
+    <!-- build: __BUILD_VERSION__ -->
+  </body>
+</html>

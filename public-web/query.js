@@ -156,7 +156,7 @@ async function listEvents() {
       toTime = formatLocalDateTime(future);
     }
 
-    let url = `${API_URL}/events?lat=${lat}&lng=${lng}&radius=${radius}&from=${fromTime}&to=${toTime}`;
+    let url = `${API_URL}/events?lat=${lat}&lng=${lng}&radius=${radius}&from=${fromTime}&to=${toTime}&has_act=0`;
     if (category) url += `&category=${category}`;
     const kwEl = document.getElementById('queryKeyword');
     const q = kwEl ? kwEl.value.trim() : '';
@@ -590,7 +590,7 @@ function buildShareUrl() {
 
 function buildICalUrl() {
   const { lat, lng, radius, category } = _loadedMeta;
-  let url = `${API_URL}/events?lat=${lat}&lng=${lng}&radius=${radius}&window=30d&format=ical`;
+  let url = `${API_URL}/events?lat=${lat}&lng=${lng}&radius=${radius}&window=30d&format=ical&has_act=0`;
   if (category) url += `&category=${encodeURIComponent(category)}`;
   return url;
 }
