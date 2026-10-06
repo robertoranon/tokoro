@@ -17,7 +17,17 @@ export class HTMLFetcher {
   /** undefined = not looked up yet; null = nothing to substitute. */
   private standardUa: string | null | undefined;
 
-  constructor(engine: BrowserEngine = 'chrome') {
+  /** How many times a blocked page is re-fetched with a standard user-agent. */
+  private retries: number;
+  /** Pause before the second and later retries. */
+  private retryDelayMs: number;
+
+  constructor(
+    engine: BrowserEngine = 'chrome',
+    options: { retries?: number; retryDelayMs?: number } = {}
+  ) {
+    this.retries = options.retries ?? 2;
+    this.retryDelayMs = options.retryDelayMs ?? 3000;
     this.engine = engine;
     this.wsEndpoint = process.env.OBSCURA_WS_ENDPOINT || 'ws://127.0.0.1:9222';
     this.autoLaunch = engine === 'obscura' && !process.env.OBSCURA_WS_ENDPOINT;
@@ -132,8 +142,10 @@ export class HTMLFetcher {
 
   /**
    * Fetch a page. If the result looks like a bot-protection block page, retry
-   * once with a standard (non-headless) user-agent; pages that load normally
-   * are fetched exactly once.
+   * (up to `retries` times, with a short pause before the second and later
+   * ones) with a standard, non-headless user-agent; pages that load normally
+   * are fetched exactly once. If every retry is blocked, the first result is
+   * returned so the caller decides what to do.
    */
   async fetchPage(url: string): Promise<FetchedPage> {
     const first = await this.fetchOnce(url);
@@ -141,16 +153,21 @@ export class HTMLFetcher {
 
     const ua = await this.standardUserAgent();
     if (!ua) return first;
-    console.log(
-      `↻ ${url} looks like a bot-protection page — retrying with a standard browser user-agent`
-    );
-    const second = await this.fetchOnce(url, ua);
-    if (looksBlocked(second.title, second.text)) {
-      console.log('  Still blocked after the retry');
-      return first;
+    for (let attempt = 1; attempt <= this.retries; attempt++) {
+      if (attempt > 1) {
+        await new Promise(r => setTimeout(r, this.retryDelayMs));
+      }
+      console.log(
+        `↻ ${url} looks like a bot-protection page — retrying with a standard browser user-agent (${attempt}/${this.retries})`
+      );
+      const again = await this.fetchOnce(url, ua);
+      if (!looksBlocked(again.title, again.text)) {
+        console.log('  Retry succeeded');
+        return again;
+      }
     }
-    console.log('  Retry succeeded');
-    return second;
+    console.log('  Still blocked after the retries');
+    return first;
   }
 
   private async fetchOnce(

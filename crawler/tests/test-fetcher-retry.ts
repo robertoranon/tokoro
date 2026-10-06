@@ -29,6 +29,7 @@ const TOUR_PAGE = `<!doctype html><html><head><title>Test Band - Live Tour Dates
 const LONG_PAGE = `<!doctype html><html><head><title>Access denied news</title></head><body>${'<p>Tour dates and news about the band.</p>'.repeat(200)}<p>Sorry, you have been blocked from commenting.</p></body></html>`;
 
 const requests: Record<string, string[]> = {};
+let flakyHits = 0;
 
 const server = http.createServer((req, res) => {
   const path = req.url ?? '/';
@@ -42,6 +43,11 @@ const server = http.createServer((req, res) => {
   } else if (path === '/always-blocked') {
     res.statusCode = 403;
     res.end(BLOCK_PAGE);
+  } else if (path === '/flaky') {
+    // Blocked twice (first fetch and first retry), then lets the request through.
+    flakyHits++;
+    res.statusCode = flakyHits <= 2 ? 403 : 200;
+    res.end(flakyHits <= 2 ? BLOCK_PAGE : TOUR_PAGE);
   } else if (path === '/long') {
     res.end(LONG_PAGE);
   } else {
@@ -52,7 +58,7 @@ const server = http.createServer((req, res) => {
 async function main() {
   await new Promise<void>(r => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  const fetcher = new HTMLFetcher('chrome');
+  const fetcher = new HTMLFetcher('chrome', { retryDelayMs: 100 });
   await fetcher.initialize();
   try {
     console.log('\n=== a normal page is fetched once ===\n');
@@ -82,14 +88,32 @@ async function main() {
     }
 
     console.log(
-      '\n=== a page that stays blocked is retried once, then returned as is ===\n'
+      '\n=== a page that stays blocked is retried twice, then returned as is ===\n'
     );
     {
       const p = await fetcher.fetchPage(`${base}/always-blocked`);
-      assert(requests['/always-blocked'].length === 2, 'one retry, not a loop');
+      assert(
+        requests['/always-blocked'].length === 3,
+        'the first fetch plus two retries, not a loop'
+      );
       assert(
         looksBlocked(p.title, p.text),
         'still recognisable as blocked, for the caller to handle'
+      );
+    }
+
+    console.log(
+      '\n=== a second retry can succeed where the first is still blocked ===\n'
+    );
+    {
+      const p = await fetcher.fetchPage(`${base}/flaky`);
+      assert(
+        requests['/flaky'].length === 3,
+        'fetch, retry 1 (blocked), retry 2'
+      );
+      assert(
+        !looksBlocked(p.title, p.text) && p.text.includes('Udine'),
+        'the second retry result is returned'
       );
     }
 
