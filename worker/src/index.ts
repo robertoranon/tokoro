@@ -39,6 +39,8 @@ interface Event {
   tags?: string[];
   festival_name?: string;
   festival_url?: string;
+  act_name?: string;
+  act_url?: string;
   created_at: string; // ISO 8601 format
 }
 
@@ -1003,8 +1005,9 @@ async function handlePostEvent(request: Request, env: Env): Promise<Response> {
 		INSERT INTO events (
 			id, pubkey, signature, title, description, url, venue_name, address,
 			lat, lng, geohash5, geohash6, start_time, end_time,
-			category, tags, created_at, festival_name, festival_url
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			category, tags, created_at, festival_name, festival_url,
+			act_name, act_url
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
   )
     .bind(
@@ -1026,7 +1029,9 @@ async function handlePostEvent(request: Request, env: Env): Promise<Response> {
       tagsJson,
       event.created_at,
       event.festival_name || null,
-      event.festival_url || null
+      event.festival_url || null,
+      event.act_name || null,
+      event.act_url || null
     )
     .run();
 
@@ -1090,7 +1095,8 @@ async function handlePutEvent(
 			signature = ?, title = ?, description = ?, url = ?, venue_name = ?,
 			address = ?, lat = ?, lng = ?, geohash5 = ?, geohash6 = ?,
 			start_time = ?, end_time = ?, category = ?, tags = ?,
-			festival_name = ?, festival_url = ?, updated_at = ?
+			festival_name = ?, festival_url = ?, act_name = ?, act_url = ?,
+			updated_at = ?
 		WHERE id = ?
 	`
   )
@@ -1111,6 +1117,8 @@ async function handlePutEvent(
       JSON.stringify(event.tags || []),
       event.festival_name || null,
       event.festival_url || null,
+      event.act_name || null,
+      event.act_url || null,
       updatedAt,
       eventId
     )
