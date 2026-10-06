@@ -7,6 +7,8 @@
 #   npm run tours -- --debug
 # Use a different file:
 #   npm run tours -- --bands /path/to/other.yaml
+# After a run with failures (network trouble, a site down), repeat only those sources:
+#   npm run tours -- --retry-failed
 
 defaults:
   fetcher: playwright # playwright | jina; per-source override allowed

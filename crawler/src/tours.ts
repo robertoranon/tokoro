@@ -14,6 +14,7 @@ import {
   type BandsConfig,
 } from './tours/bands-config.js';
 import { tallyShows } from './tours/tour-source.js';
+import { selectRetrySources } from './tours/retry.js';
 import {
   appendRunLog,
   defaultLogsDir,
@@ -49,7 +50,12 @@ export function buildTourRunRecord(
     sources_total: results.length,
     status,
     ...counters,
-    entries: results.map(r => ({ url: r.url, outcome: r.outcome })),
+    entries: results.map(r => {
+      const failedShows = r.shows.filter(x => x.outcome === 'failed').length;
+      return failedShows > 0
+        ? { url: r.url, outcome: r.outcome, failed_shows: failedShows }
+        : { url: r.url, outcome: r.outcome };
+    }),
   };
 }
 
@@ -87,10 +93,38 @@ async function main() {
   }
 
   const env = loadCrawlerEnv();
-  const sources = activeSources(config);
+  let sources = activeSources(config);
   if (sources.length === 0) {
     console.warn(`No active sources in ${bandsFile} — nothing to do`);
     process.exit(0);
+  }
+  if (process.argv.includes('--retry-failed')) {
+    // Only the sources that failed (or had failed shows) in the last live run.
+    const selection = selectRetrySources(
+      sources,
+      await readRunRecords(defaultLogsDir())
+    );
+    if (selection.noPreviousRun) {
+      console.error(
+        'Error: --retry-failed needs a previous live tours run, but logs/runs.jsonl has none (debug runs are not logged).'
+      );
+      process.exit(1);
+    }
+    for (const url of selection.missing) {
+      console.warn(
+        `Skipping ${url}: failed last time but is no longer an active source`
+      );
+    }
+    if (selection.sources.length === 0) {
+      console.log(
+        `Nothing to retry: no source failed in the last tours run (${selection.basedOn ?? 'unknown time'}).`
+      );
+      process.exit(0);
+    }
+    console.log(
+      `Retrying ${selection.sources.length} of ${sources.length} source(s) that failed in the run of ${selection.basedOn ?? 'unknown time'}`
+    );
+    sources = selection.sources;
   }
   console.log(
     `Tours: ${sources.length} source(s), ${activeBands(config).length} active band(s)${debug ? ' (DEBUG: nothing is published)' : ''}`

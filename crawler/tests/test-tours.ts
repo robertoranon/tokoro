@@ -1,4 +1,5 @@
 import * as ed from '@noble/ed25519';
+import { selectRetrySources } from '../src/tours/retry.js';
 import { looksBlocked, assertNotBlocked } from '../src/utils/block-page.js';
 import { EventNormalizer } from '../src/utils/normalizer.js';
 import { ExtractedEventSchema } from '../src/types/event.js';
@@ -1379,6 +1380,126 @@ sources:
       /Blocked by bot protection/.test(message) &&
         message.includes('https://b.example/live'),
       'assertNotBlocked throws naming the url'
+    );
+  }
+
+  console.log('\n=== run record: failed shows per source ===\n');
+  {
+    const results: TourSourceResult[] = [
+      {
+        url: 'https://a.example/live',
+        outcome: 'published',
+        shows: [
+          { title: 'a', outcome: 'published' },
+          { title: 'b', outcome: 'failed' },
+          { title: 'c', outcome: 'failed' },
+        ],
+      },
+      {
+        url: 'https://b.example/live',
+        outcome: 'unchanged',
+        shows: [{ title: 'x', outcome: 'unchanged' }],
+      },
+      { url: 'https://c.example/live', outcome: 'failed', shows: [] },
+    ];
+    const rec = buildTourRunRecord(
+      results,
+      new Date('2030-10-01T10:00:00Z'),
+      new Date('2030-10-01T10:01:00Z')
+    );
+    assert(
+      rec.entries[0].failed_shows === 2,
+      'failed shows are counted per source'
+    );
+    assert(
+      !('failed_shows' in rec.entries[1]),
+      'no failed_shows key when nothing failed'
+    );
+    assert(
+      !('failed_shows' in rec.entries[2]),
+      'a source that failed outright has no shows to count'
+    );
+  }
+
+  console.log('\n=== selectRetrySources ===\n');
+  {
+    const src = (url: string) => ({ url, mode: 'band' as const, band: 'X' });
+    const sources = [
+      src('https://a.example/live'),
+      src('https://b.example/live'),
+      src('https://c.example/live'),
+      src('https://d.example/live'),
+    ];
+    const rec = (
+      kind: string,
+      started: string,
+      entries: { url: string; outcome: string; failed_shows?: number }[]
+    ): RunRecord => ({ kind: kind as any, started_at: started, entries });
+
+    const none = selectRetrySources(sources, []);
+    assert(
+      none.noPreviousRun && none.sources.length === 0,
+      'no previous tours run'
+    );
+    assert(
+      selectRetrySources(sources, [
+        rec('radar', 'r', [
+          { url: 'https://a.example/live', outcome: 'failed' },
+        ]),
+      ]).noPreviousRun,
+      'other kinds of runs are ignored'
+    );
+
+    const records: RunRecord[] = [
+      rec('tours', '2030-10-01', [
+        { url: 'https://a.example/live', outcome: 'failed' },
+        { url: 'https://b.example/live', outcome: 'failed' },
+      ]),
+      rec('tours', '2030-10-02', [
+        { url: 'https://a.example/live', outcome: 'failed' },
+        { url: 'https://b.example/live', outcome: 'published' },
+        {
+          url: 'https://c.example/live',
+          outcome: 'published',
+          failed_shows: 2,
+        },
+        { url: 'https://d.example/live', outcome: 'no_shows' },
+        { url: 'https://gone.example/live', outcome: 'failed' },
+      ]),
+      rec('radar', '2030-10-03', [
+        { url: 'https://d.example/live', outcome: 'failed' },
+      ]),
+    ];
+    const sel = selectRetrySources(sources, records);
+    assert(
+      !sel.noPreviousRun && sel.basedOn === '2030-10-02',
+      'based on the latest tours run only'
+    );
+    assert(
+      sel.sources.map(s => s.url).join() ===
+        'https://a.example/live,https://c.example/live',
+      'failed sources and sources with failed shows, in bands.yaml order'
+    );
+    assert(
+      sel.missing.join() === 'https://gone.example/live',
+      'failed urls no longer in bands.yaml are reported, not run'
+    );
+
+    const clean = selectRetrySources(sources, [
+      rec('tours', '2030-10-04', [
+        { url: 'https://a.example/live', outcome: 'published' },
+      ]),
+    ]);
+    assert(
+      !clean.noPreviousRun && clean.sources.length === 0,
+      'a clean last run selects nothing'
+    );
+    const old = selectRetrySources(sources, [
+      rec('tours', 'x', [{ url: 'https://b.example/live', outcome: 'failed' }]),
+    ]);
+    assert(
+      old.sources.length === 1,
+      'records from before failed_shows existed still work'
     );
   }
 
