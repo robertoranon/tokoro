@@ -442,6 +442,10 @@ export default {
                 category: 'Filter by category (optional)',
                 has_festival:
                   'Set to 1 to return only festival entries (optional)',
+                act_url:
+                  'Filter to one band by its canonical site URL (optional)',
+                has_act:
+                  'Set to 1 to return only band shows, 0 to exclude them (optional)',
               },
               example:
                 '/events?lat=45.464&lng=9.189&radius=100&from=2026-03-04T00:00:00&to=2026-06-04T00:00:00',
@@ -597,6 +601,8 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
   const hasFestivalFilter = buildHasFestivalFilter(
     url.searchParams.get('has_festival') || ''
   );
+  const actFilter = buildActUrlFilter(url.searchParams.get('act_url') || '');
+  const hasActFilter = buildHasActFilter(url.searchParams.get('has_act') || '');
   const pubkeyFilter = url.searchParams.get('pubkey') || '';
   const q = url.searchParams.get('q') || '';
   const textFilter = buildTextFilter(q);
@@ -632,6 +638,11 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
       allParams.push(...festivalFilter.params);
     }
     allQuery += hasFestivalFilter;
+    if (actFilter.sql) {
+      allQuery += actFilter.sql;
+      allParams.push(...actFilter.params);
+    }
+    allQuery += hasActFilter;
     allQuery += ' ORDER BY start_time ASC LIMIT 100 OFFSET ?';
     allParams.push(offset);
 
@@ -678,6 +689,11 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
       pubkeyParams.push(...festivalFilter.params);
     }
     pubkeyQuery += hasFestivalFilter;
+    if (actFilter.sql) {
+      pubkeyQuery += actFilter.sql;
+      pubkeyParams.push(...actFilter.params);
+    }
+    pubkeyQuery += hasActFilter;
     pubkeyQuery += ' ORDER BY start_time ASC LIMIT 100';
 
     const pubkeyResult = await env.DB.prepare(pubkeyQuery)
@@ -774,6 +790,11 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
     params.push(...festivalFilter.params);
   }
   query += hasFestivalFilter;
+  if (actFilter.sql) {
+    query += actFilter.sql;
+    params.push(...actFilter.params);
+  }
+  query += hasActFilter;
 
   if (pubkeyFilter) {
     query += ' AND pubkey = ?';
