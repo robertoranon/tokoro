@@ -18,6 +18,7 @@ A static single-page application for querying and browsing Tokoro events. No bui
 - MUST support filtering by keyword (`q`): matches events whose title, description, or tags contain the value as a substring; empty value disables the filter
 - MUST default to a configurable location and 100 km radius
 - MUST provide preset time-range shortcuts (today, next 7 days, next 30 days, etc.)
+- MUST always send `has_act=0` on the geo queries of the browse page, the map page (both via `buildQueryUrl`) and the iCal subscription URL, so band shows (events with an `act_url`, listed on `tours.html`) never appear in their results
 
 **FR-1.3: Results**
 
@@ -264,13 +265,60 @@ A read-only browse page for the festivals on the radar (entries published by the
 
 ---
 
+## FR-8: Band Tours (`tours.html`)
+
+A read-only, band-first browse page for the shows published by the crawler's `npm run tours`. It is independent of the other pages: logo-only nav, no links to or from them, its own ticker and the teal page colour.
+
+**FR-8.1: Data**
+
+- MUST fetch `GET {API}/events?has_act=1&from=<today>T00:00:00&to=<today + 548 days (~18 months)>T23:59:59&offset=N` (no-geo browse), following `has_more` until exhausted, capped at 30 pages (then show a notice)
+- MUST show only events with a non-empty `act_url`, a real `YYYY-MM-DD` start date and numeric `lat`/`lng`; MUST hide shows dated before today (a show today stays) and de-duplicate by event id
+- MUST treat dates as venue-local `YYYY-MM-DD` strings (no `Date` parsing); the `band-tour` tag is not displayed
+
+**FR-8.2: Grouping**
+
+- MUST group shows client-side by `act_url`; the band name is `act_name`, or the host of `act_url` (without `www.`) when empty
+- MUST order bands by their next show date, then name; shows within a band by date, then time
+
+**FR-8.3: Band cards**
+
+- MUST render one collapsed `<details>` card per band; the summary shows the band name, the number of upcoming shows and "Next: Tue 12 Nov, 21:00" (year added only if not the current one; time omitted when the start is midnight)
+- MUST show in the body every show (weekday, date, time when not midnight, venue and address joined with " · ", a "Show page" link when the event has a URL, and the distance when an area origin is set) and a "Band website" link; the API has no city field, so the address stands in for it
+- MUST keep open cards open when filters change or the list re-renders
+
+**FR-8.4: Filters**
+
+- MUST offer a keyword field (accent- and case-insensitive substring over band name, title, venue, address and tags; debounced) and from/to date inputs (inclusive, on the show date); filters combine with AND
+- MUST offer an area filter: a place typed into the input and geocoded with `geocode()` on Enter (Nominatim), or a "Near me" toggle using browser geolocation, plus a radius select (25 / 50 / 100 / 250 / 500 km, default 100); with an origin set, shows farther than the radius are hidden and each show gets its distance
+- MUST, when geocoding or geolocation fails, show a notice and keep all shows visible
+
+**FR-8.5: Map**
+
+- MUST offer an optional Leaflet map: hidden until "Show on map" is pressed on a band; it then shows one pin per distinct location of that band's visible shows (popup: band, date, venue and address) and fits to them (Europe outliers ignored for the fit, as on the radar)
+- MUST contain the "Hide map" button inside the map panel (a flex column: map above, button row below); the map panel hides itself when the mapped band no longer matches the filters
+- MUST keep working without the map: if Leaflet fails to load, the "Show on map" actions are omitted
+
+**FR-8.6: States**
+
+- MUST show a loading status, "No upcoming shows yet." when there are no shows, "No shows match your filters." when filters hide everything, a retryable error state when the API fails, and a "not configured" error instead of fetching when the API placeholder was not replaced; a status line reports "N of M bands · K shows"
+
+**FR-8.7: Safety and build**
+
+- MUST escape all API text with `escHtml` and link only through `safeUrl`; MUST use functional CSS class names (`.band-card`, `.band-show`, `.result-actions`)
+- MUST be listed in `inject-worker-url.js` (`ALL_FILES`); `tests/inject.test.mjs` enforces this
+- Logic lives in `tours.js` (pure, unit-tested in `tests/tours.test.mjs`); `tests/tours.smoke.mjs` runs the page offline in headless Chromium against a fake API (set `TOURS_SMOKE_MAP=1` to add the Leaflet checks, which need internet for the Leaflet CDN)
+
+**Known limitations:** no URL state for the filters; the no-geo path returns 100 shows per page, so a very large data set takes several requests; one band per `act_url`; the page does not paginate the rendered list.
+
+---
+
 ## Visual style (bold per-page colour)
 
-All pages share `theme.css`, linked after each page's inline `<style>`. Pages keep layout CSS only; design tokens (`:root` variables) and colour, type and line work live in `theme.css`. Each `<body>` carries `data-page` (browse and it = blue, festivals = orange, map = lime, publish = violet, privacy = yellow), which sets `--page`, the full-bleed page colour.
+All pages share `theme.css`, linked after each page's inline `<style>`. Pages keep layout CSS only; design tokens (`:root` variables) and colour, type and line work live in `theme.css`. Each `<body>` carries `data-page` (browse and it = blue, festivals = orange, map = lime, publish = violet, privacy = yellow, tours = teal `#00d6b4`), which sets `--page`, the full-bleed page colour.
 
 - **Look:** full-bleed page colour, white cards with 2px black borders, black blocks with white text, square corners, no soft shadows. Hover lifts a card with a hard 5px black offset shadow.
 - **Type:** Archivo 800-900 (expanded, uppercase) for headings and the wordmark; Poppins 400-600 for body text.
-- **Chrome:** a yellow scrolling ticker above a sticky black nav bar (logo, Browse / Map, yellow Publish button). Each page has its own ticker text. The festival radar is a separate section: its nav bar holds only the "Tokoro Radar" logo, and no other page links to it or from it. Magenta is not used. The page `<header>` acts as the hero: a large title with an outlined `<em>`, plus an intro line. The map page uses a compact header so the map keeps the viewport.
+- **Chrome:** a yellow scrolling ticker above a sticky black nav bar (logo, Browse / Map, yellow Publish button). Each page has its own ticker text. The festival radar and the band tours page are separate sections: each nav bar holds only its own logo ("Tokoro Radar", "Tokoro Tours"), and no other page links to either or from either. Magenta is not used. The page `<header>` acts as the hero: a large title with an outlined `<em>`, plus an intro line. The map page uses a compact header so the map keeps the viewport.
 - **Colour rules:** text is black on every saturated background; white text appears only on black. Yellow is a fill and the focus halo. Black on violet is about 4.5:1.
 - **Categories:** the 13 `--cat-*` tokens are unchanged. The `CAT_COLORS` maps in `query.js`, `map.html` and `festivals.html` must equal them. `.cat-tab` is the category label on a card edge (`.tab` belongs to the publish page's own tabs).
 - **Motion:** ticker scroll, hero and card rise-in, card hover lift. All of it is disabled under `prefers-reduced-motion`. Keyframes must set opacity in `to`, or elements stay hidden.

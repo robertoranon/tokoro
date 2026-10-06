@@ -9,6 +9,7 @@ A simple web interface for querying events from the Tokoro API.
 - Geocoding support via OpenStreetMap Nominatim API
 - Mobile-responsive design
 - `festivals.html`: Festival radar. Browse under-the-radar festivals by month on a map; independent of the event pages
+- `tours.html`: Band tours. Upcoming shows of the followed bands, band by band, with filters and an optional map; independent of the other pages. Band shows are excluded from the other pages (`has_act=0`)
 
 ## Deployment to Cloudflare Pages
 
@@ -84,8 +85,10 @@ Tests (run from the repo root):
 
 ```bash
 node public-web/tests/festivals.test.mjs   # festivals.js unit tests
+node public-web/tests/tours.test.mjs      # tours.js unit tests
 node public-web/tests/inject.test.mjs      # every page with the API placeholder is handled by the deploy injector
 node public-web/tests/festivals.smoke.mjs  # festivals.html offline in headless Chromium (Playwright from crawler/node_modules)
+node public-web/tests/tours.smoke.mjs     # tours.html offline in headless Chromium; TOURS_SMOKE_MAP=1 adds the Leaflet checks (needs internet)
 ```
 
 ## Bookmarklet Publisher
