@@ -250,6 +250,13 @@ Legitimate parallel events (different stages or acts running at the same time) a
 - **Staleness report**: each run appends a `kind: "tours"` record to `logs/runs.jsonl` and prints sources with no `published`/`updated`/`unchanged` result in their last 4 runs
 - **Scheduling**: `0 10 * * 3  cd /path/to/tokoro/crawler && /absolute/path/to/npm run tours >> logs/tours.log 2>&1` (Wednesdays; cron's PATH usually lacks npm: find it with `which npm`)
 - **Tests**: `npm run test:tours` (offline); `npm run smoke:tours` (needs `wrangler dev`)
+- **Building bands.yaml from a list**: instead of writing entries by hand, put one band per line in a text file (`#` comments allowed; `Name | https://site` gives the official site and skips the search) and let `npm run bands-scout` find each band's site and tour page and add the missing `bands` and `sources` entries. It needs `BRAVE_SEARCH_API_KEY` (for bands without a site given) plus your usual LLM settings. Bands already in `bands.yaml` (by name or alias) are skipped without any search, existing comments are kept, and nothing is written with `--dry-run`. Review the result: aliases, regions and listing sources are still by hand. Details in `SPECS.md` section 4.11. Tests: `npm run test:bands-scout` (offline)
+
+  ```bash
+  printf 'Band A\nBand B | https://bandb.example\n' > list.txt
+  npm run bands-scout -- list.txt --dry-run   # preview, writes nothing
+  npm run bands-scout -- list.txt             # add the entries to bands.yaml
+  ```
 
 #### 4. Image Mode
 

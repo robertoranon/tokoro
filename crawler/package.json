@@ -23,11 +23,13 @@
     "test:scheduler": "tsx tests/test-scheduler.ts",
     "test:radar": "tsx tests/test-radar.ts",
     "test:tours": "tsx tests/test-tours.ts",
+    "test:bands-scout": "tsx tests/test-bands-scout.ts",
     "test:scout": "tsx tests/test-scout.ts",
     "radar": "tsx src/radar.ts",
     "tours": "tsx src/tours.ts",
     "scout": "tsx src/scout.ts",
     "scout-promote": "tsx src/scout-promote.ts",
+    "bands-scout": "tsx src/bands-scout.ts",
     "smoke:radar": "tsx tests/smoke-radar-publisher.ts",
     "smoke:tours": "tsx tests/smoke-tours-publisher.ts",
     "smoke:scout": "tsx tests/smoke-scout.ts"
