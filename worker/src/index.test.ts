@@ -15,7 +15,10 @@ import {
   buildActUrlFilter,
   buildHasActFilter,
   validatePutRequest,
+  validateAdoptBody,
+  decideAdopt,
 } from './index';
+import { verifyActSignature, actMessage } from './crypto';
 import { isDuplicate } from '../../shared/llm/duplicate-check';
 import { encode as geohashEncode, neighbors } from './geohash';
 import type { LLMProvider } from '../../shared/types/llm';
@@ -693,5 +696,196 @@ describe('validatePutRequest', () => {
         existing
       )
     ).toEqual({ ok: false, status: 400, error: 'created_at mismatch' });
+  });
+});
+
+// Shared with crawler/tests/test-tours.ts: both sides must agree on these bytes.
+const ACT_VECTOR = {
+  privkey: '0101010101010101010101010101010101010101010101010101010101010101',
+  pubkey: '8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c',
+  eventId: 'abababababababababababababababababababababababababababababababab',
+  actName: 'Test Band',
+  actUrl: 'https://testband.example',
+  signature:
+    'eb42a79e717ed8cf6a9657d1f8b426ee770dc35a6705a77f648b1b27f908d139f7481f05e916b75fc5a6c7ecf4e38ff4c1daa70dff51ce70cd19b923e9b64303',
+};
+
+describe('verifyActSignature', () => {
+  const v = ACT_VECTOR;
+
+  it('accepts the fixed vector', async () => {
+    expect(
+      await verifyActSignature(
+        v.eventId,
+        v.actName,
+        v.actUrl,
+        v.pubkey,
+        v.signature
+      )
+    ).toBe(true);
+  });
+
+  it('rejects any change to the id, name, url or key', async () => {
+    expect(
+      await verifyActSignature(
+        'cd'.repeat(32),
+        v.actName,
+        v.actUrl,
+        v.pubkey,
+        v.signature
+      )
+    ).toBe(false);
+    expect(
+      await verifyActSignature(
+        v.eventId,
+        'Other Band',
+        v.actUrl,
+        v.pubkey,
+        v.signature
+      )
+    ).toBe(false);
+    expect(
+      await verifyActSignature(
+        v.eventId,
+        v.actName,
+        'https://other.example',
+        v.pubkey,
+        v.signature
+      )
+    ).toBe(false);
+    expect(
+      await verifyActSignature(
+        v.eventId,
+        v.actName,
+        v.actUrl,
+        '02'.repeat(32),
+        v.signature
+      )
+    ).toBe(false);
+  });
+
+  it('rejects malformed input instead of throwing', async () => {
+    expect(
+      await verifyActSignature(
+        v.eventId,
+        v.actName,
+        v.actUrl,
+        'zz',
+        v.signature
+      )
+    ).toBe(false);
+    expect(
+      await verifyActSignature(v.eventId, v.actName, v.actUrl, v.pubkey, '')
+    ).toBe(false);
+  });
+
+  it('uses a domain separator: the raw event id is not a valid message', async () => {
+    const message = await actMessage(v.eventId, v.actName, v.actUrl);
+    expect(message.length).toBe(32);
+    const rawId = new Uint8Array(
+      v.eventId.match(/.{2}/g)!.map(h => parseInt(h, 16))
+    );
+    expect(Array.from(message)).not.toEqual(Array.from(rawId));
+  });
+});
+
+describe('validateAdoptBody', () => {
+  const good = {
+    pubkey: 'a'.repeat(64),
+    signature: 'b'.repeat(128),
+    act_name: 'Test Band',
+    act_url: 'https://testband.example',
+  };
+
+  it('accepts a well-formed body and returns the fields as given', () => {
+    const r = validateAdoptBody(good);
+    expect(r).toEqual({
+      ok: true,
+      pubkey: good.pubkey,
+      signature: good.signature,
+      actName: 'Test Band',
+      actUrl: 'https://testband.example',
+    });
+  });
+
+  it('rejects non-objects', () => {
+    for (const b of [null, undefined, 'x', 3, []]) {
+      const r = validateAdoptBody(b);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.status).toBe(400);
+    }
+  });
+
+  it('rejects a malformed pubkey or signature', () => {
+    expect(validateAdoptBody({ ...good, pubkey: 'abc' }).ok).toBe(false);
+    expect(validateAdoptBody({ ...good, pubkey: 'g'.repeat(64) }).ok).toBe(
+      false
+    );
+    expect(validateAdoptBody({ ...good, signature: 'b'.repeat(64) }).ok).toBe(
+      false
+    );
+    expect(validateAdoptBody({ ...good, signature: undefined }).ok).toBe(false);
+  });
+
+  it('rejects an empty or too long act_name', () => {
+    expect(validateAdoptBody({ ...good, act_name: '' }).ok).toBe(false);
+    expect(validateAdoptBody({ ...good, act_name: '   ' }).ok).toBe(false);
+    expect(validateAdoptBody({ ...good, act_name: 'x'.repeat(201) }).ok).toBe(
+      false
+    );
+    expect(validateAdoptBody({ ...good, act_name: 'x'.repeat(200) }).ok).toBe(
+      true
+    );
+    expect(validateAdoptBody({ ...good, act_name: 42 }).ok).toBe(false);
+  });
+
+  it('requires act_url to be an http(s) url of at most 500 characters', () => {
+    expect(validateAdoptBody({ ...good, act_url: '' }).ok).toBe(false);
+    expect(validateAdoptBody({ ...good, act_url: 'not a url' }).ok).toBe(false);
+    expect(
+      validateAdoptBody({ ...good, act_url: 'ftp://band.example' }).ok
+    ).toBe(false);
+    expect(
+      validateAdoptBody({ ...good, act_url: 'javascript:alert(1)' }).ok
+    ).toBe(false);
+    expect(
+      validateAdoptBody({
+        ...good,
+        act_url: 'https://band.example/' + 'x'.repeat(500),
+      }).ok
+    ).toBe(false);
+    expect(
+      validateAdoptBody({ ...good, act_url: 'http://band.example/live' }).ok
+    ).toBe(true);
+  });
+});
+
+describe('decideAdopt', () => {
+  it('adopts an event that has no act yet', () => {
+    expect(decideAdopt(null, 'https://testband.example')).toBe('adopt');
+    expect(decideAdopt(undefined, 'https://testband.example')).toBe('adopt');
+    expect(decideAdopt('', 'https://testband.example')).toBe('adopt');
+    expect(decideAdopt('  ', 'https://testband.example')).toBe('adopt');
+  });
+
+  it('is idempotent for the same act (a trailing slash does not matter)', () => {
+    expect(
+      decideAdopt('https://testband.example', 'https://testband.example')
+    ).toBe('already');
+    expect(
+      decideAdopt('https://testband.example/', 'https://testband.example')
+    ).toBe('already');
+    expect(
+      decideAdopt('https://testband.example', 'https://testband.example/')
+    ).toBe('already');
+  });
+
+  it('never overwrites a different act', () => {
+    expect(
+      decideAdopt('https://other.example', 'https://testband.example')
+    ).toBe('conflict');
+    expect(
+      decideAdopt('https://testband.example/live', 'https://testband.example')
+    ).toBe('conflict');
   });
 });

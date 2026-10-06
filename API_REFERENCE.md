@@ -11,6 +11,7 @@
 | `POST`   | `/events`                                                           | Publish a signed event                      |
 | `PUT`    | `/events/:id`                                                       | Edit own event (re-signed; `created_at` immutable; no dedup) |
 | `DELETE` | `/events/:id`                                                       | Delete an event (signature required)        |
+| `POST`   | `/events/:id/act`                                                   | Attach act_name/act_url to an existing event that has none (signed, allowlisted key) |
 
 ### Stars
 

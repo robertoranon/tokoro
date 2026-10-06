@@ -34,6 +34,7 @@ API Endpoints:
 - `POST /events` - Publish signed event
 - `PUT /events/:id` - Edit own event (new signature required)
 - `DELETE /events/:id` - Delete own event (signature required)
+- `POST /events/:id/act` - Attach a band (`act_name`, `act_url`) to an existing event that has none (signed by an allowlisted key)
 
 **Stars** (Event Interactions)
 
