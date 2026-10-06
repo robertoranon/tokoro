@@ -34,6 +34,9 @@ const p2 = n => String(n).padStart(2, '0');
 const nowD = new Date();
 const today = `${nowD.getFullYear()}-${p2(nowD.getMonth() + 1)}-${p2(nowD.getDate())}`;
 const day = n => T.addDays(today, n);
+// created_at is UTC without a zone suffix, like the crawler writes it.
+const createdAgo = days =>
+  new Date(Date.now() - days * 86400000).toISOString().slice(0, 19);
 const show = (id, band, off, place, lat, lng, over = {}) => ({
   id,
   title: band + ' live',
@@ -49,10 +52,11 @@ const show = (id, band, off, place, lat, lng, over = {}) => ({
   end_time: null,
   category: 'music',
   tags: ['band-tour'],
+  created_at: createdAgo(30), // old unless a test says otherwise
   ...over,
 });
 const EVENTS = [
-  show('a1', 'Alpha', 12, 'Udine', 46.06, 13.23),
+  show('a1', 'Alpha', 12, 'Udine', 46.06, 13.23, { created_at: createdAgo(2) }), // new
   show('a2', 'Alpha', 20, 'Ljubljana', 46.05, 14.5),
   show('a3', 'Alpha', 30, 'Udine', 46.07, 13.24),
   show('b1', 'Beta', 40, 'Berlin', 52.52, 13.4),
@@ -380,6 +384,107 @@ try {
       garbage
     );
     check('saved links: no uncaught page errors', errors.length === 0, errors);
+    await context.close();
+  }
+
+  // 13. "new" badges: shows first published in the last 7 days
+  {
+    const { page, context, errors } = await newPage(browser);
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        value: {
+          writeText: async t => {
+            window.__copied = t;
+          },
+        },
+        configurable: true,
+      });
+    });
+    await page.goto(base + '/tours.html');
+    await settleNames(page, ['Alpha', 'Beta']);
+    const badges = await page.$$eval('.band-card', cards =>
+      cards.map(c => ({
+        name: c
+          .querySelector('.band-card__name')
+          .textContent.replace(/[▾▴]/g, '')
+          .trim(),
+        badge: c.querySelector('.band-card__badge')?.textContent.trim() ?? null,
+      }))
+    );
+    check(
+      'new: only the band with a recently published show has the NEW badge',
+      JSON.stringify(badges) ===
+        JSON.stringify([
+          { name: 'Alpha', badge: 'NEW' },
+          { name: 'Beta', badge: null },
+        ]),
+      badges
+    );
+    check(
+      'new: bands are not reordered because of the badge',
+      JSON.stringify(await names(page)) === JSON.stringify(['Alpha', 'Beta'])
+    );
+
+    await page.click('.band-card:has-text("Alpha") .band-card__summary');
+    const marked = await page
+      .locator('.band-card:has-text("Alpha") .band-show')
+      .evaluateAll(els => els.map(e => !!e.querySelector('.band-show__new')));
+    check(
+      'new: inside the card only the new show is marked',
+      JSON.stringify(marked) === JSON.stringify([true, false, false]),
+      marked
+    );
+
+    // the "New only" toggle
+    check(
+      'new: the toggle starts off',
+      (await page.getAttribute('#newOnlyToggle', 'aria-pressed')) === 'false'
+    );
+    await page.click('#newOnlyToggle');
+    const onlyNew = await settleNames(page, ['Alpha']);
+    const shownShows = await page
+      .locator('.band-card:has-text("Alpha") .band-show')
+      .count();
+    check(
+      'new only: just the band and show that are new remain',
+      JSON.stringify(onlyNew) === JSON.stringify(['Alpha']) &&
+        shownShows === 1 &&
+        (await page.getAttribute('#newOnlyToggle', 'aria-pressed')) === 'true',
+      [onlyNew, shownShows]
+    );
+    check(
+      'new only: the status line counts what is shown',
+      /1 of 2 bands/.test(await status(page)) &&
+        /1 show\b/.test(await status(page)),
+      await status(page)
+    );
+
+    // saved link
+    await page.click('#copyLinkBtn');
+    const copied = await page.evaluate(() => window.__copied);
+    check(
+      'new only: Copy link carries new=1',
+      new URL(copied).searchParams.get('new') === '1',
+      copied
+    );
+    await page.goto(copied);
+    const restoredNew = await settleNames(page, ['Alpha']);
+    check(
+      'new only: the saved link restores the toggle and the filter',
+      JSON.stringify(restoredNew) === JSON.stringify(['Alpha']) &&
+        (await page.getAttribute('#newOnlyToggle', 'aria-pressed')) === 'true',
+      restoredNew
+    );
+
+    // toggle off again
+    await page.click('#newOnlyToggle');
+    const back = await settleNames(page, ['Alpha', 'Beta']);
+    check(
+      'new only: turning it off shows everything again',
+      JSON.stringify(back) === JSON.stringify(['Alpha', 'Beta']),
+      back
+    );
+    check('new: no uncaught page errors', errors.length === 0, errors);
     await context.close();
   }
 

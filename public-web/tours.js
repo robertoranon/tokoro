@@ -45,6 +45,24 @@ function hostOf(url) {
   }
 }
 
+// A show is "new" for this many days after the crawler first published it.
+const NEW_DAYS = 7;
+
+/**
+ * Published within the last `days` days. `created_at` is set by the crawler
+ * when it first publishes a show (an update keeps it) and is UTC without a
+ * zone suffix. A slightly future value (clock skew) counts as new; a far-future
+ * or unparseable one does not.
+ */
+function isNewShow(show, nowMs, days = NEW_DAYS) {
+  const raw = show && typeof show.createdAt === 'string' ? show.createdAt : '';
+  if (!raw) return false;
+  const t = Date.parse(/(?:z|[+-]\d{2}:\d{2})$/i.test(raw) ? raw : raw + 'Z');
+  if (!isFinite(t)) return false;
+  const age = nowMs - t;
+  return age >= -DAY_MS && age < days * DAY_MS;
+}
+
 /** An API event published by the tours crawler: has an act_url, a real date, numeric coordinates. */
 function isTourShow(e) {
   return (
@@ -75,6 +93,7 @@ function toShow(e) {
     venue: e.venue_name || '',
     address: e.address || '',
     description: e.description || '',
+    createdAt: e.created_at || '',
     tags: (e.tags || []).filter(t => t !== TOUR_TAG),
     lat: e.lat,
     lng: e.lng,
@@ -182,10 +201,19 @@ function fmtDistance(km) {
  */
 function filterShows(
   list,
-  { keyword = '', from = '', to = '', origin = null, radiusKm = 0 } = {}
+  {
+    keyword = '',
+    from = '',
+    to = '',
+    origin = null,
+    radiusKm = 0,
+    newOnly = false,
+    nowMs = Date.now(),
+  } = {}
 ) {
   const q = normalizeText(keyword).trim();
   return list.filter(s => {
+    if (newOnly && !isNewShow(s, nowMs)) return false;
     if (from && s.start < from) return false;
     if (to && s.start > to) return false;
     if (origin && radiusKm > 0 && haversineKm(origin, s) > radiusKm)
@@ -204,7 +232,7 @@ function filterShows(
  * [{ key, name, url, shows, next }] one per act_url; shows by date, bands by
  * their next show then name.
  */
-function groupByBand(shows) {
+function groupByBand(shows, nowMs) {
   const byKey = new Map();
   for (const s of shows) {
     if (!byKey.has(s.bandUrl)) {
@@ -221,6 +249,9 @@ function groupByBand(shows) {
   for (const b of bands) {
     b.shows.sort(byDateThenId);
     b.next = b.shows[0];
+    // Shows first published recently; 0 when no clock is given.
+    b.newCount =
+      nowMs === undefined ? 0 : b.shows.filter(x => isNewShow(x, nowMs)).length;
   }
   return bands.sort((a, b) =>
     a.next.start !== b.next.start
@@ -229,6 +260,12 @@ function groupByBand(shows) {
         : 1
       : a.name.localeCompare(b.name)
   );
+}
+
+/** Badge text for a band: "NEW" for one new show, "NEW · 3" for several, "" for none. */
+function fmtNewBadge(count) {
+  if (!count || count < 1) return '';
+  return count === 1 ? 'NEW' : 'NEW · ' + count;
 }
 
 /** "Tue 12 Nov", "Tue 12 Nov, 21:00"; a year is added when it is not the current one. */
@@ -299,12 +336,14 @@ function buildTourQuery({
   origin = null,
   radius = DEFAULT_RADIUS_KM,
   place = '',
+  newOnly = false,
 } = {}) {
   const p = new URLSearchParams();
   const q = String(keyword).trim();
   if (q) p.set('q', q);
   if (from) p.set('from', from);
   if (to) p.set('to', to);
+  if (newOnly) p.set('new', '1');
   if (origin && isFinite(origin.lat) && isFinite(origin.lng)) {
     p.set('lat', Number(origin.lat).toFixed(4));
     p.set('lng', Number(origin.lng).toFixed(4));
@@ -334,6 +373,7 @@ function parseTourQuery(search) {
     origin,
     radius: RADII_KM.includes(radius) ? radius : DEFAULT_RADIUS_KM,
     place: origin ? (p.get('place') || '').slice(0, 120) : '',
+    newOnly: p.get('new') === '1',
   };
 }
 
@@ -355,6 +395,9 @@ const api = {
   fmtDistance,
   groupPins,
   fitPoints,
+  NEW_DAYS,
+  isNewShow,
+  fmtNewBadge,
   RADII_KM,
   DEFAULT_RADIUS_KM,
   buildTourQuery,

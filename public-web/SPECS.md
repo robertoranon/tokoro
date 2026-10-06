@@ -286,6 +286,12 @@ A read-only, band-first browse page for the shows published by the crawler's `np
 - MUST show in the body every show (weekday, date, time when not midnight, venue and address joined with " · ", a "Show page" link when the event has a URL, and the distance when an area origin is set) and a "Band website" link; the API has no city field, so the address stands in for it
 - MUST keep open cards open when filters change or the list re-renders
 
+**FR-8.3a: New shows**
+
+- MUST treat a show as **new** when it was first published within the last 7 days (`NEW_DAYS`): its API `created_at` (set by the crawler when it first publishes a show and kept by later updates; UTC without a zone suffix) is less than 7 days before now. A `created_at` up to a day in the future (clock skew) counts as new; a farther-future, empty or unparseable one does not.
+- MUST show a **NEW** badge in the band card's summary when the band has at least one new show among the shows currently visible (`NEW · n` when several), and a small "new" marker next to the date of each new show inside the card. Bands are not reordered because of it.
+- MUST offer a **New only** toggle (`aria-pressed`) in the filters that keeps only new shows (and so only bands that have one); it combines with every other filter and the status line counts what remains.
+
 **FR-8.4: Filters**
 
 - MUST offer a keyword field (accent- and case-insensitive substring over band name, title, venue, address and tags; debounced) and from/to date inputs (inclusive, on the show date); filters combine with AND
@@ -294,7 +300,7 @@ A read-only, band-first browse page for the shows published by the crawler's `np
 
 **FR-8.4a: Saved queries**
 
-- MUST offer a "Copy link" button that copies a link to the page carrying the current filters, so a query can be saved or shared (the events page's "Copy link" works the same way). Query parameters: `q` (keyword), `from`, `to` (`YYYY-MM-DD`), and, only when an area filter is active, `lat`, `lng` (rounded to 4 decimals), `radius` and `place` (the typed place name; absent for "Near me"). Empty filters are omitted, so a page with no filters copies the bare page url. If the clipboard is unavailable the link is shown in a prompt.
+- MUST offer a "Copy link" button that copies a link to the page carrying the current filters, so a query can be saved or shared (the events page's "Copy link" works the same way). Query parameters: `q` (keyword), `from`, `to` (`YYYY-MM-DD`), and, only when an area filter is active, `lat`, `lng` (rounded to 4 decimals), `radius` and `place` (the typed place name; absent for "Near me"). `new=1` when "New only" is on. Empty filters are omitted, so a page with no filters copies the bare page url. If the clipboard is unavailable the link is shown in a prompt.
 - MUST restore the filters from these parameters on load and apply them: the inputs are filled, an area filter is active (a typed place shows as that text, otherwise as `lat, lng`), and the list is filtered once the shows have loaded. Invalid values are ignored without error: a date that is not a real calendar date, a latitude/longitude outside the valid range or missing one of the pair, a radius that is not one of the select's options (default 100), a keyword longer than 200 characters (truncated).
 - Open band cards and the mapped band are not saved.
 

@@ -21,6 +21,9 @@ const {
   buildTourQuery,
   parseTourQuery,
   DEFAULT_RADIUS_KM,
+  isNewShow,
+  NEW_DAYS,
+  fmtNewBadge,
 } = createRequire(import.meta.url)('../tours.js');
 
 const TODAY = '2030-10-01';
@@ -39,6 +42,7 @@ const ev = over => ({
   end_time: null,
   category: 'music',
   tags: ['band-tour', 'rock'],
+  created_at: '2030-09-20T08:00:00',
   ...over,
 });
 
@@ -334,9 +338,10 @@ const ev = over => ({
     origin: { lat: 46.0637, lng: 13.2353 },
     radius: 50,
     place: 'Udine',
+    newOnly: false,
   });
-  assert.deepEqual(parseTourQuery('q=a'), { keyword: 'a', from: '', to: '', origin: null, radius: DEFAULT_RADIUS_KM, place: '' });
-  assert.deepEqual(parseTourQuery(''), { keyword: '', from: '', to: '', origin: null, radius: DEFAULT_RADIUS_KM, place: '' });
+  assert.deepEqual(parseTourQuery('q=a'), { keyword: 'a', from: '', to: '', origin: null, radius: DEFAULT_RADIUS_KM, place: '', newOnly: false });
+  assert.deepEqual(parseTourQuery(''), { keyword: '', from: '', to: '', origin: null, radius: DEFAULT_RADIUS_KM, place: '', newOnly: false });
   console.log('✅ parseTourQuery: query string → filters, with or without the leading ?'); }
 
 { const bad = parseTourQuery('?from=bad&to=2030-13-45&lat=999&lng=13&radius=7&place=X');
@@ -358,9 +363,82 @@ const ev = over => ({
     origin: { lat: 46.0637, lng: 13.2353 },
     radius: 250,
     place: 'Udine, Italy',
+    newOnly: false,
   };
   assert.deepEqual(parseTourQuery('?' + buildTourQuery(state)), state);
   console.log('✅ saved query: round trip, including special characters'); }
+
+
+// ── "new" shows (first published in the last NEW_DAYS days) ──────────────────
+{ const NOW = Date.parse('2030-10-10T12:00:00Z');
+  const showAt = created => toShows([ev({ id: 'n', created_at: created })], TODAY)[0];
+  assert.equal(NEW_DAYS, 7);
+  assert.equal(showAt('2030-10-09T08:00:00').createdAt, '2030-10-09T08:00:00', 'toShow keeps created_at');
+  assert.equal(isNewShow(showAt('2030-10-09T08:00:00'), NOW), true, 'yesterday is new');
+  assert.equal(isNewShow(showAt('2030-10-03T12:00:01'), NOW), true, 'just under 7 days is new');
+  assert.equal(isNewShow(showAt('2030-10-03T11:59:59'), NOW), false, 'just over 7 days is not');
+  assert.equal(isNewShow(showAt('2030-09-01T00:00:00'), NOW), false, 'old');
+  assert.equal(isNewShow(showAt('2030-10-10T12:30:00'), NOW), true, 'a slightly future created_at (clock skew) is new');
+  assert.equal(isNewShow(showAt('2030-10-20T00:00:00'), NOW), false, 'a far-future created_at is not trusted');
+  assert.equal(isNewShow({ createdAt: '' }, NOW), false);
+  assert.equal(isNewShow({ createdAt: 'garbage' }, NOW), false);
+  assert.equal(isNewShow({}, NOW), false);
+  assert.equal(isNewShow(showAt('2030-10-08T12:00:00'), NOW, 1), false, 'the window can be passed in');
+  // created_at is UTC: "2030-10-03T11:59:59" is 7 days minus 1 s before NOW's 12:00:00Z only if read as UTC
+  console.log('✅ isNewShow: created in the last 7 days, read as UTC; bad or far-future values are not new'); }
+
+{ const NOW = Date.parse('2030-10-10T12:00:00Z');
+  const shows = toShows(
+    [
+      ev({ id: 'new1', created_at: '2030-10-09T08:00:00', start_time: '2030-11-12T21:00:00' }),
+      ev({ id: 'old1', created_at: '2030-09-01T08:00:00', start_time: '2030-11-13T21:00:00' }),
+      ev({ id: 'old2', act_name: 'Other Band', act_url: 'https://other.example', created_at: '2030-09-01T08:00:00' }),
+      ev({ id: 'new2', act_name: 'Third Band', act_url: 'https://third.example', created_at: '2030-10-09T09:00:00', start_time: '2030-12-01T21:00:00' }),
+      ev({ id: 'new3', act_name: 'Third Band', act_url: 'https://third.example', created_at: '2030-10-09T09:00:00', start_time: '2030-12-02T21:00:00' }),
+    ],
+    TODAY
+  );
+  const ids = list => list.map(s => s.id);
+  assert.deepEqual(ids(filterShows(shows, { newOnly: true, nowMs: NOW })), ['new1', 'new2', 'new3']);
+  assert.deepEqual(ids(filterShows(shows, { newOnly: false, nowMs: NOW })).length, 5);
+  assert.deepEqual(ids(filterShows(shows, { newOnly: true, nowMs: NOW, keyword: 'third' })), ['new2', 'new3'], 'new-only combines with the other filters');
+  console.log('✅ filterShows: newOnly keeps only new shows'); }
+
+{ const NOW = Date.parse('2030-10-10T12:00:00Z');
+  const shows = toShows(
+    [
+      ev({ id: 'a', created_at: '2030-10-09T08:00:00', start_time: '2030-11-12T21:00:00' }),
+      ev({ id: 'b', created_at: '2030-09-01T08:00:00', start_time: '2030-11-13T21:00:00' }),
+      ev({ id: 'c', act_name: 'Other Band', act_url: 'https://other.example', created_at: '2030-09-01T08:00:00' }),
+      ev({ id: 'd', act_name: 'Third Band', act_url: 'https://third.example', created_at: '2030-10-09T09:00:00', start_time: '2030-12-01T21:00:00' }),
+      ev({ id: 'e', act_name: 'Third Band', act_url: 'https://third.example', created_at: '2030-10-09T09:00:00', start_time: '2030-12-02T21:00:00' }),
+    ],
+    TODAY
+  );
+  const bands = groupByBand(shows, NOW);
+  const byName = Object.fromEntries(bands.map(b => [b.name, b]));
+  assert.equal(byName['Test Band'].newCount, 1);
+  assert.equal(byName['Other Band'].newCount, 0);
+  assert.equal(byName['Third Band'].newCount, 2);
+  assert.deepEqual(bands.map(b => b.name), groupByBand(shows).map(b => b.name), 'new bands are not reordered');
+  assert.equal(groupByBand(shows)[0].newCount, 0, 'without a clock nothing is new');
+  console.log('✅ groupByBand: newCount per band; order unchanged'); }
+
+{ assert.equal(new URLSearchParams(buildTourQuery({ newOnly: true })).get('new'), '1');
+  assert.equal(buildTourQuery({ newOnly: false }), '');
+  assert.equal(parseTourQuery('?new=1').newOnly, true);
+  assert.equal(parseTourQuery('?new=0').newOnly, false);
+  assert.equal(parseTourQuery('?new=yes').newOnly, false);
+  assert.equal(parseTourQuery('').newOnly, false);
+  const state = { keyword: 'a', from: '', to: '', origin: null, radius: DEFAULT_RADIUS_KM, place: '', newOnly: true };
+  assert.deepEqual(parseTourQuery('?' + buildTourQuery(state)), state);
+  console.log('✅ saved query: the New-only toggle travels in the link'); }
+
+{ assert.equal(fmtNewBadge(0), '');
+  assert.equal(fmtNewBadge(undefined), '');
+  assert.equal(fmtNewBadge(1), 'NEW');
+  assert.equal(fmtNewBadge(3), 'NEW · 3');
+  console.log('✅ fmtNewBadge: NEW, or NEW · n for several, nothing for none'); }
 
 // ── loadTourEvents ───────────────────────────────────────────────────────────
 {

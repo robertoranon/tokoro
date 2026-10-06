@@ -264,6 +264,27 @@
         font-weight: 600;
         color: var(--link);
       }
+      .band-card__badge {
+        justify-self: start;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        padding: 2px 8px;
+        background: var(--yellow);
+        color: var(--ink);
+        border: var(--stroke);
+      }
+      .band-show__new {
+        margin-left: 8px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 1px 6px;
+        background: var(--yellow);
+        color: var(--ink);
+        border: 1px solid var(--ink);
+      }
       .band-card__body {
         padding: 0 20px 16px;
         border-top: 1px solid var(--border);
@@ -391,6 +412,14 @@
           </button>
         </div>
         <div class="filter-row">
+          <button
+            id="newOnlyToggle"
+            class="toggle"
+            type="button"
+            aria-pressed="false"
+          >
+            New only
+          </button>
           <button id="copyLinkBtn" class="toggle" type="button">
             🔗 Copy link
           </button>
@@ -438,6 +467,7 @@
           origin: null, // { lat, lng }
           originSource: '', // 'gps' | 'place' | ''
           place: '', // label of a typed place (saved in links)
+          newOnly: false, // only shows first published in the last NEW_DAYS days
           radius: 100,
           open: new Set(), // band keys currently expanded
           mapBand: null, // band key shown on the map
@@ -464,6 +494,8 @@
             to: state.to,
             origin: state.origin,
             radiusKm: state.origin ? state.radius : 0,
+            newOnly: state.newOnly,
+            nowMs: Date.now(),
           });
           if (state.origin) list = T.withDistance(list, state.origin);
           return list;
@@ -483,6 +515,9 @@
             '<li class="band-show">' +
             '<div class="band-show__date">' +
             escHtml(T.fmtShowDate(s.start, s.time, today)) +
+            (T.isNewShow(s, Date.now())
+              ? '<span class="band-show__new">new</span>'
+              : '') +
             '</div>' +
             '<div class="band-show__place">' +
             escHtml(place) +
@@ -510,6 +545,11 @@
             '<span class="band-card__name">' +
             escHtml(b.name) +
             '</span>' +
+            (T.fmtNewBadge(b.newCount)
+              ? '<span class="band-card__badge">' +
+                escHtml(T.fmtNewBadge(b.newCount)) +
+                '</span>'
+              : '') +
             '<span class="band-card__count">' +
             n +
             (n === 1 ? ' upcoming show' : ' upcoming shows') +
@@ -541,7 +581,7 @@
         function render() {
           if (!state.ready) return;
           const list = visibleShows();
-          const bands = T.groupByBand(list);
+          const bands = T.groupByBand(list, Date.now());
           const totalBands = T.groupByBand(state.all).length;
 
           if (!state.all.length) {
@@ -816,6 +856,19 @@
           }
         }
 
+        // ── New only: shows first published in the last few days ──────
+        function syncNewOnly() {
+          el('newOnlyToggle').setAttribute(
+            'aria-pressed',
+            String(state.newOnly)
+          );
+        }
+        el('newOnlyToggle').addEventListener('click', () => {
+          state.newOnly = !state.newOnly;
+          syncNewOnly();
+          render();
+        });
+
         // ── Saved queries: the filters live in the link ────────────────
         el('copyLinkBtn').addEventListener('click', async () => {
           const query = T.buildTourQuery({
@@ -825,6 +878,7 @@
             origin: state.origin,
             radius: state.radius,
             place: state.originSource === 'place' ? state.place : '',
+            newOnly: state.newOnly,
           });
           const url =
             window.location.origin +
@@ -849,6 +903,8 @@
           state.from = saved.from;
           state.to = saved.to;
           state.radius = saved.radius;
+          state.newOnly = saved.newOnly;
+          syncNewOnly();
           el('keywordFilter').value = saved.keyword;
           el('fromDate').value = saved.from;
           el('toDate').value = saved.to;
