@@ -48,7 +48,11 @@ export class JinaFetcher {
         headers['Authorization'] = `Bearer ${this.apiKey}`;
       }
 
-      console.log(`Jina request headers:`, headers);
+      // Never log the API key.
+      console.log(`Jina request headers:`, {
+        ...headers,
+        ...(headers['Authorization'] ? { Authorization: 'Bearer ***' } : {}),
+      });
 
       const jinaResponse = await fetch(jinaUrl, {
         headers,
