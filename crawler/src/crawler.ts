@@ -158,7 +158,10 @@ export function groupEventsByDay(
 
 // Domains where Playwright is reliably blocked (bot detection, sign-in walls, etc.)
 // For these, the Jina fetcher is used automatically even when playwright is the default.
-const JINA_PREFERRED_DOMAINS = new Set(['bandsintown.com']);
+// Empty on purpose: the browser fetcher retries blocked pages with a standard
+// user-agent (html-fetcher.ts), which is enough for Bandsintown. Add a domain
+// here only if that retry is not enough and Jina is.
+const JINA_PREFERRED_DOMAINS = new Set<string>();
 
 export type CrawlerMode =
   | 'direct'

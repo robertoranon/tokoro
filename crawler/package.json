@@ -24,6 +24,7 @@
     "test:radar": "tsx tests/test-radar.ts",
     "test:tours": "tsx tests/test-tours.ts",
     "test:bands-scout": "tsx tests/test-bands-scout.ts",
+    "test:fetcher": "tsx tests/test-fetcher-retry.ts",
     "test:scout": "tsx tests/test-scout.ts",
     "radar": "tsx src/radar.ts",
     "tours": "tsx src/tours.ts",

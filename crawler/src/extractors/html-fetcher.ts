@@ -3,6 +3,7 @@ import { spawn, spawnSync, ChildProcess } from 'child_process';
 import { createConnection } from 'net';
 import { extractCleanText } from '../../../shared/extractors/html-cleaner.js';
 import { FetchedPage } from '../types/event.js';
+import { looksBlocked } from '../utils/block-page.js';
 
 export type { FetchedPage };
 export type BrowserEngine = 'obscura' | 'chrome';
@@ -13,6 +14,8 @@ export class HTMLFetcher {
   private engine: BrowserEngine;
   private wsEndpoint: string;
   private autoLaunch: boolean;
+  /** undefined = not looked up yet; null = nothing to substitute. */
+  private standardUa: string | null | undefined;
 
   constructor(engine: BrowserEngine = 'chrome') {
     this.engine = engine;
@@ -101,15 +104,68 @@ export class HTMLFetcher {
     }
   }
 
+  /**
+   * The browser's own user-agent with the "HeadlessChrome" marker removed
+   * (same platform and version), or null when it carries no such marker.
+   * Bot protection such as Cloudflare rejects the marker, not the browser.
+   */
+  private async standardUserAgent(): Promise<string | null> {
+    if (this.standardUa !== undefined) return this.standardUa;
+    let ua: string | null = null;
+    try {
+      const context = await this.browser!.newContext();
+      try {
+        const page = await context.newPage();
+        const raw = await page.evaluate(() => navigator.userAgent);
+        ua = raw.includes('HeadlessChrome')
+          ? raw.replace('HeadlessChrome', 'Chrome')
+          : null;
+      } finally {
+        await context.close();
+      }
+    } catch {
+      ua = null;
+    }
+    this.standardUa = ua;
+    return ua;
+  }
+
+  /**
+   * Fetch a page. If the result looks like a bot-protection block page, retry
+   * once with a standard (non-headless) user-agent; pages that load normally
+   * are fetched exactly once.
+   */
   async fetchPage(url: string): Promise<FetchedPage> {
+    const first = await this.fetchOnce(url);
+    if (!looksBlocked(first.title, first.text)) return first;
+
+    const ua = await this.standardUserAgent();
+    if (!ua) return first;
+    console.log(
+      `↻ ${url} looks like a bot-protection page — retrying with a standard browser user-agent`
+    );
+    const second = await this.fetchOnce(url, ua);
+    if (looksBlocked(second.title, second.text)) {
+      console.log('  Still blocked after the retry');
+      return first;
+    }
+    console.log('  Retry succeeded');
+    return second;
+  }
+
+  private async fetchOnce(
+    url: string,
+    userAgent?: string
+  ): Promise<FetchedPage> {
     if (!this.browser) {
       await this.initialize();
     }
 
-    // CDP connections require an explicit context; launched browsers have a default one.
+    // CDP connections require an explicit context; launched browsers have a
+    // default one. A custom user-agent also needs its own context.
     let context: BrowserContext | null = null;
-    if (this.engine === 'obscura') {
-      context = await this.browser!.newContext();
+    if (this.engine === 'obscura' || userAgent) {
+      context = await this.browser!.newContext(userAgent ? { userAgent } : {});
     }
     const page = context
       ? await context.newPage()
