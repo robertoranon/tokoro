@@ -26,6 +26,9 @@ import {
   type ExistingShow,
 } from '../src/tours/tour-publisher.js';
 import type { NormalizedEvent } from '../src/types/event.js';
+import { TourExtractor } from '../src/extractors/tour-extractor.js';
+import type { LLMProvider } from '../../shared/types/llm.js';
+import type { FetchedPage } from '../src/types/event.js';
 
 let passed = 0;
 let failed = 0;
@@ -55,6 +58,31 @@ const bytesToHex = (b: Uint8Array) =>
     .join('');
 const hexToBytes = (hex: string) =>
   Uint8Array.from(hex.match(/.{2}/g)!.map(h => parseInt(h, 16)));
+
+type FakeLLM = LLMProvider & {
+  calls: number;
+  messages: { role: string; content: any }[][];
+  options: any[];
+};
+
+function fakeLLM(reply: string | (() => string)): FakeLLM {
+  const llm: FakeLLM = {
+    name: 'fake',
+    calls: 0,
+    messages: [],
+    options: [],
+    async complete(messages: any, options?: any) {
+      llm.calls++;
+      llm.messages.push(messages);
+      llm.options.push(options);
+      return {
+        content: typeof reply === 'function' ? reply() : reply,
+        model: 'fake',
+      };
+    },
+  };
+  return llm;
+}
 
 async function main() {
   console.log('\n=== act fields through the normalizer ===\n');
@@ -691,6 +719,77 @@ sources:
         () => true
       ),
       'lookup rejects a non-2xx response'
+    );
+  }
+
+  console.log('\n=== TourExtractor ===\n');
+  {
+    const page: FetchedPage = {
+      url: 'https://testband.example/live',
+      title: 'Test Band — Live',
+      html: '<html></html>',
+      text: '12 NOV 2030  Udine  Club X\n20 NOV 2030  Ljubljana  Kino Šiška',
+    };
+    const reply = JSON.stringify({
+      shows: [
+        {
+          title: 'Test Band live',
+          performers: ['Test Band'],
+          start_time: '2030-11-12T21:00:00',
+          venue_name: 'Club X',
+          city: 'Udine',
+        },
+        {
+          title: 'Test Band live',
+          performers: ['Test Band'],
+          start_time: '2030-11-20',
+          venue_name: 'Kino Šiška',
+          city: 'Ljubljana',
+        },
+      ],
+    });
+    const llm = fakeLLM(reply);
+    const shows = await new TourExtractor({
+      llm,
+      referenceDate: '2030-10-01',
+    }).extract(page);
+    assert(shows.length === 2, 'two shows extracted');
+    assert(llm.calls === 1, 'one LLM call per page');
+    assert(
+      llm.options[0].responseFormat === 'json',
+      'JSON response format requested'
+    );
+    const sys = String(llm.messages[0][0].content);
+    assert(
+      /performers/.test(sys) && /every/i.test(sys),
+      'system prompt asks for every show with performers'
+    );
+    const user = JSON.stringify(llm.messages[0][1].content);
+    assert(user.includes('2030-10-01'), "user prompt carries today's date");
+    assert(user.includes('Club X'), 'user prompt carries the page text');
+
+    const empty = fakeLLM(reply);
+    assert(
+      (
+        await new TourExtractor({ llm: empty }).extract({
+          ...page,
+          text: '   ',
+        })
+      ).length === 0 && empty.calls === 0,
+      'blank page → no shows, no LLM call'
+    );
+    const junk = fakeLLM('not json');
+    assert(
+      await new TourExtractor({ llm: junk }).extract(page).then(
+        () => false,
+        () => true
+      ),
+      'malformed JSON throws (the source is then reported failed)'
+    );
+    const none = fakeLLM(JSON.stringify({ shows: [] }));
+    assert(
+      (await new TourExtractor({ llm: none }).extract(page)).length === 0,
+      'empty list → no shows'
     );
   }
 
