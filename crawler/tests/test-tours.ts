@@ -1685,6 +1685,26 @@ sources:
       /never drop|do not drop|must not drop/i.test(prompt),
       'the prompt forbids dropping them'
     );
+    assert(
+      /infer/i.test(prompt) && /surrounding/i.test(prompt),
+      'the prompt lets the model infer region/country from the surrounding shows'
+    );
+    assert(
+      /only when|if,? and only if/i.test(prompt),
+      'and only when the context makes the place unambiguous'
+    );
+    assert(
+      /Durham/.test(prompt),
+      'with a worked example of a bare city among US cities'
+    );
+    assert(
+      /Never replace a region or country that the page prints/i.test(prompt),
+      'printed values are never replaced'
+    );
+    assert(
+      !/do not guess it/i.test(prompt),
+      'the old blanket ban on guessing the country is gone'
+    );
   }
 
   console.log(
