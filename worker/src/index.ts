@@ -292,6 +292,22 @@ export function buildHasFestivalFilter(hasFestival: string): string {
     : '';
 }
 
+export function buildActUrlFilter(actUrl: string): {
+  sql: string;
+  params: string[];
+} {
+  const normalized = actUrl.trim().replace(/\/$/, '');
+  if (!normalized) return { sql: '', params: [] };
+  return { sql: ' AND act_url = ?', params: [normalized] };
+}
+
+// '1' keeps only band shows, '0' excludes them; anything else is ignored.
+export function buildHasActFilter(hasAct: string): string {
+  if (hasAct === '1') return " AND act_url IS NOT NULL AND act_url != ''";
+  if (hasAct === '0') return " AND (act_url IS NULL OR act_url = '')";
+  return '';
+}
+
 export type PutValidation =
   | { ok: true }
   | { ok: false; status: number; error: string };
