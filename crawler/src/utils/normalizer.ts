@@ -1,6 +1,7 @@
 import { ExtractedEvent, NormalizedEvent } from '../types/event.js';
 import {
   geocodeAddress,
+  type GeoBias,
   GeocodingResult,
 } from '../../../shared/utils/geocode.js';
 import { encode as encodeGeohash } from './geohash.js';
@@ -65,7 +66,7 @@ export class EventNormalizer {
 
   async normalize(
     event: ExtractedEvent,
-    options?: { createdAt?: string }
+    options?: { createdAt?: string; geoBias?: GeoBias }
   ): Promise<NormalizedEvent | null> {
     console.log(`Normalizing event: ${event.title}`);
 
@@ -83,7 +84,9 @@ export class EventNormalizer {
       }
 
       console.log(`Geocoding address: ${geocodeQuery}`);
-      let geocoded = await geocodeAddress(geocodeQuery, event.venue_name);
+      let geocoded = await geocodeAddress(geocodeQuery, event.venue_name, {
+        bias: options?.geoBias,
+      });
 
       if (!geocoded) {
         geocoded = await this.geocodeFromSearch(event.venue_name);

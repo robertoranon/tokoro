@@ -2207,6 +2207,73 @@ sources:
     }
   }
 
+  console.log('\n=== the normalizer passes geoBias to the geocoder ===\n');
+  {
+    setGeocodeMinIntervalMs(0);
+    clearGeocodeCache();
+    const realFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = (async () =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () => [
+            {
+              lat: '54.67',
+              lon: '-1.75',
+              display_name: 'County Durham, England, UK',
+              importance: 0.619,
+              address: { country_code: 'gb' },
+            },
+            {
+              lat: '36.0',
+              lon: '-78.9',
+              display_name: 'Durham, North Carolina, USA',
+              importance: 0.619,
+              address: { country_code: 'us' },
+            },
+          ],
+        }) as Response) as typeof fetch;
+
+      const privkey = bytesToHex(ed.utils.randomPrivateKey());
+      const pubkey = bytesToHex(
+        await ed.getPublicKeyAsync(hexToBytes(privkey))
+      );
+      const normalizer = new EventNormalizer({ keypair: { privkey, pubkey } });
+      const event = {
+        title: 'DPAC',
+        address: 'Durham',
+        start_time: '2030-10-27T20:00:00',
+        category: 'music' as const,
+      };
+
+      const plain = await normalizer.normalize(event);
+      assert(
+        plain?.lat === 54.67,
+        'without a bias: the first candidate, as before'
+      );
+      const biased = await normalizer.normalize(event, {
+        geoBias: { lat: 37, lng: -80 },
+      });
+      assert(
+        biased?.lat === 36.0 && biased?.lng === -78.9,
+        'with geoBias: North Carolina'
+      );
+      const withCoords = await normalizer.normalize(
+        { ...event, lat: 1, lng: 2 },
+        { geoBias: { lat: 37, lng: -80 } }
+      );
+      assert(
+        withCoords?.lat === 1 && withCoords?.lng === 2,
+        'coordinates already known are never overridden by the bias'
+      );
+    } finally {
+      globalThis.fetch = realFetch;
+      clearGeocodeCache();
+      setGeocodeMinIntervalMs(1100);
+    }
+  }
+
   // (later tasks append their sections above this line)
 
   console.log(`\n${passed} passed, ${failed} failed`);
