@@ -26,6 +26,8 @@ import {
   type ExistingShow,
 } from '../src/tours/tour-publisher.js';
 import type { NormalizedEvent } from '../src/types/event.js';
+import { isDebugRequested, buildTourRunRecord } from '../src/tours.js';
+import type { TourSourceResult } from '../src/crawler.js';
 import { TourExtractor } from '../src/extractors/tour-extractor.js';
 import type { LLMProvider } from '../../shared/types/llm.js';
 import {
@@ -1253,6 +1255,58 @@ sources:
     assert(
       sourceOutcome([r('failed'), r('published')]) === 'published',
       'some success → that outcome'
+    );
+  }
+
+  console.log('\n=== tours runner helpers ===\n');
+  {
+    assert(
+      isDebugRequested(['node', 'x', '--debug'], {}).debug,
+      '--debug recognised'
+    );
+    assert(
+      isDebugRequested(['node', 'x'], { npm_config_debug: 'true' }).fromNpm,
+      'npm-swallowed --debug recognised'
+    );
+
+    const results: TourSourceResult[] = [
+      {
+        url: 'https://a.example/live',
+        outcome: 'published',
+        shows: [
+          { title: 'a', outcome: 'published' },
+          { title: 'b', outcome: 'unmatched' },
+        ],
+      },
+      { url: 'https://b.example/live', outcome: 'failed', shows: [] },
+    ];
+    const rec = buildTourRunRecord(
+      results,
+      new Date('2030-10-01T10:00:00Z'),
+      new Date('2030-10-01T10:01:30Z')
+    );
+    assert(rec.kind === 'tours', 'record kind');
+    assert(rec.sources_total === 2, 'sources_total');
+    assert(rec.status === 'partial', 'one failed source → partial');
+    assert(
+      rec.published === 1 && rec.unmatched === 1,
+      'show counters summed across sources'
+    );
+    assert(rec.duration_s === 90, 'duration');
+    assert(
+      JSON.stringify(rec.entries) ===
+        JSON.stringify([
+          { url: 'https://a.example/live', outcome: 'published' },
+          { url: 'https://b.example/live', outcome: 'failed' },
+        ]),
+      'entries are {url, outcome} per source (what the stale report reads)'
+    );
+    const allFailed = buildTourRunRecord([results[1]], new Date(), new Date());
+    assert(allFailed.status === 'failed', 'all sources failed → failed');
+    assert(
+      buildTourRunRecord(results.slice(0, 1), new Date(), new Date()).status ===
+        'ok',
+      'no failures → ok'
     );
   }
 

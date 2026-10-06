@@ -25,6 +25,7 @@
     "test:tours": "tsx tests/test-tours.ts",
     "test:scout": "tsx tests/test-scout.ts",
     "radar": "tsx src/radar.ts",
+    "tours": "tsx src/tours.ts",
     "scout": "tsx src/scout.ts",
     "scout-promote": "tsx src/scout-promote.ts",
     "smoke:radar": "tsx tests/smoke-radar-publisher.ts",
