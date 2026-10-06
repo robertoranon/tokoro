@@ -47,6 +47,12 @@ export const FESTIVAL_LISTING_MAX_TOKENS = 1000;
  *  Used by: crawler FestivalEntryExtractor (festival-entry mode) */
 export const FESTIVAL_ENTRY_MAX_TOKENS = 3500;
 
+/** Max output tokens for a tour-show extraction over one page (up to ~200
+ *  shows with performers, venue and city; generous so the JSON is never
+ *  truncated mid-object).
+ *  Used by: crawler TourExtractor (tours runner) */
+export const TOUR_MAX_TOKENS = 12000;
+
 /** Max output tokens for a scout run over one source page (up to 40 candidates
  *  with name, url, hints and a one-sentence reason; generous so the JSON is
  *  never truncated mid-object).

@@ -21,6 +21,15 @@ import {
   finalizeRadarEntry,
   resolveEntryDraft,
 } from './radar/festival-entry.js';
+import { TourExtractor } from './extractors/tour-extractor.js';
+import { TourPublisher } from './tours/tour-publisher.js';
+import {
+  processTourSourcePage,
+  sourceOutcome,
+  type ShowResult,
+  type SourceOutcome,
+} from './tours/tour-source.js';
+import type { BandsConfig, TourSource } from './tours/bands-config.js';
 
 export interface CrawlResult {
   published: number;
@@ -28,7 +37,11 @@ export interface CrawlResult {
   failed: number;
 }
 import { LLMProvider } from '../../shared/types/llm.js';
-import { ExtractedEvent } from './types/event.js';
+import {
+  ExtractedEvent,
+  type FetchedPage,
+  type NormalizedEvent,
+} from './types/event.js';
 import {
   DEFAULT_MAX_CONTENT_LENGTH,
   FESTIVAL_MAX_CONTENT_LENGTH,
@@ -158,6 +171,12 @@ export interface RadarEntryResult {
   url: string;
   outcome: RadarOutcome;
 }
+
+export interface TourSourceResult {
+  url: string;
+  outcome: SourceOutcome;
+  shows: ShowResult[];
+}
 export type FetcherType = 'playwright' | 'jina';
 export type { BrowserEngine, PdfParserType };
 
@@ -190,6 +209,8 @@ export class EventCrawler {
   private publisher: APIPublisher;
   private festivalEntryExtractor: FestivalEntryExtractor;
   private radarPublisher: RadarPublisher;
+  private tourExtractor: TourExtractor;
+  private tourPublisher: TourPublisher;
 
   constructor(private config: CrawlerConfig) {
     const fetcherType = config.fetcher || 'playwright';
@@ -226,6 +247,14 @@ export class EventCrawler {
       referenceDate: config.referenceDate,
     });
     this.radarPublisher = new RadarPublisher(
+      config.apiUrl,
+      config.keypair.pubkey
+    );
+    this.tourExtractor = new TourExtractor({
+      llm: config.llm,
+      referenceDate: config.referenceDate,
+    });
+    this.tourPublisher = new TourPublisher(
       config.apiUrl,
       config.keypair.pubkey
     );
@@ -599,6 +628,93 @@ export class EventCrawler {
     }
     if (!normalized) return 'failed';
     return this.radarPublisher.apply(normalized, match);
+  }
+
+  /**
+   * Crawl tour sources (spec: band tours §2). Returns one result per source,
+   * never throws for a single bad source. Used by `npm run tours`.
+   */
+  async crawlTourSources(
+    sources: TourSource[],
+    config: BandsConfig
+  ): Promise<TourSourceResult[]> {
+    const results: TourSourceResult[] = [];
+    try {
+      await this.fetcher.initialize();
+      for (const source of sources) {
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`Tour source (${source.mode}): ${source.url}`);
+        console.log(`${'='.repeat(60)}\n`);
+
+        let shows: ShowResult[] = [];
+        let outcome: SourceOutcome;
+        try {
+          const page = await this.fetcherForUrl(source.url).fetchPage(
+            source.url
+          );
+          shows = await this.processTourSource(page, source, config);
+          outcome = sourceOutcome(shows);
+        } catch (error) {
+          console.error(
+            `\n❌ Error processing tour source ${source.url}:`,
+            error
+          );
+          outcome = 'failed';
+        }
+        console.log(`→ ${outcome}`);
+        results.push({ url: source.url, outcome, shows });
+      }
+    } finally {
+      await this.fetcher.close();
+    }
+    return results;
+  }
+
+  private async processTourSource(
+    page: FetchedPage,
+    source: TourSource,
+    config: BandsConfig
+  ): Promise<ShowResult[]> {
+    const today =
+      this.config.referenceDate || new Date().toISOString().slice(0, 10);
+
+    if (this.config.debug) {
+      // Debug: extract and attribute, print the finalized shows; never look
+      // anything up or publish. `apply` returns 'published' only as an
+      // "extracted" marker, like the radar's debug run.
+      return processTourSourcePage(page, source, config, {
+        extract: p => this.tourExtractor.extract(p),
+        lookup: async () => [],
+        normalize: async (event, options) => {
+          if (!this.config.normalize) {
+            this.printRawEvents([event]);
+            // Raw mode has no geocoding: report as extracted.
+            return {
+              ...event,
+              lat: event.lat ?? 0,
+              lng: event.lng ?? 0,
+              pubkey: this.config.keypair.pubkey,
+              signature: '',
+              start_time: String(event.start_time),
+              created_at: options?.createdAt ?? '',
+            } as NormalizedEvent;
+          }
+          const normalized = await this.normalizer.normalize(event, options);
+          if (normalized) console.log(JSON.stringify(normalized, null, 2));
+          return normalized;
+        },
+        apply: async () => 'published',
+        today,
+      });
+    }
+
+    return processTourSourcePage(page, source, config, {
+      extract: p => this.tourExtractor.extract(p),
+      lookup: actUrl => this.tourPublisher.lookup(actUrl),
+      normalize: (event, options) => this.normalizer.normalize(event, options),
+      apply: (event, match) => this.tourPublisher.apply(event, match),
+      today,
+    });
   }
 
   private async crawlFestival(urls: string[]): Promise<CrawlResult> {

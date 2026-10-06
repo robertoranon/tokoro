@@ -484,6 +484,73 @@ Write order is watchlist (only if something was promoted), state, inbox, so an i
 
 **Scheduling:** plain crontab, e.g. weekly (every Thursday, offset from the Monday radar run; a less frequent schedule is a crontab edit): `0 10 * * 4  cd /path/to/tokoro/crawler && /absolute/path/to/npm run scout >> logs/scout.log 2>&1`.
 
+### 4.10 Tour Runner (`npm run tours`)
+
+Watches band sites and venue/aggregator listings for new shows of a curated set of bands, and publishes each as a signed event carrying `act_name` and `act_url` (unsigned metadata, like `festival_name`/`festival_url`). Entry point `src/tours.ts`, structured like the radar runner (section 4.8). Always write `npm run tours -- --debug` (note the `--`): without it npm swallows the flag, but the runner detects npm's `npm_config_debug` environment variable, prints a notice, and still runs in debug mode. Non-debug runs print a `LIVE RUN` line naming the API URL before crawling. Reads `bands.yaml` (`--bands <path>` to override; example: `bands.example.yaml`; the real file is gitignored). The worker must already accept the act fields (otherwise the API silently drops them).
+
+**`bands.yaml`.** Top-level keys `defaults`, `bands`, `sources` (at least one of `bands`/`sources` must be present; an empty list is allowed).
+
+| Field (`defaults`)              | Description                                                                          |
+| ------------------------------- | ------------------------------------------------------------------------------------ |
+| `fetcher` / `browser` / `model` | Fallbacks for every source (`playwright` \| `jina`; `chrome` \| `obscura`; model name) |
+| `region`                        | Default region `{south, west, north, east}` in degrees                               |
+
+| Field (band) | Required | Description                                                                                                                             |
+| ------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`       | yes      | Display name and attribution key                                                                                                        |
+| `url`        | yes      | Canonical band site. Normalized like a `festival_url` (scheme + host + path, no query/hash/trailing slash); becomes the show's `act_url` |
+| `aliases`    | no       | Other spellings seen on listings (list of non-empty strings)                                                                            |
+| `region`     | no       | Per-band region override, or the string `none` (worldwide, ignoring the default region)                                                |
+| `status`     | no       | `active` (default) or `paused` (the band and its band-mode sources are skipped, nothing is deleted)                                     |
+| `added`      | no       | `YYYY-MM-DD`, bookkeeping (YAML dates are converted back to strings)                                                                    |
+| `notes`      | no       | Curator notes; never sent to the LLM or API                                                                                             |
+
+| Field (source)                  | Required  | Description                                                                                                                                                       |
+| ------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`                           | yes       | The page to read. Kept as written (a listing's query string may matter); duplicates are detected on the normalized form                                           |
+| `mode`                          | yes       | `band`: the page is a band's own site, every show on it is that band's. `listing`: a venue/aggregator page; only shows whose bill names a registry band are kept |
+| `band`                          | band mode | Name of a registry band                                                                                                                                           |
+| `only`                          | no        | Listing mode: names of registry bands to match; default is the whole registry                                                                                     |
+| `fetcher` / `browser` / `model` | no        | Per-source overrides over `defaults`                                                                                                                              |
+
+**Validation** (any error exits 1 before crawling, naming the offender): required `name` and `url`; band names unique case-insensitively; band URLs unique after normalization; source URLs unique after normalization; a band-mode `band` and every `only` entry must name a known band (case-insensitive); `region` needs `south < north`, `west < east`, latitudes within ±90 and longitudes within ±180; invalid `status`/`mode`/`fetcher`/`browser` values and wrongly typed fields are errors. Zero active sources (none, or only band-mode sources of paused bands): warning, exit 0, no run log.
+
+**Behavior.** Sources run sequentially, each with its own crawler instance; a failing source logs and continues. The exit code is 1 if any show failed or every source failed.
+
+1. **Extraction.** One LLM call per page returns every upcoming show with its full bill (`performers`, headliner first), venue, city, and optional address, coordinates, url, tags, description. JSON-LD is not used (band and venue pages rarely have it and it lacks the bill). The LLM does not decide which acts matter. Parsing is lenient: a single bad show is dropped, malformed optional fields (bad `url`, out-of-range coordinates, non-list `tags`) are dropped instead of rejecting the show, a comma-separated `performers`/`tags` string is split, a bare array or a single-key wrapper is accepted, and at most 200 shows are read per page. A date-only `start_time` becomes `YYYY-MM-DDT00:00:00`; a time keeps its local value (zone suffix stripped, no conversion); a non-existent calendar date drops the show. Empty page text means no shows and no LLM call; malformed JSON from the LLM fails the source.
+2. **Attribution (deterministic).** Band mode: every show belongs to the source's band. Listing mode: the first candidate band (active, narrowed by `only`) whose name or alias equals a performer under normalization (lowercase, accents stripped, apostrophes removed, punctuation to space, whitespace collapsed; whole-name equality, never substring). Shows with no match are counted `unmatched` and never published.
+3. **Skip rules.** `skipped_past`: start date before today (a show today stays). `skipped_out_of_region`: outside the band's effective region (its own, else the default; `none` or no region means no check). The region check runs on the draft's coordinates when it has them, and again on the geocoded coordinates, because drafts usually lack them.
+4. **Finalization.** Category `music`; tags are trimmed, lowercased, deduplicated, gain `band-tour`, and drop a tag equal to the band name; `act_name` and `act_url` come from the registry; `url` defaults to the source page; the city is appended to the address when the address does not already mention it (the city alone when there is no address); when the LLM gave no description and the bill has other acts, the description is `With A, B.` (support acts). The event is then normalized (geocoded from coordinates, else address/venue, and signed) by the common normalizer.
+5. **Publish-or-update.**
+   - **Lookup:** `GET /events?pubkey=<crawler>&act_url=<band url>&from=1970-01-01T00:00:00&to=2999-12-31T23:59:59`, once per band per source run, on the first show of that band that survives the skip rules. The explicit window is required because the pubkey-only path defaults to now through +7 days. A non-array response is an error (that show is `failed`).
+   - **Match:** an existing show with the same local start date (first 10 characters) and coordinates within 0.005 degrees (~500 m) in both axes; the closest wins. A changed start time on the same day still matches. Matching therefore needs coordinates, taken from the draft when present, otherwise from geocoding: the entry is normalized, matched on the geocoded position, and re-normalized with those coordinates and the stored `created_at` when a match is found.
+   - **No match** means `POST`, `published`. **Match that differs** means `PUT /events/:id`, re-signed with the stored `created_at` (immutable and signed), `updated`. **Otherwise** no API write, `unchanged`.
+   - **Differs** is true only for: `start_time` changed; a non-empty new `end_time` that differs from the stored one (a known end time is never erased by a run that found none); coordinates moved by more than 0.005 degrees in lat or lng; a stored empty description or url that the new show fills. `null` equals `''`. Wording differences in title, venue, address, tags and non-empty descriptions never trigger an update, since LLM output varies between runs. When a `PUT` is issued the whole event is sent.
+   - **Errors:** `PUT` 404 falls back to `POST`. `POST`/`PUT` 401/403 are `failed` (logged as a signing/identity bug), 409 is `failed` (duplicate of an event that is not this crawler's show), a network error is `failed`.
+   - **At most once per run.** The runner remembers the ids it has already sent in the source run (`sentIds`, with stub ids for newly published shows). A show listed twice on one page, or an existing show listed twice, is `POST`ed or `PUT` at most once; the second listing counts as `unchanged`. Shows published earlier in the run are also matchable for later listings of the same band and day.
+   - **Never deletes.** A show that disappears from a page, or a cancelled one, stays published until it expires.
+   - **Geocoding failure.** A show that cannot be geocoded is `failed` and retried next run. The radar's stored-coordinates fallback (section 4.7, 2b) exists in the tour code but only helps when the draft itself carried coordinates that produced a match; because tour matching needs coordinates, it effectively never applies (the radar can use it because it matches on date alone).
+   - The LLM pre-publish duplicate check is not used.
+6. **Debug.** `--debug` runs extraction, attribution and the skip rules with normalization on: shows are geocoded and printed as signed events; no lookup, no API call, no run log, no staleness report. The summary says "extracted" (the internal outcome `published` is only an "extracted" marker) and states that nothing was published.
+
+**Outcomes per show:** `published | updated | unchanged | unmatched | skipped_past | skipped_out_of_region | failed`. **Outcomes per source** (the best result among its shows, in the order `published`, `updated`, `unchanged`, `failed`, else `no_shows`): `published | updated | unchanged | no_shows | failed`; a source whose fetch or extraction throws is `failed`.
+
+**Run log.** Appends one record to `logs/runs.jsonl`: `kind: "tours"`, timing, `sources_total`, `status` (`ok`; `partial` when some but not all sources failed; `failed` when all did), the seven show counters (`published`, `updated`, `unchanged`, `unmatched`, `skipped_past`, `skipped_out_of_region`, `failed`) and `entries: [{url, outcome}]` with the source outcomes. Debug runs write no record.
+
+**Staleness report.** After each (non-debug) run the runner prints active sources whose last 4 tours runs (`STALE_WINDOW`, that included them) had no `published`/`updated`/`unchanged` source outcome: a dead source, or a band with no upcoming shows. A source needs 4 runs of its own history before it can be flagged. The generic report (`findStaleSources`, per run kind) also serves the radar.
+
+**Scheduling:** plain crontab, e.g. `0 10 * * 3  cd /path/to/tokoro/crawler && /absolute/path/to/npm run tours >> logs/tours.log 2>&1` (Wednesdays, so it never overlaps the Monday radar and Thursday scout runs).
+
+**Known limitations:**
+
+- (a) The lookup returns at most 100 shows per band (the worker's `LIMIT`); a band with more than 100 published shows under one `act_url` could cause duplicate `POST`s.
+- (b) No antimeridian regions (`west < east` is required).
+- (c) One show per band per day per place: two shows on the same day within ~500 m are treated as one.
+- (d) Shows that vanish from a page remain until they expire; nothing is ever deleted.
+- (e) A show whose geocoding fails in a run is `failed` and retried next run; the stored-coordinates fallback does not help tours.
+- (f) A listing-mode bill only matches by exact normalized name or alias; a band billed under an unlisted spelling is `unmatched` until an alias is added.
+- (g) In debug mode an extracted show is counted as `published` internally; the summary labels it "extracted".
+
 ---
 
 ## 5. HTML Fetching
@@ -2560,6 +2627,12 @@ Total events published: 10
 - Unit tests in `tests/test-radar.ts` (`npm run test:radar`, offline): watchlist parsing, radar entry helpers, extractor, publish-or-update logic, run log and staleness report
 - End-to-end `tests/smoke-radar-publisher.ts` (`npm run smoke:radar`, needs `wrangler dev`)
 - Unit tests in `tests/test-scout.ts` (`npm run test:scout`, offline): sources config, candidate/state model and dedup keys, link extraction, scout extractor, orchestration, promote
+
+### 14.9 Tour Runner Tests
+
+- Unit tests in `tests/test-tours.ts` (`npm run test:tours`, offline): `bands.yaml` parsing and validation, show parsing and finalization, name/alias matching, region check, show matching and `differs`, publish-or-update, extractor, source processing (attribution, skips, duplicates within a run), run log and staleness report
+- End-to-end `tests/smoke-tours-publisher.ts` (`npm run smoke:tours`, needs `wrangler dev`)
+- `tests/` is not covered by `tsc` (the tsconfig includes `src` and `shared` only), so test files are only checked by running them
 
 ---
 

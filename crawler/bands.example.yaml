@@ -1,0 +1,55 @@
+# Tours watchlist — bands to follow, and pages to read their shows from.
+# Copy to bands.yaml and edit. Crawl weekly (offset from the Monday radar run):
+#   0 10 * * 3  cd /path/to/tokoro/crawler && /absolute/path/to/npm run tours >> logs/tours.log 2>&1
+#   (cron's PATH usually lacks npm: find it with `which npm`; logs/ is gitignored.)
+#
+# Try a single run without publishing anything:
+#   npm run tours -- --debug
+# Use a different file:
+#   npm run tours -- --bands /path/to/other.yaml
+
+defaults:
+  fetcher: playwright # playwright | jina; per-source override allowed
+  # Optional default region: shows outside this box are dropped (and counted).
+  # south/west/north/east in degrees. Roughly Europe:
+  region: { south: 34, west: -11, north: 72, east: 45 }
+
+# The registry: one entry per band. `url` is required and becomes the show's
+# act_url — the key the tours page groups shows by.
+bands:
+  - name: Test Band
+    url: https://testband.example # canonical band site
+    aliases: ["The Test Band", "TB"] # other spellings seen on venue listings
+    status: active # active (default) | paused — paused bands are skipped, not deleted
+    added: 2026-10-06 # optional bookkeeping (YYYY-MM-DD)
+    notes: "post-rock, Udine-based" # curator notes; never sent to the LLM or API
+
+  - name: Far Band
+    url: https://farband.example
+    region: none # worldwide for this band, even though a default region is set
+
+  - name: Other Band
+    url: https://otherband.example
+    region: { south: 45, west: 5, north: 49, east: 17 } # per-band override
+
+# The pages to read. Two modes:
+#   band     the page is a band's own site: EVERY show on it is that band's.
+#   listing  a venue or aggregator page: all shows are extracted, then only
+#            those whose bill names a registry band (name or alias) are kept.
+#            Optional `only: [names]` narrows matching to part of the registry.
+sources:
+  - url: https://testband.example/live
+    mode: band
+    band: Test Band
+
+  - url: https://farband.example/tour
+    mode: band
+    band: Far Band
+    fetcher: jina # per-source overrides: fetcher, browser (chrome | obscura), model
+
+  - url: https://venue.example/programme
+    mode: listing # every registry band
+
+  - url: https://aggregator.example/gigs?city=udine
+    mode: listing
+    only: [Test Band, Other Band]

@@ -5,6 +5,7 @@ LLM-powered semantic crawler for extracting structured event data from web pages
 ## Features
 
 - **Festival Entry Mode / Radar**: One date-range entry per festival homepage (name, dates, place, short description, link), published or updated weekly from a curated `festivals.yaml` watchlist
+- **Band Tours**: Watches band sites and venue listings for new shows of the bands in a curated `bands.yaml`, published weekly with `act_name`/`act_url`
 - **Festival Mode**: Crawl entire festival programs — discovers all listing/schedule pages and stamps every event with festival metadata
 - **Two-Phase Discovery**: Automatically discovers individual event pages from venue homepages
 - **Multiple Fetcher Options**: Choose between Playwright (JS rendering) or Jina AI Reader (fast, lightweight)
@@ -239,6 +240,16 @@ Legitimate parallel events (different stages or acts running at the same time) a
 - **Scheduling**: weekly (every Thursday; edit the crontab line for a less frequent schedule): `0 10 * * 4  cd /path/to/tokoro/crawler && /absolute/path/to/npm run scout >> logs/scout.log 2>&1`
 - **Dedup and promote**: urls are compared by host + path + meaningful query (tracking parameters ignored); an approved candidate whose url has a query string (usually an aggregator page) is not promoted until you replace it with the festival's own site. Names already known are given to the LLM so it does not return them again
 - **Tests**: `npm run test:scout` (offline)
+
+#### Band tours
+
+- **What it does**: follows a curated set of bands. It reads band sites (every show on the page) and venue/aggregator listings (only shows whose bill names one of your bands, matched by name or alias), and publishes each upcoming show as an event with `act_name`/`act_url`. Changed shows (time, a move of more than ~500 m, a newly filled description or url) are updated; nothing is ever deleted, so vanished shows stay until they expire
+- **Setup**: `cp bands.example.yaml bands.yaml`, list your bands (`name` and `url` required), then your sources (`mode: band` for a band's own page, `mode: listing` for a venue page). A default `region` drops shows outside a bounding box (`region: none` on a band overrides it)
+- **Try it**: `npm run tours -- --debug` (note the `--`) extracts, geocodes and prints the shows as signed events, publishing nothing and writing no run log. `npm run tours` is a live run; use `--bands <path>` for another file. Deploy the worker with the act fields first
+- **Outcomes** per show: `published`, `updated`, `unchanged`, `unmatched`, `skipped_past`, `skipped_out_of_region`, `failed`. The run exits 1 if any show failed. A show that cannot be geocoded is `failed` and retried next run
+- **Staleness report**: each run appends a `kind: "tours"` record to `logs/runs.jsonl` and prints sources with no `published`/`updated`/`unchanged` result in their last 4 runs
+- **Scheduling**: `0 10 * * 3  cd /path/to/tokoro/crawler && /absolute/path/to/npm run tours >> logs/tours.log 2>&1` (Wednesdays; cron's PATH usually lacks npm: find it with `which npm`)
+- **Tests**: `npm run test:tours` (offline); `npm run smoke:tours` (needs `wrangler dev`)
 
 #### 4. Image Mode
 

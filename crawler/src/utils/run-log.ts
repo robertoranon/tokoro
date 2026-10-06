@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 
 /** A line of logs/runs.jsonl. `kind` is absent on records written before radar existed. */
 export interface RunRecord {
-  kind?: 'jobs' | 'radar' | 'scout';
+  kind?: 'jobs' | 'radar' | 'scout' | 'tours';
   entries?: Array<{ url: string; outcome: string }>;
   [key: string]: unknown;
 }
@@ -54,18 +54,19 @@ export const STALE_WINDOW = 4;
 const HEALTHY = new Set(['published', 'updated', 'unchanged']);
 
 /**
- * The "silently dead source" report (spec §3): festivals whose last `window`
- * radar runs (that included them) produced no published/updated/unchanged
- * outcome. Needs a full window of history for that festival before flagging.
+ * The "silently dead source" report (spec §3): sources whose last `window`
+ * runs of `kind` (that included them) produced no published/updated/unchanged
+ * outcome. Needs a full window of history for that source before flagging.
  */
-export function findStaleFestivals(
+export function findStaleSources(
   records: RunRecord[],
   activeUrls: string[],
+  kind: 'radar' | 'tours',
   window = STALE_WINDOW
 ): string[] {
-  const radarRuns = records.filter(r => r.kind === 'radar');
+  const runs = records.filter(r => r.kind === kind);
   return activeUrls.filter(url => {
-    const outcomes = radarRuns
+    const outcomes = runs
       .map(r => r.entries?.find(e => e.url === url)?.outcome)
       .filter((o): o is string => o !== undefined)
       .slice(-window);
@@ -74,4 +75,13 @@ export function findStaleFestivals(
       !outcomes.some(o => HEALTHY.has(o) || o === 'skipped_series')
     );
   });
+}
+
+/** Radar festivals that look dead (see findStaleSources). */
+export function findStaleFestivals(
+  records: RunRecord[],
+  activeUrls: string[],
+  window = STALE_WINDOW
+): string[] {
+  return findStaleSources(records, activeUrls, 'radar', window);
 }

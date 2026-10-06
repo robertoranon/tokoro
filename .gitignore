@@ -99,6 +99,7 @@ worker/users.txt
 crawler/jobs.yaml
 
 crawler/festivals.yaml
+crawler/bands.yaml
 crawler/scout-sources.yaml
 crawler/candidates.yaml
 crawler/scout-state.json

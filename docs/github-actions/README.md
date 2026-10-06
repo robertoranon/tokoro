@@ -1,4 +1,4 @@
-# Running radar and scout on GitHub Actions
+# Running radar, scout and tours on GitHub Actions
 
 The crawler code stays in the public `tokoro` repo. Personal data lives in a
 separate **private** repo (e.g. `tokoro-radar-data`) that runs the workflows.
@@ -7,18 +7,21 @@ separate **private** repo (e.g. `tokoro-radar-data`) that runs the workflows.
 
 ```
 festivals.yaml          # radar watchlist (copy of crawler/festivals.yaml)
+bands.yaml              # tours watchlist (copy of crawler/bands.yaml)
 scout-sources.yaml      # scout discovery sources + taste profile
 candidates.yaml         # scout output (committed back by the workflow)
 scout-state.json        # scout memory (committed back by the workflow)
 .github/workflows/radar.yml
 .github/workflows/scout.yml
+.github/workflows/tours.yml
 ```
 
-Copy `radar.yml` and `scout.yml` from this folder into `.github/workflows/`.
+Copy `radar.yml`, `scout.yml` and `tours.yml` from this folder into `.github/workflows/`.
+Tours runs on Wednesdays, so it never overlaps the Monday radar and Thursday scout runs.
 
 ## Setup
 
-1. Create the private repo and push the four data files from `crawler/`.
+1. Create the private repo and push the data files from `crawler/`.
 2. Settings → Secrets and variables → Actions:
    - **Secrets**: `TOKORO_API_URL`, `CRAWLER_PRIVKEY`, `CRAWLER_PUBKEY`,
      `OPENROUTER_API_KEY` (or the key for your provider); optional
