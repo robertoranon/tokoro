@@ -2503,6 +2503,67 @@ sources:
     );
   }
 
+  console.log('\n=== adopted / duplicate outcomes ===\n');
+  {
+    const r = (outcome: ShowResult['outcome']): ShowResult => ({
+      title: 't',
+      outcome,
+    });
+    const t = tallyShows([
+      r('adopted'),
+      r('adopted'),
+      r('duplicate'),
+      r('published'),
+    ]);
+    assert(
+      t.adopted === 2 &&
+        t.duplicate === 1 &&
+        t.published === 1 &&
+        t.failed === 0,
+      'new counters'
+    );
+    assert(
+      sourceOutcome([r('adopted')]) === 'updated',
+      'a source whose best result is an adoption counts as updated (healthy)'
+    );
+    assert(
+      sourceOutcome([r('duplicate')]) === 'unchanged',
+      'a source whose shows are all duplicates is healthy, not dead'
+    );
+    assert(
+      sourceOutcome([r('duplicate'), r('failed')]) === 'unchanged',
+      'a duplicate beats a failure'
+    );
+    assert(
+      sourceOutcome([r('published'), r('adopted')]) === 'published',
+      'published still wins'
+    );
+    assert(
+      sourceOutcome([r('adopted'), r('unchanged')]) === 'updated',
+      'adopted beats unchanged'
+    );
+
+    const rec = buildTourRunRecord(
+      [
+        {
+          url: 'https://a.example/tour',
+          outcome: 'updated',
+          shows: [r('adopted'), r('duplicate')],
+        },
+      ],
+      new Date(),
+      new Date()
+    );
+    assert(
+      (rec as any).adopted === 1 && (rec as any).duplicate === 1,
+      'the run record carries the new counters'
+    );
+    assert(
+      rec.status === 'ok',
+      'adopted and duplicate shows do not make a run partial'
+    );
+  }
+
   // (later tasks append their sections above this line)
 
   console.log(`\n${passed} passed, ${failed} failed`);

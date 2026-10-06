@@ -1,7 +1,13 @@
 import type { NormalizedEvent } from '../types/event.js';
 import { normalizeName } from './tour-shows.js';
 
-export type TourOutcome = 'published' | 'updated' | 'unchanged' | 'failed';
+export type TourOutcome =
+  | 'published'
+  | 'updated'
+  | 'unchanged'
+  | 'adopted' // a duplicate of another key's event, now attached to the band
+  | 'duplicate' // a duplicate that could not be attached
+  | 'failed';
 
 /** An event as returned by GET /events (nulls for empty columns, tags parsed). */
 export interface ExistingShow {

@@ -46,6 +46,8 @@ export interface TourCounters {
   published: number;
   updated: number;
   unchanged: number;
+  adopted: number;
+  duplicate: number;
   unmatched: number;
   skipped_past: number;
   skipped_out_of_region: number;
@@ -57,6 +59,8 @@ export function tallyShows(results: ShowResult[]): TourCounters {
     published: 0,
     updated: 0,
     unchanged: 0,
+    adopted: 0,
+    duplicate: 0,
     unmatched: 0,
     skipped_past: 0,
     skipped_out_of_region: 0,
@@ -77,8 +81,8 @@ export type SourceOutcome =
 export function sourceOutcome(results: ShowResult[]): SourceOutcome {
   const has = (o: ShowOutcome) => results.some(r => r.outcome === o);
   if (has('published')) return 'published';
-  if (has('updated')) return 'updated';
-  if (has('unchanged')) return 'unchanged';
+  if (has('updated') || has('adopted')) return 'updated';
+  if (has('unchanged') || has('duplicate')) return 'unchanged';
   if (has('failed')) return 'failed';
   return 'no_shows';
 }
