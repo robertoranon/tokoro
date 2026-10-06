@@ -19,6 +19,13 @@ import {
   type TourShowDraft,
 } from '../src/tours/tour-shows.js';
 import type { BandConfig } from '../src/tours/bands-config.js';
+import {
+  matchShow,
+  differs,
+  TourPublisher,
+  type ExistingShow,
+} from '../src/tours/tour-publisher.js';
+import type { NormalizedEvent } from '../src/types/event.js';
 
 let passed = 0;
 let failed = 0;
@@ -441,6 +448,249 @@ sources:
         'https://x.example'
       ).description === 'With Opener.',
       'support acts summarised into a description'
+    );
+  }
+
+  console.log('\n=== matchShow / differs ===\n');
+  {
+    const mk = (over: Partial<ExistingShow> = {}): ExistingShow => ({
+      id: 'e1',
+      title: 'Test Band live',
+      description: 'With Opener.',
+      url: 'https://x.example',
+      venue_name: 'Club X',
+      address: 'Udine',
+      lat: 46.06,
+      lng: 13.23,
+      start_time: '2030-11-12T21:00:00',
+      end_time: null,
+      category: 'music',
+      tags: ['band-tour'],
+      act_name: 'Test Band',
+      act_url: 'https://testband.example',
+      created_at: '2030-01-01T10:00:00',
+      ...over,
+    });
+    const existing = [
+      mk({ id: 'a' }),
+      mk({ id: 'b', start_time: '2030-11-13T21:00:00' }),
+      mk({ id: 'c', lat: 45.43, lng: 12.33 }), // same day, other city
+    ];
+    assert(
+      matchShow(existing, '2030-11-12T20:30:00', 46.0601, 13.2301)?.id === 'a',
+      'same day + place matches even if the time changed'
+    );
+    assert(
+      matchShow(existing, '2030-11-12T21:00:00', 45.43, 12.33)?.id === 'c',
+      'same day, other city matches that show'
+    );
+    assert(
+      matchShow(existing, '2030-11-14T21:00:00', 46.06, 13.23) === undefined,
+      'other day: no match'
+    );
+    assert(
+      matchShow(existing, '2030-11-12T21:00:00', 48.2, 16.4) === undefined,
+      'same day, unknown place: no match'
+    );
+    assert(
+      matchShow([], '2030-11-12T21:00:00', 46.06, 13.23) === undefined,
+      'empty list'
+    );
+
+    const next = (over: Partial<NormalizedEvent> = {}): NormalizedEvent => ({
+      pubkey: 'p',
+      signature: 's',
+      title: 'Test Band live (rewording)',
+      description: 'A different blurb entirely.',
+      url: 'https://other.example',
+      venue_name: 'Club X!',
+      address: 'Via Roma 1, Udine',
+      lat: 46.0602,
+      lng: 13.2299,
+      start_time: '2030-11-12T21:00:00',
+      category: 'music',
+      tags: ['x'],
+      created_at: 'c',
+      ...over,
+    });
+    const base = mk();
+    assert(
+      !differs(base, next()),
+      'wording, url, venue text, tags never trigger an update'
+    );
+    assert(
+      differs(base, next({ start_time: '2030-11-12T20:00:00' })),
+      'start time change'
+    );
+    assert(
+      differs(base, next({ end_time: '2030-11-12T23:00:00' })),
+      'end time appears'
+    );
+    assert(differs(base, next({ lat: 46.07 })), 'coordinates moved > 500 m');
+    assert(
+      !differs(base, next({ lat: 46.063 })),
+      'coordinates within tolerance'
+    );
+    assert(
+      differs(mk({ description: null }), next()),
+      'empty stored description gets filled'
+    );
+    assert(
+      !differs(mk({ description: null }), next({ description: undefined })),
+      'both empty → unchanged'
+    );
+    assert(differs(mk({ url: null }), next()), 'empty stored url gets filled');
+    assert(
+      !differs(
+        mk({ end_time: '2030-11-12T23:00:00' }),
+        next({ end_time: undefined })
+      ),
+      'a known end_time is not erased by a run that lost it'
+    );
+  }
+
+  console.log('\n=== TourPublisher ===\n');
+  {
+    type Call = { url: string; method: string; body?: any };
+    const calls: Call[] = [];
+    const respond = (status: number, json: unknown = {}) =>
+      ({
+        ok: status >= 200 && status < 300,
+        status,
+        json: async () => json,
+        text: async () => JSON.stringify(json),
+      }) as Response;
+    let nextStatus = 201;
+    const fakeFetch = (async (url: string, init?: RequestInit) => {
+      calls.push({
+        url,
+        method: init?.method ?? 'GET',
+        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+      });
+      if ((init?.method ?? 'GET') === 'GET')
+        return respond(200, [
+          {
+            id: 'e1',
+            start_time: '2030-11-12T21:00:00',
+            lat: 46.06,
+            lng: 13.23,
+            tags: [],
+            category: 'music',
+            title: 't',
+            created_at: 'c',
+          },
+        ]);
+      return respond(nextStatus);
+    }) as unknown as typeof fetch;
+
+    const pub = new TourPublisher('http://api.test', 'PUBKEY', fakeFetch);
+    const found = await pub.lookup('https://testband.example');
+    assert(found.length === 1, 'lookup returns the array');
+    const q = new URL(calls[0].url).searchParams;
+    assert(
+      q.get('pubkey') === 'PUBKEY' &&
+        q.get('act_url') === 'https://testband.example',
+      'lookup filters by pubkey + act_url'
+    );
+    assert(
+      q.get('from') === '1970-01-01T00:00:00' &&
+        q.get('to') === '2999-12-31T23:59:59',
+      'lookup uses an explicit wide range'
+    );
+
+    const ev = {
+      pubkey: 'PUBKEY',
+      signature: 's',
+      title: 'T',
+      lat: 46.06,
+      lng: 13.23,
+      start_time: '2030-11-12T21:00:00',
+      category: 'music',
+      created_at: 'c',
+    } as NormalizedEvent;
+    nextStatus = 201;
+    assert(
+      (await pub.apply(ev, undefined)) === 'published',
+      'no match → POST → published'
+    );
+    assert(
+      calls.at(-1)!.method === 'POST' &&
+        calls.at(-1)!.url === 'http://api.test/events',
+      'POST /events'
+    );
+
+    const match = found[0];
+    assert(
+      (await pub.apply(ev, match)) === 'unchanged',
+      'match without meaningful change → unchanged (no request)'
+    );
+    const before = calls.length;
+    nextStatus = 200;
+    assert(
+      (await pub.apply({ ...ev, start_time: '2030-11-12T20:00:00' }, match)) ===
+        'updated',
+      'changed time → PUT → updated'
+    );
+    assert(
+      calls.at(-1)!.method === 'PUT' &&
+        calls.at(-1)!.url === 'http://api.test/events/e1',
+      'PUT /events/:id'
+    );
+    assert(calls.length === before + 1, 'exactly one request for the update');
+
+    const calls404 = calls.length;
+    const seq = (async (url: string, init?: RequestInit) => {
+      calls.push({ url, method: init?.method ?? 'GET' });
+      if (init?.method === 'PUT') return respond(404);
+      return respond(201);
+    }) as unknown as typeof fetch;
+    const pub404 = new TourPublisher('http://api.test', 'PUBKEY', seq);
+    assert(
+      (await pub404.apply(
+        { ...ev, start_time: '2030-11-12T20:00:00' },
+        match
+      )) === 'published',
+      'PUT 404 falls back to POST'
+    );
+    assert(calls.length === calls404 + 2, 'PUT then POST');
+
+    for (const [status, label] of [
+      [401, 'PUT 401'],
+      [409, 'POST 409'],
+      [500, 'POST 500'],
+    ] as const) {
+      const f = (async () => respond(status)) as unknown as typeof fetch;
+      const p = new TourPublisher('http://api.test', 'PUBKEY', f);
+      const outcome = label.startsWith('PUT')
+        ? await p.apply({ ...ev, start_time: '2030-11-12T20:00:00' }, match)
+        : await p.apply(ev, undefined);
+      assert(outcome === 'failed', `${label} → failed`);
+    }
+    const netErr = new TourPublisher('http://api.test', 'PUBKEY', (async () => {
+      throw new Error('boom');
+    }) as unknown as typeof fetch);
+    assert(
+      (await netErr.apply(ev, undefined)) === 'failed',
+      'network error → failed'
+    );
+
+    const badShape = new TourPublisher('http://api.test', 'PUBKEY', (async () =>
+      respond(200, { events: [] })) as unknown as typeof fetch);
+    assert(
+      await badShape.lookup('https://x.example').then(
+        () => false,
+        () => true
+      ),
+      'lookup rejects a non-array response'
+    );
+    const notOk = new TourPublisher('http://api.test', 'PUBKEY', (async () =>
+      respond(500)) as unknown as typeof fetch);
+    assert(
+      await notOk.lookup('https://x.example').then(
+        () => false,
+        () => true
+      ),
+      'lookup rejects a non-2xx response'
     );
   }
 
