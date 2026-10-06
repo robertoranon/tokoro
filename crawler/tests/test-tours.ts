@@ -49,6 +49,15 @@ import {
 } from '../src/tours/tour-source.js';
 import { parseBandsConfig as parseCfg } from '../src/tours/bands-config.js';
 import type { ExtractedEvent } from '../src/types/event.js';
+import {
+  geocodeCandidates,
+  geocodeAddress,
+  pickCandidate,
+  medianBias,
+  clearGeocodeCache,
+  setGeocodeMinIntervalMs,
+  type GeoCandidate,
+} from '../../shared/utils/geocode.js';
 
 let passed = 0;
 let failed = 0;
@@ -1981,6 +1990,221 @@ sources:
       sent[0].ev.created_at === '2030-01-01T10:00:00',
       'matched by venue before geocoding, so the update is signed with the stored created_at'
     );
+  }
+
+  console.log('\n=== geocoder candidates and bias ===\n');
+  {
+    setGeocodeMinIntervalMs(0);
+    const realFetch = globalThis.fetch;
+    try {
+      const requested: string[] = [];
+      // A tiny fake Nominatim: query → rows (or an HTTP status number).
+      const row = (
+        lat: number,
+        lng: number,
+        importance: number,
+        cc: string,
+        name: string
+      ) => ({
+        lat: String(lat),
+        lon: String(lng),
+        display_name: name,
+        importance,
+        address: { country_code: cc },
+      });
+      const table: Record<string, unknown[] | number> = {
+        Durham: [
+          row(54.67, -1.75, 0.619, 'gb', 'County Durham, England, UK'),
+          row(36.0, -78.9, 0.619, 'us', 'Durham, North Carolina, USA'),
+          row(54.78, -1.58, 0.594, 'gb', 'Durham, England, UK'),
+          row(43.12, -70.92, 0.513, 'us', 'Durham, New Hampshire, USA'),
+        ],
+        Sydney: [
+          row(
+            -33.87,
+            151.21,
+            0.782,
+            'au',
+            'Sydney, New South Wales, Australia'
+          ),
+          row(46.14, -60.19, 0.512, 'ca', 'Sydney, Nova Scotia, Canada'),
+        ],
+        Atlanta: [row(33.75, -84.39, 0.7, 'us', 'Atlanta, Georgia, USA')],
+        Washington: [row(38.9, -77.04, 0.8, 'us', 'Washington, DC, USA')],
+        Asheville: [
+          row(35.6, -82.55, 0.6, 'us', 'Asheville, North Carolina, USA'),
+        ],
+        Nowhere: [],
+        Limited: 429,
+      };
+      const stub = () => {
+        requested.length = 0;
+        clearGeocodeCache();
+        globalThis.fetch = (async (url: any) => {
+          const q = new URL(String(url)).searchParams.get('q')!;
+          requested.push(q);
+          const hit = table[q];
+          if (typeof hit === 'number')
+            return { ok: false, status: hit, json: async () => [] } as Response;
+          return {
+            ok: true,
+            status: 200,
+            json: async () => hit ?? [],
+          } as Response;
+        }) as typeof fetch;
+      };
+
+      stub();
+      const durham = await geocodeCandidates('Durham');
+      assert(
+        durham.length === 4 &&
+          durham[0].countryCode === 'GB' &&
+          durham[1].displayName.includes('North Carolina'),
+        'candidates are parsed (importance, display name, upper-case country code)'
+      );
+      assert(
+        durham[1].importance === 0.619 &&
+          durham[1].lat === 36.0 &&
+          durham[1].lng === -78.9,
+        'with coordinates and importance as numbers'
+      );
+      await geocodeCandidates('Durham');
+      await geocodeCandidates('  durham ');
+      assert(
+        requested.length === 1,
+        'the same query is requested once per process (cached, case- and space-insensitive)'
+      );
+      assert(
+        (await geocodeCandidates('Nowhere')).length === 0,
+        'no results is an empty list'
+      );
+      assert(
+        await geocodeCandidates('Limited').then(
+          () => false,
+          e => /429/.test(String(e))
+        ),
+        'HTTP errors reject'
+      );
+      const before = requested.length;
+      await geocodeCandidates('Limited').catch(() => {});
+      assert(requested.length === before + 1, 'a failed request is not cached');
+
+      // pickCandidate
+      const cand = (
+        lat: number,
+        lng: number,
+        importance: number,
+        cc = 'xx'
+      ): GeoCandidate => ({
+        lat,
+        lng,
+        importance,
+        displayName: `${lat},${lng}`,
+        countryCode: cc,
+      });
+      const NA = { lat: 37, lng: -80 };
+      assert(pickCandidate([], NA) === undefined, 'no candidates → undefined');
+      assert(
+        pickCandidate(durham)?.countryCode === 'GB',
+        'without a bias the first candidate is used, as before'
+      );
+      assert(
+        pickCandidate(durham, NA)?.displayName.includes('North Carolina') ===
+          true,
+        'a tie (0.619 / 0.619) goes to the candidate nearest the bias'
+      );
+      const sydney = await geocodeCandidates('Sydney');
+      assert(
+        pickCandidate(sydney, NA)?.countryCode === 'AU',
+        'a clear winner (0.782 vs 0.512) is kept whatever the bias'
+      );
+      const near = [cand(10, 10, 0.5), cand(50, 50, 0.52), cand(11, 11, 0.9)];
+      assert(
+        pickCandidate(near, { lat: 50, lng: 50 })?.importance === 0.9,
+        'only candidates within the margin of the best compete'
+      );
+      assert(
+        pickCandidate(
+          [cand(10, 10, 0.5), cand(50, 50, 0.46)],
+          { lat: 50, lng: 50 },
+          0.1
+        )?.lat === 50,
+        'the margin is a parameter'
+      );
+      assert(
+        pickCandidate([cand(1, 1, 0), cand(2, 2, 0)], { lat: 2, lng: 2 })
+          ?.lat === 2,
+        'missing importance (0) ties everything: nearest wins'
+      );
+
+      // geocodeAddress
+      stub();
+      assert(
+        (await geocodeAddress('Durham'))?.lat === 54.67,
+        'geocodeAddress without a bias is unchanged (first candidate)'
+      );
+      const biased = await geocodeAddress('Durham', undefined, { bias: NA });
+      assert(
+        biased?.lat === 36.0 &&
+          !!biased?.displayName.includes('North Carolina'),
+        'with a bias the near-tie resolves to North Carolina'
+      );
+      assert(
+        requested.filter(q => q === 'Durham').length === 1,
+        'both calls share one request'
+      );
+      assert(
+        (await geocodeAddress('Sydney', undefined, { bias: NA }))?.lat ===
+          -33.87,
+        'Sydney stays in Australia with the same bias'
+      );
+      assert(
+        (await geocodeAddress('Nowhere', undefined, { bias: NA })) === null,
+        'no result stays null'
+      );
+
+      // medianBias
+      stub();
+      const bias3 = await medianBias([
+        'Atlanta',
+        'Washington',
+        'Asheville',
+        'Durham',
+      ]);
+      assert(
+        !!bias3 && bias3.lat > 33 && bias3.lat < 40 && bias3.lng < -70,
+        'the median of the first candidates is in North America (the UK Durham among four places cannot move it)'
+      );
+      stub();
+      assert(
+        (await medianBias(['Atlanta', 'Washington'])) === undefined,
+        'fewer than 3 places: no bias'
+      );
+      stub();
+      const withFailures = await medianBias([
+        'Atlanta',
+        'Limited',
+        'Nowhere',
+        'Washington',
+        'Asheville',
+        'Atlanta',
+      ]);
+      assert(
+        !!withFailures,
+        'failing and empty queries are skipped, duplicates counted once'
+      );
+      stub();
+      await medianBias(['Atlanta', 'atlanta ', 'Washington', 'Asheville']);
+      assert(
+        requested.filter(q => q.toLowerCase().trim() === 'atlanta').length ===
+          1,
+        'the same place is looked up once'
+      );
+    } finally {
+      globalThis.fetch = realFetch;
+      clearGeocodeCache();
+      setGeocodeMinIntervalMs(1100);
+    }
   }
 
   // (later tasks append their sections above this line)
