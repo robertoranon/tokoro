@@ -23,6 +23,7 @@ import {
   type ExistingShow,
   type TourOutcome,
 } from './tour-publisher.js';
+import { errorReason, MAX_REASON, truncate } from './failure-report.js';
 
 export type ShowOutcome =
   | TourOutcome
@@ -40,6 +41,23 @@ export interface ShowResult {
    * update. The crawler never deletes; the curator removes it.
    */
   stale?: { id: string; band: string; lat: number; lng: number };
+  /** Why the show failed (set whenever `outcome` is 'failed'). */
+  reason?: string;
+}
+
+/** Why normalize found no location for a show (it returned null). */
+function noLocationReason(entry: ExtractedEvent): string {
+  const query = entry.address || entry.venue_name;
+  if (query) {
+    return truncate(
+      `geocoding found no usable location for "${query}"`,
+      MAX_REASON
+    );
+  }
+  if (entry.lat === undefined || entry.lng === undefined) {
+    return 'no address or venue on the page to geocode';
+  }
+  return 'no usable location for the coordinates on the page';
 }
 
 export interface TourCounters {
@@ -98,6 +116,8 @@ export interface TourSourceDeps {
     event: NormalizedEvent,
     match: ExistingShow | undefined
   ) => Promise<TourOutcome>;
+  /** Why the last `apply` failed (the publisher's `lastFailure`). Optional. */
+  failureReason?: () => string | undefined;
   /**
    * Where the page's places cluster (see `medianBias`), given the geocoder
    * queries of the upcoming shows that have no coordinates. Optional: without
@@ -249,7 +269,11 @@ export async function processTourSourcePage(
         );
       }
       if (!normalized) {
-        results.push({ title: draft.title, outcome: 'failed' });
+        results.push({
+          title: draft.title,
+          outcome: 'failed',
+          reason: noLocationReason(entry),
+        });
         continue;
       }
 
@@ -302,7 +326,18 @@ export async function processTourSourcePage(
       }
 
       const outcome = await deps.apply(normalized, match);
-      results.push({ title: draft.title, outcome });
+      if (outcome === 'failed') {
+        results.push({
+          title: draft.title,
+          outcome,
+          reason: truncate(
+            deps.failureReason?.() || 'publishing failed',
+            MAX_REASON
+          ),
+        });
+      } else {
+        results.push({ title: draft.title, outcome });
+      }
       if (outcome === 'published' || outcome === 'updated') {
         const key = handledKey(band.url, normalized.start_time.slice(0, 10));
         const stub: ExistingShow = {
@@ -323,7 +358,11 @@ export async function processTourSourcePage(
       console.error(
         `  Error on "${draft.title}": ${error instanceof Error ? error.message : error}`
       );
-      results.push({ title: draft.title, outcome: 'failed' });
+      results.push({
+        title: draft.title,
+        outcome: 'failed',
+        reason: errorReason(error),
+      });
     }
   }
   return results;

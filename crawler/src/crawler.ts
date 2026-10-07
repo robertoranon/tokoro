@@ -24,6 +24,7 @@ import {
 import { TourExtractor } from './extractors/tour-extractor.js';
 import { TourPublisher } from './tours/tour-publisher.js';
 import { signAdoption } from './tours/adopt.js';
+import { errorReason } from './tours/failure-report.js';
 import { medianBias } from '../../shared/utils/geocode.js';
 import {
   processTourSourcePage,
@@ -182,6 +183,8 @@ export interface TourSourceResult {
   url: string;
   outcome: SourceOutcome;
   shows: ShowResult[];
+  /** Why the whole source failed (fetch, block page, extraction...). */
+  error?: string;
 }
 export type FetcherType = 'playwright' | 'jina';
 export type { BrowserEngine, PdfParserType };
@@ -657,21 +660,28 @@ export class EventCrawler {
 
         let shows: ShowResult[] = [];
         let outcome: SourceOutcome;
+        let error: string | undefined;
         try {
           const page = assertNotBlocked(
             await this.fetcherForUrl(source.url).fetchPage(source.url)
           );
           shows = await this.processTourSource(page, source, config);
           outcome = sourceOutcome(shows);
-        } catch (error) {
+        } catch (err) {
           console.error(
             `\n❌ Error processing tour source ${source.url}:`,
-            error
+            err
           );
           outcome = 'failed';
+          error = errorReason(err);
         }
         console.log(`→ ${outcome}`);
-        results.push({ url: source.url, outcome, shows });
+        results.push({
+          url: source.url,
+          outcome,
+          shows,
+          ...(error !== undefined ? { error } : {}),
+        });
       }
     } finally {
       await this.fetcher.close();
@@ -726,6 +736,7 @@ export class EventCrawler {
       ownPubkey: this.config.keypair.pubkey,
       normalize: (event, options) => this.normalizer.normalize(event, options),
       apply: (event, match) => this.tourPublisher.apply(event, match),
+      failureReason: () => this.tourPublisher.lastFailure,
       today,
     });
   }

@@ -5,7 +5,14 @@ import { fileURLToPath } from 'url';
 /** A line of logs/runs.jsonl. `kind` is absent on records written before radar existed. */
 export interface RunRecord {
   kind?: 'jobs' | 'radar' | 'scout' | 'tours';
-  entries?: Array<{ url: string; outcome: string; failed_shows?: number }>;
+  entries?: Array<{
+    url: string;
+    outcome: string;
+    failed_shows?: number;
+    error?: string;
+    failures?: Array<{ title: string; reason: string }>;
+    failures_omitted?: number;
+  }>;
   [key: string]: unknown;
 }
 

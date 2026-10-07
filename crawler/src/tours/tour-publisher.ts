@@ -113,6 +113,17 @@ export function differs(
   );
 }
 
+/** The run-log reason for a non-OK response (never the body). */
+function apiFailure(status: number, request: string): string {
+  if (status === 401 || status === 403) {
+    return `API error ${status} — signing or identity problem`;
+  }
+  if (status === 409) {
+    return 'duplicate of an existing event that could not be linked';
+  }
+  return `API error ${status} (${request})`;
+}
+
 export type AdoptSigner = (
   eventId: string,
   actName: string,
@@ -120,12 +131,22 @@ export type AdoptSigner = (
 ) => Promise<string>;
 
 export class TourPublisher {
+  private failure: string | undefined;
+
   constructor(
     private apiUrl: string,
     private pubkey: string,
     private fetchFn: typeof fetch = fetch,
     private signAdopt?: AdoptSigner
   ) {}
+
+  /**
+   * Why the last `apply` failed: short and safe for the run log (no response
+   * bodies, no keys). Undefined when it did not fail.
+   */
+  get lastFailure(): string | undefined {
+    return this.failure;
+  }
 
   /**
    * Every show of one act (any date), whichever key published it, so events
@@ -168,6 +189,7 @@ export class TourPublisher {
     event: NormalizedEvent,
     match: ExistingShow | undefined
   ): Promise<TourOutcome> {
+    this.failure = undefined;
     if (!match) return this.post(event);
     if (!differs(match, event)) {
       console.log(`= Unchanged: ${event.title}`);
@@ -178,7 +200,10 @@ export class TourPublisher {
 
   private async post(event: NormalizedEvent): Promise<TourOutcome> {
     const res = await this.send('POST', '/events', event);
-    if (!res) return 'failed';
+    if (!res) {
+      this.failure = 'network error (POST /events)';
+      return 'failed';
+    }
     if (res.ok) {
       console.log(`✓ Published: ${event.title}`);
       return 'published';
@@ -189,6 +214,7 @@ export class TourPublisher {
       if (adopted) return adopted;
     }
     this.logError(res.status, event, body);
+    this.failure = apiFailure(res.status, 'POST /events');
     return 'failed';
   }
 
@@ -262,7 +288,10 @@ export class TourPublisher {
 
   private async put(id: string, event: NormalizedEvent): Promise<TourOutcome> {
     const res = await this.send('PUT', `/events/${id}`, event);
-    if (!res) return 'failed';
+    if (!res) {
+      this.failure = 'network error (PUT /events/:id)';
+      return 'failed';
+    }
     if (res.ok) {
       console.log(`↻ Updated: ${event.title} (ID: ${id})`);
       return 'updated';
@@ -272,6 +301,7 @@ export class TourPublisher {
       return this.post(event);
     }
     this.logError(res.status, event, await res.text().catch(() => ''));
+    this.failure = apiFailure(res.status, 'PUT /events/:id');
     return 'failed';
   }
 

@@ -16,6 +16,13 @@ import {
 import { tallyShows } from './tours/tour-source.js';
 import { selectRetrySources } from './tours/retry.js';
 import {
+  errorReason,
+  formatFailures,
+  MAX_FAILURES,
+  MAX_TITLE,
+  truncate,
+} from './tours/failure-report.js';
+import {
   appendRunLog,
   defaultLogsDir,
   readRunRecords,
@@ -59,10 +66,20 @@ export function buildTourRunRecord(
     ...counters,
     ...(staleShows.length > 0 ? { stale: staleShows } : {}),
     entries: results.map(r => {
-      const failedShows = r.shows.filter(x => x.outcome === 'failed').length;
-      return failedShows > 0
-        ? { url: r.url, outcome: r.outcome, failed_shows: failedShows }
-        : { url: r.url, outcome: r.outcome };
+      const failed = r.shows.filter(x => x.outcome === 'failed');
+      const failures = failed.slice(0, MAX_FAILURES).map(x => ({
+        title: truncate(x.title, MAX_TITLE),
+        reason: x.reason ?? 'unknown reason',
+      }));
+      const omitted = failed.length - failures.length;
+      return {
+        url: r.url,
+        outcome: r.outcome,
+        ...(failed.length > 0 ? { failed_shows: failed.length } : {}),
+        ...(r.error ? { error: r.error } : {}),
+        ...(failures.length > 0 ? { failures } : {}),
+        ...(omitted > 0 ? { failures_omitted: omitted } : {}),
+      };
     }),
   };
 }
@@ -169,7 +186,12 @@ async function main() {
       console.error(
         `  Error: ${error instanceof Error ? error.message : error}`
       );
-      results.push({ url: source.url, outcome: 'failed', shows: [] });
+      results.push({
+        url: source.url,
+        outcome: 'failed',
+        shows: [],
+        error: errorReason(error),
+      });
     }
   }
 
@@ -184,6 +206,12 @@ async function main() {
     console.log(
       `\nTours complete: ${record.published} published, ${record.updated} updated, ${record.unchanged} unchanged, ${record.adopted} adopted, ${record.duplicate} duplicate, ${record.unmatched} unmatched, ${record.skipped_past} past, ${record.skipped_out_of_region} out of region, ${record.failed} failed`
     );
+  }
+
+  const failureLines = formatFailures(results);
+  if (failureLines.length > 0) {
+    console.log('');
+    for (const line of failureLines) console.log(line);
   }
 
   if (record.stale && record.stale.length > 0) {
