@@ -52,6 +52,7 @@ import {
 } from '../src/tours/tour-source.js';
 import { parseBandsConfig as parseCfg } from '../src/tours/bands-config.js';
 import { buildTrackedBands } from '../src/tours/tracked-bands.js';
+import { formatFailures } from '../src/tours/failure-report.js';
 import { parseExportArgs } from '../src/export-tracked-bands.js';
 import type { ExtractedEvent } from '../src/types/event.js';
 import {
@@ -2886,6 +2887,443 @@ sources: []
     assert(
       throws(() => parseExportArgs(['node', 'x', '--out', 'o.json', '--nope'])),
       'unknown flags are rejected'
+    );
+  }
+
+  console.log('\n=== failure reasons: processTourSourcePage ===\n');
+  {
+    const cfg = parseCfg(`
+bands:
+  - name: Test Band
+    url: https://testband.example
+sources:
+  - { url: "https://testband.example/live", mode: band, band: Test Band }
+`);
+    const page: FetchedPage = {
+      url: 'https://testband.example/live',
+      title: 'P',
+      html: '',
+      text: 'x',
+    };
+    const okNormalize: TourSourceDeps['normalize'] = async (e, opts) =>
+      ({
+        pubkey: 'p',
+        signature: 's',
+        title: e.title,
+        lat: e.lat ?? 46.06,
+        lng: e.lng ?? 13.23,
+        start_time: String(e.start_time),
+        category: e.category,
+        created_at: opts?.createdAt ?? 'now',
+        act_name: e.act_name,
+        act_url: e.act_url,
+        tags: e.tags,
+      }) as NormalizedEvent;
+    const deps = (
+      drafts: TourShowDraft[],
+      over: Partial<TourSourceDeps> = {}
+    ): TourSourceDeps => ({
+      extract: async () => drafts,
+      lookup: async () => [],
+      normalize: okNormalize,
+      apply: async () => 'published',
+      today: '2030-10-01',
+      ...over,
+    });
+    const run = (d: TourSourceDeps) =>
+      processTourSourcePage(page, cfg.sources[0], cfg, d);
+    const noPlace: TourShowDraft = {
+      title: 'Nowhere show',
+      performers: ['Test Band'],
+      start_time: '2030-11-12T21:00:00',
+    };
+    const withCity: TourShowDraft = {
+      ...noPlace,
+      title: 'Udine show',
+      venue_name: 'Club X',
+      city: 'Udine',
+    };
+    const venueOnly: TourShowDraft = {
+      ...noPlace,
+      title: 'Venue show',
+      venue_name: 'Club X',
+    };
+
+    let res = await run(deps([noPlace], { normalize: async () => null }));
+    assert(
+      res[0].outcome === 'failed' &&
+        res[0].reason === 'no address or venue on the page to geocode',
+      'normalize null without any place → "no address or venue on the page to geocode"'
+    );
+    res = await run(deps([withCity], { normalize: async () => null }));
+    assert(
+      res[0].outcome === 'failed' &&
+        res[0].reason === 'geocoding found no usable location for "Udine"',
+      'normalize null with an address → geocoding reason quoting the address'
+    );
+    res = await run(deps([venueOnly], { normalize: async () => null }));
+    assert(
+      res[0].reason === 'geocoding found no usable location for "Club X"',
+      'normalize null with only a venue → the venue is the quoted query'
+    );
+    const longCity: TourShowDraft = {
+      ...noPlace,
+      city: 'x'.repeat(300),
+    };
+    res = await run(deps([longCity], { normalize: async () => null }));
+    assert(
+      res[0].reason!.length === 160 && res[0].reason!.endsWith('…'),
+      'a long reason is truncated to 160 chars with an ellipsis'
+    );
+
+    res = await run(
+      deps([withCity], {
+        apply: async () => 'failed',
+        failureReason: () => 'API error 500 (POST /events)',
+      })
+    );
+    assert(
+      res[0].outcome === 'failed' &&
+        res[0].reason === 'API error 500 (POST /events)',
+      "apply 'failed' → the publisher's failure reason"
+    );
+    res = await run(deps([withCity], { apply: async () => 'failed' }));
+    assert(
+      res[0].reason === 'publishing failed',
+      'apply \'failed\' without failureReason → "publishing failed"'
+    );
+    res = await run(
+      deps([withCity], {
+        apply: async () => 'failed',
+        failureReason: () => undefined,
+      })
+    );
+    assert(
+      res[0].reason === 'publishing failed',
+      'failureReason returning nothing → "publishing failed"'
+    );
+    res = await run(
+      deps([withCity], {
+        lookup: async () => {
+          throw new Error('Lookup failed (500)');
+        },
+      })
+    );
+    assert(
+      res[0].outcome === 'failed' && res[0].reason === 'Lookup failed (500)',
+      'lookup throwing → the error message'
+    );
+    res = await run(
+      deps([withCity], {
+        normalize: async () => {
+          throw new Error('Nominatim exploded');
+        },
+      })
+    );
+    assert(
+      res[0].outcome === 'failed' && res[0].reason === 'Nominatim exploded',
+      'normalize throwing → the error message'
+    );
+    res = await run(deps([withCity]));
+    assert(
+      res[0].outcome === 'published' && !('reason' in res[0]),
+      'a successful show carries no reason'
+    );
+  }
+
+  console.log('\n=== failure reasons: TourPublisher.lastFailure ===\n');
+  {
+    const ev = {
+      pubkey: 'PUBKEY',
+      signature: 's',
+      title: 'T',
+      lat: 46.06,
+      lng: 13.23,
+      start_time: '2030-11-12T21:00:00',
+      category: 'music',
+      created_at: 'c',
+    } as NormalizedEvent;
+    const match: ExistingShow = {
+      id: 'e1',
+      title: 'T',
+      lat: 46.06,
+      lng: 13.23,
+      start_time: '2030-11-12T21:00:00',
+      category: 'music',
+      tags: [],
+      created_at: 'c',
+    };
+    const respond = (status: number, json: unknown = { error: 'SECRET' }) =>
+      ({
+        ok: status >= 200 && status < 300,
+        status,
+        json: async () => json,
+        text: async () => JSON.stringify(json),
+      }) as Response;
+    let status = 500;
+    const f = (async () => respond(status)) as unknown as typeof fetch;
+    const pub = new TourPublisher('http://api.test', 'PUBKEY', f);
+    assert(pub.lastFailure === undefined, 'no failure before any apply');
+
+    status = 500;
+    await pub.apply(ev, undefined);
+    assert(
+      pub.lastFailure === 'API error 500 (POST /events)',
+      'POST 500 → "API error 500 (POST /events)"'
+    );
+    status = 403;
+    await pub.apply(ev, undefined);
+    assert(
+      pub.lastFailure === 'API error 403 — signing or identity problem',
+      'POST 403 → signing or identity problem'
+    );
+    status = 401;
+    await pub.apply({ ...ev, start_time: '2030-11-12T20:00:00' }, match);
+    assert(
+      pub.lastFailure === 'API error 401 — signing or identity problem',
+      'PUT 401 → signing or identity problem'
+    );
+    status = 500;
+    await pub.apply({ ...ev, start_time: '2030-11-12T20:00:00' }, match);
+    assert(
+      pub.lastFailure === 'API error 500 (PUT /events/:id)',
+      'PUT 500 → "API error 500 (PUT /events/:id)"'
+    );
+    assert(
+      !/SECRET|PUBKEY/.test(pub.lastFailure ?? ''),
+      'no response body or key in the reason'
+    );
+    status = 409;
+    await pub.apply(ev, undefined);
+    assert(
+      pub.lastFailure ===
+        'duplicate of an existing event that could not be linked',
+      'unlinkable 409 → duplicate that could not be linked'
+    );
+    status = 201;
+    assert(
+      (await pub.apply(ev, undefined)) === 'published' &&
+        pub.lastFailure === undefined,
+      'a successful apply resets lastFailure'
+    );
+    status = 500;
+    await pub.apply(ev, undefined);
+    assert(
+      (await pub.apply(ev, match)) === 'unchanged' &&
+        pub.lastFailure === undefined,
+      'an unchanged apply (no request) resets lastFailure too'
+    );
+
+    const netErr = new TourPublisher('http://api.test', 'PUBKEY', (async () => {
+      throw new Error('boom');
+    }) as unknown as typeof fetch);
+    await netErr.apply(ev, undefined);
+    assert(
+      netErr.lastFailure === 'network error (POST /events)',
+      'network error on POST → "network error (POST /events)"'
+    );
+    await netErr.apply({ ...ev, start_time: '2030-11-12T20:00:00' }, match);
+    assert(
+      netErr.lastFailure === 'network error (PUT /events/:id)',
+      'network error on PUT → "network error (PUT /events/:id)"'
+    );
+  }
+
+  console.log('\n=== failure reasons: run record ===\n');
+  {
+    const failedShows = (n: number, reason: string): ShowResult[] =>
+      Array.from({ length: n }, (_, i) => ({
+        title: `Show ${i + 1}`,
+        outcome: 'failed' as const,
+        reason,
+      }));
+    const results: TourSourceResult[] = [
+      {
+        url: 'https://a.example/live',
+        outcome: 'published',
+        shows: [
+          { title: 'ok', outcome: 'published' },
+          {
+            title: 'T'.repeat(200),
+            outcome: 'failed',
+            reason: 'API error 500 (POST /events)',
+          },
+        ],
+      },
+      {
+        url: 'https://b.example/live',
+        outcome: 'unchanged',
+        shows: [{ title: 'x', outcome: 'unchanged' }],
+      },
+      {
+        url: 'https://c.example/live',
+        outcome: 'failed',
+        shows: [],
+        error:
+          'Blocked by bot protection ("Just a moment") at https://c.example/live',
+      },
+      {
+        url: 'https://d.example/live',
+        outcome: 'failed',
+        shows: failedShows(13, 'publishing failed'),
+      },
+    ];
+    const rec = buildTourRunRecord(
+      results,
+      new Date('2030-10-01T10:00:00Z'),
+      new Date('2030-10-01T10:01:00Z')
+    );
+    const [a, b, c, d] = rec.entries as any[];
+    assert(
+      a.failed_shows === 1 &&
+        a.failures.length === 1 &&
+        a.failures[0].reason === 'API error 500 (POST /events)',
+      'failures list the failed shows with their reason'
+    );
+    assert(
+      a.failures[0].title.length === 80 && a.failures[0].title.endsWith('…'),
+      'long titles are truncated to 80 chars'
+    );
+    assert(
+      !('failures_omitted' in a) && !('error' in a),
+      'no failures_omitted / error keys when not relevant'
+    );
+    assert(
+      Object.keys(b).sort().join() === 'outcome,url',
+      'a clean source has only url and outcome'
+    );
+    assert(
+      c.error ===
+        'Blocked by bot protection ("Just a moment") at https://c.example/live' &&
+        !('failures' in c),
+      'a source error is recorded, without an empty failures list'
+    );
+    assert(
+      d.failed_shows === 13 &&
+        d.failures.length === 10 &&
+        d.failures_omitted === 3 &&
+        d.failures[9].title === 'Show 10',
+      'at most 10 failures, the rest counted in failures_omitted'
+    );
+
+    // --retry-failed ignores the new keys
+    const src = (url: string) => ({ url, mode: 'band' as const, band: 'X' });
+    const sel = selectRetrySources(
+      [
+        src('https://a.example/live'),
+        src('https://b.example/live'),
+        src('https://c.example/live'),
+        src('https://d.example/live'),
+      ],
+      [JSON.parse(JSON.stringify(rec)) as RunRecord]
+    );
+    assert(
+      sel.sources.map(s => s.url).join() ===
+        'https://a.example/live,https://c.example/live,https://d.example/live',
+      'selectRetrySources works on entries with error/failures/failures_omitted'
+    );
+    const withKeys: RunRecord = {
+      kind: 'tours',
+      started_at: 's',
+      entries: [
+        {
+          url: 'https://b.example/live',
+          outcome: 'published',
+          failures: [{ title: 't', reason: 'r' }],
+          error: 'e',
+        },
+      ],
+    };
+    assert(
+      selectRetrySources([src('https://b.example/live')], [withKeys]).sources
+        .length === 0,
+      'error/failures alone do not select a source (outcome and failed_shows decide)'
+    );
+  }
+
+  console.log('\n=== failure reasons: formatFailures ===\n');
+  {
+    const shows = (
+      list: [string, string][],
+      extra: ShowResult[] = []
+    ): ShowResult[] => [
+      ...extra,
+      ...list.map(([title, reason]) => ({
+        title,
+        outcome: 'failed' as const,
+        reason,
+      })),
+    ];
+    assert(
+      formatFailures([
+        {
+          url: 'https://a.example/live',
+          outcome: 'published',
+          shows: [{ title: 'ok', outcome: 'published' }],
+        },
+      ]).length === 0,
+      'nothing to report → no lines'
+    );
+    const lines = formatFailures([
+      {
+        url: 'https://www.venue.example/programme/?page=2#top',
+        outcome: 'published',
+        shows: shows(
+          [
+            ['A', 'API error 500 (POST /events)'],
+            ['B', 'API error 500 (POST /events)'],
+            ['C', 'geocoding found no usable location for "Udine"'],
+            ['D', 'API error 500 (POST /events)'],
+            ['E', 'Lookup failed (500)'],
+            ['F', 'Lookup failed (500)'],
+          ],
+          [{ title: 'fine', outcome: 'published' }]
+        ),
+      },
+      { url: 'https://clean.example/', outcome: 'unchanged', shows: [] },
+      {
+        url: 'https://blocked.example/',
+        outcome: 'failed',
+        shows: [],
+        error: 'fetch failed',
+      },
+    ]);
+    assert(
+      JSON.stringify(lines) ===
+        JSON.stringify([
+          'Failures (why):',
+          '  - www.venue.example/programme/',
+          '    · 3 shows: API error 500 (POST /events)',
+          '    · C: geocoding found no usable location for "Udine"',
+          '    · E: Lookup failed (500)',
+          '    · F: Lookup failed (500)',
+          '  - blocked.example',
+          '    fetch failed',
+        ]),
+      'groups 3+ identical reasons, lists the rest, skips clean sources, prints source errors'
+    );
+
+    const many = formatFailures([
+      {
+        url: 'https://x.example/' + 'p'.repeat(100),
+        outcome: 'failed',
+        shows: shows(
+          Array.from(
+            { length: 14 },
+            (_, i) => [`S${i + 1}`, `reason ${i + 1}`] as [string, string]
+          )
+        ),
+      },
+    ]);
+    assert(
+      many[1].length === 4 + 70 && many[1].endsWith('…'),
+      'the url is shortened to host+path, at most 70 chars'
+    );
+    assert(
+      many.length === 2 + 10 + 1 &&
+        many[11] === '    · S10: reason 10' &&
+        many[12] === '    … and 4 more',
+      'at most 10 lines per source, then "… and N more"'
     );
   }
 
