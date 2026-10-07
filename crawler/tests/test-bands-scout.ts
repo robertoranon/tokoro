@@ -669,6 +669,103 @@ sources:
         'tour link whose page is empty is still used, flagged as not verified'
       );
     }
+    // aggregator fallback: blocked site, or no tour page on it
+    {
+      const bitUrl = 'https://www.bandsintown.com/a/123-test-band';
+      const withAgg: SearchResult[] = [
+        ...results,
+        { title: 'Test Band Tour Dates', url: bitUrl, snippet: 'concerts' },
+      ];
+      const aggLLM = (pick: string | null) =>
+        fakeLLM((system, _user) => {
+          if (/Bandsintown or Songkick/.test(system))
+            return JSON.stringify({ url: pick });
+          if (/search results/i.test(system))
+            return JSON.stringify({
+              url: 'https://testband.example/en/home?utm=1',
+            });
+          return JSON.stringify({
+            tour_url: null,
+            homepage_lists_shows: false,
+          });
+        });
+      const blockedSite = async (url: string) => {
+        if (url.includes('bandsintown'))
+          return page(url, '', 'Test Band concerts');
+        throw new Error('Blocked by bot protection');
+      };
+
+      const o = await findBand(
+        { name: 'Test Band' },
+        mkDeps(aggLLM(bitUrl), {
+          search: async () => withAgg,
+          fetchPage: blockedSite,
+        })
+      );
+      assert(
+        o.status === 'found' && o.tourUrl === bitUrl,
+        'blocked site → aggregator page used as tour page'
+      );
+      if (o.status === 'found')
+        assert(
+          o.siteUrl === 'https://testband.example/en/home' &&
+            /aggregator/.test(o.note),
+          'site kept, note says aggregator'
+        );
+
+      const noTour = await findBand(
+        { name: 'Test Band' },
+        mkDeps(aggLLM(bitUrl), {
+          search: async () => withAgg,
+          fetchPage: async url =>
+            page(url, '<a href="/music">M</a>', 'Test Band concerts'),
+        })
+      );
+      assert(
+        noTour.status === 'found' && noTour.tourUrl === bitUrl,
+        'no tour page on the site → aggregator page'
+      );
+
+      const wrongBand = await findBand(
+        { name: 'Test Band' },
+        mkDeps(aggLLM(bitUrl), {
+          search: async () => withAgg,
+          fetchPage: async url =>
+            url.includes('bandsintown')
+              ? page(url, '', 'Other Artist events')
+              : blockedSite(url),
+        })
+      );
+      assert(
+        wrongBand.status === 'error',
+        'aggregator page not naming the band is rejected (original error kept)'
+      );
+
+      const invented = await findBand(
+        { name: 'Test Band' },
+        mkDeps(aggLLM('https://www.songkick.com/artists/999'), {
+          search: async () => withAgg,
+          fetchPage: blockedSite,
+        })
+      );
+      assert(
+        invented.status === 'error',
+        'aggregator url outside the results is rejected'
+      );
+
+      const noAgg = await findBand(
+        { name: 'Test Band' },
+        mkDeps(aggLLM(null), {
+          search: async () => results,
+          fetchPage: async url =>
+            page(url, '<a href="/music">M</a>', 'some text'),
+        })
+      );
+      assert(
+        noAgg.status === 'no_tour_page',
+        'no aggregator in results → unchanged no_tour_page'
+      );
+    }
     // errors are contained
     {
       const o = await findBand(

@@ -130,6 +130,9 @@ async function askJson(
   return parsed as Record<string, unknown>;
 }
 
+const errorMessage = (e: unknown) =>
+  e instanceof Error ? e.message : String(e);
+
 const sameUrl = (a: string, b: string) => {
   try {
     return normalizeActUrl(a) === normalizeActUrl(b);
@@ -137,6 +140,77 @@ const sameUrl = (a: string, b: string) => {
     return a === b;
   }
 };
+
+// Concert aggregators the tours crawler can read. Used only as a fallback
+// tour page, when the band's own site is blocked or has no tour page.
+const AGGREGATOR_DOMAINS = ['bandsintown.com', 'songkick.com'];
+
+function isAggregatorHost(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return AGGREGATOR_DOMAINS.some(d => host === d || host.endsWith(`.${d}`));
+  } catch {
+    return false;
+  }
+}
+
+const AGGREGATOR_PROMPT = `You find a band's concert-listing page on an aggregator (Bandsintown or Songkick) from the results of a web search.
+
+Given the band name and a numbered list of results (title, url, snippet), return the url of the page that lists THIS band's upcoming concerts: the band's own artist page, not a single event, a venue, a city, a tribute act or another artist with a similar name.
+
+Rules:
+- Return a url EXACTLY as it appears in the list, never invent or edit one.
+- If no result is clearly this band's artist page, return null. A wrong answer is worse than none.
+
+Return ONLY a JSON object: {"url": "<url from the list>" | null}`;
+
+const fold = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+/**
+ * Fallback for a band whose own site is blocked or has no tour page: search
+ * for its Bandsintown/Songkick artist page and return it if it loads and
+ * names the band. Never throws; undefined means nothing usable was found.
+ */
+async function findAggregatorPage(
+  name: string,
+  deps: FinderDeps
+): Promise<string | undefined> {
+  if (!deps.search) return undefined;
+  try {
+    const results = (await deps.search(`"${name}" tour dates`)).filter(r =>
+      isAggregatorHost(r.url)
+    );
+    if (results.length === 0) return undefined;
+    const list = results
+      .map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`)
+      .join('\n');
+    const answer = (
+      await askJson(
+        deps.llm,
+        AGGREGATOR_PROMPT,
+        `Band: ${name}\n\nResults:\n${list}`
+      )
+    ).url;
+    if (typeof answer !== 'string' || !answer) return undefined;
+    const hit = results.find(r => r.url === answer || sameUrl(r.url, answer));
+    if (!hit) return undefined;
+    // Unlike a link from the band's own site this is a guess: it must load
+    // (the fetcher throws on bot-protection pages) and mention the band.
+    const page = await deps.fetchPage(hit.url);
+    if (!fold(`${page.title} ${page.text}`).includes(fold(name))) {
+      return undefined;
+    }
+    return hit.url;
+  } catch {
+    return undefined;
+  }
+}
 
 async function pickSite(
   name: string,
@@ -177,7 +251,23 @@ export async function findBand(
       how = 'site from search';
     }
 
-    const home = await deps.fetchPage(siteUrl);
+    let home: FetchedPage;
+    try {
+      home = await deps.fetchPage(siteUrl);
+    } catch (fetchError) {
+      // Blocked or unreachable: the band's dates may still be on an aggregator.
+      const alt = await findAggregatorPage(name, deps);
+      if (alt) {
+        return {
+          status: 'found',
+          name,
+          siteUrl,
+          tourUrl: alt,
+          note: `bands-scout: ${how}; the site could not be read (${errorMessage(fetchError).slice(0, 80)}), tour page from an aggregator found by search`,
+        };
+      }
+      throw fetchError;
+    }
     const links = extractLinks(home);
     // The scout runs once per band, so the LLM gets the whole page.
     const listing = links.map(l => `${l.text} → ${l.url}`).join('\n');
@@ -249,6 +339,17 @@ export async function findBand(
       };
     }
 
+    const alt = await findAggregatorPage(name, deps);
+    if (alt) {
+      return {
+        status: 'found',
+        name,
+        siteUrl,
+        tourUrl: alt,
+        note: `bands-scout: ${how}; no tour page on the site, tour page from an aggregator found by search`,
+      };
+    }
+
     return {
       status: 'no_tour_page',
       name,
@@ -259,7 +360,7 @@ export async function findBand(
     return {
       status: 'error',
       name,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorMessage(error),
     };
   }
 }
