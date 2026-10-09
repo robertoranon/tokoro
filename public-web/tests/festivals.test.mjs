@@ -21,6 +21,8 @@ const {
   fmtDistance,
   groupPins,
   fitPoints,
+  freshness,
+  FRESH_DAYS,
 } = createRequire(import.meta.url)('../festivals.js');
 
 const ev = over => ({
@@ -299,6 +301,34 @@ const sample = [
   const edge = [[34, -25], [72, 45], [34, 45], [72, -25]];
   assert.deepEqual(fitPoints([...edge, [33.9, 0], [50, 45.1]]), edge);
   console.log('✅ fitPoints: Europe box only, all points if none inside, boundaries inclusive'); }
+
+// ── freshness ─────────────────────────────────────────────────────────────────
+{ const now = Date.parse('2026-10-09T12:00:00Z');
+  assert.equal(FRESH_DAYS, 7);
+  assert.equal(freshness({ createdAt: '2026-10-09T02:55:01' }, now), 'new');
+  assert.equal(freshness({ createdAt: '2026-10-03T13:00:00', updatedAt: null }, now), 'new');
+  assert.equal(freshness({ createdAt: '2026-10-02T11:59:59' }, now), '');
+  // created long ago, updated recently → updated; a recent creation wins over an update
+  assert.equal(freshness({ createdAt: '2026-09-01T00:00:00', updatedAt: '2026-10-08T00:00:00' }, now), 'updated');
+  assert.equal(freshness({ createdAt: '2026-10-05T00:00:00', updatedAt: '2026-10-08T00:00:00' }, now), 'new');
+  assert.equal(freshness({ createdAt: '2026-09-01T00:00:00', updatedAt: '2026-09-20T00:00:00' }, now), '');
+  console.log('✅ freshness: new within 7 days of created_at, else updated within 7 days of updated_at'); }
+
+{ const now = Date.parse('2026-10-09T12:00:00Z');
+  assert.equal(freshness({ createdAt: '2026-10-10T06:00:00' }, now), 'new'); // clock skew
+  assert.equal(freshness({ createdAt: '2026-10-20T00:00:00' }, now), '');
+  assert.equal(freshness({ createdAt: '' }, now), '');
+  assert.equal(freshness({ createdAt: 'garbage', updatedAt: 'nope' }, now), '');
+  assert.equal(freshness({}, now), '');
+  assert.equal(freshness(null, now), '');
+  assert.equal(freshness({ createdAt: '2026-10-09T02:55:01Z' }, now), 'new');
+  console.log('✅ freshness: skew tolerance, far future / empty / unparseable / missing → none'); }
+
+{ const f = toFestival(ev({ created_at: '2026-10-01T08:55:22', updated_at: '2026-10-05T19:09:02' }));
+  assert.equal(f.createdAt, '2026-10-01T08:55:22');
+  assert.equal(f.updatedAt, '2026-10-05T19:09:02');
+  assert.equal(toFestival(ev({})).updatedAt, '');
+  console.log('✅ toFestival: carries created_at / updated_at'); }
 
 // --- add new test sections above this line ---
 

@@ -52,16 +52,19 @@ const radar = (id, name, startOff, endOff, over = {}) => ({
   end_time: ymd(endOff) + 'T23:59:59',
   category: 'music',
   tags: ['festival', 'electronic'],
+  created_at: '2025-01-01T00:00:00',
+  updated_at: null,
   ...over,
 });
+const utcAgo = days => new Date(Date.now() - days * 86400000).toISOString().slice(0, 19);
 const EVENTS = [
   radar('old', 'Ended Fest', -9, -1), // ended yesterday → hidden
   { ...radar('prog', 'Concert', 3, 3), tags: [], start_time: ymd(3) + 'T21:00:00', end_time: null }, // program event → hidden
   radar('art', 'Aurora Art Weekend', 40, 42, { category: 'art', description: 'Installations in a Café courtyard', lat: 46.07, lng: 13.24, tags: ['festival', 'installation'] }),
   radar('run', 'Running Fest', -5, 3, { lat: 45.7, lng: 13.7 }),
   radar('cc', 'Tagged Concert', 4, 4, { start_time: ymd(4) + 'T21:00:00', end_time: ymd(4) + 'T23:00:00' }), // tagged concert → hidden
-  radar('thr', 'Berlin Stage Days', 41, 44, { category: 'theater', lat: 52.52, lng: 13.4 }),
-  radar('mus', 'Soon Sound', 10, 12, { lat: 46.5, lng: 11.3 }),
+  radar('thr', 'Berlin Stage Days', 41, 44, { category: 'theater', lat: 52.52, lng: 13.4, updated_at: utcAgo(1) }), // → updated pill
+  radar('mus', 'Soon Sound', 10, 12, { lat: 46.5, lng: 11.3, created_at: utcAgo(2) }), // → new pill
   radar('ny', 'Far Future Fest', 400, 402, { lat: 48.2, lng: 16.37 }),
   radar('xss', 'Safe <b>Name</b>', 20, 21, { description: '<img src=x onerror="window.__xss=1">', category: 'other', lat: 41.9, lng: 12.5 }),
 ];
@@ -172,6 +175,8 @@ try {
     check('status line counts the festivals', /6/.test(await page.textContent('#statusLine')), await page.textContent('#statusLine'));
     check('HTML in names/descriptions is escaped, nothing executed', (await page.evaluate(() => window.__xss)) === undefined && (await page.locator('img[src="x"]').count()) === 0 && (await titles(page)).includes('Safe <b>Name</b> 2026'));
     check('every card shows a formatted date range and a safe outbound link', (await page.locator('.fest-card__date').count()) === 6 && (await page.locator('.fest-card a[href^="https://"][rel~="noopener"]').count()) >= 6);
+    const pills = await page.$$eval('.fest-card', cards => cards.map(c => [c.querySelector('.fest-card__title').textContent.trim(), c.querySelector('.fest-card__fresh')?.textContent.trim() ?? ''] ).filter(([, p]) => p));
+    check('freshness pills: "new" on a recent entry, "updated" on a recently changed one, none elsewhere', JSON.stringify(pills) === JSON.stringify([['Soon Sound 2026', 'new'], ['Berlin Stage Days 2026', 'updated']]), pills);
 
     // ── 2. filters ───────────────────────────────────────────────────────────
     await page.selectOption('#categoryFilter', 'art');

@@ -264,6 +264,23 @@
         font-weight: 700;
         color: var(--link);
       }
+      .fest-card__fresh {
+        margin-left: 8px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 1px 6px;
+        border: 1px solid var(--ink);
+        color: var(--ink);
+        vertical-align: 1px;
+      }
+      .fest-card__fresh--new {
+        background: var(--yellow);
+      }
+      .fest-card__fresh--updated {
+        background: var(--surface);
+      }
       .fest-card__category {
         font-size: 10px;
         font-weight: 700;
@@ -493,6 +510,14 @@
             .slice(0, 6)
             .map(t => '<span class="tag">' + escHtml(t) + '</span>')
             .join('');
+          const fresh = F.freshness(f, Date.now());
+          const freshPill = fresh
+            ? '<span class="fest-card__fresh fest-card__fresh--' +
+              fresh +
+              '">' +
+              fresh +
+              '</span>'
+            : '';
           const catClass = ['music', 'art', 'theater'].includes(f.category)
             ? f.category
             : 'other';
@@ -507,6 +532,7 @@
             '<div class="fest-card__top">' +
             '<span class="fest-card__date">' +
             escHtml(F.fmtFestivalRange(f.start, f.end, today)) +
+            freshPill +
             '</span>' +
             '<span class="fest-card__category">' +
             escHtml(f.category) +
