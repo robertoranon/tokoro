@@ -624,7 +624,11 @@ export class EventCrawler {
 
     // Look up first: an update must re-sign with the stored created_at.
     const existing = await this.radarPublisher.lookup(festivalUrl);
-    const match = matchEdition(existing, String(entry.start_time));
+    const match = matchEdition(
+      existing,
+      String(entry.start_time),
+      this.config.keypair.pubkey
+    );
     const createdAt = match?.created_at;
     let normalized = await this.normalizer.normalize(entry, { createdAt });
     if (!normalized && match) {

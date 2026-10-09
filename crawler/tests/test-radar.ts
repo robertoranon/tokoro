@@ -912,6 +912,25 @@ console.log('\n=== matchEdition ===\n');
     'festival tag + T00:00:00 start but end not T23:59:59 is never matched'
   );
   assert(
+    matchEdition(
+      [
+        entry({ id: 'theirs', pubkey: 'other' }),
+        entry({ id: 'ours', pubkey: 'pk', start_time: '2026-06-10T00:00:00' }),
+      ],
+      '2026-06-18T00:00:00',
+      'pk'
+    )?.id === 'ours',
+    "this key's entry wins over a closer one held by another key"
+  );
+  assert(
+    matchEdition(
+      [entry({ id: 'theirs', pubkey: 'other' })],
+      '2026-06-18T00:00:00',
+      'pk'
+    )?.id === 'theirs',
+    "another key's entry still matches when this key has none"
+  );
+  assert(
     matchEdition([entry({ id: 'real' })], '2026-06-18T00:00:00')?.id === 'real',
     'a radar-shaped entry still matches'
   );
@@ -1061,23 +1080,45 @@ console.log('\n=== RadarPublisher ===\n');
   };
 
   {
-    const { fn, calls } = fakeFetch(() => ({ status: 200, body: [match] }));
+    const { fn, calls } = fakeFetch(() => ({
+      status: 200,
+      body: { events: [match], has_more: false },
+    }));
     const existing = await new RadarPublisher('http://api', 'pk', fn).lookup(
       'https://terra.example'
     );
     const url = new URL(calls[0].url);
-    assert(existing.length === 1, 'lookup returns the array');
+    assert(existing.length === 1, 'lookup returns the events');
     assert(
       url.pathname === '/events' &&
-        url.searchParams.get('pubkey') === 'pk' &&
+        !url.searchParams.has('pubkey') &&
         url.searchParams.get('festival_url') === 'https://terra.example' &&
         url.searchParams.get('from') === '1970-01-01T00:00:00' &&
         url.searchParams.get('to') === '2999-12-31T23:59:59',
-      'lookup sends pubkey, festival_url and an explicit wide time window'
+      'lookup sends festival_url and an explicit wide time window, any key'
     );
   }
   {
-    const { fn } = fakeFetch(() => ({ status: 200, body: { events: [] } }));
+    const { fn, calls } = fakeFetch(c =>
+      new URL(c.url).searchParams.get('offset') === '0'
+        ? { status: 200, body: { events: [match], has_more: true } }
+        : {
+            status: 200,
+            body: { events: [{ ...match, id: 'b' }], has_more: false },
+          }
+    );
+    const existing = await new RadarPublisher('http://api', 'pk', fn).lookup(
+      'https://terra.example'
+    );
+    assert(
+      existing.length === 2 &&
+        calls.length === 2 &&
+        new URL(calls[1].url).searchParams.get('offset') === '1',
+      'lookup follows has_more pages'
+    );
+  }
+  {
+    const { fn } = fakeFetch(() => ({ status: 200, body: [] }));
     let threw = false;
     try {
       await new RadarPublisher('http://api', 'pk', fn).lookup(
@@ -1168,6 +1209,28 @@ console.log('\n=== RadarPublisher ===\n');
     assert(
       outcome === 'failed',
       'POST 409 (duplicate of a foreign event) → failed, loudly'
+    );
+  }
+  {
+    const { fn, calls } = fakeFetch(() => ({ status: 200 }));
+    const outcome = await new RadarPublisher('http://api', 'pk', fn).apply(
+      { ...event, end_time: '2026-06-22T23:59:59' },
+      { ...match, pubkey: 'other' }
+    );
+    assert(
+      outcome === 'unchanged' && calls.length === 0,
+      'match held by another key → never updated, never posted → unchanged'
+    );
+  }
+  {
+    const { fn, calls } = fakeFetch(() => ({ status: 200 }));
+    const outcome = await new RadarPublisher('http://api', 'pk', fn).apply(
+      { ...event, end_time: '2026-06-22T23:59:59' },
+      { ...match, pubkey: 'pk' }
+    );
+    assert(
+      outcome === 'updated' && calls.length === 1,
+      'match held by this key → updated as before'
     );
   }
   {
