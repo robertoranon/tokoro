@@ -610,6 +610,17 @@ A manual helper that turns a plain list of band names into `bands.yaml` entries:
 - (e) Cosmetic: when `bands:` is created above an existing `sources:` that is preceded by a column-0 comment, that comment can end up above the new `bands:` key.
 - (f) The aggregator fallback needs `BRAVE_SEARCH_API_KEY` (also for bands given with a site hint), covers only Bandsintown and Songkick, and may lag behind the band's own site; these sites can also block the crawler, in which case the source later fails like any other.
 
+
+### 4.12 Tracked Bands Export (`npm run export-bands`)
+
+Writes the public list of the bands the tours runner follows, for the tours page of the public web (`public-web/SPECS.md`).
+
+**Usage:** `npm run export-bands -- --out <file> [--bands <path>]`. `--out` is required; `--bands` defaults to `bands.yaml`. `scripts/deploy-public-web.sh` runs it and ships the result as `tracked-bands.json` (skipped, with a notice, when `crawler/bands.yaml` does not exist).
+
+**Output:** `{ "generated": "YYYY-MM-DD", "bands": [{ "name", "url" }] }` (2-space indented, trailing newline). Only active bands (`status` not `paused`) are listed, sorted by name (case- and accent-insensitive). Only name and site url are exported: notes, aliases, region and status are curator data and never leave the file. The output directory is created if missing and the file is written atomically.
+
+**Errors (exit 1):** unknown option, missing `--out`, `--bands` without a path, `bands.yaml` not found, or a `bands.yaml` that fails the normal validation (4.10); nothing is written. On success it prints `Exported N tracked band(s) to <file>`.
+
 ---
 
 ## 5. HTML Fetching
@@ -2445,6 +2456,13 @@ Total events published: 10
 - Fetch page with dynamic content (e.g., React SPA)
 - Verify Playwright waits for content to load
 - Verify Jina fetcher handles dynamic content
+
+**Test 3b: Bot-protection retry** (`tests/test-fetcher-retry.ts`, `npm run test:fetcher`)
+
+- Runs the real `HTMLFetcher` with headless Chromium against a local server that blocks like Cloudflare (no internet needed)
+- Verify a page blocked on the headless user-agent is retried with a standard `Chrome` one (section 5.1, step 9) and the retry's content is returned; a page blocked every time is fetched three times (the fetch plus two retries) and then returned as blocked; a second retry can succeed after a blocked first retry; a long page that merely quotes block phrases, and a normal page, are fetched once
+
+**Diagnostic `probe:fetch`** (`tests/probe-fetch.ts`, not part of any suite, live network): `npm run probe:fetch -- <url>...` fetches each URL with the Chrome browser fetcher and prints whether it looks blocked (`looksBlocked`), the text length and how many date-like strings it found; without arguments it probes a Bandsintown artist page. Exit code 1 if any URL looked blocked or failed. Use it to see whether a site accepts the crawler before adding it as a source.
 
 ### 14.2 Page Discovery Tests
 

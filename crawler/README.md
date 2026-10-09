@@ -10,6 +10,7 @@ LLM-powered semantic crawler for extracting structured event data from web pages
 - **Two-Phase Discovery**: Automatically discovers individual event pages from venue homepages
 - **Multiple Fetcher Options**: Choose between Playwright (JS rendering) or Jina AI Reader (fast, lightweight)
 - **Pluggable Browser Engine**: Playwright can drive headless Chrome (default) or [Obscura](https://github.com/h4ckf0r0day/obscura) (lightweight Rust-based CDP browser with built-in anti-detection)
+- **Bot-protection handling**: pages that serve a bot-block interstitial are retried with a standard browser user-agent and, if still blocked, fail the source with a clear reason instead of silently yielding nothing
 - **Multi-LLM Support**: Easy switching between OpenRouter, OpenAI, Anthropic, and local Ollama
 - **Smart Extraction**: Uses LLMs to extract event details from any web page format with intelligent address parsing
 - **Geocoding**: Automatically geocodes addresses to coordinates using OpenStreetMap
@@ -153,6 +154,18 @@ npm run crawl -- --fetcher playwright https://modern-spa.com/events
 npm run crawl -- --fetcher jina --mode direct https://example.com/event/123
 ```
 
+#### Bot-protection pages
+
+If the Playwright fetcher gets a bot-protection page (a short page titled e.g. "Attention Required" or "Just a moment"), it fetches the page again up to twice with the browser's own user-agent minus the `HeadlessChrome` marker. If every attempt is blocked, the source fails with `Blocked by bot protection (...)` (visible in the run log) rather than reporting "no shows". This is not a guarantee: Cloudflare does not decide on the user-agent alone, and many requests in a short time can get you blocked for a while.
+
+To check whether a site accepts the crawler before adding it as a source:
+
+```bash
+npm run probe:fetch -- https://example.com/page   # live network; exits 1 if blocked
+```
+
+Offline test of the retry: `npm run test:fetcher` (needs Chromium, no internet).
+
 ### Choose Browser Engine (Playwright only)
 
 When using the Playwright fetcher, you can choose which headless browser engine drives it:
@@ -256,7 +269,7 @@ Legitimate parallel events (different stages or acts running at the same time) a
 - **Publish the tracked list**: `npm run export-bands -- --out tracked-bands.json` writes the public list of active bands (name and site only; `--bands <path>` for another file); `scripts/deploy-public-web.sh` does it for you
 - **Scheduling**: `0 10 * * 3  cd /path/to/tokoro/crawler && /absolute/path/to/npm run tours >> logs/tours.log 2>&1` (Wednesdays; cron's PATH usually lacks npm: find it with `which npm`)
 - **Tests**: `npm run test:tours` (offline); `npm run smoke:tours` (needs `wrangler dev`)
-- **Building bands.yaml from a list**: instead of writing entries by hand, put one band per line in a text file (`#` comments allowed; `Name | https://site` gives the official site and skips the search) and let `npm run bands-scout` find each band's site and tour page and add the missing `bands` and `sources` entries. It needs `BRAVE_SEARCH_API_KEY` (for bands without a site given) plus your usual LLM settings. Bands already in `bands.yaml` (by name or alias) are skipped without any search, existing comments are kept, and nothing is written with `--dry-run`. Review the result: aliases, regions and listing sources are still by hand. Details in `SPECS.md` section 4.11. Tests: `npm run test:bands-scout` (offline)
+- **Building bands.yaml from a list**: instead of writing entries by hand, put one band per line in a text file (`#` comments allowed; `Name | https://site` gives the official site and skips the search) and let `npm run bands-scout` find each band's site and tour page and add the missing `bands` and `sources` entries. It needs `BRAVE_SEARCH_API_KEY` (for bands without a site given) plus your usual LLM settings. Bands already in `bands.yaml` (by name or alias) are skipped without any search, existing comments are kept, and nothing is written with `--dry-run`. If a band's own site cannot be read (blocked, unreachable) or has no tour page, the scout falls back to one more search for the band's Bandsintown or Songkick page (checked to be the right artist) and uses that as the source. Review the result: aliases, regions and listing sources are still by hand. Details in `SPECS.md` section 4.11. Tests: `npm run test:bands-scout` (offline)
 
   ```bash
   printf 'Band A\nBand B | https://bandb.example\n' > list.txt
@@ -426,14 +439,21 @@ The crawler operates in different phases depending on the mode:
 
 ```
 src/
-├── llm/           # LLM provider abstraction
-├── extractors/    # HTML fetching & event extraction
-├── utils/         # Geocoding, signing, publishing
+├── extractors/    # HTML/PDF/image fetching & event, festival-entry and tour extraction
+├── radar/         # festivals.yaml parsing, radar entries, radar publisher
+├── scout/         # festival scout: sources, candidates, links, promote
+├── tours/         # bands.yaml, tour shows, tour publisher/source, bands finder, failure report, tracked bands
+├── utils/         # Geocoding, normalizer, signing, publishing, run log, bot-page detection, Brave search
 ├── types/         # TypeScript types & Zod schemas
 ├── crawler.ts     # Main crawler orchestration
 ├── setup.ts       # Shared env/keypair/LLM setup
 ├── index.ts       # CLI entry point (npm run crawl)
-└── scheduler.ts   # Scheduler entry point (npm run crawl-jobs)
+├── scheduler.ts   # Scheduler entry point (npm run crawl-jobs)
+├── radar.ts       # npm run radar
+├── scout.ts, scout-promote.ts   # npm run scout, scout-promote
+├── tours.ts       # npm run tours
+├── bands-scout.ts # npm run bands-scout
+└── export-tracked-bands.ts  # npm run export-bands
 ```
 
 ## Configuration
