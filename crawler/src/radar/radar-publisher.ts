@@ -11,6 +11,7 @@ export type RadarOutcome =
 /** An event as returned by GET /events (nulls for empty columns, tags parsed). */
 export interface ExistingEntry {
   id: string;
+  pubkey?: string;
   title: string;
   description?: string | null;
   url?: string | null;
@@ -58,20 +59,29 @@ function isRadarEntry(e: ExistingEntry): boolean {
 
 const asMs = (localIso: string) => Date.parse(`${localIso.slice(0, 19)}Z`);
 
-/** The existing radar entry for the same edition: closest start_time within the window. */
+/**
+ * The existing radar entry for the same edition: closest start_time within
+ * the window. An entry held by `ownPubkey` wins over other keys' entries
+ * (only our own can be updated); another key's entry still matches when we
+ * have none, so the edition is not posted a second time.
+ */
 export function matchEdition(
   existing: ExistingEntry[],
-  startTime: string
+  startTime: string,
+  ownPubkey?: string
 ): ExistingEntry | undefined {
   const target = asMs(startTime);
   let best: ExistingEntry | undefined;
-  let bestGap = Infinity;
+  let bestRank = Infinity;
   for (const e of existing) {
     if (!isRadarEntry(e)) continue;
     const gap = Math.abs(asMs(e.start_time) - target);
-    if (gap <= EDITION_WINDOW_DAYS * DAY_MS && gap < bestGap) {
+    if (gap > EDITION_WINDOW_DAYS * DAY_MS) continue;
+    const foreign = !!ownPubkey && !!e.pubkey && e.pubkey !== ownPubkey;
+    const rank = (foreign ? EDITION_WINDOW_DAYS * DAY_MS + 1 : 0) + gap;
+    if (rank < bestRank) {
       best = e;
-      bestGap = gap;
+      bestRank = rank;
     }
   }
   return best;
@@ -106,23 +116,37 @@ export class RadarPublisher {
     private fetchFn: typeof fetch = fetch
   ) {}
 
-  /** All of this crawler's events for one festival_url (any date). */
+  /**
+   * Every event for one festival_url (any date), whichever key published it,
+   * so entries published under a previous crawler key are still recognised.
+   * The no-geo browse path answers `{ events, has_more }`, 100 per page.
+   */
   async lookup(festivalUrl: string): Promise<ExistingEntry[]> {
-    const params = new URLSearchParams({
-      pubkey: this.pubkey,
-      festival_url: festivalUrl,
-      from: LOOKUP_FROM,
-      to: LOOKUP_TO,
-    });
-    const res = await this.fetchFn(`${this.apiUrl}/events?${params}`);
-    if (!res.ok) throw new Error(`Lookup failed (${res.status})`);
-    const data: unknown = await res.json();
-    if (!Array.isArray(data)) {
-      throw new Error(
-        'Lookup returned an unexpected shape (expected an array)'
-      );
+    const all: ExistingEntry[] = [];
+    let offset = 0;
+    for (let page = 0; page < 20; page++) {
+      const params = new URLSearchParams({
+        festival_url: festivalUrl,
+        from: LOOKUP_FROM,
+        to: LOOKUP_TO,
+        offset: String(offset),
+      });
+      const res = await this.fetchFn(`${this.apiUrl}/events?${params}`);
+      if (!res.ok) throw new Error(`Lookup failed (${res.status})`);
+      const data = (await res.json()) as {
+        events?: unknown;
+        has_more?: boolean;
+      };
+      if (!data || !Array.isArray(data.events)) {
+        throw new Error(
+          'Lookup returned an unexpected shape (expected { events: [...] })'
+        );
+      }
+      all.push(...(data.events as ExistingEntry[]));
+      if (!data.has_more || data.events.length === 0) return all;
+      offset += data.events.length;
     }
-    return data as ExistingEntry[];
+    return all;
   }
 
   /**
@@ -134,6 +158,14 @@ export class RadarPublisher {
     match: ExistingEntry | undefined
   ): Promise<RadarOutcome> {
     if (!match) return this.post(event);
+    // Held by another key (e.g. a previous crawler key): it counts as the
+    // edition, but it is not ours to update, and posting again duplicates it.
+    if (match.pubkey && match.pubkey !== this.pubkey) {
+      console.log(
+        `= Already in the database under another key: ${event.title}`
+      );
+      return 'unchanged';
+    }
     if (!differs(match, event)) {
       console.log(`= Unchanged: ${event.title}`);
       return 'unchanged';

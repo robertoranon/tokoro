@@ -245,6 +245,7 @@ A read-only browse page for the festivals on the radar (entries published by the
 
 - MUST group festivals under "Happening now" (already started) and then one heading per start month, ordered by start date then name (by distance when "Near me" is on)
 - MUST show per card: date range (`18–21 Jun`, year only if not the current one), title, category (raw category value), venue/address, description (clamped to 3 lines), up to 6 tags, and an outbound link to the festival's own site
+- MUST show a freshness pill next to the date range, for 7 days (`FRESH_DAYS`): **NEW** (yellow) when the entry's `created_at` is less than 7 days before now, otherwise **UPDATED** (outlined) when its `updated_at` is. The radar keeps `created_at` across updates and only `PUT`s on dates, category, a real move or a description gap fill, so UPDATED means one of those changed. Timestamps are UTC without a zone suffix; a value up to a day in the future (clock skew) counts, a farther-future, empty or unparseable one does not. Cards are not reordered because of it
 - MUST show friendly empty states ("Nothing on the radar yet." when there are no entries; "Nothing on the radar yet for {month}" when only a month is selected; "No festivals match your filters." otherwise) and a retryable error state when the API fails; if the deploy step has not replaced the API placeholder it shows a "not configured" error instead of fetching
 
 **FR-7.4: Map**

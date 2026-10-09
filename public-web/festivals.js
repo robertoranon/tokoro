@@ -67,7 +67,37 @@ function toFestival(e) {
     address: e.address || '',
     lat: e.lat,
     lng: e.lng,
+    createdAt: e.created_at || '',
+    updatedAt: e.updated_at || '',
   };
+}
+
+// A festival is "new" / "updated" for this many days (the radar runs weekly).
+const FRESH_DAYS = 7;
+
+/**
+ * Within the last `days` days. API timestamps are UTC without a zone suffix.
+ * A slightly future value (clock skew) counts; a far-future, empty or
+ * unparseable one does not.
+ */
+function isRecent(raw, nowMs, days) {
+  if (typeof raw !== 'string' || !raw) return false;
+  const t = Date.parse(/(?:z|[+-]\d{2}:\d{2})$/i.test(raw) ? raw : raw + 'Z');
+  if (!isFinite(t)) return false;
+  const age = nowMs - t;
+  return age >= -DAY_MS && age < days * DAY_MS;
+}
+
+/**
+ * 'new' when first published within `days` days, else 'updated' when the
+ * radar last changed it (dates, category, location, description gap fill:
+ * the only changes that make it PUT) within `days` days, else ''.
+ */
+function freshness(f, nowMs, days = FRESH_DAYS) {
+  if (!f) return '';
+  if (isRecent(f.createdAt, nowMs, days)) return 'new';
+  if (isRecent(f.updatedAt, nowMs, days)) return 'updated';
+  return '';
 }
 
 /** Radar entries only, not yet ended (ending today still counts), de-duplicated, sorted. */
@@ -320,6 +350,8 @@ const api = {
   byStartThenName,
   toFestival,
   toFestivals,
+  FRESH_DAYS,
+  freshness,
   radarWindow,
   buildRadarUrl,
   loadRadarEvents,
