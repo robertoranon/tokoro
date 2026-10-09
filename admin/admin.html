@@ -346,6 +346,14 @@
         <h2>Search Events</h2>
         <div class="form-row">
           <div class="form-group">
+            <label for="f-id">Event ID</label>
+            <input type="text" id="f-id" placeholder="full ID or its start" />
+          </div>
+          <div class="form-group">
+            <label for="f-title">Title</label>
+            <input type="text" id="f-title" placeholder="words in the title" />
+          </div>
+          <div class="form-group">
             <label for="f-pubkey">Pubkey</label>
             <input
               type="text"
@@ -680,6 +688,39 @@
         await fetchEvents(false);
       }
 
+      // Enter in any search field runs the search
+      for (const id of ['f-id', 'f-title', 'f-pubkey', 'f-category']) {
+        document.getElementById(id).addEventListener('keydown', e => {
+          if (e.key === 'Enter') runSearch();
+        });
+      }
+
+      // Case- and accent-insensitive ("cafe" finds "Café")
+      function foldText(s) {
+        return String(s || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase();
+      }
+
+      // Every whitespace-separated word must appear in the title
+      function titleMatches(ev, words) {
+        const title = foldText(ev.title);
+        return words.every(w => title.includes(w));
+      }
+
+      // An ID as copied from the table or a log, possibly shortened ("14bb932ecb…")
+      function idPrefix(raw) {
+        return String(raw || '')
+          .trim()
+          .replace(/(…|\.\.\.)$/, '')
+          .toLowerCase();
+      }
+
+      // The API has no title or ID search: with either term, every result page
+      // is read (up to this many) and filtered here.
+      const SCAN_MAX_PAGES = 50;
+
       async function fetchEvents(replace) {
         const { workerUrl } = loadSettings();
         if (!workerUrl) {
@@ -691,6 +732,17 @@
         const fromVal = document.getElementById('f-from').value;
         const toVal = document.getElementById('f-to').value;
         const category = document.getElementById('f-category').value.trim();
+        const titleWords = foldText(document.getElementById('f-title').value)
+          .split(/\s+/)
+          .filter(Boolean);
+        const id = idPrefix(document.getElementById('f-id').value);
+        if (titleWords.length || id) {
+          return scanSearch(
+            ev =>
+              (!id || String(ev.id || '').startsWith(id)) &&
+              (!titleWords.length || titleMatches(ev, titleWords))
+          );
+        }
 
         const params = new URLSearchParams();
         if (pubkey) params.set('pubkey', pubkey);
@@ -740,6 +792,70 @@
         } finally {
           document.getElementById('search-btn').disabled = false;
           document.getElementById('load-more-btn').disabled = false;
+        }
+      }
+
+      async function scanSearch(matchesEvent) {
+        const { workerUrl } = loadSettings();
+        const pubkey = document.getElementById('f-pubkey').value.trim();
+        const fromVal = document.getElementById('f-from').value;
+        const toVal = document.getElementById('f-to').value;
+        const category = document.getElementById('f-category').value.trim();
+
+        setStatus('Searching…');
+        document.getElementById('search-btn').disabled = true;
+        document.getElementById('load-more-wrap').style.display = 'none';
+
+        try {
+          const matches = [];
+          let offset = 0;
+          let scanned = 0;
+          let truncated = false;
+          for (let page = 0; ; page++) {
+            if (page === SCAN_MAX_PAGES) {
+              truncated = true;
+              break;
+            }
+            const params = new URLSearchParams();
+            if (pubkey) params.set('pubkey', pubkey);
+            if (fromVal) params.set('from', datetimeLocalToISO(fromVal));
+            if (toVal) params.set('to', datetimeLocalToISO(toVal));
+            if (category) params.set('category', category);
+            // The pubkey path answers one plain array; the browse path pages
+            if (!pubkey) params.set('offset', String(offset));
+            const res = await fetch(`${workerUrl}/events?${params}`);
+            if (!res.ok) {
+              const body = await res.text();
+              throw new Error(`HTTP ${res.status}: ${body}`);
+            }
+            const data = await res.json();
+            const events = Array.isArray(data) ? data : data.events || [];
+            const hasMore = Array.isArray(data)
+              ? false
+              : data.has_more || false;
+            scanned += events.length;
+            matches.push(...events.filter(matchesEvent));
+            setStatus(
+              `Searching… ${scanned} events read, ${matches.length} match.`
+            );
+            if (!hasMore || events.length === 0) break;
+            offset += events.length;
+          }
+
+          renderResults(matches);
+          setStatus(
+            `${matches.length} event${matches.length !== 1 ? 's' : ''} found (${scanned} read` +
+              (truncated
+                ? `; stopped after ${SCAN_MAX_PAGES} pages: narrow with From/To or Category)`
+                : ')') +
+              '.',
+            truncated ? 'error' : 'success'
+          );
+        } catch (err) {
+          setStatus('Error: ' + err.message, 'error');
+          renderResults([]);
+        } finally {
+          document.getElementById('search-btn').disabled = false;
         }
       }
 
