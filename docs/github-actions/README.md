@@ -8,6 +8,7 @@ separate **private** repo (e.g. `tokoro-radar-data`) that runs the workflows.
 ```
 festivals.yaml          # radar watchlist (copy of crawler/festivals.yaml)
 bands.yaml              # tours watchlist (copy of crawler/bands.yaml)
+logs/runs.jsonl         # tours run log (committed back by the workflow)
 scout-sources.yaml      # scout discovery sources + taste profile
 candidates.yaml         # scout output (committed back by the workflow)
 scout-state.json        # scout memory (committed back by the workflow)
@@ -22,6 +23,11 @@ third of the sources in `bands.yaml` (`--part 1/3`, `2/3`, `3/3`). A source's
 part comes from a hash of its url, so adding a band never moves the others;
 every source is still checked once a week. A manual run lets you pick a part,
 or `all`. Monday's tours run starts two hours after the radar.
+After each tours run (even a failed one) the workflow commits `logs/runs.jsonl`
+back to the private repo, and restores it before the next run. That keeps the
+staleness report working (it needs 4 runs of a source) and makes
+`--retry-failed` usable: start the workflow manually with "retry_failed" ticked
+to re-run only what failed in the last run.
 
 ## Setup
 

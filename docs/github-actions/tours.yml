@@ -15,10 +15,17 @@ on:
         type: choice
         options: ["1/3", "2/3", "3/3", "all"]
         default: "1/3"
+      retry_failed:
+        description: "Only re-run the sources that failed in the last tours run (ignores 'part')"
+        type: boolean
+        default: false
 
 concurrency:
   group: tours
   cancel-in-progress: false
+
+permissions:
+  contents: write # commit logs/runs.jsonl back
 
 jobs:
   tours:
@@ -53,6 +60,14 @@ jobs:
         working-directory: tokoro/crawler
         run: npx playwright install --with-deps chromium
 
+      # The run log (staleness report, --retry-failed) lives in the private repo.
+      - name: Restore run log
+        run: |
+          mkdir -p tokoro/crawler/logs
+          if [ -f data/logs/runs.jsonl ]; then
+            cp data/logs/runs.jsonl tokoro/crawler/logs/runs.jsonl
+          fi
+
       - name: Run tours
         working-directory: tokoro/crawler
         env:
@@ -66,6 +81,7 @@ jobs:
           BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
           EVENT_SCHEDULE: ${{ github.event.schedule }}
           INPUT_PART: ${{ inputs.part }}
+          INPUT_RETRY: ${{ inputs.retry_failed }}
         run: |
           case "$EVENT_SCHEDULE" in
             "0 12 * * 1") PART=1/3 ;;
@@ -74,5 +90,23 @@ jobs:
             *) PART="$INPUT_PART" ;; # manual run
           esac
           ARGS=(--bands "$GITHUB_WORKSPACE/data/bands.yaml")
-          if [ "$PART" != "all" ]; then ARGS+=(--part "$PART"); fi
+          if [ "$INPUT_RETRY" = "true" ]; then
+            ARGS+=(--retry-failed)
+          elif [ "$PART" != "all" ]; then
+            ARGS+=(--part "$PART")
+          fi
           npm run tours -- "${ARGS[@]}"
+
+      - name: Save run log
+        if: always()
+        run: |
+          [ -f tokoro/crawler/logs/runs.jsonl ] || exit 0
+          mkdir -p data/logs
+          cp tokoro/crawler/logs/runs.jsonl data/logs/runs.jsonl
+          cd data
+          git config user.name "tokoro-tours[bot]"
+          git config user.email "actions@users.noreply.github.com"
+          git add logs/runs.jsonl
+          git diff --cached --quiet || git commit -m "chore: tours run log $(date -u +%F)"
+          git pull --rebase
+          git push
