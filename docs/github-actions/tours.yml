@@ -1,10 +1,20 @@
 # Copy to .github/workflows/tours.yml in the private data repo.
 name: Band tours
 
+# bands.yaml is split in three parts by a stable hash of each source url
+# (`--part N/3`), one part per run: Monday, Wednesday and Friday.
 on:
   schedule:
-    - cron: "0 10 * * 3" # Wednesdays 10:00 UTC
+    - cron: "0 12 * * 1" # Mondays 12:00 UTC    -> part 1/3
+    - cron: "0 12 * * 3" # Wednesdays 12:00 UTC -> part 2/3
+    - cron: "0 12 * * 5" # Fridays 12:00 UTC    -> part 3/3
   workflow_dispatch:
+    inputs:
+      part:
+        description: "Which part of bands.yaml to run"
+        type: choice
+        options: ["1/3", "2/3", "3/3", "all"]
+        default: "1/3"
 
 concurrency:
   group: tours
@@ -13,7 +23,7 @@ concurrency:
 jobs:
   tours:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
       - name: Checkout private data repo
         uses: actions/checkout@v4
@@ -54,4 +64,15 @@ jobs:
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
           JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
           BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
-        run: npm run tours -- --bands "$GITHUB_WORKSPACE/data/bands.yaml"
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          INPUT_PART: ${{ inputs.part }}
+        run: |
+          case "$EVENT_SCHEDULE" in
+            "0 12 * * 1") PART=1/3 ;;
+            "0 12 * * 3") PART=2/3 ;;
+            "0 12 * * 5") PART=3/3 ;;
+            *) PART="$INPUT_PART" ;; # manual run
+          esac
+          ARGS=(--bands "$GITHUB_WORKSPACE/data/bands.yaml")
+          if [ "$PART" != "all" ]; then ARGS+=(--part "$PART"); fi
+          npm run tours -- "${ARGS[@]}"

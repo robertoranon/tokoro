@@ -94,6 +94,7 @@ export type SourceOutcome =
   | 'updated'
   | 'unchanged'
   | 'no_shows'
+  | 'out_of_region'
   | 'failed';
 
 export function sourceOutcome(results: ShowResult[]): SourceOutcome {
@@ -102,6 +103,9 @@ export function sourceOutcome(results: ShowResult[]): SourceOutcome {
   if (has('updated') || has('adopted')) return 'updated';
   if (has('unchanged') || has('duplicate')) return 'unchanged';
   if (has('failed')) return 'failed';
+  // Shows were found but all fell outside the region: not the same as a page
+  // with nothing on it.
+  if (has('skipped_out_of_region')) return 'out_of_region';
   return 'no_shows';
 }
 

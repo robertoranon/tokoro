@@ -17,7 +17,11 @@ scout-state.json        # scout memory (committed back by the workflow)
 ```
 
 Copy `radar.yml`, `scout.yml` and `tours.yml` from this folder into `.github/workflows/`.
-Tours runs on Wednesdays, so it never overlaps the Monday radar and Thursday scout runs.
+Tours runs three times a week (Mon, Wed, Fri, 12:00 UTC), each time on one
+third of the sources in `bands.yaml` (`--part 1/3`, `2/3`, `3/3`). A source's
+part comes from a hash of its url, so adding a band never moves the others;
+every source is still checked once a week. A manual run lets you pick a part,
+or `all`. Monday's tours run starts two hours after the radar.
 
 ## Setup
 

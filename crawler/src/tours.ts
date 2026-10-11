@@ -15,6 +15,7 @@ import {
 } from './tours/bands-config.js';
 import { tallyShows } from './tours/tour-source.js';
 import { selectRetrySources } from './tours/retry.js';
+import { parsePart, selectPart } from './tours/part.js';
 import {
   errorReason,
   formatFailures,
@@ -122,6 +123,29 @@ async function main() {
   if (sources.length === 0) {
     console.warn(`No active sources in ${bandsFile} — nothing to do`);
     process.exit(0);
+  }
+  const partIndex = process.argv.indexOf('--part');
+  if (partIndex !== -1) {
+    if (process.argv.includes('--retry-failed')) {
+      console.error(
+        'Error: --part and --retry-failed cannot be combined (a retry reads the whole last run).'
+      );
+      process.exit(1);
+    }
+    const part = parsePart(process.argv[partIndex + 1] ?? '');
+    if (typeof part === 'string') {
+      console.error(`Error: ${part}`);
+      process.exit(1);
+    }
+    const total = sources.length;
+    sources = selectPart(sources, part);
+    console.log(
+      `Part ${part.index}/${part.total}: ${sources.length} of ${total} source(s)`
+    );
+    if (sources.length === 0) {
+      console.log('Nothing to do in this part.');
+      process.exit(0);
+    }
   }
   if (process.argv.includes('--retry-failed')) {
     // Only the sources that failed (or had failed shows) in the last live run.

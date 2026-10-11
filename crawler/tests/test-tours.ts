@@ -2,6 +2,7 @@ import * as ed from '@noble/ed25519';
 import { signAdoption, adoptMessage } from '../src/tours/adopt.js';
 import { getTourShowsPrompt } from '../../shared/extractors/tour-prompt.js';
 import { selectRetrySources } from '../src/tours/retry.js';
+import { parsePart, selectPart } from '../src/tours/part.js';
 import { looksBlocked, assertNotBlocked } from '../src/utils/block-page.js';
 import { EventNormalizer } from '../src/utils/normalizer.js';
 import { ExtractedEventSchema } from '../src/types/event.js';
@@ -1269,6 +1270,20 @@ sources:
       'nothing publishable → no_shows'
     );
     assert(sourceOutcome([]) === 'no_shows', 'empty → no_shows');
+    assert(
+      sourceOutcome([r('skipped_out_of_region'), r('skipped_past')]) ===
+        'out_of_region',
+      'only out-of-region (and past) shows → out_of_region'
+    );
+    assert(
+      sourceOutcome([r('skipped_out_of_region'), r('unchanged')]) ===
+        'unchanged',
+      'out-of-region does not outrank a real outcome'
+    );
+    assert(
+      sourceOutcome([r('skipped_out_of_region'), r('failed')]) === 'failed',
+      'a failed show outranks out-of-region'
+    );
     assert(
       sourceOutcome([r('failed'), r('failed')]) === 'failed',
       'only failures → failed'
@@ -3324,6 +3339,71 @@ sources:
         many[11] === '    · S10: reason 10' &&
         many[12] === '    … and 4 more',
       'at most 10 lines per source, then "… and N more"'
+    );
+  }
+
+  console.log('\n=== --part N/M ===\n');
+  {
+    const ok = parsePart('2/3');
+    assert(
+      typeof ok !== 'string' && ok.index === 2 && ok.total === 3,
+      'parses 2/3'
+    );
+    for (const bad of [
+      '0/3',
+      '4/3',
+      '1/0',
+      '1',
+      'a/b',
+      '1/2/3',
+      '',
+      '1.5/3',
+      '-1/3',
+    ]) {
+      assert(typeof parsePart(bad) === 'string', `rejects "${bad}"`);
+    }
+
+    const sources = Array.from({ length: 120 }, (_, i) => ({
+      url: `https://band${i}.example/tour`,
+      mode: 'band' as const,
+      band: `B${i}`,
+    }));
+    const parts = [1, 2, 3].map(i =>
+      selectPart(sources, { index: i, total: 3 })
+    );
+    const all = parts.flat().map(x => x.url);
+    assert(
+      all.length === sources.length && new Set(all).size === sources.length,
+      'every source lands in exactly one part'
+    );
+    assert(
+      parts.every(p => p.length > 20 && p.length < 60),
+      `parts are roughly balanced (${parts.map(p => p.length).join('/')})`
+    );
+    assert(
+      parts[0].every(
+        (x, i, a) => i === 0 || sources.indexOf(a[i - 1]) < sources.indexOf(x)
+      ),
+      'keeps bands.yaml order within a part'
+    );
+
+    // Stable: adding a source does not move the others between parts.
+    const more = [
+      ...sources,
+      { url: 'https://new.example/tour', mode: 'band' as const, band: 'N' },
+    ];
+    const before = new Map(
+      parts.flatMap((p, i) => p.map(x => [x.url, i] as const))
+    );
+    const after = [1, 2, 3].map(i => selectPart(more, { index: i, total: 3 }));
+    const moved = after.flatMap((p, i) =>
+      p.filter(x => before.has(x.url) && before.get(x.url) !== i)
+    );
+    assert(moved.length === 0, 'adding a source moves no other source');
+
+    assert(
+      selectPart(sources, { index: 1, total: 1 }).length === sources.length,
+      '1/1 selects everything'
     );
   }
 
