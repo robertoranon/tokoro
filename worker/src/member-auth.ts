@@ -1,6 +1,11 @@
 import * as ed25519 from '@noble/ed25519';
 import './crypto'; // side effect: configures ed25519.etc.sha512Async
-import { jsonResponse } from './http';
+import {
+  jsonResponse,
+  contentLengthTooLarge,
+  payloadTooLarge,
+  readBodyLimited,
+} from './http';
 
 export const MAX_SKEW_SECONDS = 300;
 
@@ -34,13 +39,14 @@ export type AuthResult =
   | { ok: true; pubkey: string }
   | { ok: false; status: number; error: string; serverTime?: number };
 
-/** Verify X-Pubkey / X-Signature / X-Timestamp for (domain, payload). */
-export async function verifySignedRequest(
+/**
+ * The cheap part of verifySignedRequest: header format and timestamp window,
+ * no signature check. Lets body endpoints reject junk before reading the body.
+ */
+export function precheckAuthHeaders(
   request: Request,
-  domain: string,
-  payload: string,
   nowMs: number = Date.now()
-): Promise<AuthResult> {
+): AuthResult {
   const pubkey = (request.headers.get('X-Pubkey') || '').toLowerCase();
   const signature = request.headers.get('X-Signature') || '';
   const ts = request.headers.get('X-Timestamp') || '';
@@ -64,6 +70,21 @@ export async function verifySignedRequest(
       serverTime: nowSec,
     };
   }
+  return { ok: true, pubkey };
+}
+
+/** Verify X-Pubkey / X-Signature / X-Timestamp for (domain, payload). */
+export async function verifySignedRequest(
+  request: Request,
+  domain: string,
+  payload: string,
+  nowMs: number = Date.now()
+): Promise<AuthResult> {
+  const pre = precheckAuthHeaders(request, nowMs);
+  if (!pre.ok) return pre;
+  const pubkey = pre.pubkey;
+  const signature = request.headers.get('X-Signature') || '';
+  const ts = request.headers.get('X-Timestamp') || '';
   try {
     const valid = await ed25519.verifyAsync(
       hexToBytes(signature),
@@ -87,4 +108,20 @@ export function authErrorResponse(
       : { error: r.error },
     r.status
   );
+}
+
+/**
+ * The body of a signed request, read only after the cheap checks, in this
+ * order: Content-Length over the limit → 413; malformed headers or timestamp
+ * out of range → 401; body over the limit once read → 413. The caller still
+ * verifies the signature over the returned text.
+ */
+export async function readSignedBody(
+  request: Request,
+  nowMs: number = Date.now()
+): Promise<string | Response> {
+  if (contentLengthTooLarge(request)) return payloadTooLarge();
+  const pre = precheckAuthHeaders(request, nowMs);
+  if (!pre.ok) return authErrorResponse(pre);
+  return readBodyLimited(request);
 }

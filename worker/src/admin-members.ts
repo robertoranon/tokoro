@@ -1,8 +1,12 @@
 import type { Env } from './index';
 import { jsonResponse } from './http';
-import { verifySignedRequest, authErrorResponse } from './member-auth';
+import {
+  verifySignedRequest,
+  authErrorResponse,
+  readSignedBody,
+} from './member-auth';
 import { normalizeActUrl, normalizeName } from './band-keys';
-import { nowIso } from './members';
+import { nowIso, MAX_URL_LENGTH } from './members';
 
 const HEX_64 = /^[0-9a-f]{64}$/i;
 const MAX_MEMBER_NAME = 60;
@@ -25,6 +29,20 @@ async function authAdmin(
     return jsonResponse({ error: 'Unauthorized' }, 403);
   }
   return true;
+}
+
+/**
+ * The body of a signed admin request: 503 when the admin is not configured,
+ * then the checks of readSignedBody (413 / 401 / 413) before reading it.
+ */
+async function readAdminBody(
+  request: Request,
+  env: Env
+): Promise<string | Response> {
+  if (!env.ADMIN_PUBKEY) {
+    return jsonResponse({ error: 'Admin not configured' }, 503);
+  }
+  return readSignedBody(request);
 }
 
 function parseJson(raw: string): any | null {
@@ -79,7 +97,8 @@ async function listMembers(request: Request, env: Env): Promise<Response> {
 }
 
 async function createMember(request: Request, env: Env): Promise<Response> {
-  const raw = await request.text();
+  const raw = await readAdminBody(request, env);
+  if (raw instanceof Response) return raw;
   const a = await authAdmin(request, env, 'admin-member', raw);
   if (a !== true) return a;
   const body = parseJson(raw);
@@ -253,7 +272,8 @@ async function rejectSuggestions(
   request: Request,
   env: Env
 ): Promise<Response> {
-  const raw = await request.text();
+  const raw = await readAdminBody(request, env);
+  if (raw instanceof Response) return raw;
   const a = await authAdmin(request, env, 'admin-suggestion-reject', raw);
   if (a !== true) return a;
   const body = parseJson(raw);
@@ -280,7 +300,8 @@ async function rejectSuggestions(
 }
 
 async function linkSuggestions(request: Request, env: Env): Promise<Response> {
-  const raw = await request.text();
+  const raw = await readAdminBody(request, env);
+  if (raw instanceof Response) return raw;
   const a = await authAdmin(request, env, 'admin-suggestion-link', raw);
   if (a !== true) return a;
   const body = parseJson(raw);
@@ -288,8 +309,13 @@ async function linkSuggestions(request: Request, env: Env): Promise<Response> {
   if (!body || !ids)
     return jsonResponse({ error: 'ids must be a non-empty list of ids' }, 400);
   const actUrl = normalizeActUrl(body.act_url);
-  if (!actUrl)
-    return jsonResponse({ error: 'act_url must be an http(s) URL' }, 400);
+  if (!actUrl || actUrl.length > MAX_URL_LENGTH)
+    return jsonResponse(
+      {
+        error: `act_url must be an http(s) URL (max ${MAX_URL_LENGTH} characters)`,
+      },
+      400
+    );
 
   let updated = 0;
   for (const id of ids) {
@@ -299,15 +325,17 @@ async function linkSuggestions(request: Request, env: Env): Promise<Response> {
       .bind(id)
       .first<{ pubkey: string; status: string }>();
     if (!row || row.status === 'linked') continue;
-    await env.DB.prepare(
-      "UPDATE band_suggestions SET status = 'linked', act_url = ? WHERE id = ?"
-    )
-      .bind(actUrl, id)
-      .run();
+    // Follow first, then mark linked: not atomic, but if the request fails
+    // in between, the suggestion is still unlinked and a retry completes it.
     await env.DB.prepare(
       'INSERT OR IGNORE INTO member_bands (pubkey, act_url, created_at) VALUES (?, ?, ?)'
     )
       .bind(row.pubkey, actUrl, nowIso())
+      .run();
+    await env.DB.prepare(
+      "UPDATE band_suggestions SET status = 'linked', act_url = ? WHERE id = ?"
+    )
+      .bind(actUrl, id)
       .run();
     updated++;
   }

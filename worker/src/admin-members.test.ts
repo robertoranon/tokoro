@@ -393,3 +393,138 @@ describe('band followers', () => {
     ]);
   });
 });
+
+describe('hardening', () => {
+  async function suggestion(name: string) {
+    const k = await makeKey();
+    await createMember(k.pubkey, 'M' + name);
+    return { k, id: await addSuggestion(k.pubkey, name) };
+  }
+  const post = (path: string, domain: string, obj: unknown) => {
+    const body = JSON.stringify(obj);
+    return call(admin, 'POST', path, domain, body, body);
+  };
+  const list = (status: string) =>
+    call(
+      admin,
+      'GET',
+      '/admin/suggestions',
+      'admin-read',
+      '/admin/suggestions',
+      undefined,
+      '?status=' + status
+    );
+
+  it('413 for an oversized body (Content-Length and without)', async () => {
+    const big = { pubkey: 'a'.repeat(64), name: 'x', pad: 'y'.repeat(9000) };
+    const res = await post('/admin/members', 'admin-member', big);
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: 'Payload too large' });
+    const cl = (await routeAdminMemberRequest(
+      new Request('https://w.test/admin/suggestions/reject', {
+        method: 'POST',
+        headers: { 'Content-Length': '9000' },
+        body: '{}',
+      }),
+      env,
+      '/admin/suggestions/reject'
+    ))!;
+    expect(cl.status).toBe(413);
+  });
+
+  it('401 for malformed headers on body endpoints without reading the body', async () => {
+    for (const path of [
+      '/admin/members',
+      '/admin/suggestions/reject',
+      '/admin/suggestions/link',
+    ]) {
+      const req = new Request('https://w.test' + path, {
+        method: 'POST',
+        body: '{}',
+      });
+      const res = (await routeAdminMemberRequest(req, env, path))!;
+      expect(res.status).toBe(401);
+      expect(req.bodyUsed).toBe(false);
+    }
+  });
+
+  it('lists rejected and linked suggestions by status; 400 for an unknown status', async () => {
+    const a = await suggestion('Rejected Band');
+    const b = await suggestion('Linked Band');
+    await suggestion('Pending Band');
+    await post('/admin/suggestions/reject', 'admin-suggestion-reject', {
+      ids: [a.id],
+    });
+    await post('/admin/suggestions/link', 'admin-suggestion-link', {
+      ids: [b.id],
+      act_url: 'https://linked.example',
+    });
+    const keys = async (s: string) =>
+      ((await (await list(s)).json()) as any[]).map(g => g.key);
+    expect(await keys('rejected')).toEqual(['rejectedband']);
+    expect(await keys('linked')).toEqual(['linkedband']);
+    expect(await keys('pending')).toEqual(['pendingband']);
+    const bogus = await list('bogus');
+    expect(bogus.status).toBe(400);
+    expect(await bogus.json()).toEqual({ error: 'Invalid status' });
+  });
+
+  it('links a rejected suggestion', async () => {
+    const { k, id } = await suggestion('Second Thoughts');
+    await post('/admin/suggestions/reject', 'admin-suggestion-reject', {
+      ids: [id],
+      reason: 'no',
+    });
+    const res = await post('/admin/suggestions/link', 'admin-suggestion-link', {
+      ids: [id],
+      act_url: 'https://second.example',
+    });
+    expect(await res.json()).toEqual({ updated: 1 });
+    const row = await env.DB.prepare(
+      'SELECT status, act_url FROM band_suggestions WHERE id = ?'
+    )
+      .bind(id)
+      .first();
+    expect(row).toEqual({
+      status: 'linked',
+      act_url: 'https://second.example',
+    });
+    const f = await env.DB.prepare(
+      'SELECT act_url FROM member_bands WHERE pubkey = ?'
+    )
+      .bind(k.pubkey)
+      .first();
+    expect(f).toEqual({ act_url: 'https://second.example' });
+  });
+
+  it('400 for more than 200 ids', async () => {
+    const ids = Array.from({ length: 201 }, (_, i) => i + 1);
+    expect(
+      (
+        await post('/admin/suggestions/reject', 'admin-suggestion-reject', {
+          ids,
+        })
+      ).status
+    ).toBe(400);
+    expect(
+      (
+        await post('/admin/suggestions/link', 'admin-suggestion-link', {
+          ids,
+          act_url: 'https://x.example',
+        })
+      ).status
+    ).toBe(400);
+  });
+
+  it('400 for a link act_url longer than 500 characters', async () => {
+    const { id } = await suggestion('Long Url');
+    const res = await post('/admin/suggestions/link', 'admin-suggestion-link', {
+      ids: [id],
+      act_url: 'https://band.example/' + 'a'.repeat(480),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: 'act_url must be an http(s) URL (max 500 characters)',
+    });
+  });
+});

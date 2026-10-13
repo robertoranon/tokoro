@@ -127,7 +127,9 @@ The signed message is `SHA-256("<domain>:<payload>:<timestamp>")`. The timestamp
 | `admin-suggestion-reject` | `POST /admin/suggestions/reject`                                | raw JSON body                           |
 | `admin-suggestion-link`   | `POST /admin/suggestions/link`                                  | raw JSON body                           |
 
-A normalized band URL is scheme + host[:port] + path, lower-case scheme and host, without query, fragment or trailing slash (http/https only). CORS allows the three headers.
+A normalized band URL is scheme + host[:port] + path, lower-case scheme and host, without query, fragment or trailing slash (http/https only), at most 500 characters (a suggestion `url` or link `act_url` that is longer after normalization → `400`). CORS allows the three headers.
+
+Endpoints with a JSON body (`POST /member/suggestions`, `POST /admin/members`, `POST /admin/suggestions/reject`, `POST /admin/suggestions/link`) accept at most 8 KB and check the cheap things before reading it: a `Content-Length` above 8 KB → `413 {"error": "Payload too large"}` (before any auth check); for the admin endpoints, `503` when the admin is not configured; malformed headers or a timestamp outside the window → `401`; a body that turns out larger than 8 KB → `413`; then the signature (`401`) and the member/admin check (`403`).
 
 ---
 

@@ -240,6 +240,15 @@ The member endpoints (`/member/*`) and the admin member/suggestion endpoints (`/
    - Member endpoints: the pubkey must exist in `members` with `revoked_at IS NULL`, else `403 {"error": "Forbidden", "message": "Not an active member"}`.
    - Admin endpoints: if `ADMIN_PUBKEY` is not configured → `503 {"error": "Admin not configured"}` (checked **before** steps 1-3); the pubkey must equal `ADMIN_PUBKEY` (case-insensitive), else `403 {"error": "Unauthorized"}`.
 
+**Endpoints with a body** (`POST /member/suggestions`, `POST /admin/members`, `POST /admin/suggestions/reject`, `POST /admin/suggestions/link`) are signed over the raw body, so the body must be read before step 3. To avoid buffering bodies for unauthenticated requests, the order of checks is:
+
+1. `Content-Length` header present and greater than 8192 bytes → `413 {"error": "Payload too large"}` (before any other check).
+2. Admin endpoints only: `ADMIN_PUBKEY` not configured → `503`.
+3. Steps 1-2 above (header format, timestamp window) → `401`, **without reading the body**.
+4. Read the body; more than 8192 bytes (UTF-8) → `413 {"error": "Payload too large"}`.
+5. Step 3 above (signature over the body) → `401`, then step 4 (authorization) → `403`.
+6. Body parsing and validation → `400`.
+
 **Domains and payloads:**
 
 | Domain | Endpoint | Payload |
@@ -1087,10 +1096,10 @@ POST /member/suggestions
 
 **Processing Steps:**
 
-1. Verify the request (section 3.6); authentication happens before the body is parsed.
+1. Verify the request (section 3.6, including the order of checks for endpoints with a body: `413` for a body over 8 KB); authentication happens before the body is parsed.
 2. Parse the body: not JSON → `400 {"error": "Invalid JSON"}`; not a JSON object → `400 {"error": "Invalid body"}`.
 3. `name` is trimmed; if it is empty, longer than 120 characters, or contains no letter or digit (`normalizeName` is empty) → `400 {"error": "name is required (1-120 characters)"}`.
-4. If `url` is present and not `null` or `""`, it is normalized with `normalizeActUrl`; if invalid → `400 {"error": "url must be an http(s) URL"}`. The normalized form is stored.
+4. If `url` is present and not `null` or `""`, it is normalized with `normalizeActUrl`; if invalid, or longer than 500 characters once normalized → `400 {"error": "url must be an http(s) URL (max 500 characters)"}`. The normalized form is stored.
 5. If the same member already has a **pending** suggestion whose `normalizeName` equals this one, return `200 {"id": <existing id>, "duplicate": true}` and store nothing. Different members may suggest the same band. There is no cap on the number of suggestions.
 6. Otherwise insert a row with `status = 'pending'` and `created_at = now`.
 
@@ -1100,11 +1109,11 @@ POST /member/suggestions
 { "id": 12 }
 ```
 
-**Error Responses:** `400`, `401`, `403`.
+**Error Responses:** `400`, `401`, `403`, `413`.
 
 ### 7.12 Admin Member Endpoints
 
-All admin endpoints in sections 7.12-7.14 are signed as described in section 3.6 by `ADMIN_PUBKEY` (`503` when it is not configured, `403 {"error": "Unauthorized"}` for any other valid key). The member's private key is generated on the admin page and never sent to the worker; only the public key and a display name are stored.
+All admin endpoints in sections 7.12-7.14 are signed as described in section 3.6 by `ADMIN_PUBKEY` (`503` when it is not configured, `403 {"error": "Unauthorized"}` for any other valid key). The endpoints with a body (create member, reject, link) follow the order of checks of section 3.6 and answer `413` for a body over 8 KB. The member's private key is generated on the admin page and never sent to the worker; only the public key and a display name are stored.
 
 #### 7.12.1 GET /admin/members (List Members)
 
@@ -1160,7 +1169,7 @@ Signed with domain `admin-member-revoke` over the lower-cased `:pubkey`. Sets `r
 
 #### 7.12.4 DELETE /admin/members/:pubkey (Delete Member)
 
-Signed with domain `admin-member-delete` over the lower-cased `:pubkey`. Deletes the member's rows from `member_bands`, then `band_suggestions`, then `members`.
+Signed with domain `admin-member-delete` over the lower-cased `:pubkey`. Deletes the member's rows from `member_bands`, then `band_suggestions`, then `members`. The three deletes run as separate statements, not in one transaction: if the request fails half-way, some rows may be gone while the member remains; repeating the delete completes it (each statement is idempotent).
 
 **Response (200 OK):** `{ "message": "Member deleted", "pubkey": "<pubkey>" }`
 
@@ -1234,8 +1243,10 @@ POST /admin/suggestions/link
 **Processing Steps:**
 
 1. `ids` validated as in 7.13.2.
-2. `act_url` normalized with `normalizeActUrl`; invalid → `400 {"error": "act_url must be an http(s) URL"}`.
+2. `act_url` normalized with `normalizeActUrl`; invalid, or longer than 500 characters once normalized → `400 {"error": "act_url must be an http(s) URL (max 500 characters)"}`.
 3. For each id that exists and is not already `linked` (pending **or rejected**): set `status = 'linked'` and `act_url`, and follow `act_url` for the suggesting member (insert into `member_bands` if not present). Unknown and already linked ids are skipped.
+
+The follow and the status change run as separate statements (follow first, then `linked`), not in one transaction, and the ids are processed one by one. If the request fails half-way, the suggestions not yet marked `linked` are still pending or rejected, so repeating the same request completes them (the follow is idempotent).
 
 **Response (200 OK):** `{ "updated": <number of suggestions linked> }`
 
@@ -1307,6 +1318,7 @@ The 2-day grace period ensures events that have just ended remain visible briefl
 | 403  | Forbidden (resource doesn't belong to user, blocklisted, not an active member, or not the admin) |
 | 404  | Not Found                                                    |
 | 409  | Conflict (duplicate event, or member already exists)         |
+| 413  | Payload Too Large (body over 8 KB on a signed member/admin endpoint) |
 | 500  | Internal Server Error                                        |
 | 503  | Service Unavailable (ADMIN_PUBKEY secret not configured)     |
 
@@ -1351,7 +1363,8 @@ The 2-day grace period ensures events that have just ended remain visible briefl
 
 - Member name: trimmed, 1-60 characters
 - Suggestion name: trimmed, 1-120 characters, at least one letter or digit
-- Suggestion URL and `act_url`: http(s) only, stored normalized (section 3.6)
+- Suggestion URL and `act_url`: http(s) only, stored normalized (section 3.6), at most 500 characters after normalization
+- Request body of the signed member/admin endpoints: at most 8192 bytes (`413 {"error": "Payload too large"}`, section 3.6)
 - Reject reason: trimmed, at most 200 characters
 - Suggestion `ids`: non-empty array of at most 200 positive integers
 

@@ -221,3 +221,95 @@ describe('POST /member/suggestions', () => {
     expect((await send(anna, 'not json')).status).toBe(400);
   });
 });
+
+describe('hardening', () => {
+  const sendSuggest = (key: TestKey, body: string) =>
+    call(key, 'POST', '/member/suggestions', 'band-suggest', body, body);
+
+  it('400 for a suggestion url longer than 500 characters', async () => {
+    const long = 'https://band.example/' + 'a'.repeat(480);
+    const res = await sendSuggest(
+      anna,
+      JSON.stringify({ name: 'Long', url: long })
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: 'url must be an http(s) URL (max 500 characters)',
+    });
+    // exactly 500 is fine
+    const ok = 'https://band.example/' + 'a'.repeat(500 - 21);
+    expect(ok.length).toBe(500);
+    expect(
+      (await sendSuggest(anna, JSON.stringify({ name: 'Ok', url: ok }))).status
+    ).toBe(201);
+  });
+
+  it('413 for an oversized body without Content-Length (after the header check)', async () => {
+    const body = JSON.stringify({ name: 'Big', pad: 'x'.repeat(9000) });
+    const res = await sendSuggest(anna, body);
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: 'Payload too large' });
+  });
+
+  it('413 from Content-Length before authentication', async () => {
+    const res = (await routeMemberRequest(
+      new Request('https://w.test/member/suggestions', {
+        method: 'POST',
+        headers: { 'Content-Length': '100000' },
+        body: '{}',
+      }),
+      env,
+      '/member/suggestions'
+    ))!;
+    expect(res.status).toBe(413);
+  });
+
+  it('401 for malformed headers without reading the body', async () => {
+    const req = new Request('https://w.test/member/suggestions', {
+      method: 'POST',
+      headers: { 'X-Pubkey': 'nothex', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Beta' }),
+    });
+    const res = (await routeMemberRequest(req, env, '/member/suggestions'))!;
+    expect(res.status).toBe(401);
+    expect(req.bodyUsed).toBe(false);
+  });
+
+  it('401 for a stale timestamp without reading the body', async () => {
+    const body = JSON.stringify({ name: 'Beta' });
+    const headers = await authHeaders(
+      anna,
+      'band-suggest',
+      body,
+      Math.floor(Date.now() / 1000) - 3600
+    );
+    const req = new Request('https://w.test/member/suggestions', {
+      method: 'POST',
+      headers,
+      body,
+    });
+    const res = (await routeMemberRequest(req, env, '/member/suggestions'))!;
+    expect(res.status).toBe(401);
+    expect(((await res.json()) as any).server_time).toEqual(expect.any(Number));
+    expect(req.bodyUsed).toBe(false);
+  });
+
+  it('403 for a revoked member on follow, unfollow and suggest', async () => {
+    const bob = await makeKey();
+    await addMember(bob, 'Bob', true);
+    const url = 'https://alpha.example';
+    expect(
+      (await call(bob, 'POST', bandPath(url), 'band-follow', url)).status
+    ).toBe(403);
+    expect(
+      (await call(bob, 'DELETE', bandPath(url), 'band-unfollow', url)).status
+    ).toBe(403);
+    expect(
+      (await sendSuggest(bob, JSON.stringify({ name: 'Beta' }))).status
+    ).toBe(403);
+    const n = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM band_suggestions'
+    ).first();
+    expect(n).toEqual({ n: 0 });
+  });
+});

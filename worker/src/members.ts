@@ -1,9 +1,14 @@
 import type { Env } from './index';
 import { jsonResponse } from './http';
-import { verifySignedRequest, authErrorResponse } from './member-auth';
+import {
+  verifySignedRequest,
+  authErrorResponse,
+  readSignedBody,
+} from './member-auth';
 import { decodeB64Url, normalizeActUrl, normalizeName } from './band-keys';
 
 const MAX_SUGGESTION_NAME = 120;
+export const MAX_URL_LENGTH = 500;
 
 export function nowIso(): string {
   return new Date().toISOString().slice(0, 19);
@@ -115,7 +120,8 @@ async function handleMemberSuggest(
   request: Request,
   env: Env
 ): Promise<Response> {
-  const raw = await request.text();
+  const raw = await readSignedBody(request);
+  if (raw instanceof Response) return raw;
   const m = await authMember(request, env, 'band-suggest', raw);
   if (m instanceof Response) return m;
 
@@ -144,8 +150,13 @@ async function handleMemberSuggest(
   let url: string | null = null;
   if (body.url !== undefined && body.url !== null && body.url !== '') {
     url = normalizeActUrl(body.url);
-    if (url === null) {
-      return jsonResponse({ error: 'url must be an http(s) URL' }, 400);
+    if (url === null || url.length > MAX_URL_LENGTH) {
+      return jsonResponse(
+        {
+          error: `url must be an http(s) URL (max ${MAX_URL_LENGTH} characters)`,
+        },
+        400
+      );
     }
   }
 
