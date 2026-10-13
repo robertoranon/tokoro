@@ -13,6 +13,8 @@ import {
   DEDUP_SQL_BUFFER_MS,
 } from '../../shared/dedup-config';
 import { CORS_HEADERS, jsonResponse } from './http';
+import { routeMemberRequest } from './members';
+import { routeAdminMemberRequest } from './admin-members';
 
 export interface Env {
   DB: D1Database;
@@ -550,6 +552,20 @@ export default {
                 signature: 'Signature of event ID (hex)',
               },
             },
+            'GET /member/me': {
+              description:
+                'The calling member: name, followed bands, own suggestions (signed with X-Pubkey/X-Signature/X-Timestamp)',
+            },
+            'POST|DELETE /member/bands/:act_url_b64': {
+              description: 'Follow or unfollow a band (signed)',
+            },
+            'POST /member/suggestions': {
+              description: 'Suggest a band to the admin (signed)',
+              body: {
+                name: 'Band name (required)',
+                url: 'Band site (optional)',
+              },
+            },
           },
         });
       }
@@ -602,6 +618,12 @@ export default {
         const targetPubkey = path.split('/')[3];
         return await handleDeleteBlocklist(request, env, targetPubkey);
       }
+
+      // Routes: /member/* and the admin member/suggestion endpoints
+      const memberResponse =
+        (await routeMemberRequest(request, env, path)) ??
+        (await routeAdminMemberRequest(request, env, path));
+      if (memberResponse) return memberResponse;
 
       return jsonResponse({ error: 'Not found' }, 404);
     } catch (error) {
