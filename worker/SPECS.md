@@ -245,7 +245,7 @@ The member endpoints (`/member/*`) and the admin member/suggestion endpoints (`/
 1. `Content-Length` header present and greater than 8192 bytes → `413 {"error": "Payload too large"}` (before any other check).
 2. Admin endpoints only: `ADMIN_PUBKEY` not configured → `503`.
 3. Steps 1-2 above (header format, timestamp window) → `401`, **without reading the body**.
-4. Read the body; more than 8192 bytes (UTF-8) → `413 {"error": "Payload too large"}`.
+4. Read the body as a stream, counting bytes; as soon as more than 8192 bytes have arrived, stop reading (cancel the stream) and answer `413 {"error": "Payload too large"}`, so an oversized body without `Content-Length` is never buffered whole. Otherwise decode the bytes as UTF-8 (an absent body is the empty string).
 5. Step 3 above (signature over the body) → `401`, then step 4 (authorization) → `403`.
 6. Body parsing and validation → `400`.
 

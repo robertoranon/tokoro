@@ -34,16 +34,35 @@ export function contentLengthTooLarge(
 }
 
 /**
- * The request body as text, or a 413 Response when it is larger than
- * maxBytes (announced by Content-Length, or measured after reading).
+ * The request body as UTF-8 text, or a 413 Response when it is larger than
+ * maxBytes: announced by Content-Length, or counted while streaming (reading
+ * stops and the stream is cancelled as soon as the count passes the limit).
+ * An absent body is the empty string.
  */
 export async function readBodyLimited(
   request: Request,
   maxBytes: number = MAX_BODY_BYTES
 ): Promise<string | Response> {
   if (contentLengthTooLarge(request, maxBytes)) return payloadTooLarge();
-  const text = await request.text();
-  if (new TextEncoder().encode(text).length > maxBytes)
-    return payloadTooLarge();
-  return text;
+  if (!request.body) return '';
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      return payloadTooLarge();
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    bytes.set(c, offset);
+    offset += c.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
 }
