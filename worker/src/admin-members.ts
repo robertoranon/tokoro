@@ -64,6 +64,17 @@ function parseJson(raw: string): any | null {
   }
 }
 
+// D1 accepts at most 100 bound parameters per statement: id lists are split
+// into chunks that leave room for a few extra parameters.
+const ID_CHUNK = 90;
+
+function chunks<T>(list: T[], size = ID_CHUNK): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
+}
+const placeholders = (n: number) => new Array(n).fill('?').join(', ');
+
 function validIds(v: unknown): number[] | null {
   if (!Array.isArray(v) || v.length === 0 || v.length > MAX_IDS) return null;
   return v.every(n => Number.isInteger(n) && n > 0) ? (v as number[]) : null;
@@ -296,15 +307,15 @@ async function rejectSuggestions(
       400
     );
   }
-  let updated = 0;
-  for (const id of ids) {
-    const r = await env.DB.prepare(
-      "UPDATE band_suggestions SET status = 'rejected', reject_reason = ? WHERE id = ? AND status = 'pending'"
-    )
-      .bind(reason || null, id)
-      .run();
-    updated += r.meta.changes;
-  }
+  // One UPDATE per chunk of ids (one for up to ID_CHUNK ids), all in one batch.
+  const writes = chunks([...new Set(ids)]).map(chunk =>
+    env.DB.prepare(
+      `UPDATE band_suggestions SET status = 'rejected', reject_reason = ?
+       WHERE status = 'pending' AND id IN (${placeholders(chunk.length)})`
+    ).bind(reason || null, ...chunk)
+  );
+  const results = await env.DB.batch(writes);
+  const updated = results.reduce((n, r) => n + (r.meta?.changes ?? 0), 0);
   return jsonResponse({ updated });
 }
 
@@ -326,34 +337,39 @@ async function linkSuggestions(request: Request, env: Env): Promise<Response> {
       400
     );
 
-  // Read first (unknown and already linked ids are skipped), then write the
-  // follow + status update of every remaining suggestion in one batch, which
-  // D1 runs as a single transaction: all of them happen or none.
+  // Read first, one query per chunk of ids (one for up to ID_CHUNK ids);
+  // unknown and already linked ids are skipped. Then write the follows and
+  // the status updates of the remaining suggestions in one batch, which D1
+  // runs as a single transaction: all of them happen or none.
   const now = nowIso();
-  const writes: D1PreparedStatement[] = [];
-  const seen = new Set<number>();
-  let updated = 0;
-  for (const id of ids) {
-    if (seen.has(id)) continue;
-    seen.add(id);
-    const row = await env.DB.prepare(
-      'SELECT pubkey, status FROM band_suggestions WHERE id = ?'
+  const linkable: number[] = [];
+  for (const chunk of chunks([...new Set(ids)])) {
+    const res = await env.DB.prepare(
+      `SELECT id, pubkey, status FROM band_suggestions
+       WHERE id IN (${placeholders(chunk.length)})`
     )
-      .bind(id)
-      .first<{ pubkey: string; status: string }>();
-    if (!row || row.status === 'linked') continue;
+      .bind(...chunk)
+      .all<{ id: number; pubkey: string; status: string }>();
+    for (const row of res.results || []) {
+      if (row.status !== 'linked') linkable.push(row.id);
+    }
+  }
+  const writes: D1PreparedStatement[] = [];
+  for (const chunk of chunks(linkable)) {
+    const inList = placeholders(chunk.length);
     writes.push(
       env.DB.prepare(
-        'INSERT OR IGNORE INTO member_bands (pubkey, act_url, created_at) VALUES (?, ?, ?)'
-      ).bind(row.pubkey, actUrl, now),
+        `INSERT OR IGNORE INTO member_bands (pubkey, act_url, created_at)
+         SELECT DISTINCT pubkey, ?, ? FROM band_suggestions WHERE id IN (${inList})`
+      ).bind(actUrl, now, ...chunk),
       env.DB.prepare(
-        "UPDATE band_suggestions SET status = 'linked', act_url = ? WHERE id = ?"
-      ).bind(actUrl, id)
+        `UPDATE band_suggestions SET status = 'linked', act_url = ?
+         WHERE id IN (${inList})`
+      ).bind(actUrl, ...chunk)
     );
-    updated++;
   }
   if (writes.length > 0) await env.DB.batch(writes);
-  return jsonResponse({ updated });
+  return jsonResponse({ updated: linkable.length });
 }
 
 async function listBandFollowers(

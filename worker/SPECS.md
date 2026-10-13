@@ -1224,7 +1224,9 @@ POST /admin/suggestions/reject
 
 1. `ids` must be a non-empty array of at most 200 positive integers (a body that is not a JSON object also fails here) → else `400 {"error": "ids must be a non-empty list of ids"}`.
 2. `reason` is optional and trimmed; longer than 200 characters → `400 {"error": "reason is limited to 200 characters"}`. An empty reason is stored as `NULL`.
-3. Each **pending** suggestion among `ids` becomes `status = 'rejected'` with `reject_reason`. Unknown ids and suggestions in another status are skipped.
+3. Each **pending** suggestion among `ids` becomes `status = 'rejected'` with `reject_reason`. Unknown ids and suggestions in another status are skipped; a repeated id counts once.
+
+The update is one `UPDATE … WHERE status = 'pending' AND id IN (…)` per chunk of at most 90 ids (one statement for up to 90 ids, at most 3 for 200; D1 allows 100 bound parameters per statement), all in one D1 `batch` (a single transaction); `updated` is the sum of the statements' `meta.changes`.
 
 **Response (200 OK):** `{ "updated": <number of suggestions changed> }`
 
@@ -1246,7 +1248,7 @@ POST /admin/suggestions/link
 2. `act_url` normalized with `normalizeActUrl`; invalid, or longer than 500 characters once normalized → `400 {"error": "act_url must be an http(s) URL (max 500 characters)"}`.
 3. For each id that exists and is not already `linked` (pending **or rejected**): set `status = 'linked'` and `act_url`, and follow `act_url` for the suggesting member (insert into `member_bands` if not present). Unknown and already linked ids are skipped.
 
-The suggestions are read first (a repeated id counts once); then the follow and the status change of every suggestion to link are written in one D1 `batch`, which runs as a single transaction. Either every listed suggestion is followed and marked `linked`, or, if any statement fails, none is and the request fails (`500`) leaving all of them as they were (no follow without `linked`, no `linked` without follow).
+The suggestions are read first with one `SELECT id, pubkey, status … WHERE id IN (…)` per chunk of at most 90 deduplicated ids (one query for up to 90 ids, at most 3 for 200: D1 limits both the queries per invocation and the bound parameters per statement, at 100), so a repeated id counts once. Then the follows (`INSERT OR IGNORE INTO member_bands … SELECT DISTINCT pubkey, act_url, now FROM band_suggestions WHERE id IN (…)`) and the status changes (`UPDATE … WHERE id IN (…)`) of the suggestions to link, again per chunk, are written in one D1 `batch`, which runs as a single transaction. Either every listed suggestion is followed and marked `linked`, or, if any statement fails, none is and the request fails (`500`) leaving all of them as they were (no follow without `linked`, no `linked` without follow).
 
 **Response (200 OK):** `{ "updated": <number of suggestions linked> }`
 

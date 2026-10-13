@@ -687,3 +687,113 @@ describe('atomic writes', () => {
     expect(await n('member_bands')).toBe(2);
   });
 });
+
+describe('few D1 queries for bulk link / reject', () => {
+  /** env.DB that counts prepare() and batch() calls and, like D1, refuses more than 100 bound parameters. */
+  function counting(db: any) {
+    const stats = { prepares: 0, batches: 0, maxParams: 0 };
+    const wrap = (st: any): any => ({
+      bind: (...a: unknown[]) => {
+        stats.maxParams = Math.max(stats.maxParams, a.length);
+        if (a.length > 100) throw new Error('too many SQL variables');
+        return wrap(st.bind(...a));
+      },
+      run: () => st.run(),
+      first: () => st.first(),
+      all: () => st.all(),
+      _exec: () => st._exec(),
+    });
+    return {
+      stats,
+      prepare: (sql: string) => {
+        stats.prepares++;
+        return wrap(db.prepare(sql));
+      },
+      batch: (sts: any[]) => {
+        stats.batches++;
+        return db.batch(sts);
+      },
+    };
+  }
+  async function seed(n: number) {
+    const ids: number[] = [];
+    const keys: TestKey[] = [];
+    for (let i = 0; i < 5; i++) {
+      const k = await makeKey();
+      await createMember(k.pubkey, 'M' + i);
+      keys.push(k);
+    }
+    for (let i = 0; i < n; i++)
+      ids.push(await addSuggestion(keys[i % 5].pubkey, 'Band ' + i));
+    return ids;
+  }
+  const send = (path: string, domain: string, obj: unknown) => {
+    const body = JSON.stringify(obj);
+    return call(admin, 'POST', path, domain, body, body);
+  };
+  const count = async (sql: string) =>
+    (await env.DB.prepare(sql).first()).n as number;
+
+  it('link: 50 ids take at most 3 prepares and one batch', async () => {
+    const ids = await seed(50);
+    const real = env.DB;
+    const db = counting(real);
+    env.DB = db;
+    const res = await send('/admin/suggestions/link', 'admin-suggestion-link', {
+      ids: [...ids, ids[0], 99999],
+      act_url: 'https://band.example',
+    });
+    env.DB = real;
+    expect(await res.json()).toEqual({ updated: 50 });
+    expect(db.stats.prepares).toBeLessThanOrEqual(3);
+    expect(db.stats.batches).toBe(1);
+    expect(
+      await count(
+        "SELECT COUNT(*) AS n FROM band_suggestions WHERE status = 'linked' AND act_url = 'https://band.example'"
+      )
+    ).toBe(50);
+    expect(await count('SELECT COUNT(*) AS n FROM member_bands')).toBe(5);
+  });
+
+  it('reject: 50 ids take one prepare', async () => {
+    const ids = await seed(50);
+    const real = env.DB;
+    const db = counting(real);
+    env.DB = db;
+    const res = await send(
+      '/admin/suggestions/reject',
+      'admin-suggestion-reject',
+      { ids: [...ids, ids[0], 99999], reason: 'No' }
+    );
+    env.DB = real;
+    expect(await res.json()).toEqual({ updated: 50 });
+    expect(db.stats.prepares).toBeLessThanOrEqual(1);
+    expect(
+      await count(
+        "SELECT COUNT(*) AS n FROM band_suggestions WHERE status = 'rejected' AND reject_reason = 'No'"
+      )
+    ).toBe(50);
+  });
+
+  it('200 ids stay within 100 bound parameters per statement', async () => {
+    const ids = await seed(200);
+    const real = env.DB;
+    const db = counting(real);
+    env.DB = db;
+    const rej = await send(
+      '/admin/suggestions/reject',
+      'admin-suggestion-reject',
+      { ids: ids.slice(0, 100) }
+    );
+    const link = await send(
+      '/admin/suggestions/link',
+      'admin-suggestion-link',
+      { ids, act_url: 'https://band.example' }
+    );
+    env.DB = real;
+    expect(await rej.json()).toEqual({ updated: 100 });
+    expect(await link.json()).toEqual({ updated: 200 });
+    expect(db.stats.maxParams).toBeLessThanOrEqual(100);
+    expect(db.stats.prepares).toBeLessThanOrEqual(2 + 3 + 6);
+  });
+});
