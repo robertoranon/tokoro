@@ -12,6 +12,7 @@ import {
   DEDUP_TIME_WINDOW_MS,
   DEDUP_SQL_BUFFER_MS,
 } from '../../shared/dedup-config';
+import { CORS_HEADERS, jsonResponse } from './http';
 
 export interface Env {
   DB: D1Database;
@@ -55,13 +56,6 @@ interface DbEventRow {
   pubkey?: unknown;
   [key: string]: unknown;
 }
-
-// CORS headers for all responses
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
 
 // Calculate distance between two coordinates using Haversine formula (returns km)
 function haversineDistance(
@@ -1425,14 +1419,4 @@ async function generateEventId(eventData: any): Promise<string> {
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   return hashHex;
-}
-
-function jsonResponse(data: any, status: number = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-      ...CORS_HEADERS,
-    },
-  });
 }
