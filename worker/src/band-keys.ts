@@ -40,7 +40,10 @@ export function decodeB64Url(s: string): string | null {
       s.replace(/-/g, '+').replace(/_/g, '/') +
       '='.repeat((4 - (s.length % 4)) % 4);
     const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    return new TextDecoder('utf-8', {
+      fatal: true,
+      ignoreBOM: false,
+    }).decode(bytes);
   } catch {
     return null;
   }
