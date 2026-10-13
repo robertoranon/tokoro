@@ -404,6 +404,10 @@
       .follow-btn[aria-pressed='true'] {
         color: #c0392b;
       }
+      .follow-btn:disabled {
+        opacity: 0.5;
+        cursor: progress;
+      }
       .suggest-pane {
         margin: 12px 0;
       }
@@ -525,6 +529,7 @@
           class="notice-line"
           role="status"
           aria-live="polite"
+          hidden
         ></p>
       </section>
 
@@ -599,6 +604,7 @@
           suggestions: [],
           mine: false, // show only followed bands
           syncing: false,
+          inFlight: new Set(), // normalized band urls with a follow/unfollow request pending
         };
         let trackedDone = false; // load() has finished its tracked-bands attempt
         const today = formatLocalDateTime(new Date()).slice(0, 10);
@@ -629,6 +635,11 @@
         }
         function setNotice(text) {
           el('noticeLine').textContent = text || '';
+        }
+        // The member note is hidden while empty, so visitors get no blank line.
+        function setMemberNote(text) {
+          el('memberNote').textContent = text || '';
+          el('memberNote').hidden = !text;
         }
 
         // ── Filtering ───────────────────────────────────────────────────
@@ -683,6 +694,7 @@
         function followBtnHtml(bandKey) {
           if (!member.ok) return '';
           const on = M.isFollowed(member.followed, bandKey);
+          const busy = member.inFlight.has(M.normalizeActUrl(bandKey));
           return (
             '<button type="button" class="follow-btn" data-follow="' +
             escHtml(bandKey) +
@@ -692,7 +704,9 @@
             (on ? 'Stop following this band' : 'Follow this band') +
             '" title="' +
             (on ? 'Following' : 'Follow this band') +
-            '">' +
+            '"' +
+            (busy ? ' disabled' : '') +
+            '>' +
             (on ? '♥' : '♡') +
             '</button>'
           );
@@ -1226,21 +1240,23 @@
 
         async function toggleFollow(bandUrl) {
           const key = M.normalizeActUrl(bandUrl);
-          if (!key || !member.ok) return;
+          // One request per band at a time: clicks while one is pending are ignored.
+          if (!key || !member.ok || member.inFlight.has(key)) return;
           const was = member.followed.has(key);
           if (was) member.followed.delete(key);
           else member.followed.add(key);
+          member.inFlight.add(key);
           render();
           const res = await (
             was ? member.api.unfollow(bandUrl) : member.api.follow(bandUrl)
           ).catch(() => null);
+          member.inFlight.delete(key);
           if (!res || !res.ok) {
             if (was) member.followed.add(key);
             else member.followed.delete(key);
-            render();
-            el('memberNote').textContent =
-              'Could not save that change. Please try again.';
+            setMemberNote('Could not save that change. Please try again.');
           }
+          render();
         }
         el('bandList').addEventListener('click', e => {
           const btn = e.target.closest('[data-follow]');
@@ -1273,6 +1289,7 @@
           if (again && again.ok)
             member.suggestions = again.data.suggestions || [];
           renderSuggestions(currentViews());
+          await syncMember(); // a suggestion matching a tracked band is followed now
         });
 
         async function initMember() {
@@ -1290,8 +1307,9 @@
           const seed = fromLink ? link.seed : M.loadStoredSeed(storage);
           if (!seed) {
             if (link.status === 'invalid') {
-              el('memberNote').textContent =
-                'This link does not look right. Ask for a new one.';
+              setMemberNote(
+                'This link does not look right. Ask for a new one.'
+              );
             }
             return;
           }
@@ -1300,8 +1318,7 @@
             imported = await M.importMember(seed);
           } catch (err) {
             if (!fromLink) M.clearSeed(storage);
-            el('memberNote').textContent =
-              'This link does not look right. Ask for a new one.';
+            setMemberNote('This link does not look right. Ask for a new one.');
             return;
           }
           member.api = M.createMemberApi(
@@ -1313,15 +1330,22 @@
           try {
             res = await member.api.me();
           } catch (err) {
-            return; // offline: stay a visitor this time, keep the link
+            res = null; // offline
           }
-          if (!res.ok) {
-            if (res.status === 401 || res.status === 403) {
-              M.clearSeed(storage);
-              el('memberNote').textContent =
-                'This personal link is no longer active. Ask for a new one.';
+          if (!res || !res.ok) {
+            if (res && (res.status === 401 || res.status === 403)) {
+              // Only a rejected stored seed is cleared: a dead link must
+              // not wipe a working stored one.
+              if (!fromLink) M.clearSeed(storage);
+              setMemberNote(
+                'This personal link is no longer active. Ask for a new one.'
+              );
+            } else if (fromLink) {
+              // Offline or server error: keep the (unverified) link so a
+              // reload works later; a later 401/403 clears it.
+              M.saveSeed(storage, seed);
             }
-            return;
+            return; // visitor view this time
           }
           if (fromLink) M.saveSeed(storage, seed);
           member.ok = true;

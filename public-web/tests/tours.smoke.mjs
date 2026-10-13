@@ -11,6 +11,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const T = require('../tours.js');
+const M = require('../member.js');
 
 let chromium;
 try {
@@ -76,6 +77,10 @@ const state = {
   tracked: undefined,
   memberRequests: [], // every /member/* request: "METHOD /path"
   memberMe: null, // null → 403; else the /member/me body
+  memberAccept: null, // null → any pubkey; else a Set: other X-Pubkey values get 403
+  memberMeStatus: 0, // non-zero → /member/me answers with this status
+  bandDelayMs: 0, // artificial delay on /member/bands/*
+  serverFollowed: new Set(), // band urls followed through POST/DELETE /member/bands/*
 };
 let base = '';
 const TYPES = {
@@ -90,8 +95,29 @@ const server = http.createServer(async (req, res) => {
     state.memberRequests.push(req.method + ' ' + url.pathname);
     let raw = '';
     for await (const chunk of req) raw += chunk;
+    const pk = String(req.headers['x-pubkey'] || '');
+    if (state.memberAccept && !state.memberAccept.has(pk)) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end('{"error":"Forbidden"}');
+      return;
+    }
+    if (url.pathname.startsWith('/member/bands/')) {
+      if (state.bandDelayMs)
+        await new Promise(r => setTimeout(r, state.bandDelayMs));
+      const bandUrl = Buffer.from(
+        url.pathname.slice('/member/bands/'.length),
+        'base64url'
+      ).toString();
+      if (req.method === 'POST') state.serverFollowed.add(bandUrl);
+      else state.serverFollowed.delete(bandUrl);
+    }
     if (url.pathname === '/member/me') {
-      if (!state.memberMe) {
+      if (state.memberMeStatus) {
+        res.writeHead(state.memberMeStatus, {
+          'Content-Type': 'application/json',
+        });
+        res.end('{"error":"Server error"}');
+      } else if (!state.memberMe) {
         res.writeHead(403, { 'Content-Type': 'application/json' });
         res.end('{"error":"Forbidden"}');
       } else {
@@ -728,6 +754,11 @@ try {
     check('visitor: no suggest pane', await page.isHidden('#suggestPane'));
     check('visitor: no follow buttons', (await page.locator('.follow-btn').count()) === 0);
     check('visitor: no /member requests', state.memberRequests.length === 0, state.memberRequests);
+    const noteBox = await page.evaluate(() => {
+      const r = document.getElementById('memberNote').getBoundingClientRect();
+      return { h: r.height, hidden: document.getElementById('memberNote').hidden };
+    });
+    check('visitor: the empty member note takes no space', (await page.isHidden('#memberNote')) && noteBox.h === 0, noteBox);
     await context.close();
   }
 
@@ -802,6 +833,47 @@ try {
     await page.click('#suggestForm button[type=submit]');
     await page.waitForFunction(() => document.getElementById('suggestList').textContent.includes('Brand New Band'));
     check('member: new suggestion is listed as Waiting', (await page.textContent('#suggestList')).includes('Waiting'));
+
+    // Rapid toggling (A4): two clicks while the first request is in flight
+    // send one request; the final state matches the server.
+    await page.click('#allBandsBtn');
+    await settleNames(page, ['Alpha', 'Beta']);
+    state.serverFollowed = new Set(['https://alpha.example']);
+    state.bandDelayMs = 400;
+    state.memberRequests.length = 0;
+    await page.evaluate(() => {
+      const sel = '[data-follow="https://alpha.example"]';
+      document.querySelector(sel).click();
+      document.querySelector(sel).click();
+    });
+    await new Promise(r => setTimeout(r, 1200));
+    state.bandDelayMs = 0;
+    const alphaReqs = state.memberRequests.filter(r => r.includes(Buffer.from('https://alpha.example').toString('base64url')));
+    const alphaPressed = await page.getAttribute('[data-follow="https://alpha.example"]', 'aria-pressed');
+    check('member: rapid double click sends one request', alphaReqs.length === 1, state.memberRequests);
+    check(
+      'member: after rapid clicks the button matches the server',
+      alphaPressed === String(state.serverFollowed.has('https://alpha.example')),
+      [alphaPressed, [...state.serverFollowed]]
+    );
+
+    // A new suggestion that matches a tracked band is followed at once (A5).
+    state.memberRequests.length = 0;
+    const alphaFollow = 'POST /member/bands/' + Buffer.from('https://alpha.example').toString('base64url');
+    await page.fill('#suggestName', 'Alpha');
+    await page.click('#suggestForm button[type=submit]');
+    try {
+      await page.waitForFunction(
+        () => document.querySelector('[data-follow="https://alpha.example"]')?.getAttribute('aria-pressed') === 'true',
+        null,
+        { timeout: 5000 }
+      );
+    } catch {}
+    check('member: a new suggestion matching a tracked band sends a follow', state.memberRequests.includes(alphaFollow), state.memberRequests);
+    check(
+      'member: ...and its heart shows pressed',
+      (await page.getAttribute('[data-follow="https://alpha.example"]', 'aria-pressed')) === 'true'
+    );
     check('member: no page errors', errors.length === 0, errors);
     await context.close();
 
@@ -822,7 +894,77 @@ try {
     await gone.page.waitForFunction(() => document.getElementById('memberNote').textContent.length > 0);
     check('revoked: visitor view', await gone.page.isHidden('#memberBar'));
     check('revoked: stored seed cleared', (await gone.page.evaluate(() => localStorage.getItem('tokoro_member'))) === null);
+    check(
+      'revoked: the member note is visible with its text',
+      (await gone.page.isVisible('#memberNote')) &&
+        (await gone.page.textContent('#memberNote')).includes('no longer active'),
+      await gone.page.textContent('#memberNote')
+    );
     await gone.context.close();
+
+    // A dead link must not wipe a working stored seed (A2).
+    const badSeed = Buffer.from(Array.from({ length: 32 }, (_, i) => 200 - i)).toString('base64url');
+    const goodPk = (await M.importMember(seed)).pubkey;
+    state.memberMe = { name: 'Anna', bands: [], suggestions: [] };
+    state.memberAccept = new Set([goodPk]);
+    try {
+      const dead = await newPage(browser);
+      await dead.page.goto(base + '/member.js'); // same origin, to seed localStorage once
+      await dead.page.evaluate(s => localStorage.setItem('tokoro_member', s), seed);
+      await dead.page.goto(base + '/tours.html');
+      await dead.page.waitForSelector('#memberBar:not([hidden])');
+      check('dead link: the stored seed works on its own', true);
+      await dead.page.goto(base + '/member.js');
+      await dead.page.goto(base + '/tours.html#k=' + badSeed);
+      await dead.page.waitForSelector('.band-card');
+      await dead.page.waitForFunction(() => document.getElementById('memberNote').textContent.length > 0);
+      check('dead link: visitor view for this visit', await dead.page.isHidden('#memberBar'));
+      check(
+        'dead link: the working stored seed is kept',
+        (await dead.page.evaluate(() => localStorage.getItem('tokoro_member'))) === seed
+      );
+      await dead.page.goto(base + '/tours.html');
+      await dead.page.waitForSelector('#memberBar:not([hidden])', { timeout: 5000 }).catch(() => {});
+      check('dead link: the next visit without the link is a member again', await dead.page.isVisible('#memberBar'));
+      await dead.context.close();
+    } finally {
+      state.memberAccept = null;
+    }
+
+    // Offline / server error on the first open: the link is kept (A3).
+    state.memberMeStatus = 500;
+    try {
+      const off = await newPage(browser);
+      await off.page.goto(base + '/tours.html#k=' + seed);
+      await off.page.waitForSelector('.band-card');
+      let stored = null;
+      try {
+        await off.page.waitForFunction(() => localStorage.getItem('tokoro_member') !== null, null, { timeout: 5000 });
+        stored = await off.page.evaluate(() => localStorage.getItem('tokoro_member'));
+      } catch {}
+      check('5xx on first open: the link seed is stored', stored === seed, stored);
+      check('5xx on first open: visitor view', await off.page.isHidden('#memberBar'));
+      state.memberMeStatus = 0;
+      await off.page.reload();
+      await off.page.waitForSelector('#memberBar:not([hidden])', { timeout: 5000 }).catch(() => {});
+      check('5xx on first open: a reload once the server is back shows the member view', await off.page.isVisible('#memberBar'));
+      await off.context.close();
+    } finally {
+      state.memberMeStatus = 0;
+    }
+    {
+      const net = await newPage(browser);
+      await net.page.route('**/member/me', r => r.abort());
+      await net.page.goto(base + '/tours.html#k=' + seed);
+      await net.page.waitForSelector('.band-card');
+      let stored = null;
+      try {
+        await net.page.waitForFunction(() => localStorage.getItem('tokoro_member') !== null, null, { timeout: 5000 });
+        stored = await net.page.evaluate(() => localStorage.getItem('tokoro_member'));
+      } catch {}
+      check('offline first open: the link seed is stored, visitor view', stored === seed && (await net.page.isHidden('#memberBar')), stored);
+      await net.context.close();
+    }
   }
 } finally {
   if (browser) await browser.close();
