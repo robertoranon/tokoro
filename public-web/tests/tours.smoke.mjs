@@ -1204,7 +1204,7 @@ try {
       await net.context.close();
     }
 
-    // ── Following any tracked band, and bands without upcoming shows ─────────
+    // ── Following any tracked band ─────────
     {
       const b64 = u => Buffer.from(u).toString('base64url');
       const DELTA = 'https://deltaquiet.example';
@@ -1314,97 +1314,7 @@ try {
       check('tracked follow: a finished tap moves nothing', same(before, after), [before, after]);
       await page.setViewportSize({ width: 1280, height: 720 });
 
-      // My bands lists followed bands without shows below the cards.
-      const quietRows = () =>
-        page.$$eval('#quietBands li', lis =>
-          lis.map(li => {
-            const a = li.querySelector('a');
-            return {
-              name: a.textContent.replace(/↗/, '').trim(),
-              href: a.getAttribute('href'),
-              target: a.getAttribute('target'),
-              rel: a.getAttribute('rel'),
-              follow: li.querySelector('.follow-btn')?.getAttribute('aria-pressed'),
-            };
-          })
-        );
-      await page.click('#myBandsBtn');
-      await page.waitForSelector('#quietBands');
-      const quiet = await quietRows();
-      check(
-        'quiet bands: My bands lists followed bands without shows (tracked name, else host), with links and hearts',
-        JSON.stringify(quiet.map(r => [r.name, r.href, r.follow])) ===
-          JSON.stringify([
-            ['Delta Quiet', DELTA, 'true'],
-            ['unknown-band.example', 'https://www.unknown-band.example', 'true'],
-          ]) &&
-          quiet.every(r => r.target === '_blank' && r.rel === 'noopener noreferrer') &&
-          (await page.textContent('#quietBands')).includes('Following · no upcoming shows'),
-        quiet
-      );
-      check(
-        'quiet bands: the cards still list only followed bands with shows',
-        JSON.stringify(await names(page)) === JSON.stringify(['Alpha']),
-        await names(page)
-      );
-      check(
-        'quiet bands: the status line counts them',
-        /1 of 2 bands · 3 shows · 2 following without shows$/.test(await status(page)),
-        await status(page)
-      );
-
-      // The keyword filter applies to their names; "New only" hides them.
-      await page.fill('#keywordFilter', 'DÉLTA');
-      await page.waitForFunction(() => document.querySelectorAll('#quietBands li').length === 1, null, { timeout: 5000 }).catch(() => {});
-      check(
-        'quiet bands: the keyword hides non-matching ones (accents and case ignored)',
-        JSON.stringify((await quietRows()).map(r => r.name)) === JSON.stringify(['Delta Quiet']) &&
-          (await page.textContent('#bandList')).includes('No shows match your filters.') &&
-          /· 1 following without shows$/.test(await status(page)),
-        [await quietRows(), await status(page)]
-      );
-      await page.fill('#keywordFilter', '');
-      await page.waitForFunction(() => document.querySelectorAll('#quietBands li').length === 2, null, { timeout: 5000 }).catch(() => {});
-      await page.click('#newOnlyToggle');
-      check(
-        'quiet bands: hidden while "New only" is on',
-        (await page.locator('#quietBands').count()) === 0 && !/without shows/.test(await status(page)),
-        await status(page)
-      );
-      await page.click('#newOnlyToggle');
-      await page.waitForSelector('#quietBands');
-
-      // Unfollowing from the section removes the row; the pane's heart follows.
-      state.memberRequests.length = 0;
-      await page.locator(`#quietBands [data-follow="${DELTA}"]`).click();
-      await page.waitForFunction(
-        d => !document.querySelector(`#quietBands [data-follow="${d}"]`),
-        DELTA,
-        { timeout: 5000 }
-      ).catch(() => {});
-      check(
-        'quiet bands: unfollowing one removes its row and sends the request',
-        JSON.stringify((await quietRows()).map(r => r.name)) === JSON.stringify(['unknown-band.example']) &&
-          state.memberRequests.includes('DELETE /member/bands/' + b64(DELTA)),
-        [await quietRows(), state.memberRequests]
-      );
-      check(
-        "quiet bands: the tracked pane's heart is updated too",
-        (await page.getAttribute(sel, 'aria-pressed')) === 'false'
-      );
-
-      // Following only bands without shows: the section replaces the empty hint.
-      await page.locator('#bandList [data-follow="https://alpha.example"]').click();
-      await page.waitForFunction(() => !document.querySelector('.band-card'), null, { timeout: 5000 }).catch(() => {});
-      const bodyText = await page.textContent('#bandList');
-      check(
-        'quiet bands: following only bands without shows shows the section, no empty message',
-        (await page.locator('#quietBands li').count()) === 1 &&
-          !bodyText.includes('not following any band') &&
-          !bodyText.includes('No shows match'),
-        bodyText
-      );
-      check('tracked follow / quiet bands: no page errors', errors.length === 0, errors);
+      check('tracked follow: no page errors', errors.length === 0, errors);
       await context.close();
       state.tracked = undefined;
     }

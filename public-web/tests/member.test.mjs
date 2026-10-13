@@ -193,64 +193,6 @@ test('followedSet / isFollowed use normalized urls', () => {
   assert.equal(M.isFollowed(set, 'https://beta.example'), false);
 });
 
-// ── Followed bands without upcoming shows ─────────────────────────────────────
-test('quietFollowed: a tracked band with no shows is listed with its tracked name and url', () => {
-  const out = M.quietFollowed(
-    M.followedSet(['https://gamma.example']),
-    [{ name: 'Gamma Ray', url: 'https://Gamma.example/' }],
-    []
-  );
-  assert.deepEqual(out, [
-    { key: 'https://gamma.example', name: 'Gamma Ray', url: 'https://Gamma.example/' },
-  ]);
-});
-
-test('quietFollowed: a followed band that has shows is not listed', () => {
-  const out = M.quietFollowed(
-    M.followedSet(['https://alpha.example', 'https://gamma.example']),
-    [
-      { name: 'Alpha', url: 'https://alpha.example' },
-      { name: 'Gamma', url: 'https://gamma.example' },
-    ],
-    [{ bandName: 'Alpha', bandUrl: 'https://ALPHA.example/' }]
-  );
-  assert.deepEqual(out.map(q => q.key), ['https://gamma.example']);
-});
-
-test('quietFollowed: an unknown band is named after its host', () => {
-  const out = M.quietFollowed(M.followedSet(['https://www.unknown.example/tour/']), [], []);
-  assert.deepEqual(out, [
-    { key: 'https://www.unknown.example/tour', name: 'unknown.example', url: 'https://www.unknown.example/tour' },
-  ]);
-});
-
-test('quietFollowed: urls differing by trailing slash or case collapse', () => {
-  const out = M.quietFollowed(
-    new Set(['https://delta.example', 'HTTPS://DELTA.example/']),
-    [
-      { name: 'Delta', url: 'https://delta.example/' },
-      { name: 'Delta (dup)', url: 'https://DELTA.example' },
-    ],
-    []
-  );
-  assert.deepEqual(out, [{ key: 'https://delta.example', name: 'Delta', url: 'https://delta.example/' }]);
-});
-
-test('quietFollowed: sorted by name, accents and case ignored; nothing followed → empty', () => {
-  const tracked = [
-    { name: 'zeta', url: 'https://z.example' },
-    { name: 'Élan', url: 'https://e.example' },
-    { name: 'Beta', url: 'https://b.example' },
-  ];
-  const out = M.quietFollowed(
-    M.followedSet(['https://z.example', 'https://e.example', 'https://b.example']),
-    tracked,
-    []
-  );
-  assert.deepEqual(out.map(q => q.name), ['Beta', 'Élan', 'zeta']);
-  assert.deepEqual(M.quietFollowed(new Set(), tracked, []), []);
-});
-
 test('supportsEd25519: true where WebCrypto has Ed25519', async () => {
   assert.equal(await M.supportsEd25519(), true);
 });

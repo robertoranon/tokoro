@@ -198,39 +198,6 @@ function isFollowed(set, bandUrl) {
   return !!k && set.has(k);
 }
 
-/**
- * Followed bands with no upcoming show at all in `shows` (the page's show
- * objects, { bandName, bandUrl }), as [{ key, name, url }] sorted by name.
- * key: the normalized url; name: the tracked band's name, else the site host
- * (without "www."); url: the tracked band's url as written, else the key.
- */
-function quietFollowed(followed, trackedBands, shows) {
-  const withShows = new Set();
-  for (const s of shows || []) {
-    const k = normalizeActUrl(s.bandUrl);
-    if (k) withShows.add(k);
-  }
-  const tracked = new Map();
-  for (const b of trackedBands || []) {
-    const k = normalizeActUrl(b.url);
-    if (k && !tracked.has(k)) tracked.set(k, b);
-  }
-  const out = new Map();
-  for (const raw of followed || []) {
-    const key = normalizeActUrl(raw);
-    if (!key || withShows.has(key) || out.has(key)) continue;
-    const t = tracked.get(key);
-    out.set(key, {
-      key,
-      name: t ? t.name : new URL(key).hostname.replace(/^www\./, ''),
-      url: t ? t.url : key,
-    });
-  }
-  return [...out.values()].sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
-  );
-}
-
 // ── Signed API client ────────────────────────────────────────────────────────
 
 async function signRequest(member, domain, payload, nowSec) {
@@ -333,7 +300,6 @@ const memberApi = {
   describeSuggestions,
   followedSet,
   isFollowed,
-  quietFollowed,
   createMemberApi,
 };
 
