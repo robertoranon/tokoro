@@ -270,11 +270,37 @@ describe('suggestions', () => {
       'GET',
       '/admin/suggestions',
       'admin-read',
-      '/admin/suggestions',
+      '/admin/suggestions?detail=1',
       undefined,
       '?detail=1'
     );
     expect(((await detail.json()) as any[])[0].member_names).toEqual(['Anna']);
+  });
+
+  it('admin-read signs the query string: a signature for the bare path is refused with a query', async () => {
+    await memberWithSuggestion('Anna', 'Beta Band');
+    const replay = await call(
+      admin,
+      'GET',
+      '/admin/suggestions',
+      'admin-read',
+      '/admin/suggestions',
+      undefined,
+      '?detail=1'
+    );
+    expect(replay.status).toBe(401);
+    for (const path of ['/admin/members', '/admin/band-followers']) {
+      const r = await call(
+        admin,
+        'GET',
+        path,
+        'admin-read',
+        path,
+        undefined,
+        '?x=1'
+      );
+      expect(r.status).toBe(401);
+    }
   });
 
   it('rejects with a reason', async () => {
@@ -436,7 +462,7 @@ describe('hardening', () => {
       'GET',
       '/admin/suggestions',
       'admin-read',
-      '/admin/suggestions',
+      '/admin/suggestions?status=' + status,
       undefined,
       '?status=' + status
     );

@@ -257,7 +257,7 @@ The member endpoints (`/member/*`) and the admin member/suggestion endpoints (`/
 | `band-follow` | `POST /member/bands/:act_url_b64` | the normalized `act_url` (decoded from the path, then `normalizeActUrl`) |
 | `band-unfollow` | `DELETE /member/bands/:act_url_b64` | the normalized `act_url` |
 | `band-suggest` | `POST /member/suggestions` | the raw JSON request body, byte for byte |
-| `admin-read` | `GET /admin/members`, `GET /admin/suggestions`, `GET /admin/band-followers` | the request path without query string (e.g. `/admin/suggestions` also for `?detail=1`) |
+| `admin-read` | `GET /admin/members`, `GET /admin/suggestions`, `GET /admin/band-followers` | the request path with its query string exactly as sent (URL pathname + search, e.g. `/admin/suggestions?detail=1`; without a query, just the path such as `/admin/suggestions`). A signature for one query is refused (`401`) for any other, so a captured read cannot be replayed with `?detail=1` added |
 | `admin-member` | `POST /admin/members` | the raw JSON request body |
 | `admin-member-revoke` | `POST /admin/members/:pubkey/revoke` | the target pubkey from the path, lower-cased |
 | `admin-member-delete` | `DELETE /admin/members/:pubkey` | the target pubkey from the path, lower-cased |
@@ -1117,7 +1117,7 @@ All admin endpoints in sections 7.12-7.14 are signed as described in section 3.6
 
 #### 7.12.1 GET /admin/members (List Members)
 
-Signed with domain `admin-read` over `/admin/members`.
+Signed with domain `admin-read` over `/admin/members` (plus the query string, if any, as sent; section 3.6).
 
 **Response (200 OK):** newest member first (ties by name).
 
@@ -1179,7 +1179,7 @@ Signed with domain `admin-member-delete` over the lower-cased `:pubkey`. Deletes
 
 #### 7.13.1 GET /admin/suggestions (Grouped Suggestions)
 
-**Request:** `GET /admin/suggestions?status=<pending|rejected|linked>&detail=1`, signed with domain `admin-read` over `/admin/suggestions` (the query string is not signed).
+**Request:** `GET /admin/suggestions?status=<pending|rejected|linked>&detail=1`, signed with domain `admin-read` over the path and query string exactly as sent (e.g. `/admin/suggestions?status=rejected&detail=1`; `/admin/suggestions` when there is no query). The query string is signed, so a signature made for `/admin/suggestions` is refused with `401` when `?detail=1` is added.
 
 - `status`: default `pending`; any other value than the three statuses → `400 {"error": "Invalid status"}`.
 - `detail=1`: adds the names of the members who made the suggestions. Without it, only counts are returned.
@@ -1252,7 +1252,7 @@ The follow and the status change run as separate statements (follow first, then 
 
 ### 7.14 GET /admin/band-followers (Follower Counts)
 
-Signed with domain `admin-read` over `/admin/band-followers`. A demand signal: counts only, never member names.
+Signed with domain `admin-read` over `/admin/band-followers` (plus the query string, if any, as sent; section 3.6). A demand signal: counts only, never member names.
 
 Only follows of active members count: follows of revoked members (`revoked_at` set) are left out, and a band followed only by revoked members does not appear. (`band_count` in `GET /admin/members` still counts every follow of each member, revoked or not.)
 

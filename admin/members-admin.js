@@ -101,13 +101,11 @@ function createAdminApi({ ed, fetchFn, workerUrl, privKeyHex }) {
       ),
     deleteMember: pubkey =>
       call('DELETE', '/admin/members/' + pubkey, 'admin-member-delete', pubkey),
-    listSuggestions: ({ detail = false } = {}) =>
-      call(
-        'GET',
-        '/admin/suggestions' + (detail ? '?detail=1' : ''),
-        'admin-read',
-        '/admin/suggestions'
-      ),
+    // admin-read signs the exact path requested, query string included.
+    listSuggestions: ({ detail = false } = {}) => {
+      const path = '/admin/suggestions' + (detail ? '?detail=1' : '');
+      return call('GET', path, 'admin-read', path);
+    },
     rejectSuggestions: (ids, reason) =>
       postJson('/admin/suggestions/reject', 'admin-suggestion-reject', {
         ids,

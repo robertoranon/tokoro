@@ -57,6 +57,10 @@ describe('browser and admin clients against the Worker', () => {
     );
     const groups = await adminApi.listSuggestions();
     expect(groups).toHaveLength(1);
+    // admin-read signs the query string too
+    const detailed = await adminApi.listSuggestions({ detail: true });
+    expect(detailed[0].member_names).toEqual(['Anna']);
+    expect(await adminApi.listMembers()).toHaveLength(1);
     expect(AM.bandsTxt(groups)).toBe('Beta Band | https://beta.example\n');
     await adminApi.linkSuggestions(groups[0].ids, 'https://beta.example/');
     const after = await api.me();

@@ -120,7 +120,7 @@ The signed message is `SHA-256("<domain>:<payload>:<timestamp>")`. The timestamp
 | `band-follow`             | `POST /member/bands/:act_url_b64`                               | normalized band URL                     |
 | `band-unfollow`           | `DELETE /member/bands/:act_url_b64`                             | normalized band URL                     |
 | `band-suggest`            | `POST /member/suggestions`                                      | raw JSON body                           |
-| `admin-read`              | `GET /admin/members`, `/admin/suggestions`, `/admin/band-followers` | request path without query          |
+| `admin-read`              | `GET /admin/members`, `/admin/suggestions`, `/admin/band-followers` | request path with its query string as sent (e.g. `/admin/suggestions?detail=1`) |
 | `admin-member`            | `POST /admin/members`                                           | raw JSON body                           |
 | `admin-member-revoke`     | `POST /admin/members/:pubkey/revoke`                            | target pubkey (lower-case)              |
 | `admin-member-delete`     | `DELETE /admin/members/:pubkey`                                 | target pubkey (lower-case)              |

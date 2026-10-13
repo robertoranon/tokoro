@@ -32,6 +32,16 @@ async function authAdmin(
 }
 
 /**
+ * The payload of admin-read: the request path with its query string exactly
+ * as requested (e.g. `/admin/suggestions?detail=1`), so a captured signature
+ * cannot be replayed with a different query.
+ */
+function readPayload(request: Request): string {
+  const url = new URL(request.url);
+  return url.pathname + url.search;
+}
+
+/**
  * The body of a signed admin request: 503 when the admin is not configured,
  * then the checks of readSignedBody (413 / 401 / 413) before reading it.
  */
@@ -86,7 +96,7 @@ export async function routeAdminMemberRequest(
 }
 
 async function listMembers(request: Request, env: Env): Promise<Response> {
-  const a = await authAdmin(request, env, 'admin-read', '/admin/members');
+  const a = await authAdmin(request, env, 'admin-read', readPayload(request));
   if (a !== true) return a;
   const res = await env.DB.prepare(
     `SELECT m.pubkey, m.name, m.created_at, m.revoked_at,
@@ -249,7 +259,7 @@ export function groupSuggestions(rows: SuggestionRow[], detail: boolean) {
 }
 
 async function listSuggestions(request: Request, env: Env): Promise<Response> {
-  const a = await authAdmin(request, env, 'admin-read', '/admin/suggestions');
+  const a = await authAdmin(request, env, 'admin-read', readPayload(request));
   if (a !== true) return a;
   const params = new URL(request.url).searchParams;
   const status = params.get('status') || 'pending';
@@ -346,12 +356,7 @@ async function listBandFollowers(
   request: Request,
   env: Env
 ): Promise<Response> {
-  const a = await authAdmin(
-    request,
-    env,
-    'admin-read',
-    '/admin/band-followers'
-  );
+  const a = await authAdmin(request, env, 'admin-read', readPayload(request));
   if (a !== true) return a;
   const res = await env.DB.prepare(
     `SELECT b.act_url, COUNT(*) AS followers

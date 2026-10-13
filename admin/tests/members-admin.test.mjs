@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import crypto from 'node:crypto';
 
 const A = createRequire(import.meta.url)('../members-admin.js');
 
@@ -30,4 +31,37 @@ test('bandsTxt drops names containing "|" separators and newlines', () => {
 
 test('bandsTxt of nothing is empty', () => {
   assert.equal(A.bandsTxt([]), '');
+});
+
+test('admin reads sign the exact path they request, query string included', async () => {
+  const sent = [];
+  const fetchFn = async (url, init) => {
+    sent.push({ url, init });
+    return { ok: true, status: 200, json: async () => [] };
+  };
+  const signed = [];
+  const ed = {
+    getPublicKeyAsync: async () => new Uint8Array(32),
+    signAsync: async msg => {
+      signed.push(Buffer.from(msg).toString('hex'));
+      return new Uint8Array(64);
+    },
+  };
+  const api = A.createAdminApi({ ed, fetchFn, workerUrl: 'https://w.test/', privKeyHex: '00'.repeat(32) });
+  await api.listSuggestions({ detail: true });
+  await api.listSuggestions();
+  await api.listMembers();
+  await api.followers();
+  const digest = (payload, ts) =>
+    crypto.createHash('sha256').update('admin-read:' + payload + ':' + ts).digest('hex');
+  const expected = [
+    ['https://w.test/admin/suggestions?detail=1', '/admin/suggestions?detail=1'],
+    ['https://w.test/admin/suggestions', '/admin/suggestions'],
+    ['https://w.test/admin/members', '/admin/members'],
+    ['https://w.test/admin/band-followers', '/admin/band-followers'],
+  ];
+  expected.forEach(([url, payload], i) => {
+    assert.equal(sent[i].url, url);
+    assert.equal(signed[i], digest(payload, sent[i].init.headers['X-Timestamp']));
+  });
 });
