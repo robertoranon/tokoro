@@ -62,7 +62,7 @@ Signed by `ADMIN_PUBKEY` (`503` when it is not configured).
 | `GET`    | `/admin/suggestions?status=&detail=1`      | Suggestions grouped by normalized band name, most requested first; `status` = `pending` (default), `rejected` or `linked`; `detail=1` adds member names |
 | `POST`   | `/admin/suggestions/reject`                | Reject pending suggestions `{ids, reason?}` → `{updated}`                   |
 | `POST`   | `/admin/suggestions/link`                  | Link suggestions to a tracked band `{ids, act_url}` and follow it for each suggester → `{updated}` |
-| `GET`    | `/admin/band-followers`                    | `[{act_url, followers}]`, most followed first (counts only)                 |
+| `GET`    | `/admin/band-followers`                    | `[{act_url, followers}]`, most followed first (counts only; active members only) |
 
 Bodies, status codes and error messages: [`worker/SPECS.md`](worker/SPECS.md) sections 7.11-7.14.
 

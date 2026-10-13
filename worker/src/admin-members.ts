@@ -354,8 +354,10 @@ async function listBandFollowers(
   );
   if (a !== true) return a;
   const res = await env.DB.prepare(
-    `SELECT act_url, COUNT(*) AS followers FROM member_bands
-     GROUP BY act_url ORDER BY followers DESC, act_url`
+    `SELECT b.act_url, COUNT(*) AS followers
+     FROM member_bands b JOIN members m ON m.pubkey = b.pubkey
+     WHERE m.revoked_at IS NULL
+     GROUP BY b.act_url ORDER BY followers DESC, b.act_url`
   ).all();
   return jsonResponse(res.results || []);
 }

@@ -370,27 +370,53 @@ describe('suggestions', () => {
 });
 
 describe('band followers', () => {
-  it('counts followers per band, most followed first, without names', async () => {
-    const ins = (p: string, u: string) =>
-      env.DB.prepare(
-        'INSERT INTO member_bands (pubkey, act_url, created_at) VALUES (?, ?, ?)'
+  const ins = (p: string, u: string) =>
+    env.DB.prepare(
+      'INSERT INTO member_bands (pubkey, act_url, created_at) VALUES (?, ?, ?)'
+    )
+      .bind(p, u, 'x')
+      .run();
+  const member = (p: string, revoked: string | null = null) =>
+    env.DB.prepare(
+      'INSERT INTO members (pubkey, name, created_at, revoked_at) VALUES (?, ?, ?, ?)'
+    )
+      .bind(p, 'M' + p, 'x', revoked)
+      .run();
+  const followers = async () =>
+    (
+      await call(
+        admin,
+        'GET',
+        '/admin/band-followers',
+        'admin-read',
+        '/admin/band-followers'
       )
-        .bind(p, u, 'x')
-        .run();
+    ).json();
+
+  it('counts followers per band, most followed first, without names', async () => {
+    await member('a');
+    await member('b');
     await ins('a', 'https://one.example');
     await ins('b', 'https://one.example');
     await ins('a', 'https://two.example');
-    const res = await call(
-      admin,
-      'GET',
-      '/admin/band-followers',
-      'admin-read',
-      '/admin/band-followers'
-    );
-    expect(await res.json()).toEqual([
+    expect(await followers()).toEqual([
       { act_url: 'https://one.example', followers: 2 },
       { act_url: 'https://two.example', followers: 1 },
     ]);
+  });
+
+  it('counts only active members: revoked members are left out', async () => {
+    await member('a');
+    await member('r', '2026-10-13T10:00:00');
+    await ins('a', 'https://one.example');
+    await ins('r', 'https://one.example');
+    await ins('r', 'https://only-revoked.example');
+    expect(await followers()).toEqual([
+      { act_url: 'https://one.example', followers: 1 },
+    ]);
+    // band_count in the member list still shows what each member has.
+    const list: any[] = (await (await listMembers()).json()) as any[];
+    expect(list.find(m => m.pubkey === 'r').band_count).toBe(2);
   });
 });
 

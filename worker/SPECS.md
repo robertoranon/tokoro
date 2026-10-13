@@ -1254,6 +1254,8 @@ The follow and the status change run as separate statements (follow first, then 
 
 Signed with domain `admin-read` over `/admin/band-followers`. A demand signal: counts only, never member names.
 
+Only follows of active members count: follows of revoked members (`revoked_at` set) are left out, and a band followed only by revoked members does not appear. (`band_count` in `GET /admin/members` still counts every follow of each member, revoked or not.)
+
 **Response (200 OK):** most followed first (ties by URL).
 
 ```json
