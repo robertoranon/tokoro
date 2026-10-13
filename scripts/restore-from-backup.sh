@@ -2,14 +2,15 @@
 set -euo pipefail
 
 # Usage: ./scripts/restore-from-backup.sh <backup-file.json>
-# Restores events and the member tables (members, member_bands,
-# band_suggestions) from a JSON backup file (produced by the Worker R2 backup)
-# into the D1 database using wrangler d1 execute. Older backups that contain
-# only events restore just the events.
+# Restores events, the member tables (members, member_bands,
+# band_suggestions) and the blocklist from a JSON backup file (produced by the
+# Worker R2 backup) into the D1 database using wrangler d1 execute. Older
+# backups restore just the tables they contain (e.g. only events, or no
+# blocklist).
 #
 # WARNING: This inserts rows — it does NOT clear the tables first.
 # Run manually: wrangler d1 execute tokoro-db --command "DELETE FROM events"
-# (and likewise for the member tables) before restoring if you want a clean slate.
+# (and likewise for the member tables and the blocklist) before restoring if you want a clean slate.
 
 if [ $# -lt 1 ]; then
 	echo "Usage: $0 <backup-file.json>"
@@ -33,7 +34,7 @@ node - "$BACKUP_FILE" "$SQL_FILE" <<'EOF'
 const fs = require('fs');
 const [,, inputFile, outputFile] = process.argv;
 const { tables } = JSON.parse(fs.readFileSync(inputFile, 'utf8'));
-const TABLES = ['events', 'members', 'member_bands', 'band_suggestions'];
+const TABLES = ['events', 'members', 'member_bands', 'band_suggestions', 'blocklist'];
 
 const stmts = [];
 for (const table of TABLES) {

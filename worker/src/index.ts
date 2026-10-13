@@ -422,12 +422,14 @@ export function selectKeysToDelete(keys: string[], retain: number): string[] {
 /**
  * Tables copied into the daily R2 backup, in payload order. The member tables
  * hold private data (names, followed bands, suggestions); the bucket is private.
+ * The blocklist is included so a restore does not unblock banned keys.
  */
 export const BACKUP_TABLES = [
   'events',
   'members',
   'member_bands',
   'band_suggestions',
+  'blocklist',
 ] as const;
 
 export type BackupTables = Partial<

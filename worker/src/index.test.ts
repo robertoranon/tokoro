@@ -322,6 +322,20 @@ describe('makeBackupPayload', () => {
     expect(parsed.tables.members[0].name).toBe('Ann');
     expect(parsed.tables.member_bands).toHaveLength(1);
     expect(parsed.tables.band_suggestions).toEqual([]);
+    expect(parsed.tables.blocklist).toEqual([]);
+  });
+
+  it('includes the blocklist, so a restore does not unblock banned keys', () => {
+    expect(BACKUP_TABLES).toContain('blocklist');
+    const parsed = JSON.parse(
+      makeBackupPayload(
+        { blocklist: [{ pubkey: 'bad', created_at: 'x' }] },
+        new Date('2026-03-26T02:00:00Z')
+      )
+    );
+    expect(parsed.tables.blocklist).toEqual([
+      { pubkey: 'bad', created_at: 'x' },
+    ]);
   });
 });
 
@@ -364,6 +378,9 @@ describe('scheduled backup', () => {
     )
       .bind('p1', 'Some Band', '2026-10-01T00:00:00')
       .run();
+    await DB.prepare('INSERT INTO blocklist (pubkey, created_at) VALUES (?, ?)')
+      .bind('banned', '2026-10-02T00:00:00')
+      .run();
     const bucket = fakeBucket();
     await worker.scheduled(
       {} as any,
@@ -385,6 +402,9 @@ describe('scheduled backup', () => {
     ]);
     expect(parsed.tables.member_bands[0].act_url).toBe('https://band.example');
     expect(parsed.tables.band_suggestions[0].name).toBe('Some Band');
+    expect(parsed.tables.blocklist).toEqual([
+      { pubkey: 'banned', created_at: '2026-10-02T00:00:00' },
+    ]);
   });
 });
 
