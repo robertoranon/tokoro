@@ -19,17 +19,17 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout private data repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: data
 
       - name: Checkout tokoro (public)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: robertoranon/tokoro
           path: tokoro
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
