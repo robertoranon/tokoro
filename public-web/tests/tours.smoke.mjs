@@ -849,12 +849,33 @@ try {
     state.serverFollowed = new Set(['https://alpha.example']);
     state.bandDelayMs = 400;
     state.memberRequests.length = 0;
-    await page.evaluate(() => {
+    const alphaOpenBefore = await isOpen(page, 'Alpha');
+    const busy = await page.evaluate(() => {
       const sel = '[data-follow="https://alpha.example"]';
       document.querySelector(sel).click();
+      // The second click reaches the handler (aria-disabled, not disabled) and is ignored there.
       document.querySelector(sel).click();
+      const b = document.querySelector(sel);
+      return { aria: b.getAttribute('aria-disabled'), disabled: b.hasAttribute('disabled') };
     });
+    check(
+      'member: an in-flight heart is aria-disabled, not disabled',
+      busy.aria === 'true' && busy.disabled === false,
+      busy
+    );
+    // A real pointer click on the in-flight heart neither sends nor toggles the card.
+    // force: skip Playwright's wait for the button to become enabled.
+    await page.locator('[data-follow="https://alpha.example"]').click({ force: true });
+    check(
+      'member: clicking an in-flight heart does not open or close the card',
+      (await isOpen(page, 'Alpha')) === alphaOpenBefore,
+      alphaOpenBefore
+    );
     await new Promise(r => setTimeout(r, 1200));
+    check(
+      'member: the heart is enabled again once the request is done',
+      (await page.getAttribute('[data-follow="https://alpha.example"]', 'aria-disabled')) === null
+    );
     state.bandDelayMs = 0;
     const alphaReqs = state.memberRequests.filter(r => r.includes(Buffer.from('https://alpha.example').toString('base64url')));
     const alphaPressed = await page.getAttribute('[data-follow="https://alpha.example"]', 'aria-pressed');

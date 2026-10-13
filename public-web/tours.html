@@ -406,7 +406,9 @@
       .follow-btn[aria-pressed='true'] {
         color: #c0392b;
       }
-      .follow-btn:disabled {
+      /* In flight: aria-disabled, not disabled (a click on a disabled button
+         inside <summary> can toggle the card in some browsers). */
+      .follow-btn[aria-disabled='true'] {
         opacity: 0.5;
         cursor: progress;
       }
@@ -715,7 +717,7 @@
             '" title="' +
             (on ? 'Following' : 'Follow this band') +
             '"' +
-            (busy ? ' disabled' : '') +
+            (busy ? ' aria-disabled="true"' : '') +
             '>' +
             (on ? '♥' : '♡') +
             '</button>'
