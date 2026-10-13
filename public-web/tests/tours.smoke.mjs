@@ -886,6 +886,87 @@ try {
       [alphaPressed, [...state.serverFollowed]]
     );
 
+    // Tapping a heart moves nothing on the page: same scroll position, same
+    // card positions, during the request and after it (All bands view).
+    {
+      await page.setViewportSize({ width: 390, height: 420 });
+      const layout = () =>
+        page.evaluate(() => ({
+          y: window.scrollY,
+          tops: [...document.querySelectorAll('.band-card__summary')].map(s => s.getBoundingClientRect().top),
+          btn: document.querySelector('[data-follow="https://beta.example"]').getBoundingClientRect().toJSON(),
+        }));
+      const same = (a, b) =>
+        Math.abs(a.y - b.y) <= 0.5 &&
+        a.tops.length === b.tops.length &&
+        a.tops.every((t, i) => Math.abs(t - b.tops[i]) <= 0.5) &&
+        ['top', 'left', 'width', 'height'].every(k => Math.abs(a.btn[k] - b.btn[k]) <= 0.5);
+      await page.evaluate(() => {
+        const s = document.querySelector('[data-follow="https://beta.example"]').closest('summary');
+        window.scrollTo(0, s.getBoundingClientRect().top + window.scrollY - 150);
+      });
+      const before = await layout();
+      check('layout: the page is scrolled for the follow-shift check', before.y > 0, before);
+      const pressedBefore = await page.getAttribute('[data-follow="https://beta.example"]', 'aria-pressed');
+      await page.evaluate(() => {
+        window.__betaBtn = document.querySelector('[data-follow="https://beta.example"]');
+      });
+      state.bandDelayMs = 400;
+      await page.locator('[data-follow="https://beta.example"]').click();
+      await page.waitForSelector('[data-follow="https://beta.example"][aria-disabled="true"]');
+      const during = await layout();
+      check('layout: an in-flight heart tap moves nothing', same(before, during), [before, during]);
+      await page.waitForSelector('[data-follow="https://beta.example"]:not([aria-disabled])');
+      state.bandDelayMs = 0;
+      const after = await layout();
+      check('layout: a heart tap moves nothing once done', same(before, after), [before, after]);
+      check(
+        'layout: the heart toggled in place (same button, pressed state flipped)',
+        (await page.evaluate(() => window.__betaBtn === document.querySelector('[data-follow="https://beta.example"]'))) &&
+          (await page.getAttribute('[data-follow="https://beta.example"]', 'aria-pressed')) !== pressedBefore
+      );
+      // Toggle back so Beta is followed again.
+      await page.locator('[data-follow="https://beta.example"]').click();
+      await page.waitForFunction(
+        p => document.querySelector('[data-follow="https://beta.example"]:not([aria-disabled])')?.getAttribute('aria-pressed') === p,
+        pressedBefore
+      );
+
+      // My bands: unfollowing removes only that card and keeps the scroll position.
+      await page.click('#myBandsBtn');
+      await page.waitForSelector('[data-follow="https://beta.example"]');
+      // A spacer keeps the page tall enough that the old position stays reachable.
+      await page.evaluate(() => {
+        const spacer = document.createElement('div');
+        spacer.id = 'smokeSpacer';
+        spacer.style.height = '2000px';
+        document.body.appendChild(spacer);
+      });
+      // Playwright scrolls a target into view before clicking: do it first, then measure.
+      await page.locator('[data-follow="https://beta.example"]').scrollIntoViewIfNeeded();
+      const mineBefore = await page.evaluate(() => ({ y: window.scrollY, names: [...document.querySelectorAll('.band-card__name')].map(e => e.textContent.replace(/[▾▴]/g, '').trim()) }));
+      await page.locator('[data-follow="https://beta.example"]').click();
+      await page.waitForSelector('[data-follow="https://beta.example"]', { state: 'detached' });
+      const mineAfter = await page.evaluate(() => ({ y: window.scrollY, names: [...document.querySelectorAll('.band-card__name')].map(e => e.textContent.replace(/[▾▴]/g, '').trim()) }));
+      check(
+        'layout: unfollowing in My bands removes only that card',
+        JSON.stringify(mineAfter.names) === JSON.stringify(mineBefore.names.filter(n => n !== 'Beta')) && mineBefore.names.includes('Beta'),
+        [mineBefore, mineAfter]
+      );
+      // The removed card can shorten the page below the old scroll position;
+      // the position is kept whenever the page is still that tall.
+      const maxY = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+      check(
+        'layout: unfollowing in My bands keeps the scroll position',
+        mineBefore.y > 0 && Math.abs(mineAfter.y - Math.min(mineBefore.y, maxY)) <= 0.5,
+        [mineBefore.y, mineAfter.y, maxY]
+      );
+      await page.evaluate(() => document.getElementById('smokeSpacer').remove());
+      await page.click('#allBandsBtn');
+      await settleNames(page, ['Alpha', 'Beta']);
+      await page.setViewportSize({ width: 1280, height: 720 });
+    }
+
     // A new suggestion that matches a tracked band is followed at once (A5).
     state.memberRequests.length = 0;
     const alphaFollow = 'POST /member/bands/' + Buffer.from('https://alpha.example').toString('base64url');
