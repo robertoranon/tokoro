@@ -70,7 +70,13 @@ const EVENTS = [
 
 // ── one local server: static page files + fake paged API ──────────────────────
 // tracked: undefined → 404; a string → served verbatim as JSON
-const state = { requests: [], failApi: false, tracked: undefined };
+const state = {
+  requests: [],
+  failApi: false,
+  tracked: undefined,
+  memberRequests: [], // every /member/* request: "METHOD /path"
+  memberMe: null, // null → 403; else the /member/me body
+};
 let base = '';
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -80,6 +86,36 @@ const PAGE_SIZE = 100;
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1');
+  if (url.pathname.startsWith('/member/')) {
+    state.memberRequests.push(req.method + ' ' + url.pathname);
+    let raw = '';
+    for await (const chunk of req) raw += chunk;
+    if (url.pathname === '/member/me') {
+      if (!state.memberMe) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end('{"error":"Forbidden"}');
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(state.memberMe));
+      }
+      return;
+    }
+    if (url.pathname === '/member/suggestions') {
+      const b = JSON.parse(raw);
+      state.memberMe.suggestions.unshift({
+        id: 100 + state.memberMe.suggestions.length,
+        name: b.name,
+        url: b.url || null,
+        status: 'pending',
+        act_url: null,
+        reject_reason: null,
+        created_at: '2030-01-01T00:00:00',
+      });
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end('{}');
+    return;
+  }
   if (url.pathname === '/events') {
     state.requests.push(req.url);
     if (state.failApi) {
@@ -111,7 +147,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   const name = url.pathname.replace(/^\//, '');
-  if (!['tours.html', 'shared.js', 'tours.js'].includes(name)) {
+  if (!['tours.html', 'shared.js', 'tours.js', 'member.js'].includes(name)) {
     res.writeHead(404);
     res.end('not found');
     return;
@@ -681,6 +717,112 @@ try {
     console.log(
       'SKIP  map checks (set TOURS_SMOKE_MAP=1 with internet access to run them)'
     );
+  }
+  // ── visitors: nothing member-related appears or is requested ──────────────
+  {
+    state.memberRequests.length = 0;
+    const { page, context } = await newPage(browser);
+    await page.goto(base + '/tours.html');
+    await page.waitForSelector('.band-card');
+    check('visitor: no member bar', await page.isHidden('#memberBar'));
+    check('visitor: no suggest pane', await page.isHidden('#suggestPane'));
+    check('visitor: no follow buttons', (await page.locator('.follow-btn').count()) === 0);
+    check('visitor: no /member requests', state.memberRequests.length === 0, state.memberRequests);
+    await context.close();
+  }
+
+  // ── members ────────────────────────────────────────────────────────────────
+  {
+    const seed = Buffer.from(Array.from({ length: 32 }, (_, i) => i + 1))
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    state.tracked = JSON.stringify({
+      generated: '2030-01-01',
+      bands: [
+        { name: 'Alpha', url: 'https://alpha.example' },
+        { name: 'Beta', url: 'https://beta.example' },
+        { name: 'Gamma Ray', url: 'https://gammaray.example' },
+      ],
+    });
+    state.memberMe = {
+      name: 'Anna',
+      bands: ['https://alpha.example'],
+      suggestions: [
+        { id: 1, name: 'gamma ray', url: null, status: 'pending', act_url: null, reject_reason: null, created_at: 'x' },
+        { id: 2, name: 'Nobody', url: null, status: 'rejected', act_url: null, reject_reason: 'Not touring', created_at: 'x' },
+      ],
+    };
+    state.memberRequests.length = 0;
+    const { page, context, errors } = await newPage(browser);
+    await page.goto(base + '/tours.html#k=' + seed);
+    await page.waitForSelector('.band-card');
+    await page.waitForSelector('#memberBar:not([hidden])');
+    check('member: greeting names the member', (await page.textContent('#memberHello')).includes('Anna'));
+    check('member: link fragment removed from the address bar', !page.url().includes('#k='), page.url());
+    check(
+      'member: seed stored for next visits',
+      (await page.evaluate(() => localStorage.getItem('tokoro_member'))) === seed
+    );
+    check('member: follow buttons shown', (await page.locator('.follow-btn').count()) === 2);
+    check('member: Alpha is followed', (await page.locator('.band-card', { hasText: 'Alpha' }).locator('.follow-btn').getAttribute('aria-pressed')) === 'true');
+
+    await page.click('#myBandsBtn');
+    check('member: My bands shows only followed bands', (await names(page)).join(',') === 'Alpha', await names(page));
+    await page.click('#allBandsBtn');
+    check('member: All bands shows everyone again', (await names(page)).length === 2);
+
+    // The pending "gamma ray" suggestion matches a tracked band: the page
+    // follows it on load (before the request log is reset below).
+    const gammaFollow =
+      'POST /member/bands/' +
+      Buffer.from('https://gammaray.example').toString('base64url');
+    for (let i = 0; i < 50 && !state.memberRequests.includes(gammaFollow); i++) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+    const autoFollowed = state.memberRequests.includes(gammaFollow);
+    const initRequests = [...state.memberRequests];
+
+    state.memberRequests.length = 0;
+    await page.locator('.band-card', { hasText: 'Beta' }).locator('.follow-btn').click();
+    await page.waitForFunction(() => document.querySelectorAll('.follow-btn[aria-pressed="true"]').length === 2);
+    check('member: following sends a follow request', state.memberRequests.some(r => r.startsWith('POST /member/bands/')), state.memberRequests);
+
+    await page.click('#myBandsBtn');
+    check('member: My bands now has both', (await names(page)).length === 2);
+    check('member: My bands choice is remembered', (await page.evaluate(() => localStorage.getItem('tokoro_member_view'))) === 'mine');
+
+    check('member: suggestion matching a tracked band is shown as Added', (await page.textContent('#suggestList')).includes('Added'));
+    check('member: rejected suggestion shows its reason', (await page.textContent('#suggestList')).includes('Not touring'));
+    check('member: matched suggestion was followed automatically', autoFollowed, initRequests);
+
+    await page.click('#suggestPane > summary'); // the pane starts collapsed
+    await page.fill('#suggestName', 'Brand New Band');
+    await page.click('#suggestForm button[type=submit]');
+    await page.waitForFunction(() => document.getElementById('suggestList').textContent.includes('Brand New Band'));
+    check('member: new suggestion is listed as Waiting', (await page.textContent('#suggestList')).includes('Waiting'));
+    check('member: no page errors', errors.length === 0, errors);
+    await context.close();
+
+    // a later visit needs no link
+    const second = await newPage(browser);
+    await second.page.addInitScript(s => localStorage.setItem('tokoro_member', s), seed);
+    await second.page.goto(base + '/tours.html');
+    await second.page.waitForSelector('#memberBar:not([hidden])');
+    check('member: stored seed works without the link', true);
+    await second.context.close();
+
+    // revoked or unknown: back to the visitor view, nothing stored
+    state.memberMe = null;
+    const gone = await newPage(browser);
+    await gone.page.addInitScript(s => localStorage.setItem('tokoro_member', s), seed);
+    await gone.page.goto(base + '/tours.html');
+    await gone.page.waitForSelector('.band-card');
+    await gone.page.waitForFunction(() => document.getElementById('memberNote').textContent.length > 0);
+    check('revoked: visitor view', await gone.page.isHidden('#memberBar'));
+    check('revoked: stored seed cleared', (await gone.page.evaluate(() => localStorage.getItem('tokoro_member'))) === null);
+    await gone.context.close();
   }
 } finally {
   if (browser) await browser.close();

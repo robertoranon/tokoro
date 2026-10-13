@@ -384,6 +384,38 @@
         padding: 6px 14px;
         cursor: pointer;
       }
+      .member-bar[hidden],
+      .suggest-pane[hidden] {
+        display: none;
+      }
+      .member-bar__hello {
+        font-weight: 600;
+        margin-right: 8px;
+      }
+      .follow-btn {
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font-size: 1.2rem;
+        line-height: 1;
+        padding: 4px 8px;
+        cursor: pointer;
+      }
+      .follow-btn[aria-pressed='true'] {
+        color: #c0392b;
+      }
+      .suggest-pane {
+        margin: 12px 0;
+      }
+      .suggest-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 8px 0;
+      }
+      .suggest-form input {
+        flex: 1 1 180px;
+      }
     </style>
     <link rel="stylesheet" href="theme.css" />
   </head>
@@ -457,6 +489,25 @@
             🔗 Copy link
           </button>
         </div>
+        <div class="filter-row member-bar" id="memberBar" hidden>
+          <span class="member-bar__hello" id="memberHello"></span>
+          <button
+            id="allBandsBtn"
+            class="toggle"
+            type="button"
+            aria-pressed="true"
+          >
+            All bands
+          </button>
+          <button
+            id="myBandsBtn"
+            class="toggle"
+            type="button"
+            aria-pressed="false"
+          >
+            My bands
+          </button>
+        </div>
         <p
           id="statusLine"
           class="status-line"
@@ -469,12 +520,46 @@
           role="status"
           aria-live="polite"
         ></p>
+        <p
+          id="memberNote"
+          class="notice-line"
+          role="status"
+          aria-live="polite"
+        ></p>
       </section>
 
       <details class="tracked-pane" id="trackedPane" hidden>
         <summary id="trackedSummary">Tracked bands</summary>
         <ul class="tracked-list" id="trackedList"></ul>
         <p class="tracked-note" id="trackedNote"></p>
+      </details>
+
+      <details class="suggest-pane" id="suggestPane" hidden>
+        <summary>Suggest a band</summary>
+        <form id="suggestForm" class="suggest-form">
+          <input
+            id="suggestName"
+            type="text"
+            maxlength="120"
+            placeholder="Band name"
+            aria-label="Band name"
+            required
+          />
+          <input
+            id="suggestUrl"
+            type="url"
+            placeholder="Website (optional)"
+            aria-label="Band website (optional)"
+          />
+          <button type="submit" class="toggle">Suggest</button>
+        </form>
+        <p
+          id="suggestMsg"
+          class="tracked-note"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <ul id="suggestList" class="tracked-list"></ul>
       </details>
 
       <section class="map-panel" id="mapPanel" aria-label="Map of shows" hidden>
@@ -490,12 +575,32 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="./shared.js"></script>
     <script src="./tours.js"></script>
+    <script src="./member.js"></script>
     <script>
       (function () {
         'use strict';
 
         const API_URL = '__TOKORO_WORKER_URL__';
         const T = window.TokoroTours;
+        const M = window.TokoroMember;
+        const storage = (() => {
+          try {
+            return window.localStorage;
+          } catch (err) {
+            return null; // private mode: member features stay off
+          }
+        })();
+        // Member state. `ok` is true only after the server accepted the link.
+        const member = {
+          ok: false,
+          api: null,
+          name: '',
+          followed: new Set(), // normalized band urls
+          suggestions: [],
+          mine: false, // show only followed bands
+          syncing: false,
+        };
+        let trackedDone = false; // load() has finished its tracked-bands attempt
         const today = formatLocalDateTime(new Date()).slice(0, 10);
 
         const state = {
@@ -537,6 +642,9 @@
             newOnly: state.newOnly,
             nowMs: Date.now(),
           });
+          if (member.ok && member.mine) {
+            list = list.filter(s => M.isFollowed(member.followed, s.bandUrl));
+          }
           if (state.origin) list = T.withDistance(list, state.origin);
           return list;
         }
@@ -572,6 +680,24 @@
           );
         }
 
+        function followBtnHtml(bandKey) {
+          if (!member.ok) return '';
+          const on = M.isFollowed(member.followed, bandKey);
+          return (
+            '<button type="button" class="follow-btn" data-follow="' +
+            escHtml(bandKey) +
+            '" aria-pressed="' +
+            on +
+            '" aria-label="' +
+            (on ? 'Stop following this band' : 'Follow this band') +
+            '" title="' +
+            (on ? 'Following' : 'Follow this band') +
+            '">' +
+            (on ? '♥' : '♡') +
+            '</button>'
+          );
+        }
+
         function bandHtml(b) {
           const bandUrl = safeUrl(b.url);
           const n = b.shows.length;
@@ -585,6 +711,7 @@
             '<span class="band-card__name">' +
             escHtml(b.name) +
             '</span>' +
+            followBtnHtml(b.key) +
             (T.fmtNewBadge(b.newCount)
               ? '<span class="band-card__badge">' +
                 escHtml(T.fmtNewBadge(b.newCount)) +
@@ -629,7 +756,9 @@
               '<p class="empty-state">No upcoming shows yet.</p>';
           } else if (!bands.length) {
             el('bandList').innerHTML =
-              '<p class="empty-state">No shows match your filters.</p>';
+              member.ok && member.mine && member.followed.size === 0
+                ? '<p class="empty-state">You are not following any band yet. Switch to All bands and tap ♡ on a band.</p>'
+                : '<p class="empty-state">No shows match your filters.</p>';
           } else {
             el('bandList').innerHTML =
               '<div class="band-list">' +
@@ -939,6 +1068,8 @@
             state.tracked = await trackedPromise;
             renderTracked();
             render();
+            trackedDone = true;
+            syncMember();
             if (truncated)
               setNotice(
                 'Showing the first results only — there are more shows than one page load.'
@@ -946,6 +1077,8 @@
           } catch (err) {
             state.tracked = await trackedPromise;
             renderTracked();
+            trackedDone = true;
+            syncMember();
             setStatus('');
             el('bandList').innerHTML =
               '<p class="error-state">Could not load tour dates right now. ' +
@@ -1017,7 +1150,198 @@
           }
         })();
 
+        // ── Members: ♥ buttons, My bands, suggestions ──────────────────
+        function renderSuggestions(views) {
+          el('suggestList').innerHTML = views
+            .map(v => {
+              const label =
+                v.state === 'added'
+                  ? 'Added'
+                  : v.state === 'rejected'
+                    ? 'Not added' + (v.reason ? ' — ' + v.reason : '')
+                    : 'Waiting';
+              return (
+                '<li class="tracked-band">' +
+                escHtml(v.name) +
+                '<span class="tracked-band__count">' +
+                escHtml(label) +
+                '</span></li>'
+              );
+            })
+            .join('');
+        }
+
+        function currentViews() {
+          return M.describeSuggestions(
+            member.suggestions,
+            state.tracked ? state.tracked.bands : []
+          );
+        }
+
+        // Follow the tracked bands that match this member's pending
+        // suggestions, once per device (so an unfollow sticks).
+        async function syncMember() {
+          if (!member.ok || !trackedDone || member.syncing) return;
+          member.syncing = true;
+          try {
+            const done = M.loadAutoFollowed(storage);
+            const views = currentViews();
+            for (const v of views) {
+              if (!v.autoFollowUrl || done.has(v.id)) continue;
+              const key = M.normalizeActUrl(v.autoFollowUrl);
+              if (key && !member.followed.has(key)) {
+                member.followed.add(key);
+                const res = await member.api
+                  .follow(v.autoFollowUrl)
+                  .catch(() => null);
+                if (!res || !res.ok) {
+                  member.followed.delete(key);
+                  continue; // try again next visit
+                }
+              }
+              done.add(v.id);
+            }
+            M.saveAutoFollowed(storage, done);
+            renderSuggestions(views);
+            render();
+          } finally {
+            member.syncing = false;
+          }
+        }
+
+        function syncViewButtons() {
+          el('allBandsBtn').setAttribute('aria-pressed', String(!member.mine));
+          el('myBandsBtn').setAttribute('aria-pressed', String(member.mine));
+        }
+        function setMine(value) {
+          member.mine = value;
+          try {
+            storage.setItem(M.MEMBER_VIEW_KEY, value ? 'mine' : 'all');
+          } catch (err) {}
+          syncViewButtons();
+          render();
+        }
+        el('allBandsBtn').addEventListener('click', () => setMine(false));
+        el('myBandsBtn').addEventListener('click', () => setMine(true));
+
+        async function toggleFollow(bandUrl) {
+          const key = M.normalizeActUrl(bandUrl);
+          if (!key || !member.ok) return;
+          const was = member.followed.has(key);
+          if (was) member.followed.delete(key);
+          else member.followed.add(key);
+          render();
+          const res = await (
+            was ? member.api.unfollow(bandUrl) : member.api.follow(bandUrl)
+          ).catch(() => null);
+          if (!res || !res.ok) {
+            if (was) member.followed.add(key);
+            else member.followed.delete(key);
+            render();
+            el('memberNote').textContent =
+              'Could not save that change. Please try again.';
+          }
+        }
+        el('bandList').addEventListener('click', e => {
+          const btn = e.target.closest('[data-follow]');
+          if (!btn) return;
+          e.preventDefault(); // the button sits inside <summary>
+          e.stopPropagation();
+          toggleFollow(btn.getAttribute('data-follow'));
+        });
+
+        el('suggestForm').addEventListener('submit', async e => {
+          e.preventDefault();
+          if (!member.ok) return;
+          const name = el('suggestName').value.trim();
+          const url = el('suggestUrl').value.trim();
+          if (!name) return;
+          const msg = el('suggestMsg');
+          msg.textContent = 'Sending…';
+          const res = await member.api.suggest(name, url).catch(() => null);
+          if (!res || !res.ok) {
+            msg.textContent =
+              res && res.status === 400
+                ? 'That does not look right. Check the name and the website.'
+                : 'Could not send that. Please try again.';
+            return;
+          }
+          el('suggestName').value = '';
+          el('suggestUrl').value = '';
+          msg.textContent = 'Thanks! We will take a look.';
+          const again = await member.api.me().catch(() => null);
+          if (again && again.ok)
+            member.suggestions = again.data.suggestions || [];
+          renderSuggestions(currentViews());
+        });
+
+        async function initMember() {
+          if (!storage || !M) return; // no member.js: visitor view
+          const link = M.readLinkSeed(window.location.hash);
+          if (link.status !== 'none') {
+            // Never leave the link in the address bar or the history.
+            history.replaceState(
+              null,
+              '',
+              window.location.pathname + window.location.search
+            );
+          }
+          const fromLink = link.status === 'found';
+          const seed = fromLink ? link.seed : M.loadStoredSeed(storage);
+          if (!seed) {
+            if (link.status === 'invalid') {
+              el('memberNote').textContent =
+                'This link does not look right. Ask for a new one.';
+            }
+            return;
+          }
+          let imported;
+          try {
+            imported = await M.importMember(seed);
+          } catch (err) {
+            if (!fromLink) M.clearSeed(storage);
+            el('memberNote').textContent =
+              'This link does not look right. Ask for a new one.';
+            return;
+          }
+          member.api = M.createMemberApi(
+            window.fetch.bind(window),
+            API_URL,
+            imported
+          );
+          let res;
+          try {
+            res = await member.api.me();
+          } catch (err) {
+            return; // offline: stay a visitor this time, keep the link
+          }
+          if (!res.ok) {
+            if (res.status === 401 || res.status === 403) {
+              M.clearSeed(storage);
+              el('memberNote').textContent =
+                'This personal link is no longer active. Ask for a new one.';
+            }
+            return;
+          }
+          if (fromLink) M.saveSeed(storage, seed);
+          member.ok = true;
+          member.name = res.data.name || '';
+          member.followed = M.followedSet(res.data.bands);
+          member.suggestions = res.data.suggestions || [];
+          member.mine = storage.getItem(M.MEMBER_VIEW_KEY) === 'mine';
+          el('memberHello').textContent = member.name
+            ? 'Hi, ' + member.name
+            : 'Hi';
+          el('memberBar').hidden = false;
+          el('suggestPane').hidden = false;
+          syncViewButtons();
+          renderSuggestions(currentViews());
+          render();
+          await syncMember();
+        }
+
         load();
+        initMember();
       })();
     </script>
     <!-- build: __BUILD_VERSION__ -->

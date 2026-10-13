@@ -258,7 +258,9 @@ function createMemberApi(
   };
 }
 
-const api = {
+// Not named `api`: tours.js declares a top-level `api` too, and classic
+// scripts share one global scope (a duplicate `const` fails to load).
+const memberApi = {
   MEMBER_VIEW_KEY,
   b64urlEncode,
   b64urlDecode,
@@ -277,6 +279,6 @@ const api = {
   createMemberApi,
 };
 
-if (typeof module !== 'undefined') module.exports = api;
+if (typeof module !== 'undefined') module.exports = memberApi;
 if (typeof window !== 'undefined')
-  window.TokoroMember = Object.assign(window.TokoroMember || {}, api);
+  window.TokoroMember = Object.assign(window.TokoroMember || {}, memberApi);
