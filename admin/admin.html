@@ -172,10 +172,14 @@
         min-height: 20px;
         color: #555;
       }
-      #status.error {
+      #status.error,
+      #m-status.error,
+      #s-status.error {
         color: #c53030;
       }
-      #status.success {
+      #status.success,
+      #m-status.success,
+      #s-status.success {
         color: #276749;
       }
 
@@ -1327,7 +1331,7 @@
         });
 
       let suggestionGroups = [];
-      async function refreshSuggestions() {
+      async function refreshSuggestions(keepStatus = false) {
         try {
           const api = adminApi();
           const detail =
@@ -1360,10 +1364,11 @@
             li.textContent = f.act_url + ' — ' + f.followers;
             list.append(li);
           }
-          say(
-            's-status',
-            suggestionGroups.length ? '' : 'No pending suggestions.'
-          );
+          if (!keepStatus)
+            say(
+              's-status',
+              suggestionGroups.length ? '' : 'No pending suggestions.'
+            );
         } catch (e) {
           say('s-status', e.message, 'error');
         }
@@ -1399,15 +1404,17 @@
             return say('s-status', 'Select at least one band.', 'error');
           const reason = prompt('Reason (optional, shown to the members):', '');
           if (reason === null) return;
+          let failed = false;
           try {
             await adminApi().rejectSuggestions(
               picked.flatMap(g => g.ids),
               reason
             );
           } catch (e) {
+            failed = true;
             say('s-status', e.message, 'error');
           }
-          refreshSuggestions();
+          refreshSuggestions(failed);
         });
       document
         .getElementById('s-link-btn')
@@ -1417,15 +1424,17 @@
             return say('s-status', 'Select at least one band.', 'error');
           const url = prompt('Site URL of the existing tracked band:', '');
           if (!url) return;
+          let failed = false;
           try {
             await adminApi().linkSuggestions(
               picked.flatMap(g => g.ids),
               url
             );
           } catch (e) {
+            failed = true;
             say('s-status', e.message, 'error');
           }
-          refreshSuggestions();
+          refreshSuggestions(failed);
         });
 
       // ── Init ──────────────────────────────────────────────────────────────────
