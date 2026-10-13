@@ -10,7 +10,7 @@ A simple web interface for querying events from the Tokoro API.
 - Mobile-responsive design
 - `festivals.html`: Festival radar. Browse under-the-radar festivals by month on a map; independent of the event pages
 - `tours.html`: Band tours. Upcoming shows of the followed bands, band by band, with filters, a NEW badge for shows first published in the last 7 days (and a "New only" filter), saved queries via "Copy link", an optional map, and a tracked-bands pane (list generated from `crawler/bands.yaml` at deploy time); independent of the other pages. Band shows are excluded from the other pages (`has_act=0`)
-- `tours.html` members: people who received a personal link from the admin (`tours.html#k=…`, created on the admin page's Members tab) can follow bands (♡/♥), switch to "My bands", and suggest bands for the admin to review. Visitors see none of this. The member logic is in `member.js`, which ships with the page; see `SPECS.md` FR-8.9
+- `tours.html` members: people who received a personal link from the admin (`tours.html#k=…`, created on the admin page's Members tab) can follow bands (♡/♥), switch to "My bands", and suggest bands for the admin to review. Visitors see none of this. The member logic is in `member.js`, which ships with the page but is loaded only for a personal link or a stored member seed (visitors never download it); see `SPECS.md` FR-8.9
 
 ## Deployment to Cloudflare Pages
 
