@@ -1,7 +1,7 @@
 # Tokoro Worker — Technical Specification
 
 **Version:** 1.0
-**Date:** 2026-03-06
+**Date:** 2026-03-06 (member endpoints added 2026-10-13)
 **Status:** Reference implementation exists — this spec enables reimplementation in any language
 
 ---
@@ -14,6 +14,7 @@ This document specifies the complete behavior of the Tokoro Worker, a serverless
 - Stores event data in SQLite (Cloudflare D1)
 - Executes geospatial queries using geohash-based indexing
 - Automatically expires past events via scheduled cron triggers
+- Stores admin-issued members, the bands they follow and the bands they suggest for the tours page (header-signed requests, section 3.6)
 
 This specification is implementation-agnostic and provides sufficient detail to reimplement the worker in any language (TypeScript, Python, Go, Rust, etc.) with complete test coverage.
 
@@ -23,7 +24,7 @@ This specification is implementation-agnostic and provides sufficient detail to 
 
 ### 2.1 Database Tables
 
-The worker interacts with two SQLite tables:
+The worker interacts with five SQLite tables: `events`, `blocklist`, and the three member tables (`members`, `member_bands`, `band_suggestions`).
 
 #### Events Table
 
@@ -72,6 +73,41 @@ CREATE TABLE blocklist (
 Blocked pubkeys are checked on write paths. Any request whose `pubkey` appears in the blocklist is rejected with `403 Forbidden`. Protected paths:
 - `POST /events`
 - `DELETE /events/:id`
+
+#### Member Tables
+
+Members (admin-issued keys for the tours page) are stored in `members`, `member_bands` and `band_suggestions`; member keys are never part of `ALLOWED_PUBKEYS` and cannot publish.
+
+```sql
+CREATE TABLE members (
+  pubkey      TEXT PRIMARY KEY,       -- member public key (64 hex chars, lower-case)
+  name        TEXT NOT NULL,          -- display name chosen by the admin (1-60 chars)
+  created_at  TEXT NOT NULL,          -- ISO 8601 format
+  revoked_at  TEXT                    -- ISO 8601 format; non-null = revoked
+);
+
+CREATE TABLE member_bands (
+  pubkey      TEXT NOT NULL,          -- member public key
+  act_url     TEXT NOT NULL,          -- normalized band site URL (section 3.6)
+  created_at  TEXT NOT NULL,          -- ISO 8601 format
+  PRIMARY KEY (pubkey, act_url)
+);
+CREATE INDEX idx_member_bands_act ON member_bands (act_url);
+
+CREATE TABLE band_suggestions (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  pubkey        TEXT NOT NULL,        -- suggesting member
+  name          TEXT NOT NULL,        -- band name, trimmed, 1-120 chars
+  url           TEXT,                 -- optional band site, normalized (section 3.6)
+  status        TEXT NOT NULL,        -- 'pending' | 'rejected' | 'linked'
+  act_url       TEXT,                 -- set when status = 'linked'
+  reject_reason TEXT,                 -- optional, max 200 chars
+  created_at    TEXT NOT NULL         -- ISO 8601 format
+);
+CREATE INDEX idx_suggestions_status ON band_suggestions (status, created_at);
+```
+
+`member_bands.act_url` is not checked against the list of tracked bands (the worker does not know it). A row for a band that is no longer tracked is harmless; clients ignore URLs that are not in their tracked list. The tables have no foreign keys: deleting a member deletes its rows explicitly (section 7.12).
 
 ### 2.2 Timestamp Format Convention
 
@@ -180,6 +216,59 @@ The prefix `"act:"` is a **domain separator**: an act signature can never be rep
 3. Verify: `ed25519.verify(signature_bytes, message_bytes, pubkey_bytes)`; any decoding error counts as a failed verification
 
 The reference implementation pins this format with a fixed cross-package test vector so the crawler (the signer) and the worker cannot drift apart.
+
+### 3.6 Member and Admin Request Signatures
+
+The member endpoints (`/member/*`) and the admin member/suggestion endpoints (`/admin/members*`, `/admin/suggestions*`, `/admin/band-followers`) authenticate with headers instead of body fields. Reads are signed too, because member data is private.
+
+**Headers:**
+
+| Header | Format |
+|---|---|
+| `X-Pubkey` | signer public key, 64 hex chars (case-insensitive; lower-cased before use) |
+| `X-Signature` | Ed25519 signature, 128 hex chars |
+| `X-Timestamp` | Unix time in seconds, 1-12 decimal digits |
+
+**Signed Message:** `SHA-256(encode_utf8(domain + ":" + payload + ":" + timestamp))`, where `timestamp` is the `X-Timestamp` header string. The domain separates operations, so a signature for one action can never be used for another; the timestamp limits replay to the acceptance window.
+
+**Verification Steps:**
+
+1. If any header is missing or malformed → `401 {"error": "Missing or malformed authentication headers"}`.
+2. If `|server_now_seconds - timestamp| > 300` → `401 {"error": "Timestamp out of range", "server_time": <server Unix seconds>}`. Clients use `server_time` to correct a wrong device clock and retry once.
+3. Verify `ed25519.verify(signature_bytes, message_bytes, pubkey_bytes)`; a failed verification or any decoding error → `401 {"error": "Invalid signature"}`.
+4. Authorization:
+   - Member endpoints: the pubkey must exist in `members` with `revoked_at IS NULL`, else `403 {"error": "Forbidden", "message": "Not an active member"}`.
+   - Admin endpoints: if `ADMIN_PUBKEY` is not configured → `503 {"error": "Admin not configured"}` (checked **before** steps 1-3); the pubkey must equal `ADMIN_PUBKEY` (case-insensitive), else `403 {"error": "Unauthorized"}`.
+
+**Endpoints with a body** (`POST /member/suggestions`, `POST /admin/members`, `POST /admin/suggestions/reject`, `POST /admin/suggestions/link`) are signed over the raw body, so the body must be read before step 3. To avoid buffering bodies for unauthenticated requests, the order of checks is:
+
+1. `Content-Length` header present and greater than 8192 bytes → `413 {"error": "Payload too large"}` (before any other check).
+2. Admin endpoints only: `ADMIN_PUBKEY` not configured → `503`.
+3. Steps 1-2 above (header format, timestamp window) → `401`, **without reading the body**.
+4. Read the body as a stream, counting bytes; as soon as more than 8192 bytes have arrived, stop reading (cancel the stream) and answer `413 {"error": "Payload too large"}`, so an oversized body without `Content-Length` is never buffered whole. Otherwise decode the bytes as UTF-8 (an absent body is the empty string).
+5. Step 3 above (signature over the body) → `401`, then step 4 (authorization) → `403`.
+6. Body parsing and validation → `400`.
+
+**Domains and payloads:**
+
+| Domain | Endpoint | Payload |
+|---|---|---|
+| `member-read` | `GET /member/me` | the literal string `/member/me` |
+| `band-follow` | `POST /member/bands/:act_url_b64` | the normalized `act_url` (decoded from the path, then `normalizeActUrl`) |
+| `band-unfollow` | `DELETE /member/bands/:act_url_b64` | the normalized `act_url` |
+| `band-suggest` | `POST /member/suggestions` | the raw JSON request body, byte for byte |
+| `admin-read` | `GET /admin/members`, `GET /admin/suggestions`, `GET /admin/band-followers` | the request path with its query string exactly as sent (URL pathname + search, e.g. `/admin/suggestions?detail=1`; without a query, just the path such as `/admin/suggestions`). A signature for one query is refused (`401`) for any other, so a captured read cannot be replayed with `?detail=1` added |
+| `admin-member` | `POST /admin/members` | the raw JSON request body |
+| `admin-member-revoke` | `POST /admin/members/:pubkey/revoke` | the target pubkey from the path, lower-cased |
+| `admin-member-delete` | `DELETE /admin/members/:pubkey` | the target pubkey from the path, lower-cased |
+| `admin-suggestion-reject` | `POST /admin/suggestions/reject` | the raw JSON request body |
+| `admin-suggestion-link` | `POST /admin/suggestions/link` | the raw JSON request body |
+
+**Normalization rules** (shared by the worker and the public-web client `member.js`; both MUST behave identically):
+
+- `normalizeActUrl(raw)`: trim; parse as a URL; only `http:` and `https:` are accepted (anything else, unparsable input or a non-string → invalid). Result is `scheme + "//" + host[:port] + path`, with the query, the fragment and all trailing slashes removed. Scheme and host are lower-cased and a default port is dropped (standard URL parsing). Example: `HTTPS://Band.Example/Tour/?x=1#top` → `https://band.example/Tour`; `https://band.example/` → `https://band.example`.
+- `normalizeName(raw)`: Unicode NFD, remove combining marks, lower-case, then remove every character that is not a letter or a digit. Example: `Sigur Rós!` → `sigurros`.
+- `act_url_b64` in paths is base64url (alphabet `A-Z a-z 0-9 - _`, no padding) of the UTF-8 URL; anything outside the alphabet or not valid UTF-8 is invalid.
 
 ---
 
@@ -524,9 +613,11 @@ All responses MUST include:
 
 ```
 Access-Control-Allow-Origin: *
-Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS
-Access-Control-Allow-Headers: Content-Type
+Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+Access-Control-Allow-Headers: Content-Type, X-Pubkey, X-Signature, X-Timestamp
 ```
+
+`X-Pubkey`, `X-Signature` and `X-Timestamp` carry the authentication of the member and admin member/suggestion endpoints (section 3.6).
 
 OPTIONS requests return `200 OK` with CORS headers and empty body.
 
@@ -537,7 +628,7 @@ OPTIONS requests return `200 OK` with CORS headers and empty body.
 GET /
 ```
 
-**Response (200 OK):** A JSON object listing the available endpoints and their parameters.
+**Response (200 OK):** A JSON object listing the available endpoints and their parameters. The listing includes the member endpoints (`GET /member/me`, `POST|DELETE /member/bands/:act_url_b64`, `POST /member/suggestions`); the admin endpoints are not listed.
 
 ### 7.3 GET /stats
 
@@ -940,6 +1031,239 @@ DELETE /admin/blocklist/<target_pubkey>
 - `403 Forbidden`: `pubkey` is not `ADMIN_PUBKEY`
 - `503 Service Unavailable`: `ADMIN_PUBKEY` secret not configured
 
+### 7.11 Member Endpoints
+
+Members are people the admin has given a personal key (section 7.12) so they can follow tracked bands on the tours page and suggest new ones. All three endpoints are signed as described in section 3.6 and require an active member (`403` for an unknown or revoked key). The request paths are matched exactly; any other method or path under `/member/` returns `404 {"error": "Not found"}`.
+
+#### 7.11.1 GET /member/me
+
+**Request:** `GET /member/me`, signed with domain `member-read` over `/member/me`.
+
+**Response (200 OK):** everything the page needs in one call.
+
+```json
+{
+  "name": "Anna",
+  "bands": ["https://band.example", "https://other.example/live"],
+  "suggestions": [
+    {
+      "id": 12,
+      "name": "Some Band",
+      "url": "https://someband.example",
+      "status": "pending",
+      "act_url": null,
+      "reject_reason": null,
+      "created_at": "2026-10-13T10:00:00"
+    }
+  ]
+}
+```
+
+- `bands`: the member's followed normalized band URLs, oldest follow first (ties by URL).
+- `suggestions`: all of the member's suggestions in any status, newest first (`id` descending).
+
+**Error Responses:** `401` (section 3.6), `403 {"error": "Forbidden", "message": "Not an active member"}`.
+
+#### 7.11.2 POST /member/bands/:act_url_b64 (Follow) and DELETE /member/bands/:act_url_b64 (Unfollow)
+
+`:act_url_b64` is the base64url-encoded band site URL (section 3.6).
+
+**Processing Steps:**
+
+1. Decode the path parameter and apply `normalizeActUrl`. If decoding fails or the URL is not http(s) → `400 {"error": "Invalid band url"}` (checked before authentication).
+2. Verify the request (section 3.6) with domain `band-follow` (POST) or `band-unfollow` (DELETE) over the normalized URL.
+3. POST inserts `(pubkey, act_url, now)` into `member_bands` if not present; DELETE removes the row if present. Both are idempotent.
+
+**Response (200 OK):**
+
+```json
+{ "act_url": "<normalized url>" }
+```
+
+**Error Responses:** `400` (invalid band URL), `401`, `403`.
+
+#### 7.11.3 POST /member/suggestions (Suggest a Band)
+
+**Request:**
+
+```json
+POST /member/suggestions
+
+{ "name": "Some Band", "url": "https://someband.example" }
+```
+
+`url` is optional. The request is signed with domain `band-suggest` over the raw body.
+
+**Processing Steps:**
+
+1. Verify the request (section 3.6, including the order of checks for endpoints with a body: `413` for a body over 8 KB); authentication happens before the body is parsed.
+2. Parse the body: not JSON → `400 {"error": "Invalid JSON"}`; not a JSON object → `400 {"error": "Invalid body"}`.
+3. `name` is trimmed; if it is empty, longer than 120 characters, or contains no letter or digit (`normalizeName` is empty) → `400 {"error": "name is required (1-120 characters)"}`.
+4. If `url` is present and not `null` or `""`, it is normalized with `normalizeActUrl`; if invalid, or longer than 500 characters once normalized → `400 {"error": "url must be an http(s) URL (max 500 characters)"}`. The normalized form is stored.
+5. If the same member already has a **pending** suggestion whose `normalizeName` equals this one, return `200 {"id": <existing id>, "duplicate": true}` and store nothing. Different members may suggest the same band. There is no cap on the number of suggestions.
+6. Otherwise insert a row with `status = 'pending'` and `created_at = now`.
+
+**Response (201 Created):**
+
+```json
+{ "id": 12 }
+```
+
+**Error Responses:** `400`, `401`, `403`, `413`.
+
+### 7.12 Admin Member Endpoints
+
+All admin endpoints in sections 7.12-7.14 are signed as described in section 3.6 by `ADMIN_PUBKEY` (`503` when it is not configured, `403 {"error": "Unauthorized"}` for any other valid key). The endpoints with a body (create member, reject, link) follow the order of checks of section 3.6 and answer `413` for a body over 8 KB. The member's private key is generated on the admin page and never sent to the worker; only the public key and a display name are stored.
+
+#### 7.12.1 GET /admin/members (List Members)
+
+Signed with domain `admin-read` over `/admin/members` (plus the query string, if any, as sent; section 3.6).
+
+**Response (200 OK):** newest member first (ties by name).
+
+```json
+[
+  {
+    "pubkey": "<64 hex chars>",
+    "name": "Anna",
+    "created_at": "2026-10-13T10:00:00",
+    "revoked_at": null,
+    "band_count": 3
+  }
+]
+```
+
+#### 7.12.2 POST /admin/members (Create Member)
+
+**Request:** signed with domain `admin-member` over the raw body.
+
+```json
+POST /admin/members
+
+{ "pubkey": "<member public key — 64 hex chars>", "name": "Anna" }
+```
+
+**Processing Steps:**
+
+1. Verify the request (section 3.6).
+2. Body not a JSON object → `400 {"error": "Invalid JSON"}`.
+3. `pubkey` is lower-cased; not 64 hex chars → `400 {"error": "pubkey must be 64 hex characters"}`.
+4. `name` is trimmed; empty or longer than 60 characters → `400 {"error": "name is required (1-60 characters)"}`.
+5. `pubkey === ADMIN_PUBKEY` → `400 {"error": "Cannot register the admin key as a member"}`.
+6. Pubkey already in `members` (active or revoked) → `409 {"error": "Member already exists"}`.
+7. Insert `(pubkey, name, now)`.
+
+**Response (201 Created):**
+
+```json
+{ "pubkey": "<64 hex chars>", "name": "Anna" }
+```
+
+#### 7.12.3 POST /admin/members/:pubkey/revoke (Revoke Member)
+
+Signed with domain `admin-member-revoke` over the lower-cased `:pubkey`. Sets `revoked_at = now` if the member is not already revoked (a second revoke keeps the first time). A revoked member gets `403` on every member endpoint; its follows and suggestions are kept.
+
+**Response (200 OK):** `{ "message": "Member revoked", "pubkey": "<pubkey>" }`
+
+**Error Responses:** `401`, `403`, `404 {"error": "Member not found"}`, `503`.
+
+#### 7.12.4 DELETE /admin/members/:pubkey (Delete Member)
+
+Signed with domain `admin-member-delete` over the lower-cased `:pubkey`. Deletes the member's rows from `member_bands`, then `band_suggestions`, then `members`, as one atomic unit (a D1 `batch`, which runs as a single transaction): either all three deletes take effect or, if any of them fails, none does and the request fails (`500`) with the member and their data unchanged.
+
+**Response (200 OK):** `{ "message": "Member deleted", "pubkey": "<pubkey>" }`
+
+**Error Responses:** `401`, `403`, `404 {"error": "Member not found"}`, `503`.
+
+### 7.13 Admin Suggestion Endpoints
+
+#### 7.13.1 GET /admin/suggestions (Grouped Suggestions)
+
+**Request:** `GET /admin/suggestions?status=<pending|rejected|linked>&detail=1`, signed with domain `admin-read` over the path and query string exactly as sent (e.g. `/admin/suggestions?status=rejected&detail=1`; `/admin/suggestions` when there is no query). The query string is signed, so a signature made for `/admin/suggestions` is refused with `401` when `?detail=1` is added.
+
+- `status`: default `pending`; any other value than the three statuses → `400 {"error": "Invalid status"}`.
+- `detail=1`: adds the names of the members who made the suggestions. Without it, only counts are returned.
+
+**Grouping:** suggestions with the given status are grouped by `normalizeName(name)`.
+
+**Response (200 OK):**
+
+```json
+[
+  {
+    "key": "someband",
+    "name_variants": ["Some Band", "some band"],
+    "urls": ["https://someband.example"],
+    "members": 2,
+    "ids": [12, 15],
+    "created_at": "2026-10-13T10:00:00",
+    "member_names": ["Anna", "Ben"]
+  }
+]
+```
+
+- `name_variants`: the distinct spellings, most frequent first (ties alphabetical).
+- `urls`: the distinct normalized URLs given by members (may be empty).
+- `members`: number of distinct members in the group.
+- `ids`: all suggestion ids in the group, ascending.
+- `created_at`: the earliest suggestion in the group.
+- `member_names`: only with `detail=1`.
+- Order: most members first, then oldest `created_at`, then `key`.
+
+#### 7.13.2 POST /admin/suggestions/reject (Reject Suggestions)
+
+**Request:** signed with domain `admin-suggestion-reject` over the raw body.
+
+```json
+POST /admin/suggestions/reject
+
+{ "ids": [12, 15], "reason": "Not touring in Europe" }
+```
+
+**Processing Steps:**
+
+1. `ids` must be a non-empty array of at most 200 positive integers (a body that is not a JSON object also fails here) → else `400 {"error": "ids must be a non-empty list of ids"}`.
+2. `reason` is optional and trimmed; longer than 200 characters → `400 {"error": "reason is limited to 200 characters"}`. An empty reason is stored as `NULL`.
+3. Each **pending** suggestion among `ids` becomes `status = 'rejected'` with `reject_reason`. Unknown ids and suggestions in another status are skipped; a repeated id counts once.
+
+The update is one `UPDATE … WHERE status = 'pending' AND id IN (…)` per chunk of at most 90 ids (one statement for up to 90 ids, at most 3 for 200; D1 allows 100 bound parameters per statement), all in one D1 `batch` (a single transaction); `updated` is the sum of the statements' `meta.changes`.
+
+**Response (200 OK):** `{ "updated": <number of suggestions changed> }`
+
+#### 7.13.3 POST /admin/suggestions/link (Link Suggestions to a Tracked Band)
+
+For suggestions that name a band already tracked under another name or URL.
+
+**Request:** signed with domain `admin-suggestion-link` over the raw body.
+
+```json
+POST /admin/suggestions/link
+
+{ "ids": [12, 15], "act_url": "https://band.example" }
+```
+
+**Processing Steps:**
+
+1. `ids` validated as in 7.13.2.
+2. `act_url` normalized with `normalizeActUrl`; invalid, or longer than 500 characters once normalized → `400 {"error": "act_url must be an http(s) URL (max 500 characters)"}`.
+3. For each id that exists and is not already `linked` (pending **or rejected**): set `status = 'linked'` and `act_url`, and follow `act_url` for the suggesting member (insert into `member_bands` if not present). Unknown and already linked ids are skipped.
+
+The suggestions are read first with one `SELECT id, pubkey, status … WHERE id IN (…)` per chunk of at most 90 deduplicated ids (one query for up to 90 ids, at most 3 for 200: D1 limits both the queries per invocation and the bound parameters per statement, at 100), so a repeated id counts once. Then the follows (`INSERT OR IGNORE INTO member_bands … SELECT DISTINCT pubkey, act_url, now FROM band_suggestions WHERE id IN (…)`) and the status changes (`UPDATE … WHERE id IN (…)`) of the suggestions to link, again per chunk, are written in one D1 `batch`, which runs as a single transaction. Either every listed suggestion is followed and marked `linked`, or, if any statement fails, none is and the request fails (`500`) leaving all of them as they were (no follow without `linked`, no `linked` without follow).
+
+**Response (200 OK):** `{ "updated": <number of suggestions linked> }`
+
+### 7.14 GET /admin/band-followers (Follower Counts)
+
+Signed with domain `admin-read` over `/admin/band-followers` (plus the query string, if any, as sent; section 3.6). A demand signal: counts only, never member names.
+
+Only follows of active members count: follows of revoked members (`revoked_at` set) are left out, and a band followed only by revoked members does not appear. (`band_count` in `GET /admin/members` still counts every follow of each member, revoked or not.)
+
+**Response (200 OK):** most followed first (ties by URL).
+
+```json
+[ { "act_url": "https://band.example", "followers": 3 } ]
+```
+
 ---
 
 ## 8. Scheduled Tasks (Cron Triggers)
@@ -966,14 +1290,14 @@ The 2-day grace period ensures events that have just ended remain visible briefl
 
 **Schedule:** Daily at 02:00 UTC
 
-**Purpose:** Snapshot the full `events` table to Cloudflare R2 for disaster recovery.
+**Purpose:** Snapshot the `events` table, the member tables (`members`, `member_bands`, `band_suggestions`) and the `blocklist` to Cloudflare R2 for disaster recovery (the blocklist is included so a restore does not silently unblock banned keys). The member tables hold private data (member names, followed bands, suggestions); they go into the same bucket as the events, which MUST NOT be publicly readable. No private key is ever stored: the server only knows public keys.
 
 **Binding requirement:** An R2 bucket must be bound as `BACKUP_BUCKET` in `wrangler.toml`. If the binding is absent at runtime, the backup step is silently skipped (no error is thrown).
 
 **Algorithm:**
 
-1. Query all rows from the `events` table.
-2. Serialise the result as a JSON object `{ timestamp, tables: { events } }` and write it to R2 under the key `backups/backup-YYYY-MM-DD.json`, where the date is the current UTC date.
+1. Query all rows from each of the tables `events`, `members`, `member_bands`, `band_suggestions` and `blocklist`.
+2. Serialise the result as a JSON object `{ timestamp, tables: { events, members, member_bands, band_suggestions, blocklist } }` (each value is the array of rows of that table, `[]` when empty) and write it to R2 under the key `backups/backup-YYYY-MM-DD.json`, where the date is the current UTC date. All five tables share one object per day, so the retention below applies to them together. Backups written before the member tables existed contain only `tables.events`, and backups written before the blocklist was added lack `tables.blocklist`; consumers (e.g. `scripts/restore-from-backup.sh`) MUST treat a missing table as empty.
 3. List all objects under the `backups/` prefix in the bucket.
 4. Sort the listed keys in ascending chronological order (oldest first).
 5. Delete the oldest keys beyond the 7 most recent (time-based retention).
@@ -994,10 +1318,11 @@ The 2-day grace period ensures events that have just ended remain visible briefl
 | 200  | Successful GET/DELETE                                        |
 | 201  | Successful POST (resource created)                           |
 | 400  | Bad Request (invalid parameters, missing fields)             |
-| 401  | Unauthorized (signature verification failed)                 |
-| 403  | Forbidden (resource doesn't belong to user, or blocklisted)  |
+| 401  | Unauthorized (signature verification failed; for signed member/admin requests also missing headers or a timestamp outside ±300 s) |
+| 403  | Forbidden (resource doesn't belong to user, blocklisted, not an active member, or not the admin) |
 | 404  | Not Found                                                    |
-| 409  | Conflict (duplicate event)                                   |
+| 409  | Conflict (duplicate event, or member already exists)         |
+| 413  | Payload Too Large (body over 8 KB on a signed member/admin endpoint) |
 | 500  | Internal Server Error                                        |
 | 503  | Service Unavailable (ADMIN_PUBKEY secret not configured)     |
 
@@ -1017,6 +1342,7 @@ The 2-day grace period ensures events that have just ended remain visible briefl
 
 - `POST /events`: `pubkey`, `signature`, `title`, `lat`, `lng`, `start_time`, `category`, `created_at`
 - `DELETE /events/:id`: `pubkey`, `signature`
+- Member and admin member/suggestion endpoints: headers `X-Pubkey`, `X-Signature`, `X-Timestamp` (section 3.6)
 
 **Coordinate Validation:**
 
@@ -1036,6 +1362,15 @@ The 2-day grace period ensures events that have just ended remain visible briefl
 
 - `pubkey`: 64 hexadecimal characters (lowercase or uppercase)
 - `signature`: 128 hexadecimal characters
+
+**Member Data Validation:**
+
+- Member name: trimmed, 1-60 characters
+- Suggestion name: trimmed, 1-120 characters, at least one letter or digit
+- Suggestion URL and `act_url`: http(s) only, stored normalized (section 3.6), at most 500 characters after normalization
+- Request body of the signed member/admin endpoints: at most 8192 bytes (`413 {"error": "Payload too large"}`, section 3.6)
+- Reject reason: trimmed, at most 200 characters
+- Suggestion `ids`: non-empty array of at most 200 positive integers
 
 ---
 
@@ -1167,6 +1502,22 @@ The 2-day grace period ensures events that have just ended remain visible briefl
 - Run cron cleanup task
 - Verify event deleted
 
+### 10.6 Member and Admin Request Tests
+
+The reference implementation covers these in `worker/src/band-keys.test.ts`, `member-auth.test.ts`, `members.test.ts`, `admin-members.test.ts`, `members-routes.test.ts` and `contract.test.ts`. Handler tests run real SQL against an in-memory SQLite stand-in for D1 (`worker/test-support/d1.ts`, built on `node:sqlite`) with test keys from `worker/test-support/sign.ts`.
+
+**Normalization (`band-keys`):** `normalizeActUrl` lower-cases scheme and host, drops query, hash, trailing slashes and a default port, keeps a non-default port, trims whitespace, rejects non-http(s) input and non-strings; `normalizeName` ignores case, accents and punctuation and returns `""` for names without letters or digits; base64url round-trips Unicode, has no padding, rejects characters outside the alphabet and invalid UTF-8.
+
+**Signed requests (`member-auth`):** a fresh, correctly signed request is accepted (also with an upper-case `X-Pubkey`); a signature for another domain, another payload or another key is rejected; a timestamp outside ±300 s is rejected with `server_time`; missing or malformed headers are rejected.
+
+**Member endpoints (`members`):** `/member/me` returns name, bands and suggestions of an active member; `403` for unknown and revoked keys; `401` without valid auth; follow stores the normalized URL and is idempotent; unfollow is idempotent; `400` for a path that is not base64url or not an http(s) URL; each member has their own list; a suggestion is created pending and listed in `/member/me`; a duplicate pending name from the same member returns the existing id; two members may suggest the same name; invalid input → `400`.
+
+**Admin endpoints (`admin-members`):** `503` without `ADMIN_PUBKEY`; `403` for a valid signature from another key; `401` for a bad signature; create, list, revoke and delete a member; a revoke signature cannot be used to delete; `409` for an existing pubkey, `400` for bad input, `404` for an unknown member; delete cascades to follows and suggestions; grouping by normalized name, counting distinct members, ordering by demand, member names only with `detail=1`; reject with a reason; link marks `linked`, stores the normalized `act_url` and follows it for the suggester; reject/link bodies are validated; follower counts are ordered and contain no names.
+
+**Through the Worker (`members-routes`):** the lifecycle create → follow → suggest → link → revoke through the main fetch handler; a member key is rejected by the allowlist on `POST /events` and `POST /events/:id/act`; CORS preflight allows the new headers; the unauthenticated blocklist read and the `404` for unknown routes are unchanged.
+
+**Contract (`contract`):** the real browser client (`public-web/member.js`) and admin client (`admin/members-admin.js`) run the whole flow against the Worker with their own signing code; a member client with a wrong device clock recovers through the `server_time` retry; the client and worker normalization functions give identical results on the same inputs.
+
 ### 10.7 Performance Tests
 
 **Test 24: Query Performance with 10k Events**
@@ -1180,6 +1531,7 @@ The 2-day grace period ensures events that have just ended remain visible briefl
 
 ### 11.1 Core Functionality
 - [x] Ed25519 signature verification (events, admin)
+- [x] Header-signed, timestamped, domain-separated member/admin requests (section 3.6)
 - [x] Geohash encoding and neighbor calculation
 - [x] Haversine distance calculation
 - [x] Event ID generation (SHA-256)
@@ -1198,6 +1550,12 @@ The 2-day grace period ensures events that have just ended remain visible briefl
 - [x] GET /admin/blocklist
 - [x] POST /admin/blocklist
 - [x] DELETE /admin/blocklist/:pubkey
+- [x] GET /member/me
+- [x] POST|DELETE /member/bands/:act_url_b64
+- [x] POST /member/suggestions
+- [x] GET|POST /admin/members, POST /admin/members/:pubkey/revoke, DELETE /admin/members/:pubkey
+- [x] GET /admin/suggestions, POST /admin/suggestions/reject, POST /admin/suggestions/link
+- [x] GET /admin/band-followers
 
 ### 11.3 Database Operations
 - [x] Event insertion with geohash
@@ -1205,6 +1563,7 @@ The 2-day grace period ensures events that have just ended remain visible briefl
 - [x] Geospatial queries (precision 2-6)
 - [x] Blocklist check on write paths (POST /events, DELETE /events/:id)
 - [x] Blocklist CRUD (GET, insert, delete)
+- [x] Member tables (`members`, `member_bands`, `band_suggestions`), delete cascade done explicitly
 
 ### 11.4 Validation & Error Handling
 - [ ] Required field validation
@@ -1232,6 +1591,12 @@ The reference implementation (TypeScript/Cloudflare Workers) can be found in:
 - `worker/src/index.ts` — Main router and event handlers
 - `worker/src/crypto.ts` — Ed25519 signature verification
 - `worker/src/geohash.ts` — Geohash encoding and neighbors
+- `worker/src/http.ts` — CORS headers and JSON response helper
+- `worker/src/band-keys.ts` — `normalizeActUrl`, `normalizeName`, base64url helpers
+- `worker/src/member-auth.ts` — signed-request message and verification (section 3.6)
+- `worker/src/members.ts` — member endpoints (section 7.11)
+- `worker/src/admin-members.ts` — admin member and suggestion endpoints (sections 7.12-7.14)
+- `worker/migrations/0007_add_members.sql` — member tables
 
 Key dependencies:
 - `@noble/ed25519` — Ed25519 signature library
@@ -1277,6 +1642,19 @@ If migrating from Cloudflare D1 to another SQLite-compatible database:
 **CORS Security:**
 - Allow all origins (`*`)
 
+**Replay of member/admin requests:**
+- Limited to 300 s by the signed timestamp; each action has its own domain, so a captured signature cannot be used for another action (for example a revoke signature cannot delete).
+
+**Stolen personal link:**
+- The personal link carries the member's private key. Anyone holding it can act as the member, but a member can only follow bands and make suggestions. Revoke (or delete) the member to cut it off.
+
+**Member keys cannot publish:**
+- Member keys are never added to `ALLOWED_PUBKEYS`; `POST /events` and `POST /events/:id/act` reject them.
+
+**Private member data:**
+- A member's list and suggestions are only returned to a signed request from that member (`/member/me`) or the admin. Admin suggestion lists show counts; member names only with `detail=1`. Follower counts never include names.
+- Clients MUST render suggestion text as text, never as HTML.
+
 ---
 
 ## 15. Compliance & Data Retention
@@ -1293,6 +1671,8 @@ To delete all data for a user (identified by `pubkey`):
 -- Delete events published by user
 DELETE FROM events WHERE pubkey = ?;
 ```
+
+For a member, `DELETE /admin/members/:pubkey` (section 7.12.4) removes the member, their followed bands and their suggestions.
 
 **Note:** Implement as authenticated endpoint `/users/:pubkey/delete` (requires signature).
 

@@ -41,6 +41,34 @@ try {
   assert.ok(tours.includes("const API_URL = 'https://worker.example';"));
   assert.ok(tours.includes('<!-- build: test-build -->'));
   console.log('✅ inject: tours.html gets the worker URL and the build version');
+
+  // Leaflet comes from unpkg: every tag that loads it is pinned with SRI.
+  const LEAFLET_SRI = {
+    'leaflet.js': 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=',
+    'leaflet.css': 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=',
+  };
+  const htmlFiles = [
+    ...pages.map(f => path.join(PUBLIC_WEB, f)),
+    path.resolve(PUBLIC_WEB, '..', 'web-publisher', 'index.html'),
+    path.resolve(PUBLIC_WEB, '..', 'admin', 'admin.html'),
+  ];
+  let leafletTags = 0;
+  for (const file of htmlFiles) {
+    const html = fs.readFileSync(file, 'utf8');
+    for (const m of html.matchAll(/<(?:link|script)\b[^>]*unpkg\.com\/leaflet[^>]*>/g)) {
+      leafletTags++;
+      const tag = m[0];
+      const name = /leaflet\.(?:js|css)/.exec(tag)[0];
+      assert.ok(tag.includes('leaflet@1.9.4/'), `${file}: Leaflet must be pinned to 1.9.4: ${tag}`);
+      assert.ok(
+        tag.includes(`integrity="${LEAFLET_SRI[name]}"`),
+        `${file}: ${name} needs integrity="${LEAFLET_SRI[name]}"`
+      );
+      assert.ok(/\scrossorigin=""/.test(tag), `${file}: ${name} needs crossorigin=""`);
+    }
+  }
+  assert.ok(leafletTags >= 8, `expected at least 8 Leaflet tags, found ${leafletTags}`);
+  console.log(`✅ sri: all ${leafletTags} Leaflet tags carry integrity and crossorigin`);
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }

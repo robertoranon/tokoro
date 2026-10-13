@@ -7,6 +7,7 @@ var TOKORO_CONFIG = {
   crawlerApiKey: 'your-api-key-here',
   relayUrl: 'https://tokoro-query.pages.dev/',
   shortcutUrl: '', // optional: iCloud link for the Apple Shortcut (share from Shortcuts app → Copy iCloud Link)
+  publicWebUrl: '', // optional: where tours.html is hosted (default for the admin "Public site URL" setting), e.g. https://tokoro-tours.pages.dev
 };
 
 // Node.js compatibility

@@ -278,6 +278,8 @@ Legitimate parallel events (different stages or acts running at the same time) a
   npm run bands-scout -- list.txt             # add the entries to bands.yaml
   ```
 
+  The list can also come from members' suggestions: in the admin page's Suggestions tab, tick the bands and press **Copy list for bands-scout**, then save the text as a file (e.g. `bands.txt`) and run `npm run bands-scout -- bands.txt`. Members see their suggestion as *Added* only after the next public-web deploy regenerates `tracked-bands.json` (see `HOW-TO-USE.md` section 10)
+
 #### 4. Image Mode
 
 - **Best for**: Event flyers, posters, social media images

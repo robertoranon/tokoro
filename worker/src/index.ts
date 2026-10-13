@@ -12,6 +12,9 @@ import {
   DEDUP_TIME_WINDOW_MS,
   DEDUP_SQL_BUFFER_MS,
 } from '../../shared/dedup-config';
+import { CORS_HEADERS, jsonResponse } from './http';
+import { routeMemberRequest } from './members';
+import { routeAdminMemberRequest } from './admin-members';
 
 export interface Env {
   DB: D1Database;
@@ -55,13 +58,6 @@ interface DbEventRow {
   pubkey?: unknown;
   [key: string]: unknown;
 }
-
-// CORS headers for all responses
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
 
 // Calculate distance between two coordinates using Haversine formula (returns km)
 function haversineDistance(
@@ -423,10 +419,30 @@ export function selectKeysToDelete(keys: string[], retain: number): string[] {
   return sorted.slice(0, Math.max(0, sorted.length - retain));
 }
 
-export function makeBackupPayload(events: any[], date: Date): string {
+/**
+ * Tables copied into the daily R2 backup, in payload order. The member tables
+ * hold private data (names, followed bands, suggestions); the bucket is private.
+ * The blocklist is included so a restore does not unblock banned keys.
+ */
+export const BACKUP_TABLES = [
+  'events',
+  'members',
+  'member_bands',
+  'band_suggestions',
+  'blocklist',
+] as const;
+
+export type BackupTables = Partial<
+  Record<(typeof BACKUP_TABLES)[number], any[]>
+>;
+
+/** `{ timestamp, tables }` with every BACKUP_TABLES entry (missing ones as []). */
+export function makeBackupPayload(tables: BackupTables, date: Date): string {
+  const out: Record<string, any[]> = {};
+  for (const t of BACKUP_TABLES) out[t] = tables[t] || [];
   return JSON.stringify({
     timestamp: date.toISOString(),
-    tables: { events },
+    tables: out,
   });
 }
 
@@ -450,9 +466,12 @@ export default {
       const now = new Date();
       const key = makeBackupKey(now);
 
-      const result = await env.DB.prepare('SELECT * FROM events').all();
-      const events = result.results || [];
-      const payload = makeBackupPayload(events, now);
+      const tables: BackupTables = {};
+      for (const t of BACKUP_TABLES) {
+        const result = await env.DB.prepare(`SELECT * FROM ${t}`).all();
+        tables[t] = result.results || [];
+      }
+      const payload = makeBackupPayload(tables, now);
 
       await env.BACKUP_BUCKET.put(key, payload, {
         httpMetadata: { contentType: 'application/json' },
@@ -556,6 +575,20 @@ export default {
                 signature: 'Signature of event ID (hex)',
               },
             },
+            'GET /member/me': {
+              description:
+                'The calling member: name, followed bands, own suggestions (signed with X-Pubkey/X-Signature/X-Timestamp)',
+            },
+            'POST|DELETE /member/bands/:act_url_b64': {
+              description: 'Follow or unfollow a band (signed)',
+            },
+            'POST /member/suggestions': {
+              description: 'Suggest a band to the admin (signed)',
+              body: {
+                name: 'Band name (required)',
+                url: 'Band site (optional)',
+              },
+            },
           },
         });
       }
@@ -608,6 +641,12 @@ export default {
         const targetPubkey = path.split('/')[3];
         return await handleDeleteBlocklist(request, env, targetPubkey);
       }
+
+      // Routes: /member/* and the admin member/suggestion endpoints
+      const memberResponse =
+        (await routeMemberRequest(request, env, path)) ??
+        (await routeAdminMemberRequest(request, env, path));
+      if (memberResponse) return memberResponse;
 
       return jsonResponse({ error: 'Not found' }, 404);
     } catch (error) {
@@ -1425,14 +1464,4 @@ async function generateEventId(eventData: any): Promise<string> {
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   return hashHex;
-}
-
-function jsonResponse(data: any, status: number = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-      ...CORS_HEADERS,
-    },
-  });
 }
