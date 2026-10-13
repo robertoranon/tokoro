@@ -623,7 +623,6 @@
     <script src="./members-admin.js"></script>
     <script type="module">
       import * as ed from 'https://esm.sh/@noble/ed25519@2';
-      import QRCode from 'https://esm.sh/qrcode@1.5.4';
 
       // SHA-512 shim required for noble/ed25519 in browser
       ed.etc.sha512Async = async (...msgs) => {
@@ -1307,6 +1306,9 @@
             document.getElementById('m-link').value = link;
             document.getElementById('m-link-box').hidden = false;
             try {
+              // Loaded lazily: a CDN failure only loses the QR code.
+              const { default: QRCode } =
+                await import('https://esm.sh/qrcode@1.5.4');
               document.getElementById('m-qr').src = await QRCode.toDataURL(
                 link,
                 { margin: 1, width: 220 }
@@ -1373,6 +1375,21 @@
           say('s-status', e.message, 'error');
         }
       }
+      // The worker accepts at most 200 ids per request: send them in chunks.
+      const MAX_IDS_PER_REQUEST = 200;
+      async function inChunks(ids, send) {
+        let failures = 0;
+        let firstError = null;
+        for (let i = 0; i < ids.length; i += MAX_IDS_PER_REQUEST) {
+          try {
+            await send(ids.slice(i, i + MAX_IDS_PER_REQUEST));
+          } catch (e) {
+            failures++;
+            if (!firstError) firstError = e;
+          }
+        }
+        return { failures, firstError };
+      }
       function selectedGroups() {
         return [...document.querySelectorAll('#s-body input:checked')].map(
           cb => suggestionGroups[Number(cb.dataset.index)]
@@ -1404,17 +1421,12 @@
             return say('s-status', 'Select at least one band.', 'error');
           const reason = prompt('Reason (optional, shown to the members):', '');
           if (reason === null) return;
-          let failed = false;
-          try {
-            await adminApi().rejectSuggestions(
-              picked.flatMap(g => g.ids),
-              reason
-            );
-          } catch (e) {
-            failed = true;
-            say('s-status', e.message, 'error');
-          }
-          refreshSuggestions(failed);
+          const { failures, firstError } = await inChunks(
+            picked.flatMap(g => g.ids),
+            ids => adminApi().rejectSuggestions(ids, reason)
+          );
+          if (failures) say('s-status', firstError.message, 'error');
+          refreshSuggestions(failures > 0);
         });
       document
         .getElementById('s-link-btn')
@@ -1424,17 +1436,12 @@
             return say('s-status', 'Select at least one band.', 'error');
           const url = prompt('Site URL of the existing tracked band:', '');
           if (!url) return;
-          let failed = false;
-          try {
-            await adminApi().linkSuggestions(
-              picked.flatMap(g => g.ids),
-              url
-            );
-          } catch (e) {
-            failed = true;
-            say('s-status', e.message, 'error');
-          }
-          refreshSuggestions(failed);
+          const { failures, firstError } = await inChunks(
+            picked.flatMap(g => g.ids),
+            ids => adminApi().linkSuggestions(ids, url)
+          );
+          if (failures) say('s-status', firstError.message, 'error');
+          refreshSuggestions(failures > 0);
         });
 
       // ── Init ──────────────────────────────────────────────────────────────────
