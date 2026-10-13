@@ -327,6 +327,14 @@
       .copy-toast.show {
         opacity: 1;
       }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        padding: 8px 16px 0;
+      }
+      .tabs [aria-pressed='true'] {
+        font-weight: 700;
+      }
     </style>
   </head>
   <body>
@@ -338,81 +346,208 @@
       </div>
       <button id="gear-btn" title="Settings">&#9881;</button>
     </header>
+    <nav class="tabs" aria-label="Sections">
+      <button class="btn btn-secondary" data-tab="events" aria-pressed="true">
+        Events
+      </button>
+      <button class="btn btn-secondary" data-tab="members" aria-pressed="false">
+        Members
+      </button>
+      <button
+        class="btn btn-secondary"
+        data-tab="suggestions"
+        aria-pressed="false"
+      >
+        Suggestions
+      </button>
+    </nav>
 
     <!-- Main -->
     <main>
-      <!-- Query form -->
-      <div class="card">
-        <h2>Search Events</h2>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="f-id">Event ID</label>
-            <input type="text" id="f-id" placeholder="full ID or its start" />
+      <div id="tab-events">
+        <!-- Query form -->
+        <div class="card">
+          <h2>Search Events</h2>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="f-id">Event ID</label>
+              <input type="text" id="f-id" placeholder="full ID or its start" />
+            </div>
+            <div class="form-group">
+              <label for="f-title">Title</label>
+              <input
+                type="text"
+                id="f-title"
+                placeholder="words in the title"
+              />
+            </div>
+            <div class="form-group">
+              <label for="f-pubkey">Pubkey</label>
+              <input
+                type="text"
+                id="f-pubkey"
+                placeholder="author public key hex"
+              />
+            </div>
+            <div class="form-group">
+              <label for="f-from">From</label>
+              <input type="datetime-local" id="f-from" />
+            </div>
+            <div class="form-group">
+              <label for="f-to">To</label>
+              <input type="datetime-local" id="f-to" />
+            </div>
+            <div class="form-group">
+              <label for="f-category">Category</label>
+              <input
+                type="text"
+                id="f-category"
+                placeholder="music, food, sports…"
+              />
+            </div>
+            <div style="display: flex; align-items: flex-end">
+              <button class="btn btn-primary" id="search-btn">Search</button>
+            </div>
           </div>
-          <div class="form-group">
-            <label for="f-title">Title</label>
-            <input type="text" id="f-title" placeholder="words in the title" />
+          <div id="status"></div>
+        </div>
+
+        <!-- Results -->
+        <div class="card">
+          <div class="table-wrap">
+            <table id="results-table">
+              <thead>
+                <tr>
+                  <th>Pubkey</th>
+                  <th>Title</th>
+                  <th>Start time</th>
+                  <th>Category</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="results-body">
+                <tr>
+                  <td colspan="5" class="empty-state">
+                    Run a search to see events.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <div class="form-group">
-            <label for="f-pubkey">Pubkey</label>
-            <input
-              type="text"
-              id="f-pubkey"
-              placeholder="author public key hex"
-            />
-          </div>
-          <div class="form-group">
-            <label for="f-from">From</label>
-            <input type="datetime-local" id="f-from" />
-          </div>
-          <div class="form-group">
-            <label for="f-to">To</label>
-            <input type="datetime-local" id="f-to" />
-          </div>
-          <div class="form-group">
-            <label for="f-category">Category</label>
-            <input
-              type="text"
-              id="f-category"
-              placeholder="music, food, sports…"
-            />
-          </div>
-          <div style="display: flex; align-items: flex-end">
-            <button class="btn btn-primary" id="search-btn">Search</button>
+          <div
+            id="load-more-wrap"
+            style="display: none; text-align: center; padding: 16px"
+          >
+            <button class="btn btn-secondary" id="load-more-btn">
+              Load more
+            </button>
           </div>
         </div>
-        <div id="status"></div>
       </div>
 
-      <!-- Results -->
-      <div class="card">
-        <div class="table-wrap">
-          <table id="results-table">
-            <thead>
-              <tr>
-                <th>Pubkey</th>
-                <th>Title</th>
-                <th>Start time</th>
-                <th>Category</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="results-body">
-              <tr>
-                <td colspan="5" class="empty-state">
-                  Run a search to see events.
-                </td>
-              </tr>
-            </tbody>
-          </table>
+      <div id="tab-members" hidden>
+        <div class="card">
+          <h2>Members</h2>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="m-name">Name</label>
+              <input
+                type="text"
+                id="m-name"
+                maxlength="60"
+                placeholder="e.g. Anna"
+              />
+            </div>
+            <div style="display: flex; align-items: flex-end">
+              <button class="btn btn-primary" id="m-create-btn">
+                Create personal link
+              </button>
+            </div>
+          </div>
+          <div id="m-status"></div>
+          <div id="m-link-box" hidden>
+            <p>
+              <strong
+                >Send this link to the member now. It cannot be shown
+                again.</strong
+              >
+            </p>
+            <input type="text" id="m-link" readonly style="width: 100%" />
+            <p>
+              <button class="btn btn-secondary" id="m-copy-btn">
+                Copy link
+              </button>
+            </p>
+            <img
+              id="m-qr"
+              alt="QR code of the personal link"
+              width="220"
+              height="220"
+            />
+          </div>
         </div>
-        <div
-          id="load-more-wrap"
-          style="display: none; text-align: center; padding: 16px"
-        >
-          <button class="btn btn-secondary" id="load-more-btn">
-            Load more
-          </button>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Since</th>
+                  <th>Bands followed</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="m-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-suggestions" hidden>
+        <div class="card">
+          <h2>Suggested bands</h2>
+          <p>
+            Most requested first. Select bands, then copy the list for
+            bands-scout, reject, or link to an existing band.
+          </p>
+          <div>
+            <button class="btn btn-secondary" id="s-copy-btn">
+              Copy list for bands-scout
+            </button>
+            <button class="btn btn-secondary" id="s-reject-btn">
+              Reject selected
+            </button>
+            <button class="btn btn-secondary" id="s-link-btn">
+              Link selected to an existing band
+            </button>
+            <button
+              class="btn btn-secondary"
+              id="s-who-btn"
+              aria-pressed="false"
+            >
+              Show who asked
+            </button>
+          </div>
+          <div id="s-status"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>Band</th>
+                  <th>Site</th>
+                  <th>Members</th>
+                  <th>Asked by</th>
+                </tr>
+              </thead>
+              <tbody id="s-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Most followed bands</h2>
+          <ul id="s-followers"></ul>
         </div>
       </div>
     </main>
@@ -434,6 +569,17 @@
             placeholder="https://your-worker.workers.dev"
           />
           <p class="modal-note">Base URL of the Tokoro Cloudflare Worker.</p>
+        </div>
+        <div class="form-group">
+          <label for="s-public-url">Public site URL</label>
+          <input
+            type="url"
+            id="s-public-url"
+            placeholder="https://your-site.pages.dev"
+          />
+          <p class="modal-note">
+            Where tours.html is hosted. Used to build members' personal links.
+          </p>
         </div>
         <div class="form-group">
           <label for="s-privkey">Admin Private Key (hex)</label>
@@ -470,8 +616,10 @@
 
     <!-- Local config: copy config.local.js.example to config.local.js at project root -->
     <script src="../config.local.js"></script>
+    <script src="./members-admin.js"></script>
     <script type="module">
       import * as ed from 'https://esm.sh/@noble/ed25519@2';
+      import QRCode from 'https://esm.sh/qrcode@1.5.4';
 
       // SHA-512 shim required for noble/ed25519 in browser
       ed.etc.sha512Async = async (...msgs) => {
@@ -527,16 +675,24 @@
             '',
           privKey: localStorage.getItem('tokoro_admin_priv_key') || '',
           pubKey: localStorage.getItem('tokoro_admin_pub_key') || '',
+          publicUrl:
+            localStorage.getItem('tokoro_admin_public_url') ||
+            window.TOKORO_CONFIG?.publicWebUrl ||
+            '',
         };
       }
 
-      function saveSettings(workerUrl, privKey, pubKey) {
+      function saveSettings(workerUrl, privKey, pubKey, publicUrl = '') {
         localStorage.setItem(
           'tokoro_admin_worker_url',
           workerUrl.replace(/\/$/, '')
         );
         localStorage.setItem('tokoro_admin_priv_key', privKey);
         localStorage.setItem('tokoro_admin_pub_key', pubKey);
+        localStorage.setItem(
+          'tokoro_admin_public_url',
+          publicUrl.replace(/\/$/, '')
+        );
       }
 
       // ── Signing ───────────────────────────────────────────────────────────────
@@ -590,6 +746,7 @@
       function openSettings() {
         const s = loadSettings();
         document.getElementById('s-worker-url').value = s.workerUrl;
+        document.getElementById('s-public-url').value = s.publicUrl;
         document.getElementById('s-privkey').value = s.privKey;
         document.getElementById('s-pubkey').value = s.pubKey;
         document.getElementById('s-pubkey-display').textContent = s.pubKey
@@ -651,7 +808,12 @@
               return;
             }
           }
-          saveSettings(workerUrl, privKey, pubKey);
+          saveSettings(
+            workerUrl,
+            privKey,
+            pubKey,
+            document.getElementById('s-public-url').value.trim()
+          );
           updateHeaderUrl();
           closeSettings();
         });
@@ -1014,6 +1176,257 @@
           delBtn.textContent = 'Delete';
         }
       }
+
+      // ── Members & suggestions ─────────────────────────────────────────────
+      const AM = window.TokoroAdminMembers;
+
+      function adminApi() {
+        const s = loadSettings();
+        if (!s.workerUrl || !s.privKey) {
+          throw new Error(
+            'Set the Worker URL and the admin private key in Settings first.'
+          );
+        }
+        return AM.createAdminApi({
+          ed,
+          fetchFn: window.fetch.bind(window),
+          workerUrl: s.workerUrl,
+          privKeyHex: s.privKey,
+        });
+      }
+      function cell(text) {
+        const td = document.createElement('td');
+        td.textContent = text;
+        return td;
+      }
+      function button(label, onClick) {
+        const b = document.createElement('button');
+        b.className = 'btn btn-secondary';
+        b.textContent = label;
+        b.addEventListener('click', onClick);
+        return b;
+      }
+      function say(id, msg, type = '') {
+        const e = document.getElementById(id);
+        e.textContent = msg;
+        e.className = type;
+      }
+
+      function showTab(name) {
+        for (const t of ['events', 'members', 'suggestions']) {
+          document.getElementById('tab-' + t).hidden = t !== name;
+        }
+        document
+          .querySelectorAll('[data-tab]')
+          .forEach(b =>
+            b.setAttribute('aria-pressed', String(b.dataset.tab === name))
+          );
+        if (name === 'members') refreshMembers();
+        if (name === 'suggestions') refreshSuggestions();
+      }
+      document
+        .querySelectorAll('[data-tab]')
+        .forEach(b =>
+          b.addEventListener('click', () => showTab(b.dataset.tab))
+        );
+
+      async function refreshMembers() {
+        try {
+          const rows = await adminApi().listMembers();
+          const body = document.getElementById('m-body');
+          body.replaceChildren();
+          for (const m of rows) {
+            const tr = document.createElement('tr');
+            tr.append(
+              cell(m.name),
+              cell(m.created_at.slice(0, 10)),
+              cell(String(m.band_count)),
+              cell(m.revoked_at ? 'Revoked' : 'Active')
+            );
+            const actions = document.createElement('td');
+            if (!m.revoked_at) {
+              actions.append(
+                button('Revoke', async () => {
+                  if (
+                    !confirm('Revoke ' + m.name + '? Their link stops working.')
+                  )
+                    return;
+                  try {
+                    await adminApi().revokeMember(m.pubkey);
+                  } catch (e) {
+                    say('m-status', e.message, 'error');
+                  }
+                  refreshMembers();
+                })
+              );
+            }
+            actions.append(
+              button('Delete', async () => {
+                if (
+                  !confirm(
+                    'Delete ' + m.name + ' and their list and suggestions?'
+                  )
+                )
+                  return;
+                try {
+                  await adminApi().deleteMember(m.pubkey);
+                } catch (e) {
+                  say('m-status', e.message, 'error');
+                }
+                refreshMembers();
+              })
+            );
+            tr.append(actions);
+            body.append(tr);
+          }
+        } catch (e) {
+          say('m-status', e.message, 'error');
+        }
+      }
+
+      document
+        .getElementById('m-create-btn')
+        .addEventListener('click', async () => {
+          const name = document.getElementById('m-name').value.trim();
+          if (!name) return say('m-status', 'Enter a name.', 'error');
+          const s = loadSettings();
+          if (!s.publicUrl) {
+            return say(
+              'm-status',
+              'Set the Public site URL in Settings first (where tours.html is hosted).',
+              'error'
+            );
+          }
+          try {
+            const { seed } = await adminApi().createMember(name);
+            const link = AM.buildMemberLink(s.publicUrl, seed);
+            document.getElementById('m-link').value = link;
+            document.getElementById('m-link-box').hidden = false;
+            try {
+              document.getElementById('m-qr').src = await QRCode.toDataURL(
+                link,
+                { margin: 1, width: 220 }
+              );
+            } catch (e) {
+              document.getElementById('m-qr').removeAttribute('src'); // offline: the link still works
+            }
+            document.getElementById('m-name').value = '';
+            say('m-status', 'Created ' + name + '.', 'success');
+            refreshMembers();
+          } catch (e) {
+            say('m-status', e.message, 'error');
+          }
+        });
+      document
+        .getElementById('m-copy-btn')
+        .addEventListener('click', async () => {
+          await navigator.clipboard.writeText(
+            document.getElementById('m-link').value
+          );
+          showToast('Link copied');
+        });
+
+      let suggestionGroups = [];
+      async function refreshSuggestions() {
+        try {
+          const api = adminApi();
+          const detail =
+            document
+              .getElementById('s-who-btn')
+              .getAttribute('aria-pressed') === 'true';
+          suggestionGroups = await api.listSuggestions({ detail });
+          const body = document.getElementById('s-body');
+          body.replaceChildren();
+          suggestionGroups.forEach((g, i) => {
+            const tr = document.createElement('tr');
+            const pick = document.createElement('td');
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.dataset.index = String(i);
+            pick.append(cb);
+            tr.append(
+              pick,
+              cell(g.name_variants.join(' / ')),
+              cell(g.urls.join(', ')),
+              cell(String(g.members)),
+              cell(detail ? (g.member_names || []).join(', ') : '')
+            );
+            body.append(tr);
+          });
+          const list = document.getElementById('s-followers');
+          list.replaceChildren();
+          for (const f of await api.followers()) {
+            const li = document.createElement('li');
+            li.textContent = f.act_url + ' — ' + f.followers;
+            list.append(li);
+          }
+          say(
+            's-status',
+            suggestionGroups.length ? '' : 'No pending suggestions.'
+          );
+        } catch (e) {
+          say('s-status', e.message, 'error');
+        }
+      }
+      function selectedGroups() {
+        return [...document.querySelectorAll('#s-body input:checked')].map(
+          cb => suggestionGroups[Number(cb.dataset.index)]
+        );
+      }
+      document.getElementById('s-who-btn').addEventListener('click', e => {
+        const on = e.target.getAttribute('aria-pressed') !== 'true';
+        e.target.setAttribute('aria-pressed', String(on));
+        refreshSuggestions();
+      });
+      document
+        .getElementById('s-copy-btn')
+        .addEventListener('click', async () => {
+          const picked = selectedGroups();
+          if (!picked.length)
+            return say('s-status', 'Select at least one band.', 'error');
+          await navigator.clipboard.writeText(AM.bandsTxt(picked));
+          say(
+            's-status',
+            'Copied. Save it as bands.txt and run: npm run bands-scout -- bands.txt',
+            'success'
+          );
+        });
+      document
+        .getElementById('s-reject-btn')
+        .addEventListener('click', async () => {
+          const picked = selectedGroups();
+          if (!picked.length)
+            return say('s-status', 'Select at least one band.', 'error');
+          const reason = prompt('Reason (optional, shown to the members):', '');
+          if (reason === null) return;
+          try {
+            await adminApi().rejectSuggestions(
+              picked.flatMap(g => g.ids),
+              reason
+            );
+          } catch (e) {
+            say('s-status', e.message, 'error');
+          }
+          refreshSuggestions();
+        });
+      document
+        .getElementById('s-link-btn')
+        .addEventListener('click', async () => {
+          const picked = selectedGroups();
+          if (!picked.length)
+            return say('s-status', 'Select at least one band.', 'error');
+          const url = prompt('Site URL of the existing tracked band:', '');
+          if (!url) return;
+          try {
+            await adminApi().linkSuggestions(
+              picked.flatMap(g => g.ids),
+              url
+            );
+          } catch (e) {
+            say('s-status', e.message, 'error');
+          }
+          refreshSuggestions();
+        });
 
       // ── Init ──────────────────────────────────────────────────────────────────
 
