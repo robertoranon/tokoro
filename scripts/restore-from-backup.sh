@@ -2,12 +2,14 @@
 set -euo pipefail
 
 # Usage: ./scripts/restore-from-backup.sh <backup-file.json>
-# Restores events from a JSON backup file (produced by the Worker R2 backup)
-# into the D1 database using wrangler d1 execute.
+# Restores events and the member tables (members, member_bands,
+# band_suggestions) from a JSON backup file (produced by the Worker R2 backup)
+# into the D1 database using wrangler d1 execute. Older backups that contain
+# only events restore just the events.
 #
-# WARNING: This inserts rows — it does NOT clear the table first.
+# WARNING: This inserts rows — it does NOT clear the tables first.
 # Run manually: wrangler d1 execute tokoro-db --command "DELETE FROM events"
-# before restoring if you want a clean slate.
+# (and likewise for the member tables) before restoring if you want a clean slate.
 
 if [ $# -lt 1 ]; then
 	echo "Usage: $0 <backup-file.json>"
@@ -24,24 +26,30 @@ fi
 
 echo "Generating INSERT statements from $BACKUP_FILE ..."
 
-# Extract events array and generate INSERT SQL using node
+# Extract the table arrays and generate INSERT SQL using node
 SQL_FILE=$(mktemp /tmp/tokoro-restore-XXXXXX.sql)
 
 node - "$BACKUP_FILE" "$SQL_FILE" <<'EOF'
 const fs = require('fs');
 const [,, inputFile, outputFile] = process.argv;
 const { tables } = JSON.parse(fs.readFileSync(inputFile, 'utf8'));
-const events = tables.events || [];
+const TABLES = ['events', 'members', 'member_bands', 'band_suggestions'];
 
-const stmts = events.map(e => {
-  const fields = Object.keys(e);
-  const values = fields.map(f => {
-    const v = e[f];
-    if (v === null || v === undefined) return 'NULL';
-    return "'" + String(v).replace(/'/g, "''") + "'";
-  });
-  return `INSERT OR IGNORE INTO events (${fields.join(', ')}) VALUES (${values.join(', ')});`;
-});
+const stmts = [];
+for (const table of TABLES) {
+  for (const e of tables[table] || []) {
+    const fields = Object.keys(e);
+    const values = fields.map(f => {
+      const v = e[f];
+      if (v === null || v === undefined) return 'NULL';
+      if (typeof v === 'number') return String(v);
+      return "'" + String(v).replace(/'/g, "''") + "'";
+    });
+    stmts.push(
+      `INSERT OR IGNORE INTO ${table} (${fields.join(', ')}) VALUES (${values.join(', ')});`
+    );
+  }
+}
 
 fs.writeFileSync(outputFile, stmts.join('\n') + '\n');
 console.log(`Generated ${stmts.length} INSERT statements.`);

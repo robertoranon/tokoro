@@ -17,7 +17,20 @@ import {
   validatePutRequest,
   validateAdoptBody,
   decideAdopt,
+  BACKUP_TABLES,
 } from './index';
+import worker from './index';
+import { makeD1 } from '../test-support/d1';
+
+const ALL_MIGRATIONS = [
+  '0001_create_events_table.sql',
+  '0002_add_address_field.sql',
+  '0003_convert_timestamps_to_text.sql',
+  '0004_add_festival_fields.sql',
+  '0005_add_blocklist.sql',
+  '0006_add_act_fields.sql',
+  '0007_add_members.sql',
+];
 import { verifyActSignature, actMessage } from './crypto';
 import { isDuplicate } from '../../shared/llm/duplicate-check';
 import { encode as geohashEncode, neighbors } from './geohash';
@@ -286,11 +299,92 @@ describe('makeBackupPayload', () => {
   it('serializes events to JSON string with timestamp', () => {
     const events = [{ id: 'abc', title: 'Test' }];
     const date = new Date('2026-03-26T02:00:00Z');
-    const payload = makeBackupPayload(events, date);
+    const payload = makeBackupPayload({ events }, date);
     const parsed = JSON.parse(payload);
     expect(parsed.timestamp).toBe('2026-03-26T02:00:00.000Z');
     expect(parsed.tables.events).toHaveLength(1);
     expect(parsed.tables.events[0].id).toBe('abc');
+  });
+
+  it('includes the member tables next to events, empty when missing', () => {
+    const date = new Date('2026-03-26T02:00:00Z');
+    const parsed = JSON.parse(
+      makeBackupPayload(
+        {
+          events: [{ id: 'abc' }],
+          members: [{ pubkey: 'p', name: 'Ann' }],
+          member_bands: [{ pubkey: 'p', act_url: 'https://a.example' }],
+        },
+        date
+      )
+    );
+    expect(Object.keys(parsed.tables)).toEqual([...BACKUP_TABLES]);
+    expect(parsed.tables.members[0].name).toBe('Ann');
+    expect(parsed.tables.member_bands).toHaveLength(1);
+    expect(parsed.tables.band_suggestions).toEqual([]);
+  });
+});
+
+describe('scheduled backup', () => {
+  function fakeBucket() {
+    const objects = new Map<string, string>();
+    return {
+      objects,
+      async put(key: string, value: string) {
+        objects.set(key, value);
+      },
+      async list() {
+        return {
+          objects: [...objects.entries()].map(([key, v]) => ({
+            key,
+            size: v.length,
+          })),
+        };
+      },
+      async delete(key: string) {
+        objects.delete(key);
+      },
+    };
+  }
+
+  it('writes events and the member tables to one object per day', async () => {
+    const DB = makeD1(ALL_MIGRATIONS);
+    await DB.prepare(
+      'INSERT INTO members (pubkey, name, created_at) VALUES (?, ?, ?)'
+    )
+      .bind('p1', 'Ann', '2026-10-01T00:00:00')
+      .run();
+    await DB.prepare(
+      'INSERT INTO member_bands (pubkey, act_url, created_at) VALUES (?, ?, ?)'
+    )
+      .bind('p1', 'https://band.example', '2026-10-01T00:00:00')
+      .run();
+    await DB.prepare(
+      `INSERT INTO band_suggestions (pubkey, name, status, created_at) VALUES (?, ?, 'pending', ?)`
+    )
+      .bind('p1', 'Some Band', '2026-10-01T00:00:00')
+      .run();
+    const bucket = fakeBucket();
+    await worker.scheduled(
+      {} as any,
+      {
+        DB,
+        BACKUP_BUCKET: bucket,
+      } as any
+    );
+    expect([...bucket.objects.keys()]).toEqual([makeBackupKey(new Date())]);
+    const parsed = JSON.parse([...bucket.objects.values()][0]);
+    expect(parsed.tables.events).toEqual([]);
+    expect(parsed.tables.members).toEqual([
+      {
+        pubkey: 'p1',
+        name: 'Ann',
+        created_at: '2026-10-01T00:00:00',
+        revoked_at: null,
+      },
+    ]);
+    expect(parsed.tables.member_bands[0].act_url).toBe('https://band.example');
+    expect(parsed.tables.band_suggestions[0].name).toBe('Some Band');
   });
 });
 

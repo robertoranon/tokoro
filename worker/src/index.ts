@@ -419,10 +419,28 @@ export function selectKeysToDelete(keys: string[], retain: number): string[] {
   return sorted.slice(0, Math.max(0, sorted.length - retain));
 }
 
-export function makeBackupPayload(events: any[], date: Date): string {
+/**
+ * Tables copied into the daily R2 backup, in payload order. The member tables
+ * hold private data (names, followed bands, suggestions); the bucket is private.
+ */
+export const BACKUP_TABLES = [
+  'events',
+  'members',
+  'member_bands',
+  'band_suggestions',
+] as const;
+
+export type BackupTables = Partial<
+  Record<(typeof BACKUP_TABLES)[number], any[]>
+>;
+
+/** `{ timestamp, tables }` with every BACKUP_TABLES entry (missing ones as []). */
+export function makeBackupPayload(tables: BackupTables, date: Date): string {
+  const out: Record<string, any[]> = {};
+  for (const t of BACKUP_TABLES) out[t] = tables[t] || [];
   return JSON.stringify({
     timestamp: date.toISOString(),
-    tables: { events },
+    tables: out,
   });
 }
 
@@ -446,9 +464,12 @@ export default {
       const now = new Date();
       const key = makeBackupKey(now);
 
-      const result = await env.DB.prepare('SELECT * FROM events').all();
-      const events = result.results || [];
-      const payload = makeBackupPayload(events, now);
+      const tables: BackupTables = {};
+      for (const t of BACKUP_TABLES) {
+        const result = await env.DB.prepare(`SELECT * FROM ${t}`).all();
+        tables[t] = result.results || [];
+      }
+      const payload = makeBackupPayload(tables, now);
 
       await env.BACKUP_BUCKET.put(key, payload, {
         httpMetadata: { contentType: 'application/json' },

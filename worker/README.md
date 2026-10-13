@@ -454,7 +454,7 @@ wrangler d1 migrations apply tokoro-db --remote
 
 ## Database Backup
 
-The worker automatically backs up the `events` table to Cloudflare R2 daily at 2am UTC. The member tables are not part of this backup; `scripts/backup-local.sh` (a full `wrangler d1 export`) includes them. The 7 most recent backups are kept; older ones are deleted. If total storage exceeds 10 GB, the oldest backup is removed until under the limit. If the R2 bucket is not configured, the backup is silently skipped.
+The worker automatically backs up the `events` table and the member tables (`members`, `member_bands`, `band_suggestions`) to Cloudflare R2 daily at 2am UTC, as one JSON object per day (`{ timestamp, tables: { events, members, member_bands, band_suggestions } }`). The member tables are private (member names, followed bands, suggestions): keep the bucket private, as for the events. No private key is ever backed up (the server only has public keys). `scripts/backup-local.sh` (a full `wrangler d1 export`) also covers every table. The 7 most recent backups are kept; older ones are deleted. If total storage exceeds 10 GB, the oldest backup is removed until under the limit. If the R2 bucket is not configured, the backup is silently skipped.
 
 ### Setup (first time)
 
@@ -487,17 +487,17 @@ Download a backup file from R2:
 wrangler r2 object get tokoro-backups/backups/backup-2026-03-26.json --file backup.json
 ```
 
-Then restore it:
+Then restore it (events and member tables; older backups with only events restore just the events):
 
 ```bash
 # From project root
 ./scripts/restore-from-backup.sh backup.json
 ```
 
-> **Warning:** The restore script uses `INSERT OR IGNORE` — it adds rows but does not clear the table first. To do a clean restore, run this first:
+> **Warning:** The restore script uses `INSERT OR IGNORE` — it adds rows but does not clear the tables first. To do a clean restore, run this first:
 >
 > ```bash
-> wrangler d1 execute tokoro-db --command "DELETE FROM events" --remote
+> wrangler d1 execute tokoro-db --command "DELETE FROM events; DELETE FROM members; DELETE FROM member_bands; DELETE FROM band_suggestions" --remote
 > ```
 
 ### List backups in R2

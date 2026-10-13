@@ -1286,14 +1286,14 @@ The 2-day grace period ensures events that have just ended remain visible briefl
 
 **Schedule:** Daily at 02:00 UTC
 
-**Purpose:** Snapshot the full `events` table to Cloudflare R2 for disaster recovery.
+**Purpose:** Snapshot the `events` table and the member tables (`members`, `member_bands`, `band_suggestions`) to Cloudflare R2 for disaster recovery. The member tables hold private data (member names, followed bands, suggestions); they go into the same bucket as the events, which MUST NOT be publicly readable. No private key is ever stored: the server only knows public keys.
 
 **Binding requirement:** An R2 bucket must be bound as `BACKUP_BUCKET` in `wrangler.toml`. If the binding is absent at runtime, the backup step is silently skipped (no error is thrown).
 
 **Algorithm:**
 
-1. Query all rows from the `events` table.
-2. Serialise the result as a JSON object `{ timestamp, tables: { events } }` and write it to R2 under the key `backups/backup-YYYY-MM-DD.json`, where the date is the current UTC date.
+1. Query all rows from each of the tables `events`, `members`, `member_bands` and `band_suggestions`.
+2. Serialise the result as a JSON object `{ timestamp, tables: { events, members, member_bands, band_suggestions } }` (each value is the array of rows of that table, `[]` when empty) and write it to R2 under the key `backups/backup-YYYY-MM-DD.json`, where the date is the current UTC date. All four tables share one object per day, so the retention below applies to them together. Backups written before the member tables existed contain only `tables.events`; consumers MUST treat a missing table as empty.
 3. List all objects under the `backups/` prefix in the bucket.
 4. Sort the listed keys in ascending chronological order (oldest first).
 5. Delete the oldest keys beyond the 7 most recent (time-based retention).
