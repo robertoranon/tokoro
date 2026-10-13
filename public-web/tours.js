@@ -452,6 +452,7 @@ const api = {
   tourWindow,
   buildToursUrl,
   loadTourEvents,
+  normalizeText,
   filterShows,
   groupByBand,
   fmtShowDate,

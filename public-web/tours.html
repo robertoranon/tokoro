@@ -315,6 +315,31 @@
         padding: 4px 0;
         font-size: 14px;
       }
+      /* Members only: room on the right of each row for a smaller, fixed
+         follow button (same idea as on the cards: nothing moves on a tap). */
+      .has-follow > .tracked-band {
+        position: relative;
+        min-height: 32px;
+        padding: 6px 40px 6px 0;
+      }
+      .has-follow > .tracked-band .follow-btn {
+        top: 0;
+        right: 0;
+        width: 32px;
+        height: 32px;
+      }
+      .quiet-bands {
+        margin-top: 18px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding-top: 12px;
+      }
+      .quiet-bands__title {
+        padding: 0 16px 8px;
+        font-size: 15px;
+        font-weight: 700;
+      }
       .tracked-band__count {
         margin-left: 8px;
         font-size: 12px;
@@ -761,11 +786,11 @@
           return html + '>' + FOLLOW_ICON + '</button>';
         }
 
-        // Update every follow button in place (no list rebuild, so nothing
-        // on the page moves).
+        // Update every follow button (cards, tracked pane, quiet bands) in
+        // place: no list rebuild, so nothing on the page moves.
         function syncFollowButtons() {
           if (!member.ok) return;
-          for (const btn of el('bandList').querySelectorAll('[data-follow]')) {
+          for (const btn of document.querySelectorAll('[data-follow]')) {
             const attrs = followBtnAttrs(btn.getAttribute('data-follow'));
             for (const [name, value] of Object.entries(attrs)) {
               if (value === null) btn.removeAttribute(name);
@@ -821,27 +846,79 @@
           );
         }
 
+        // A band row (tracked pane, quiet bands): the name linked to the
+        // band's site, then `extra`, then the member's follow button.
+        function bandRowHtml(name, rawUrl, extra) {
+          const url = safeUrl(rawUrl);
+          return (
+            '<li class="tracked-band">' +
+            (url
+              ? '<a href="' +
+                escHtml(url) +
+                '" target="_blank" rel="noopener noreferrer">' +
+                escHtml(name) +
+                ' ↗</a>'
+              : escHtml(name)) +
+            (extra || '') +
+            (url ? followBtnHtml(rawUrl) : '') +
+            '</li>'
+          );
+        }
+
+        // My bands only: followed bands with no upcoming show at all (not
+        // just filtered out). The keyword applies to their names; "New only"
+        // hides them (they have no new show); dates and area do not apply.
+        function quietBands() {
+          if (!member.ok || !member.mine || state.newOnly) return [];
+          const q = T.normalizeText(state.keyword).trim();
+          return M.quietFollowed(
+            member.followed,
+            state.tracked ? state.tracked.bands : [],
+            state.all
+          ).filter(b => !q || T.normalizeText(b.name).includes(q));
+        }
+
+        function quietHtml(quiet) {
+          if (!quiet.length) return '';
+          return (
+            '<section class="quiet-bands" id="quietBands" aria-labelledby="quietTitle">' +
+            '<h2 class="quiet-bands__title" id="quietTitle">Following · no upcoming shows</h2>' +
+            '<ul class="tracked-list has-follow">' +
+            quiet.map(b => bandRowHtml(b.name, b.url, '')).join('') +
+            '</ul></section>'
+          );
+        }
+
         function render() {
           if (!state.ready) return;
           const list = visibleShows();
           const bands = T.groupByBand(list, Date.now());
           const totalBands = T.groupByBand(state.all).length;
+          const quiet = quietBands();
 
           el('bandList').classList.toggle('has-follow', member.ok);
+          let cards;
           if (!state.all.length) {
-            el('bandList').innerHTML =
-              '<p class="empty-state">No upcoming shows yet.</p>';
-          } else if (!bands.length) {
-            el('bandList').innerHTML =
-              member.ok && member.mine && member.followed.size === 0
-                ? '<p class="empty-state">You are not following any band yet. Switch to All bands and tap ♡ on a band.</p>'
-                : '<p class="empty-state">No shows match your filters.</p>';
-          } else {
-            el('bandList').innerHTML =
+            cards = '<p class="empty-state">No upcoming shows yet.</p>';
+          } else if (bands.length) {
+            cards =
               '<div class="band-list">' +
               bands.map(bandHtml).join('') +
               '</div>';
+          } else if (member.ok && member.mine && member.followed.size === 0) {
+            cards =
+              '<p class="empty-state">You are not following any band yet. Switch to All bands and tap ♡ on a band.</p>';
+          } else if (
+            member.ok &&
+            member.mine &&
+            quiet.length &&
+            !state.all.some(s => M.isFollowed(member.followed, s.bandUrl))
+          ) {
+            cards = ''; // only bands without shows are followed: just their list
+          } else {
+            cards = '<p class="empty-state">No shows match your filters.</p>';
           }
+          el('bandList').innerHTML = cards + quietHtml(quiet);
 
           setStatus(
             state.all.length
@@ -850,10 +927,14 @@
                   totalBands +
                   ' bands · ' +
                   list.length +
-                  (list.length === 1 ? ' show' : ' shows')
+                  (list.length === 1 ? ' show' : ' shows') +
+                  (quiet.length
+                    ? ' · ' + quiet.length + ' following without shows'
+                    : '')
               : ''
           );
           renderPins(bands);
+          syncFollowButtons(); // the tracked pane's hearts
         }
 
         // ── Map (optional: the list works without Leaflet) ─────────────
@@ -1091,27 +1172,22 @@
           pane.hidden = false;
           el('trackedSummary').textContent =
             'Tracked bands (' + rows.length + ')';
+          // Members get a heart on every row (bands without shows included).
+          el('trackedList').classList.toggle('has-follow', member.ok);
           el('trackedList').innerHTML = rows
             .map(r => {
-              const url = safeUrl(r.url);
               const count = state.ready
                 ? r.upcoming
                   ? r.upcoming +
                     (r.upcoming === 1 ? ' upcoming show' : ' upcoming shows')
                   : 'no upcoming shows'
                 : '';
-              return (
-                '<li class="tracked-band">' +
-                (url
-                  ? '<a href="' +
-                    escHtml(url) +
-                    '" target="_blank" rel="noopener noreferrer">' +
-                    escHtml(r.name) +
-                    ' ↗</a>'
-                  : escHtml(r.name)) +
+              return bandRowHtml(
+                r.name,
+                r.url,
                 '<span class="tracked-band__count">' +
-                escHtml(count) +
-                '</span></li>'
+                  escHtml(count) +
+                  '</span>'
               );
             })
             .join('');
@@ -1324,7 +1400,8 @@
           refreshFollowView();
         }
         // All bands: a follow toggle only changes the buttons, so update them
-        // in place. My bands: the card appears or disappears, so re-render,
+        // in place. My bands: a card or a "no upcoming shows" row appears or
+        // disappears, so re-render (render() also syncs the tracked pane),
         // but keep the reader where they were.
         function refreshFollowView() {
           if (!member.mine) {
@@ -1335,13 +1412,15 @@
           render();
           window.scrollTo(0, y);
         }
-        el('bandList').addEventListener('click', e => {
+        function onFollowClick(e) {
           const btn = e.target.closest('[data-follow]');
           if (!btn) return;
-          e.preventDefault(); // the button sits inside <summary>
+          e.preventDefault(); // on cards the button sits inside <summary>
           e.stopPropagation();
           toggleFollow(btn.getAttribute('data-follow'));
-        });
+        }
+        el('bandList').addEventListener('click', onFollowClick);
+        el('trackedList').addEventListener('click', onFollowClick);
 
         el('suggestForm').addEventListener('submit', async e => {
           e.preventDefault();
@@ -1467,6 +1546,7 @@
           el('suggestPane').hidden = false;
           syncViewButtons();
           renderSuggestions(currentViews());
+          if (trackedDone) renderTracked(); // add the hearts (else load() will)
           render();
           await syncMember();
         }

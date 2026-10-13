@@ -804,7 +804,7 @@ try {
       'member: seed stored for next visits',
       (await page.evaluate(() => localStorage.getItem('tokoro_member'))) === seed
     );
-    check('member: follow buttons shown', (await page.locator('.follow-btn').count()) === 2);
+    check('member: follow buttons shown', (await page.locator('#bandList .follow-btn').count()) === 2);
     check('member: Alpha is followed', (await page.locator('.band-card', { hasText: 'Alpha' }).locator('.follow-btn').getAttribute('aria-pressed')) === 'true');
 
     await page.click('#myBandsBtn');
@@ -825,7 +825,7 @@ try {
 
     state.memberRequests.length = 0;
     await page.locator('.band-card', { hasText: 'Beta' }).locator('.follow-btn').click();
-    await page.waitForFunction(() => document.querySelectorAll('.follow-btn[aria-pressed="true"]').length === 2);
+    await page.waitForFunction(() => document.querySelectorAll('#bandList .follow-btn[aria-pressed="true"]').length === 2);
     check('member: following sends a follow request', state.memberRequests.some(r => r.startsWith('POST /member/bands/')), state.memberRequests);
 
     await page.click('#myBandsBtn');
@@ -851,7 +851,7 @@ try {
     state.memberRequests.length = 0;
     const alphaOpenBefore = await isOpen(page, 'Alpha');
     const busy = await page.evaluate(() => {
-      const sel = '[data-follow="https://alpha.example"]';
+      const sel = '#bandList [data-follow="https://alpha.example"]';
       document.querySelector(sel).click();
       // The second click reaches the handler (aria-disabled, not disabled) and is ignored there.
       document.querySelector(sel).click();
@@ -865,7 +865,7 @@ try {
     );
     // A real pointer click on the in-flight heart neither sends nor toggles the card.
     // force: skip Playwright's wait for the button to become enabled.
-    await page.locator('[data-follow="https://alpha.example"]').click({ force: true });
+    await page.locator('#bandList [data-follow="https://alpha.example"]').click({ force: true });
     check(
       'member: clicking an in-flight heart does not open or close the card',
       (await isOpen(page, 'Alpha')) === alphaOpenBefore,
@@ -874,11 +874,11 @@ try {
     await new Promise(r => setTimeout(r, 1200));
     check(
       'member: the heart is enabled again once the request is done',
-      (await page.getAttribute('[data-follow="https://alpha.example"]', 'aria-disabled')) === null
+      (await page.getAttribute('#bandList [data-follow="https://alpha.example"]', 'aria-disabled')) === null
     );
     state.bandDelayMs = 0;
     const alphaReqs = state.memberRequests.filter(r => r.includes(Buffer.from('https://alpha.example').toString('base64url')));
-    const alphaPressed = await page.getAttribute('[data-follow="https://alpha.example"]', 'aria-pressed');
+    const alphaPressed = await page.getAttribute('#bandList [data-follow="https://alpha.example"]', 'aria-pressed');
     check('member: rapid double click sends one request', alphaReqs.length === 1, state.memberRequests);
     check(
       'member: after rapid clicks the button matches the server',
@@ -894,7 +894,7 @@ try {
         page.evaluate(() => ({
           y: window.scrollY,
           tops: [...document.querySelectorAll('.band-card__summary')].map(s => s.getBoundingClientRect().top),
-          btn: document.querySelector('[data-follow="https://beta.example"]').getBoundingClientRect().toJSON(),
+          btn: document.querySelector('#bandList [data-follow="https://beta.example"]').getBoundingClientRect().toJSON(),
         }));
       const same = (a, b) =>
         Math.abs(a.y - b.y) <= 0.5 &&
@@ -902,39 +902,39 @@ try {
         a.tops.every((t, i) => Math.abs(t - b.tops[i]) <= 0.5) &&
         ['top', 'left', 'width', 'height'].every(k => Math.abs(a.btn[k] - b.btn[k]) <= 0.5);
       await page.evaluate(() => {
-        const s = document.querySelector('[data-follow="https://beta.example"]').closest('summary');
+        const s = document.querySelector('#bandList [data-follow="https://beta.example"]').closest('summary');
         window.scrollTo(0, s.getBoundingClientRect().top + window.scrollY - 150);
       });
       const before = await layout();
       check('layout: the page is scrolled for the follow-shift check', before.y > 0, before);
-      const pressedBefore = await page.getAttribute('[data-follow="https://beta.example"]', 'aria-pressed');
+      const pressedBefore = await page.getAttribute('#bandList [data-follow="https://beta.example"]', 'aria-pressed');
       await page.evaluate(() => {
-        window.__betaBtn = document.querySelector('[data-follow="https://beta.example"]');
+        window.__betaBtn = document.querySelector('#bandList [data-follow="https://beta.example"]');
       });
       state.bandDelayMs = 400;
-      await page.locator('[data-follow="https://beta.example"]').click();
-      await page.waitForSelector('[data-follow="https://beta.example"][aria-disabled="true"]');
+      await page.locator('#bandList [data-follow="https://beta.example"]').click();
+      await page.waitForSelector('#bandList [data-follow="https://beta.example"][aria-disabled="true"]');
       const during = await layout();
       check('layout: an in-flight heart tap moves nothing', same(before, during), [before, during]);
-      await page.waitForSelector('[data-follow="https://beta.example"]:not([aria-disabled])');
+      await page.waitForSelector('#bandList [data-follow="https://beta.example"]:not([aria-disabled])');
       state.bandDelayMs = 0;
       const after = await layout();
       check('layout: a heart tap moves nothing once done', same(before, after), [before, after]);
       check(
         'layout: the heart toggled in place (same button, pressed state flipped)',
-        (await page.evaluate(() => window.__betaBtn === document.querySelector('[data-follow="https://beta.example"]'))) &&
-          (await page.getAttribute('[data-follow="https://beta.example"]', 'aria-pressed')) !== pressedBefore
+        (await page.evaluate(() => window.__betaBtn === document.querySelector('#bandList [data-follow="https://beta.example"]'))) &&
+          (await page.getAttribute('#bandList [data-follow="https://beta.example"]', 'aria-pressed')) !== pressedBefore
       );
       // Toggle back so Beta is followed again.
-      await page.locator('[data-follow="https://beta.example"]').click();
+      await page.locator('#bandList [data-follow="https://beta.example"]').click();
       await page.waitForFunction(
-        p => document.querySelector('[data-follow="https://beta.example"]:not([aria-disabled])')?.getAttribute('aria-pressed') === p,
+        p => document.querySelector('#bandList [data-follow="https://beta.example"]:not([aria-disabled])')?.getAttribute('aria-pressed') === p,
         pressedBefore
       );
 
       // My bands: unfollowing removes only that card and keeps the scroll position.
       await page.click('#myBandsBtn');
-      await page.waitForSelector('[data-follow="https://beta.example"]');
+      await page.waitForSelector('#bandList [data-follow="https://beta.example"]');
       // A spacer keeps the page tall enough that the old position stays reachable.
       await page.evaluate(() => {
         const spacer = document.createElement('div');
@@ -943,10 +943,10 @@ try {
         document.body.appendChild(spacer);
       });
       // Playwright scrolls a target into view before clicking: do it first, then measure.
-      await page.locator('[data-follow="https://beta.example"]').scrollIntoViewIfNeeded();
+      await page.locator('#bandList [data-follow="https://beta.example"]').scrollIntoViewIfNeeded();
       const mineBefore = await page.evaluate(() => ({ y: window.scrollY, names: [...document.querySelectorAll('.band-card__name')].map(e => e.textContent.replace(/[▾▴]/g, '').trim()) }));
-      await page.locator('[data-follow="https://beta.example"]').click();
-      await page.waitForSelector('[data-follow="https://beta.example"]', { state: 'detached' });
+      await page.locator('#bandList [data-follow="https://beta.example"]').click();
+      await page.waitForSelector('#bandList [data-follow="https://beta.example"]', { state: 'detached' });
       const mineAfter = await page.evaluate(() => ({ y: window.scrollY, names: [...document.querySelectorAll('.band-card__name')].map(e => e.textContent.replace(/[▾▴]/g, '').trim()) }));
       check(
         'layout: unfollowing in My bands removes only that card',
@@ -974,7 +974,7 @@ try {
     await page.click('#suggestForm button[type=submit]');
     try {
       await page.waitForFunction(
-        () => document.querySelector('[data-follow="https://alpha.example"]')?.getAttribute('aria-pressed') === 'true',
+        () => document.querySelector('#bandList [data-follow="https://alpha.example"]')?.getAttribute('aria-pressed') === 'true',
         null,
         { timeout: 5000 }
       );
@@ -982,7 +982,7 @@ try {
     check('member: a new suggestion matching a tracked band sends a follow', state.memberRequests.includes(alphaFollow), state.memberRequests);
     check(
       'member: ...and its heart shows pressed',
-      (await page.getAttribute('[data-follow="https://alpha.example"]', 'aria-pressed')) === 'true'
+      (await page.getAttribute('#bandList [data-follow="https://alpha.example"]', 'aria-pressed')) === 'true'
     );
     check('member: no page errors', errors.length === 0, errors);
     await context.close();
@@ -1202,6 +1202,211 @@ try {
       } catch {}
       check('offline first open: the link seed is stored, visitor view', stored === seed && (await net.page.isHidden('#memberBar')), stored);
       await net.context.close();
+    }
+
+    // ── Following any tracked band, and bands without upcoming shows ─────────
+    {
+      const b64 = u => Buffer.from(u).toString('base64url');
+      const DELTA = 'https://deltaquiet.example';
+      state.tracked = JSON.stringify({
+        generated: '2030-01-01',
+        bands: [
+          { name: 'Alpha', url: 'https://alpha.example' },
+          { name: 'Beta', url: 'https://beta.example' },
+          { name: 'Gamma Ray', url: 'https://gammaray.example' },
+          { name: 'Delta Quiet', url: DELTA },
+        ],
+      });
+      state.memberMe = {
+        name: 'Anna',
+        bands: ['https://alpha.example', 'https://www.unknown-band.example/'],
+        suggestions: [],
+      };
+      state.bandDelayMs = 0;
+
+      // A visitor's tracked pane has no hearts and loads nothing member-related.
+      state.memberRequests.length = 0;
+      state.staticRequests.length = 0;
+      const vis = await newPage(browser);
+      await vis.page.goto(base + '/tours.html');
+      await vis.page.waitForSelector('.band-card');
+      await vis.page.click('#trackedSummary');
+      await vis.page.waitForLoadState('networkidle');
+      check(
+        'tracked follow: a visitor sees no hearts in the tracked pane and loads nothing member-related',
+        (await vis.page.locator('#trackedList li').count()) === 4 &&
+          (await vis.page.locator('.follow-btn').count()) === 0 &&
+          !(await vis.page.evaluate(() => document.getElementById('trackedList').classList.contains('has-follow'))) &&
+          state.memberRequests.length === 0 &&
+          !state.staticRequests.includes('/member.js') &&
+          vis.errors.length === 0,
+        [state.memberRequests, state.staticRequests, vis.errors]
+      );
+      await vis.context.close();
+
+      state.memberRequests.length = 0;
+      const { page, context, errors } = await newPage(browser);
+      await page.goto(base + '/tours.html#k=' + seed);
+      await page.waitForSelector('#memberBar:not([hidden])');
+      await page.waitForSelector('#trackedList .follow-btn', { state: 'attached' });
+      await page.click('#trackedSummary');
+      const rowHearts = await page.$$eval('#trackedList li', lis =>
+        lis.map(li => {
+          const b = li.querySelector('.follow-btn');
+          return b && [b.getAttribute('data-follow'), b.getAttribute('aria-pressed')];
+        })
+      );
+      check(
+        'tracked follow: every tracked row has a heart for a member',
+        JSON.stringify(rowHearts) ===
+          JSON.stringify([
+            ['https://alpha.example', 'true'],
+            ['https://beta.example', 'false'],
+            [DELTA, 'false'],
+            ['https://gammaray.example', 'false'],
+          ]),
+        rowHearts
+      );
+
+      // Following a band without shows from the pane flips the heart in place and moves nothing.
+      await page.setViewportSize({ width: 390, height: 420 });
+      const sel = `#trackedList [data-follow="${DELTA}"]`;
+      const layout = () =>
+        page.evaluate(
+          s => ({
+            y: window.scrollY,
+            tops: [...document.querySelectorAll('#trackedList li')].map(li => li.getBoundingClientRect().top),
+            btn: document.querySelector(s).getBoundingClientRect().toJSON(),
+          }),
+          sel
+        );
+      const same = (a, b) =>
+        Math.abs(a.y - b.y) <= 0.5 &&
+        a.tops.length === b.tops.length &&
+        a.tops.every((t, i) => Math.abs(t - b.tops[i]) <= 0.5) &&
+        ['top', 'left', 'width', 'height'].every(k => Math.abs(a.btn[k] - b.btn[k]) <= 0.5);
+      await page.evaluate(s => {
+        const li = document.querySelector(s).closest('li');
+        window.scrollTo(0, li.getBoundingClientRect().top + window.scrollY - 150);
+        window.__deltaBtn = document.querySelector(s);
+      }, sel);
+      const before = await layout();
+      check('tracked follow: the page is scrolled for the shift check', before.y > 0, before);
+      state.memberRequests.length = 0;
+      state.bandDelayMs = 400;
+      await page.locator(sel).click();
+      await page.waitForSelector(sel + '[aria-disabled="true"]');
+      const during = await layout();
+      await page.waitForSelector(sel + ':not([aria-disabled])');
+      state.bandDelayMs = 0;
+      const after = await layout();
+      check(
+        'tracked follow: following a band without shows sends a follow request',
+        state.memberRequests.includes('POST /member/bands/' + b64(DELTA)),
+        state.memberRequests
+      );
+      check(
+        'tracked follow: the heart flips in place (same button, pressed)',
+        (await page.evaluate(s => window.__deltaBtn === document.querySelector(s), sel)) &&
+          (await page.getAttribute(sel, 'aria-pressed')) === 'true'
+      );
+      check('tracked follow: an in-flight tap moves nothing', same(before, during), [before, during]);
+      check('tracked follow: a finished tap moves nothing', same(before, after), [before, after]);
+      await page.setViewportSize({ width: 1280, height: 720 });
+
+      // My bands lists followed bands without shows below the cards.
+      const quietRows = () =>
+        page.$$eval('#quietBands li', lis =>
+          lis.map(li => {
+            const a = li.querySelector('a');
+            return {
+              name: a.textContent.replace(/↗/, '').trim(),
+              href: a.getAttribute('href'),
+              target: a.getAttribute('target'),
+              rel: a.getAttribute('rel'),
+              follow: li.querySelector('.follow-btn')?.getAttribute('aria-pressed'),
+            };
+          })
+        );
+      await page.click('#myBandsBtn');
+      await page.waitForSelector('#quietBands');
+      const quiet = await quietRows();
+      check(
+        'quiet bands: My bands lists followed bands without shows (tracked name, else host), with links and hearts',
+        JSON.stringify(quiet.map(r => [r.name, r.href, r.follow])) ===
+          JSON.stringify([
+            ['Delta Quiet', DELTA, 'true'],
+            ['unknown-band.example', 'https://www.unknown-band.example', 'true'],
+          ]) &&
+          quiet.every(r => r.target === '_blank' && r.rel === 'noopener noreferrer') &&
+          (await page.textContent('#quietBands')).includes('Following · no upcoming shows'),
+        quiet
+      );
+      check(
+        'quiet bands: the cards still list only followed bands with shows',
+        JSON.stringify(await names(page)) === JSON.stringify(['Alpha']),
+        await names(page)
+      );
+      check(
+        'quiet bands: the status line counts them',
+        /1 of 2 bands · 3 shows · 2 following without shows$/.test(await status(page)),
+        await status(page)
+      );
+
+      // The keyword filter applies to their names; "New only" hides them.
+      await page.fill('#keywordFilter', 'DÉLTA');
+      await page.waitForFunction(() => document.querySelectorAll('#quietBands li').length === 1, null, { timeout: 5000 }).catch(() => {});
+      check(
+        'quiet bands: the keyword hides non-matching ones (accents and case ignored)',
+        JSON.stringify((await quietRows()).map(r => r.name)) === JSON.stringify(['Delta Quiet']) &&
+          (await page.textContent('#bandList')).includes('No shows match your filters.') &&
+          /· 1 following without shows$/.test(await status(page)),
+        [await quietRows(), await status(page)]
+      );
+      await page.fill('#keywordFilter', '');
+      await page.waitForFunction(() => document.querySelectorAll('#quietBands li').length === 2, null, { timeout: 5000 }).catch(() => {});
+      await page.click('#newOnlyToggle');
+      check(
+        'quiet bands: hidden while "New only" is on',
+        (await page.locator('#quietBands').count()) === 0 && !/without shows/.test(await status(page)),
+        await status(page)
+      );
+      await page.click('#newOnlyToggle');
+      await page.waitForSelector('#quietBands');
+
+      // Unfollowing from the section removes the row; the pane's heart follows.
+      state.memberRequests.length = 0;
+      await page.locator(`#quietBands [data-follow="${DELTA}"]`).click();
+      await page.waitForFunction(
+        d => !document.querySelector(`#quietBands [data-follow="${d}"]`),
+        DELTA,
+        { timeout: 5000 }
+      ).catch(() => {});
+      check(
+        'quiet bands: unfollowing one removes its row and sends the request',
+        JSON.stringify((await quietRows()).map(r => r.name)) === JSON.stringify(['unknown-band.example']) &&
+          state.memberRequests.includes('DELETE /member/bands/' + b64(DELTA)),
+        [await quietRows(), state.memberRequests]
+      );
+      check(
+        "quiet bands: the tracked pane's heart is updated too",
+        (await page.getAttribute(sel, 'aria-pressed')) === 'false'
+      );
+
+      // Following only bands without shows: the section replaces the empty hint.
+      await page.locator('#bandList [data-follow="https://alpha.example"]').click();
+      await page.waitForFunction(() => !document.querySelector('.band-card'), null, { timeout: 5000 }).catch(() => {});
+      const bodyText = await page.textContent('#bandList');
+      check(
+        'quiet bands: following only bands without shows shows the section, no empty message',
+        (await page.locator('#quietBands li').count()) === 1 &&
+          !bodyText.includes('not following any band') &&
+          !bodyText.includes('No shows match'),
+        bodyText
+      );
+      check('tracked follow / quiet bands: no page errors', errors.length === 0, errors);
+      await context.close();
+      state.tracked = undefined;
     }
   }
 } finally {
