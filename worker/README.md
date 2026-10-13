@@ -55,6 +55,14 @@ wrangler d1 migrations apply tokoro-db
 wrangler d1 migrations apply tokoro-db --remote
 ```
 
+**Member bands (`0007_add_members.sql`):** apply this migration to the remote database **before** deploying a Worker version that includes the member endpoints (`/member/*`, `/admin/members*`, `/admin/suggestions*`, `/admin/band-followers`):
+
+```bash
+wrangler d1 execute tokoro-db --remote --file=migrations/0007_add_members.sql
+```
+
+The new routes are additive; existing clients are unaffected.
+
 ### 4. Deploy
 
 ```bash
@@ -191,6 +199,29 @@ Unblock a public key (admin only). Same signature scheme as POST.
 }
 ```
 
+### Members (tours "My bands")
+
+The admin can issue personal links to a small group of members. A member can follow tracked bands and suggest new ones on `tours.html`; the admin reviews the suggestions. Member keys are never in `ALLOWED_PUBKEYS`, so members cannot publish.
+
+These endpoints are authenticated with headers, not body fields: `X-Pubkey`, `X-Signature`, `X-Timestamp` (Unix seconds). The signature is over `SHA-256("<domain>:<payload>:<timestamp>")`, accepted within ±300 s; a `401` caused by clock skew includes `server_time`. Every action has its own domain (see `SPECS.md` section 3.6).
+
+| Endpoint | Who | Purpose |
+| --- | --- | --- |
+| `GET /member/me` | member | name, followed bands, own suggestions |
+| `POST /member/bands/:act_url_b64` | member | follow a band (base64url site URL) |
+| `DELETE /member/bands/:act_url_b64` | member | unfollow a band |
+| `POST /member/suggestions` | member | suggest a band `{name, url?}` |
+| `GET /admin/members` | admin | list members with followed-band counts |
+| `POST /admin/members` | admin | create a member `{pubkey, name}` |
+| `POST /admin/members/:pubkey/revoke` | admin | revoke a member's link |
+| `DELETE /admin/members/:pubkey` | admin | delete a member, their follows and suggestions |
+| `GET /admin/suggestions?status=&detail=1` | admin | suggestions grouped by normalized name |
+| `POST /admin/suggestions/reject` | admin | reject `{ids, reason?}` |
+| `POST /admin/suggestions/link` | admin | link `{ids, act_url}` to a tracked band and follow it for the suggesters |
+| `GET /admin/band-followers` | admin | follower count per band |
+
+Request and response bodies, status codes and error messages: `SPECS.md` sections 7.11-7.14.
+
 ## Authentication & Security
 
 Events are authenticated using Ed25519 public key cryptography:
@@ -252,16 +283,26 @@ Queries always include the center cell plus its 8 neighbors to avoid missing eve
 ```
 worker/
 ├── src/
-│   ├── index.ts       # Main worker with API routes
-│   ├── crypto.ts      # Ed25519 signature verification
-│   └── geohash.ts     # Geohash encoding and neighbors
+│   ├── index.ts          # Main worker with API routes
+│   ├── crypto.ts         # Ed25519 signature verification
+│   ├── geohash.ts        # Geohash encoding and neighbors
+│   ├── http.ts           # CORS headers and JSON responses
+│   ├── band-keys.ts      # Band URL/name normalization, base64url
+│   ├── member-auth.ts    # Header-signed member/admin requests
+│   ├── members.ts        # /member/* endpoints
+│   ├── admin-members.ts  # Admin member and suggestion endpoints
+│   └── *.test.ts         # vitest suites
+├── test-support/
+│   ├── d1.ts             # In-memory D1 stand-in (node:sqlite) for handler tests
+│   └── sign.ts           # Test keys and auth headers
 ├── migrations/
 │   ├── 0001_create_events_table.sql
 │   ├── 0002_add_address_field.sql
 │   ├── 0003_convert_timestamps_to_text.sql
 │   ├── 0004_add_festival_fields.sql
 │   ├── 0005_add_blocklist.sql
-│   └── 0006_add_act_fields.sql
+│   ├── 0006_add_act_fields.sql
+│   └── 0007_add_members.sql
 ├── scripts/
 │   └── check-duplicate.ts  # Duplicate detection diagnostics
 ├── wrangler.toml      # Cloudflare Workers config
@@ -270,6 +311,14 @@ worker/
 ```
 
 ## Testing
+
+### Unit and integration tests
+
+```bash
+npx vitest run   # or: npm test
+```
+
+The member suites (`band-keys`, `member-auth`, `members`, `admin-members`, `members-routes`, `contract`) run real SQL against an in-memory D1 stand-in (`test-support/d1.ts`, needs a Node version with `node:sqlite`). `contract.test.ts` also loads `public-web/member.js` and `admin/members-admin.js`, so the browser clients are tested against the Worker.
 
 ### Duplicate Detection Diagnostics
 
@@ -360,6 +409,8 @@ CREATE TABLE blocklist (
 );
 ```
 
+The member tables (`members`, `member_bands`, `band_suggestions`) are defined in `migrations/0007_add_members.sql` and documented in `SPECS.md` section 2.1.
+
 ## Troubleshooting
 
 ### "Database not found" error
@@ -403,7 +454,7 @@ wrangler d1 migrations apply tokoro-db --remote
 
 ## Database Backup
 
-The worker automatically backs up the `events` table to Cloudflare R2 daily at 2am UTC. The 7 most recent backups are kept; older ones are deleted. If total storage exceeds 10 GB, the oldest backup is removed until under the limit. If the R2 bucket is not configured, the backup is silently skipped.
+The worker automatically backs up the `events` table to Cloudflare R2 daily at 2am UTC. The member tables are not part of this backup; `scripts/backup-local.sh` (a full `wrangler d1 export`) includes them. The 7 most recent backups are kept; older ones are deleted. If total storage exceeds 10 GB, the oldest backup is removed until under the limit. If the R2 bucket is not configured, the backup is silently skipped.
 
 ### Setup (first time)
 

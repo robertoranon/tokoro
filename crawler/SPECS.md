@@ -577,6 +577,8 @@ A manual helper that turns a plain list of band names into `bands.yaml` entries:
 
 **Command.** `npm run bands-scout -- <file> [--bands <path>] [--dry-run] [--fetcher playwright|jina]` (note the `--`). `<file>` is the band list. `--bands` is the `bands.yaml` to extend (default `bands.yaml`, which must already exist; the error points to `bands.example.yaml`). `--dry-run` computes and reports everything but writes nothing. `--fetcher` selects the page fetcher (default `playwright`; the browser engine comes from `BROWSER_ENGINE`, default `chrome`; `jina` uses `JINA_API_KEY` when set). An unknown flag, an invalid `--fetcher` value, a second positional argument, a missing list file, a missing or invalid `bands.yaml`, or no `<file>` is an error (message, exit 1) before anything is fetched. Environment: the LLM comes from the usual `LLM_PROVIDER`/API key settings (section 11.2); `BRAVE_SEARCH_API_KEY` enables the search step.
 
+**Input from member suggestions.** The admin page's Suggestions tab (`admin/admin.html`, see `worker/SPECS.md` section 7.13) has a "Copy list for bands-scout" button that copies the selected suggested bands in this input format: one line per band, the most common spelling, followed by ` | <site>` when a member gave a website (`|` and line breaks in names are replaced by spaces). Saved as a file, it is a valid `<file>`. The scout itself does not know about members or suggestions.
+
 **Input format.** One band per line. Blank lines and lines starting with `#` are ignored; a leading byte-order mark and CRLF line endings are tolerated. `Name | https://site` supplies the official site and skips the search for that band (the hint must be an `http`/`https` URL). A band repeated in the file (equal under name normalization: lowercase, accents stripped, punctuation to space) is dropped, first one wins. A line with no usable name, or with a hint that is not an `http`/`https` URL, is invalid: it is ignored and listed in the report.
 
 **Already-known bands.** Before any lookup, each name is compared (normalized) with the names and aliases already in `bands.yaml`. A match is reported as already present and is never searched. The LLM, the fetcher and the search client are created only when at least one band is left to look up, so a list of known bands needs no keys and launches no browser.
@@ -622,6 +624,8 @@ Writes the public list of the bands the tours runner follows, for the tours page
 **Output:** `{ "generated": "YYYY-MM-DD", "bands": [{ "name", "url" }] }` (2-space indented, trailing newline). Only active bands (`status` not `paused`) are listed, sorted by name (case- and accent-insensitive). Only name and site url are exported: notes, aliases, region and status are curator data and never leave the file. The output directory is created if missing and the file is written atomically.
 
 **Errors (exit 1):** unknown option, missing `--out`, `--bands` without a path, `bands.yaml` not found, or a `bands.yaml` that fails the normal validation (4.10); nothing is written. On success it prints `Exported N tracked band(s) to <file>`.
+
+**Members.** The tours page also uses this file to decide whether a member's suggestion has been added (matched by site url, else by normalized name; `public-web/SPECS.md` FR-8.9). A band added to `bands.yaml` therefore shows as *Added* to the members who suggested it only after the next deploy regenerates `tracked-bands.json`. Aliases are not exported, so a suggestion that matches only an alias needs the admin's "Link selected to an existing band".
 
 ---
 

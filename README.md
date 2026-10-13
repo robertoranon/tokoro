@@ -58,8 +58,10 @@ Events are queryable through a simple API. Point it at a location, a radius, and
 | [**Bookmarklet**](public-web/)            | Same capability in any browser, no extension install needed                       |
 | [**Telegram Bot**](crawler-worker/)       | Send a URL or image to extract and publish events; query the calendar with `/events in Milan next weekend` |
 | [**Web Publisher**](web-publisher/)       | Static HTML form for manually composing and publishing events                     |
-| [**Public Web**](public-web/)             | Example event browser — query by location, date, category; embeds the bookmarklet |
-| [**Admin Panel**](admin/)                 | Static HTML moderation UI — browse and delete events with admin key auth          |
+| [**Public Web**](public-web/)             | Example event browser — query by location, date, category; embeds the bookmarklet; festival radar and band-tours pages |
+| [**Admin Panel**](admin/)                 | Static HTML moderation UI — browse and delete events with admin key auth; manages tours members and reviews their band suggestions |
+
+**Members and My bands.** The band-tours page (`tours.html`) is public. In addition, the admin can give a small group of people a personal link (created in the Admin Panel's Members tab). Opening it once lets that person follow bands (♡), switch the page to "My bands", and suggest new bands. The admin reviews suggestions in the Suggestions tab and adds the good ones with `bands-scout` (see [HOW-TO-USE](HOW-TO-USE.md#10-members-and-my-bands-tours-page)). Members cannot publish events.
 
 ---
 
@@ -72,6 +74,7 @@ Events are queryable through a simple API. Point it at a location, a radius, and
 - [Node.js Crawler ReadMe](crawler/README.md)
 - [Chrome Extension ReadMe](chrome-extension/README.md)
 - [Public Web ReadMe](public-web/README.md)
+- [Admin Panel ReadMe](admin/README.md)
 
 ---
 

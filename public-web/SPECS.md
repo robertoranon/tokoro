@@ -268,7 +268,7 @@ A read-only browse page for the festivals on the radar (entries published by the
 
 ## FR-8: Band Tours (`tours.html`)
 
-A read-only, band-first browse page for the shows published by the crawler's `npm run tours`. It is independent of the other pages: logo-only nav, no links to or from them, its own ticker and the teal page colour.
+A band-first browse page for the shows published by the crawler's `npm run tours`. It is read-only for visitors; members (FR-8.9) can follow bands and suggest new ones. It is independent of the other pages: logo-only nav, no links to or from them, its own ticker and the teal page colour.
 
 **FR-8.1: Data**
 
@@ -319,7 +319,8 @@ A read-only, band-first browse page for the shows published by the crawler's `np
 
 - MUST escape all API text with `escHtml` and link only through `safeUrl`; MUST use functional CSS class names (`.band-card`, `.band-show`, `.result-actions`)
 - MUST be listed in `inject-worker-url.js` (`ALL_FILES`); `tests/inject.test.mjs` enforces this
-- Logic lives in `tours.js` (pure, unit-tested in `tests/tours.test.mjs`); `tests/tours.smoke.mjs` runs the page offline in headless Chromium against a fake API (set `TOURS_SMOKE_MAP=1` to add the Leaflet checks, which need internet for the Leaflet CDN)
+- Logic lives in `tours.js` (pure, unit-tested in `tests/tours.test.mjs`) and, for members, `member.js` (unit-tested in `tests/member.test.mjs`); `tests/tours.smoke.mjs` runs the page offline in headless Chromium against a fake API, including the visitor regression checks and the member scenarios of FR-8.9 (set `TOURS_SMOKE_MAP=1` to add the Leaflet checks, which need internet for the Leaflet CDN)
+- `member.js` is a classic script loaded after `tours.js` and ships with the page (the deploy step uploads the whole directory)
 
 **FR-8.8: Tracked bands**
 
@@ -331,7 +332,32 @@ A read-only, band-first browse page for the shows published by the crawler's `np
 - MUST degrade gracefully: if the file is missing or invalid the pane lists the bands that have shows, and it is hidden when there are none; if the shows fail to load it still lists the tracked bands, without counts
 - MUST show a "List updated YYYY-MM-DD" note when the file carries a `generated` date
 
-**Known limitations:** the tracked list changes only when the pages are redeployed (the file is generated at deploy time); which band cards are open is not part of a saved link; the no-geo path returns 100 shows per page, so a very large data set takes several requests; one band per `act_url`; the page does not paginate the rendered list.
+**FR-8.9: Members (follow bands, "My bands", suggestions)**
+
+Members are people the admin has given a **personal link** (created on the admin page's Members tab). Worker side: `worker/SPECS.md` sections 3.6 and 7.11. Member-facing text never says "key", "signature" or "pubkey".
+
+- **Visitors are unaffected:** without a stored member seed or a link in the address, the page MUST show no member UI (no member bar, no suggest pane, no ♡ buttons) and MUST make no `/member/*` request. If `localStorage` is unavailable (e.g. private mode) or `member.js` failed to load, the page stays in the visitor view.
+- **Personal link:** `tours.html#k=<seed>`, where `seed` is the base64url encoding (no padding) of a 32-byte Ed25519 private-key seed. On load, if the fragment has the shape `k=<base64url>`, the page MUST remove it at once with `history.replaceState` (path and query kept), so it does not stay in the address bar or the history. A fragment of the right shape but not 32 bytes shows "This link does not look right. Ask for a new one."
+- **Activation:** the seed (from the link, else the one stored under `localStorage` key `tokoro_member`) is imported with WebCrypto Ed25519 and the page calls `GET /member/me`. The seed from a link is stored under `tokoro_member` **only after** the server accepts it (it replaces any previously stored seed). On `401`/`403` the stored seed is cleared and the page shows "This personal link is no longer active. Ask for a new one." and stays in the visitor view. A network failure leaves the visitor view and stored data as they are. A seed that cannot be imported shows "This link does not look right. Ask for a new one." (a stored one is cleared).
+- **Member bar:** once accepted, a bar under the filters greets the member ("Hi, <name>") and offers an **All bands / My bands** switch (`aria-pressed`). The choice is remembered under `tokoro_member_view` (`mine` / `all`). "My bands" keeps only the bands whose site url (normalized) the member follows; it combines with every other filter and is not part of a saved link. With "My bands" on and no followed band, the empty state reads "You are not following any band yet. Switch to All bands and tap ♡ on a band." A followed band with no visible shows does not appear (cards come from shows).
+- **Follow buttons:** each band card's summary shows ♡ (not followed) or ♥ (followed), `aria-pressed`, labelled "Follow this band" / "Stop following this band". A tap does not open or close the card. The change is shown at once (optimistic) and sent as follow/unfollow; on failure it is reverted and the page shows "Could not save that change. Please try again."
+- **Suggest a band:** a collapsed `<details>` pane "Suggest a band" with a name field (required, max 120 characters) and an optional website field. While sending it shows "Sending…"; on success "Thanks! We will take a look." (the fields are cleared and the list re-fetched); on `400` "That does not look right. Check the name and the website."; on any other failure "Could not send that. Please try again." Sending the same name again while it is still pending does not create a second suggestion (the worker returns the existing one).
+- **Suggestion list:** under the form, every suggestion of the member (newest first), rendered as text, with its status: *Waiting*, *Added*, or *Not added* (followed by " — <reason>" when the admin gave one).
+- **"Added" is derived:** `linked` suggestions are *Added*; `rejected` are *Not added*; a `pending` suggestion is *Added* when it matches a band in `tracked-bands.json`: by normalized site url when the suggestion has a url and it matches, otherwise by normalized name (case, accents and punctuation ignored); else *Waiting*.
+- **Automatic follow, once per device:** after both the member data and the tracked bands have loaded, every pending suggestion that matches a tracked band is followed automatically, unless its id is already in the `localStorage` list `tokoro_member_autofollowed` (a JSON array of suggestion ids). The id is added once the band is followed (or already was), so a band the member later unfollows is not followed again on this device. A failed follow is retried on the next visit. `linked` suggestions are followed by the worker at link time and never by the page.
+
+**`member.js` (no DOM; `window.TokoroMember` in the browser, `require()` in Node):**
+
+- `normalizeActUrl(raw)`, `normalizeName(raw)` — MUST behave exactly like `worker/src/band-keys.ts` (`worker/src/contract.test.ts` runs both on the same inputs)
+- `b64urlEncode(bytes)`, `b64urlDecode(s)` (returns `null` for malformed input)
+- `readLinkSeed(hash)` → `{status: 'none' | 'invalid' | 'found', seed?}`
+- `importMember(seedB64)` → `{pubkey, privateKey}` (WebCrypto Ed25519); throws when the seed is not 32 bytes
+- `loadStoredSeed(storage)`, `saveSeed(storage, seed)`, `clearSeed(storage)` (key `tokoro_member`); `loadAutoFollowed(storage)` → `Set` of ids, `saveAutoFollowed(storage, set)` (key `tokoro_member_autofollowed`); `MEMBER_VIEW_KEY` (`tokoro_member_view`). Storage errors are swallowed
+- `describeSuggestions(suggestions, trackedBands)` → `[{id, name, state: 'waiting' | 'added' | 'rejected', reason, autoFollowUrl}]` (`autoFollowUrl` is the matching tracked band's url, only for matched pending suggestions)
+- `followedSet(bands)` → `Set` of normalized urls; `isFollowed(set, bandUrl)`
+- `createMemberApi(fetchFn, apiBase, member, clock?)` → `{me(), follow(url), unfollow(url), suggest(name, url?)}`. Each call signs the request with the `X-Pubkey` / `X-Signature` / `X-Timestamp` headers and the domain of `worker/SPECS.md` section 3.6, and resolves to `{ok, status, data}`. A `401` whose body carries a numeric `server_time` (the device clock is off) is retried once with the clock corrected by the difference; other failures are returned as they are. `follow`/`unfollow` with a url that is not http(s) resolve to `{ok: false, status: 400, data: null}` without a request. `clock` (Unix seconds) is injectable for tests
+
+**Known limitations:** the tracked list changes only when the pages are redeployed (the file is generated at deploy time), so a suggestion shows as *Added* only after the next deploy regenerates `tracked-bands.json`; aliases (a band tracked under another name and site) are not matched automatically and need the admin's "Link selected to an existing band"; automatic following happens once per device (remembered in that device's `localStorage`), so on a new device a matched suggestion may be followed again; a lost personal link cannot be recovered (the server never holds the private key; the admin creates a new member and deletes the old one, and the old list is lost); anyone holding the link can act as the member; member features need a browser with WebCrypto Ed25519 (elsewhere the link is reported as not looking right); which band cards are open is not part of a saved link; the no-geo path returns 100 shows per page, so a very large data set takes several requests; one band per `act_url`; the page does not paginate the rendered list.
 
 ---
 

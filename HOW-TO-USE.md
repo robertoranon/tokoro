@@ -128,6 +128,12 @@ To also apply locally (for development):
 wrangler d1 migrations apply tokoro-db --config worker/wrangler.toml
 ```
 
+**Upgrading an existing installation:** before deploying a Worker version that includes the member features (section 10), add the member tables to the remote database:
+
+```bash
+wrangler d1 execute tokoro-db --remote --file=worker/migrations/0007_add_members.sql --config worker/wrangler.toml
+```
+
 ### 2.4 Create the R2 bucket (for backups)
 
 The Worker uses an R2 bucket to store periodic backups. Create it before deploying:
@@ -282,7 +288,7 @@ Always include the crawler CLI's `CRAWLER_PUBKEY` in `ALLOWED_PUBKEYS` if you us
 
 ### Admin key (moderation)
 
-The admin key authorises blocklist operations via `admin/admin.html`. It is a separate Ed25519 keypair whose public key is set as a Worker secret.
+The admin key authorises moderation in `admin/admin.html` (deleting events, managing members and their band suggestions) and the blocklist API endpoints. It is a separate Ed25519 keypair whose public key is set as a Worker secret.
 
 **Generate the keypair:**
 
@@ -302,6 +308,9 @@ Open `admin/admin.html` in a browser. The Worker URL is pre-filled from `config.
 - **Worker URL**: your deployed API Worker URL (pre-filled from `config.local.js`)
 - **Admin Private Key**: the private key from the keypair above
 - **Admin Public Key**: the same public key you set as `ADMIN_PUBKEY`
+- **Public site URL** (only needed for members, see section 10): the address where your public web is hosted, e.g. `https://tokoro-query.pages.dev`. It can be pre-filled from `publicWebUrl` in `config.local.js`
+
+The admin page has three tabs: **Events** (search and delete events), **Members** and **Suggestions** (section 10).
 
 The private key is stored in the browser's localStorage and used locally to sign moderation requests — it is never sent to the server.
 
@@ -522,6 +531,71 @@ npm run crawl -- --date 2026-03-02 https://venue.com/events
 ```
 
 See [`crawler/README.md`](crawler/README.md) for the full options reference.
+
+---
+
+## 10. Members and My bands (tours page)
+
+The band-tours page (`tours.html`) is public. On top of that, you can give a few people a **personal link**. Someone who has opened their link (a **member**) can:
+
+- follow bands with the ♡ button (♥ means "following"),
+- switch the page between **All bands** and **My bands**,
+- suggest new bands for you to add.
+
+Members cannot publish or change events. You manage everything from the admin page (`admin/admin.html`).
+
+### Before you start (once)
+
+1. Make sure the Worker has the member tables (see "Upgrading an existing installation" in section 2.3) and is deployed.
+2. In the admin page, open **Settings** and fill in **Public site URL**: the address where your tours page lives, for example `https://tokoro-query.pages.dev`. Personal links are built from it.
+
+### Add a member
+
+1. Open the **Members** tab.
+2. Type the person's name (up to 60 characters) and press **Create personal link**.
+3. A link and a QR code appear. Press **Copy link** and send it to the person, or let them scan the QR code with their phone.
+4. **Send it now: the link cannot be shown again.** Tip: keep a copy in your password manager, in case the member loses it.
+
+Treat the link like a house key: anyone who has it can use it as that member (follow bands and make suggestions in their name).
+
+### What the member does
+
+- **Open the link once on each device** (phone, laptop). The page says "Hi, <name>", and from then on that device remembers them: next time they just open the tours page normally. The link disappears from the address bar as soon as the page opens.
+- **Follow bands:** tap ♡ on a band. **My bands** shows only the bands they follow; **All bands** shows everything. The page remembers the choice.
+- **Suggest a band:** open **Suggest a band**, type the name and, if they know it, the band's website, then press **Suggest**. Under the form they see their suggestions with a status:
+  - **Waiting** — you have not decided yet;
+  - **Added** — the band is now on the tours page (and it is followed for them automatically);
+  - **Not added** — you rejected it (with your reason, if you gave one).
+
+If the page says "This personal link is no longer active", the member was revoked or deleted.
+
+### Review suggestions
+
+Open the **Suggestions** tab. It lists the waiting suggestions grouped by band (spellings that differ only in capitals, accents or punctuation are grouped), most requested first. **Show who asked** adds the members' names. Below, **Most followed bands** shows how many members follow each band.
+
+Tick one or more bands, then:
+
+- **Add them to the tours page:**
+  1. Press **Copy list for bands-scout**.
+  2. Paste the list into a text file in the `crawler` folder, for example `bands.txt`.
+  3. In the `crawler` folder run `npm run bands-scout -- bands.txt --dry-run` to preview, then `npm run bands-scout -- bands.txt` to add the bands to `crawler/bands.yaml` (details in [`crawler/README.md`](crawler/README.md)).
+  4. Check the new entries in `bands.yaml`. If your tours run on GitHub Actions, copy the updated `bands.yaml` to the private data repo too.
+  5. Redeploy the public web (`./scripts/deploy-public-web.sh`). This refreshes the list of tracked bands; only then do members see **Added**, and the band is followed for them.
+
+  The suggestions stay in the Suggestions tab until you link or reject them. Once the band is on the tours page you can clear them with **Link selected to an existing band** (below).
+- **Reject selected:** type an optional reason (members see it) and confirm.
+- **Link selected to an existing band:** use this when the band is already tracked under another name or website (the page cannot match it on its own), or to clear suggestions you have already added. Paste the band's website as written in `bands.yaml` (its `url`). The members who suggested it follow the band right away and see **Added**.
+
+### Revoke or delete a member
+
+In the **Members** tab:
+
+- **Revoke** stops the link from working. The member's list and suggestions are kept, but nobody can use them. There is no "undo": to let the person back in, create a new member.
+- **Delete** removes the member together with their list and their suggestions.
+
+### A member lost their link
+
+A lost link cannot be recovered or shown again (the server never stores it). Create a new member for the same person, send the new link, and delete the old member. Their old list is lost, so they need to follow their bands again. A device on which they already opened the old link keeps working until you delete or revoke the old member.
 
 ---
 

@@ -9,7 +9,7 @@ Tokoro is a project that helps in discovering physical, real-world events based 
 1. **Chrome Extension** - Allows a user to request crawling a web page or one of its images to discover and publish events to the API
 2. **Cloudflare Worker (TypeScript)** - Serverless API backend handling events, social graph, and recommendations
 3. **Web Publisher (Static HTML/JS)** - Browser-based event publishing interface hosted on Cloudflare Pages
-4. **Public Web (Static HTML/JS)** - Read-only event query/browse interface hosted on Cloudflare Pages. Includes bookmarklet code that performs web page crawling as the Chrome extension. Also includes `festivals.html`, the festival radar browse page (map + month timeline). Also includes `tours.html`, the band-tours browse page (shows grouped by band).
+4. **Public Web (Static HTML/JS)** - Read-only event query/browse interface hosted on Cloudflare Pages. Includes bookmarklet code that performs web page crawling as the Chrome extension. Also includes `festivals.html`, the festival radar browse page (map + month timeline). Also includes `tours.html`, the band-tours browse page (shows grouped by band); members who open an admin-issued personal link can follow bands (♡), filter to "My bands" and suggest bands (`member.js`).
 5. **Crawler and Crawler-Worker (TypeScript)** - LLM-powered semantic crawler for extracting structured event data from web pages and its combination with the worker (for easier integration into free Cloudflare services). Also includes the band-tours runner (`npm run tours`), which watches band sites and venue listings for new shows.
 6. **Shared** - Common utilities and TypeScript types shared across components
 
@@ -55,9 +55,20 @@ API Endpoints:
 - `GET /feed?pubkey=` - Get events starred by people the user follows
 - `GET /discover?pubkey=` - Get suggested users based on similar starred events
 
+**Members (tours)** (signed with headers `X-Pubkey`/`X-Signature`/`X-Timestamp`, see `worker/SPECS.md` 3.6; member keys cannot publish)
+
+- `GET /member/me` - Member's name, followed bands and own suggestions
+- `POST|DELETE /member/bands/:act_url_b64` - Follow / unfollow a band (base64url site URL)
+- `POST /member/suggestions` - Suggest a band (`name`, optional `url`)
+- `GET|POST /admin/members` - List / create members (admin)
+- `POST /admin/members/:pubkey/revoke`, `DELETE /admin/members/:pubkey` - Revoke / delete a member (admin)
+- `GET /admin/suggestions?status=&detail=1` - Suggestions grouped by band name (admin)
+- `POST /admin/suggestions/reject|link` - Reject, or link to a tracked band (admin)
+- `GET /admin/band-followers` - Follower count per band (admin)
+
 ### Data Model
 
-Data is stored in Cloudflare D1 (SQLite) across three tables:
+Data is stored in Cloudflare D1 (SQLite). The main table is `events` (below); `blocklist` and the member tables (`members`, `member_bands`, `band_suggestions`) are described in `worker/SPECS.md` section 2.1.
 
 **Timestamp Format Convention:**
 

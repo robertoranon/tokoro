@@ -38,6 +38,34 @@
 | `GET`  | `/feed?pubkey=`     | Events starred by people the user follows                          |
 | `GET`  | `/discover?pubkey=` | Suggested users with similar event taste (collaborative filtering) |
 
+### Members (tours page)
+
+Admin-issued members follow tracked bands and suggest new ones on `tours.html`. These endpoints are signed with headers (see [Member and admin request signatures](#member-and-admin-request-signatures)); member keys are never in `ALLOWED_PUBKEYS`, so members cannot publish.
+
+| Method   | Endpoint                          | Description                                                                 |
+| -------- | --------------------------------- | --------------------------------------------------------------------------- |
+| `GET`    | `/member/me`                      | The member's name, followed band URLs and own suggestions (newest first)    |
+| `POST`   | `/member/bands/:act_url_b64`      | Follow a band; `:act_url_b64` is the base64url band site URL (idempotent)   |
+| `DELETE` | `/member/bands/:act_url_b64`      | Unfollow a band (idempotent)                                                |
+| `POST`   | `/member/suggestions`             | Suggest a band `{name, url?}` → `201 {id}`; same pending name again → `200 {id, duplicate: true}` |
+
+### Admin (members and suggestions)
+
+Signed by `ADMIN_PUBKEY` (`503` when it is not configured).
+
+| Method   | Endpoint                                   | Description                                                                 |
+| -------- | ------------------------------------------ | --------------------------------------------------------------------------- |
+| `GET`    | `/admin/members`                           | Members with `band_count`, newest first                                     |
+| `POST`   | `/admin/members`                           | Create a member `{pubkey, name}` → `201` (`409` if the pubkey exists)       |
+| `POST`   | `/admin/members/:pubkey/revoke`            | Revoke a member (their requests get `403`)                                  |
+| `DELETE` | `/admin/members/:pubkey`                   | Delete a member with their follows and suggestions                          |
+| `GET`    | `/admin/suggestions?status=&detail=1`      | Suggestions grouped by normalized band name, most requested first; `status` = `pending` (default), `rejected` or `linked`; `detail=1` adds member names |
+| `POST`   | `/admin/suggestions/reject`                | Reject pending suggestions `{ids, reason?}` → `{updated}`                   |
+| `POST`   | `/admin/suggestions/link`                  | Link suggestions to a tracked band `{ids, act_url}` and follow it for each suggester → `{updated}` |
+| `GET`    | `/admin/band-followers`                    | `[{act_url, followers}]`, most followed first (counts only)                 |
+
+Bodies, status codes and error messages: [`worker/SPECS.md`](worker/SPECS.md) sections 7.11-7.14.
+
 ### iCal feeds
 
 Add `format=ical` to any `/events` query to receive an iCal feed (RFC 5545, `text/calendar`) that can be subscribed to directly from any calendar app. Use `window=30d` (or `7d`, etc.) as a shorthand to set a rolling time window instead of explicit `from`/`to` dates — it defaults to `30d` when `format=ical`.
@@ -70,9 +98,36 @@ The Crawler Worker requires an `Authorization: Bearer <api-key>` header.
 
 ## Authentication
 
-All write operations (`POST`, `PUT`, `DELETE`) require a valid Ed25519 signature in the request body. The Worker verifies every write against the declared public key; unsigned or invalidly-signed requests are rejected.
+All write operations (`POST`, `PUT`, `DELETE`) require a valid Ed25519 signature in the request body (the member and admin member/suggestion endpoints use headers instead, see below). The Worker verifies every write against the declared public key; unsigned or invalidly-signed requests are rejected.
 
 Optionally, set `ALLOWED_PUBKEYS` on the API Worker (comma-separated hex pubkeys) to restrict publishing to known curators — if absent, any valid signature is accepted.
+
+### Member and admin request signatures
+
+The member and admin member/suggestion endpoints carry their signature in headers, and reads are signed too:
+
+| Header        | Value                                    |
+| ------------- | ---------------------------------------- |
+| `X-Pubkey`    | signer public key (64 hex chars)         |
+| `X-Signature` | Ed25519 signature (128 hex chars)        |
+| `X-Timestamp` | Unix time in seconds                     |
+
+The signed message is `SHA-256("<domain>:<payload>:<timestamp>")`. The timestamp must be within ±300 s of the server clock; otherwise the response is `401` with `server_time` (the server's Unix time) so the client can correct its clock and retry. Each action has its own domain, so a signature cannot be reused for another action:
+
+| Domain                    | Used by                                                         | Payload                                 |
+| ------------------------- | --------------------------------------------------------------- | --------------------------------------- |
+| `member-read`             | `GET /member/me`                                                | `/member/me`                            |
+| `band-follow`             | `POST /member/bands/:act_url_b64`                               | normalized band URL                     |
+| `band-unfollow`           | `DELETE /member/bands/:act_url_b64`                             | normalized band URL                     |
+| `band-suggest`            | `POST /member/suggestions`                                      | raw JSON body                           |
+| `admin-read`              | `GET /admin/members`, `/admin/suggestions`, `/admin/band-followers` | request path without query          |
+| `admin-member`            | `POST /admin/members`                                           | raw JSON body                           |
+| `admin-member-revoke`     | `POST /admin/members/:pubkey/revoke`                            | target pubkey (lower-case)              |
+| `admin-member-delete`     | `DELETE /admin/members/:pubkey`                                 | target pubkey (lower-case)              |
+| `admin-suggestion-reject` | `POST /admin/suggestions/reject`                                | raw JSON body                           |
+| `admin-suggestion-link`   | `POST /admin/suggestions/link`                                  | raw JSON body                           |
+
+A normalized band URL is scheme + host[:port] + path, lower-case scheme and host, without query, fragment or trailing slash (http/https only). CORS allows the three headers.
 
 ---
 
@@ -105,5 +160,7 @@ CREATE TABLE events (
   updated_at    TEXT
 );
 ```
+
+Members, their followed bands and their suggestions are stored in `members`, `member_bands` and `band_suggestions` (schema in [`worker/SPECS.md`](worker/SPECS.md) section 2.1).
 
 **Timestamp convention:** all times are ISO 8601 without timezone (`YYYY-MM-DDTHH:MM:SS`), representing local time at the venue's location. No UTC conversion — the event coordinates carry the timezone context implicitly.
