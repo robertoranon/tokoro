@@ -580,3 +580,110 @@ describe('hardening', () => {
     });
   });
 });
+
+describe('atomic writes', () => {
+  /** env.DB where statements containing `match` fail when executed. */
+  function failOn(db: any, match: string) {
+    const poison = (st: any): any => ({
+      bind: (...a: unknown[]) => poison(st.bind(...a)),
+      run: async () => {
+        throw new Error('injected failure');
+      },
+      first: async () => {
+        throw new Error('injected failure');
+      },
+      all: async () => {
+        throw new Error('injected failure');
+      },
+      _exec: () => {
+        throw new Error('injected failure');
+      },
+    });
+    return {
+      prepare: (sql: string) => {
+        const st = db.prepare(sql);
+        return sql.includes(match) ? poison(st) : st;
+      },
+      batch: (sts: any[]) => db.batch(sts),
+    };
+  }
+  const n = async (table: string) =>
+    (await env.DB.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first()).n;
+
+  it('delete member: a failure leaves the member, follows and suggestions in place', async () => {
+    const anna = await makeKey();
+    await createMember(anna.pubkey, 'Anna');
+    await env.DB.prepare(
+      'INSERT INTO member_bands (pubkey, act_url, created_at) VALUES (?, ?, ?)'
+    )
+      .bind(anna.pubkey, 'https://a.example', 'x')
+      .run();
+    await addSuggestion(anna.pubkey, 'Beta');
+    const real = env.DB;
+    env.DB = failOn(real, 'DELETE FROM members');
+    await expect(
+      call(
+        admin,
+        'DELETE',
+        `/admin/members/${anna.pubkey}`,
+        'admin-member-delete',
+        anna.pubkey
+      )
+    ).rejects.toThrow('injected failure');
+    env.DB = real;
+    expect(await n('members')).toBe(1);
+    expect(await n('member_bands')).toBe(1);
+    expect(await n('band_suggestions')).toBe(1);
+  });
+
+  it('link: a failure marking the suggestion linked undoes the follow', async () => {
+    const k = await makeKey();
+    await createMember(k.pubkey, 'Anna');
+    const id = await addSuggestion(k.pubkey, 'Beta');
+    const real = env.DB;
+    env.DB = failOn(real, "SET status = 'linked'");
+    const body = JSON.stringify({ ids: [id], act_url: 'https://beta.example' });
+    await expect(
+      call(
+        admin,
+        'POST',
+        '/admin/suggestions/link',
+        'admin-suggestion-link',
+        body,
+        body
+      )
+    ).rejects.toThrow('injected failure');
+    env.DB = real;
+    expect(await n('member_bands')).toBe(0);
+    const row = await env.DB.prepare(
+      'SELECT status FROM band_suggestions WHERE id = ?'
+    )
+      .bind(id)
+      .first();
+    expect(row).toEqual({ status: 'pending' });
+  });
+
+  it('link skips linked and unknown ids and counts the rest (one batch)', async () => {
+    const a = await makeKey();
+    const b = await makeKey();
+    await createMember(a.pubkey, 'A');
+    await createMember(b.pubkey, 'B');
+    const ia = await addSuggestion(a.pubkey, 'Gamma');
+    const ib = await addSuggestion(b.pubkey, 'Gamma');
+    const link = (ids: number[]) => {
+      const body = JSON.stringify({ ids, act_url: 'https://gamma.example' });
+      return call(
+        admin,
+        'POST',
+        '/admin/suggestions/link',
+        'admin-suggestion-link',
+        body,
+        body
+      );
+    };
+    expect(await (await link([ia])).json()).toEqual({ updated: 1 });
+    expect(await (await link([ia, ib, 9999])).json()).toEqual({ updated: 1 });
+    expect(await (await link([ia, ib])).json()).toEqual({ updated: 0 });
+    expect(await n('member_bands')).toBe(2);
+  });
+});

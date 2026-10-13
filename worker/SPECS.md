@@ -1169,7 +1169,7 @@ Signed with domain `admin-member-revoke` over the lower-cased `:pubkey`. Sets `r
 
 #### 7.12.4 DELETE /admin/members/:pubkey (Delete Member)
 
-Signed with domain `admin-member-delete` over the lower-cased `:pubkey`. Deletes the member's rows from `member_bands`, then `band_suggestions`, then `members`. The three deletes run as separate statements, not in one transaction: if the request fails half-way, some rows may be gone while the member remains; repeating the delete completes it (each statement is idempotent).
+Signed with domain `admin-member-delete` over the lower-cased `:pubkey`. Deletes the member's rows from `member_bands`, then `band_suggestions`, then `members`, as one atomic unit (a D1 `batch`, which runs as a single transaction): either all three deletes take effect or, if any of them fails, none does and the request fails (`500`) with the member and their data unchanged.
 
 **Response (200 OK):** `{ "message": "Member deleted", "pubkey": "<pubkey>" }`
 
@@ -1246,7 +1246,7 @@ POST /admin/suggestions/link
 2. `act_url` normalized with `normalizeActUrl`; invalid, or longer than 500 characters once normalized → `400 {"error": "act_url must be an http(s) URL (max 500 characters)"}`.
 3. For each id that exists and is not already `linked` (pending **or rejected**): set `status = 'linked'` and `act_url`, and follow `act_url` for the suggesting member (insert into `member_bands` if not present). Unknown and already linked ids are skipped.
 
-The follow and the status change run as separate statements (follow first, then `linked`), not in one transaction, and the ids are processed one by one. If the request fails half-way, the suggestions not yet marked `linked` are still pending or rejected, so repeating the same request completes them (the follow is idempotent).
+The suggestions are read first (a repeated id counts once); then the follow and the status change of every suggestion to link are written in one D1 `batch`, which runs as a single transaction. Either every listed suggestion is followed and marked `linked`, or, if any statement fails, none is and the request fails (`500`) leaving all of them as they were (no follow without `linked`, no `linked` without follow).
 
 **Response (200 OK):** `{ "updated": <number of suggestions linked> }`
 

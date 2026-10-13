@@ -1,11 +1,14 @@
 // Minimal in-memory stand-in for D1 on top of node:sqlite, so handler tests
-// run real SQL. Supports prepare().bind().run()/first()/all().
+// run real SQL. Supports prepare().bind().run()/first()/all() and
+// batch([...]) (one transaction, rolled back when a statement fails).
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const nodeRequire = createRequire(import.meta.url);
 const { DatabaseSync } = nodeRequire('node:sqlite');
+
+const toObjects = (rows: object[]) => rows.map(r => ({ ...r }));
 
 function statement(db: any, sql: string, params: unknown[]) {
   return {
@@ -27,10 +30,27 @@ function statement(db: any, sql: string, params: unknown[]) {
     async all() {
       return {
         success: true,
-        results: db
-          .prepare(sql)
-          .all(...params)
-          .map((r: object) => ({ ...r })),
+        results: toObjects(db.prepare(sql).all(...params)),
+      };
+    },
+    /** Synchronous execution for batch(): rows for queries, changes for writes. */
+    _exec() {
+      const s = db.prepare(sql);
+      if (s.columns().length > 0) {
+        return {
+          success: true,
+          meta: { changes: 0, last_row_id: 0 },
+          results: toObjects(s.all(...params)),
+        };
+      }
+      const r = s.run(...params);
+      return {
+        success: true,
+        meta: {
+          changes: Number(r.changes),
+          last_row_id: Number(r.lastInsertRowid),
+        },
+        results: [],
       };
     },
   };
@@ -49,5 +69,16 @@ export function makeD1(
   }
   return {
     prepare: (sql: string) => statement(db, sql, []),
+    async batch(statements: ReturnType<typeof statement>[]) {
+      db.exec('BEGIN');
+      try {
+        const results = statements.map(s => s._exec());
+        db.exec('COMMIT');
+        return results;
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      }
+    },
   } as unknown as D1Database;
 }

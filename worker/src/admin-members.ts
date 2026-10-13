@@ -181,15 +181,14 @@ async function deleteMember(
   if (a !== true) return a;
   if (!(await memberExists(env, target)))
     return jsonResponse({ error: 'Member not found' }, 404);
-  await env.DB.prepare('DELETE FROM member_bands WHERE pubkey = ?')
-    .bind(target)
-    .run();
-  await env.DB.prepare('DELETE FROM band_suggestions WHERE pubkey = ?')
-    .bind(target)
-    .run();
-  await env.DB.prepare('DELETE FROM members WHERE pubkey = ?')
-    .bind(target)
-    .run();
+  // One batch = one transaction: either all three deletes happen or none.
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM member_bands WHERE pubkey = ?').bind(target),
+    env.DB.prepare('DELETE FROM band_suggestions WHERE pubkey = ?').bind(
+      target
+    ),
+    env.DB.prepare('DELETE FROM members WHERE pubkey = ?').bind(target),
+  ]);
   return jsonResponse({ message: 'Member deleted', pubkey: target });
 }
 
@@ -327,28 +326,33 @@ async function linkSuggestions(request: Request, env: Env): Promise<Response> {
       400
     );
 
+  // Read first (unknown and already linked ids are skipped), then write the
+  // follow + status update of every remaining suggestion in one batch, which
+  // D1 runs as a single transaction: all of them happen or none.
+  const now = nowIso();
+  const writes: D1PreparedStatement[] = [];
+  const seen = new Set<number>();
   let updated = 0;
   for (const id of ids) {
+    if (seen.has(id)) continue;
+    seen.add(id);
     const row = await env.DB.prepare(
       'SELECT pubkey, status FROM band_suggestions WHERE id = ?'
     )
       .bind(id)
       .first<{ pubkey: string; status: string }>();
     if (!row || row.status === 'linked') continue;
-    // Follow first, then mark linked: not atomic, but if the request fails
-    // in between, the suggestion is still unlinked and a retry completes it.
-    await env.DB.prepare(
-      'INSERT OR IGNORE INTO member_bands (pubkey, act_url, created_at) VALUES (?, ?, ?)'
-    )
-      .bind(row.pubkey, actUrl, nowIso())
-      .run();
-    await env.DB.prepare(
-      "UPDATE band_suggestions SET status = 'linked', act_url = ? WHERE id = ?"
-    )
-      .bind(actUrl, id)
-      .run();
+    writes.push(
+      env.DB.prepare(
+        'INSERT OR IGNORE INTO member_bands (pubkey, act_url, created_at) VALUES (?, ?, ?)'
+      ).bind(row.pubkey, actUrl, now),
+      env.DB.prepare(
+        "UPDATE band_suggestions SET status = 'linked', act_url = ? WHERE id = ?"
+      ).bind(actUrl, id)
+    );
     updated++;
   }
+  if (writes.length > 0) await env.DB.batch(writes);
   return jsonResponse({ updated });
 }
 
