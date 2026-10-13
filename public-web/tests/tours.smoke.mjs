@@ -952,6 +952,35 @@ try {
     } finally {
       state.memberMeStatus = 0;
     }
+    // An unverified link must not replace a different stored seed.
+    state.memberMeStatus = 503;
+    try {
+      const other = Buffer.from(Array.from({ length: 32 }, (_, i) => 100 + i)).toString('base64url');
+      const keep = await newPage(browser);
+      await keep.page.addInitScript(s => {
+        if (!sessionStorage.getItem('seeded')) {
+          localStorage.setItem('tokoro_member', s);
+          sessionStorage.setItem('seeded', '1');
+        }
+      }, seed);
+      state.memberRequests.length = 0;
+      await keep.page.goto(base + '/tours.html#k=' + other);
+      await keep.page.waitForSelector('.band-card');
+      for (let i = 0; i < 50 && !state.memberRequests.includes('GET /member/me'); i++) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+      await new Promise(r => setTimeout(r, 500)); // let initMember finish
+      const stored = await keep.page.evaluate(() => localStorage.getItem('tokoro_member'));
+      check(
+        '5xx with a stored seed: a different link seed does not replace it',
+        state.memberRequests.includes('GET /member/me') && stored === seed,
+        [stored, state.memberRequests]
+      );
+      check('5xx with a stored seed: visitor view', await keep.page.isHidden('#memberBar'));
+      await keep.context.close();
+    } finally {
+      state.memberMeStatus = 0;
+    }
     {
       const net = await newPage(browser);
       await net.page.route('**/member/me', r => r.abort());

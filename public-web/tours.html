@@ -1343,8 +1343,10 @@
               );
             } else if (fromLink) {
               // Offline or server error: keep the (unverified) link so a
-              // reload works later; a later 401/403 clears it.
-              M.saveSeed(storage, seed);
+              // reload works later; a later 401/403 clears it. It never
+              // replaces a different stored seed, which may be the working one.
+              const stored = M.loadStoredSeed(storage);
+              if (!stored || stored === seed) M.saveSeed(storage, seed);
             }
             return; // visitor view this time
           }
