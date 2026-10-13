@@ -587,14 +587,17 @@
     ></script>
     <script src="./shared.js"></script>
     <script src="./tours.js"></script>
-    <script src="./member.js"></script>
     <script>
       (function () {
         'use strict';
 
         const API_URL = '__TOKORO_WORKER_URL__';
         const T = window.TokoroTours;
-        const M = window.TokoroMember;
+        // member.js is loaded on demand (loadMemberScript), so visitors never
+        // download it. M stays null for visitors; it is only used once
+        // member.ok is true or inside initMember after the load.
+        let M = null;
+        const MEMBER_SEED_KEY = 'tokoro_member'; // same key as member.js
         const storage = (() => {
           try {
             return window.localStorage;
@@ -1235,6 +1238,7 @@
           el('myBandsBtn').setAttribute('aria-pressed', String(member.mine));
         }
         function setMine(value) {
+          if (!member.ok) return;
           member.mine = value;
           try {
             storage.setItem(M.MEMBER_VIEW_KEY, value ? 'mine' : 'all');
@@ -1246,9 +1250,10 @@
         el('myBandsBtn').addEventListener('click', () => setMine(true));
 
         async function toggleFollow(bandUrl) {
+          if (!member.ok) return;
           const key = M.normalizeActUrl(bandUrl);
           // One request per band at a time: clicks while one is pending are ignored.
-          if (!key || !member.ok || member.inFlight.has(key)) return;
+          if (!key || member.inFlight.has(key)) return;
           const was = member.followed.has(key);
           if (was) member.followed.delete(key);
           else member.followed.add(key);
@@ -1299,17 +1304,38 @@
           await syncMember(); // a suggestion matching a tracked band is followed now
         });
 
+        // Only a personal link or a stored seed makes the page fetch member.js.
+        function loadMemberScript() {
+          if (window.TokoroMember) return Promise.resolve(window.TokoroMember);
+          return new Promise(resolve => {
+            const script = document.createElement('script');
+            script.src = './member.js';
+            script.onload = () => resolve(window.TokoroMember || null);
+            script.onerror = () => resolve(null);
+            document.head.appendChild(script);
+          });
+        }
+
         async function initMember() {
-          if (!storage || !M) return; // no member.js: visitor view
-          const link = M.readLinkSeed(window.location.hash);
-          if (link.status !== 'none') {
-            // Never leave the link in the address bar or the history.
+          if (!storage) return; // private mode: visitor view
+          const hash = window.location.hash;
+          if (/^#k=[A-Za-z0-9_-]+$/.test(hash)) {
+            // Never leave the link in the address bar or the history, even
+            // if member.js then fails to load.
             history.replaceState(
               null,
               '',
               window.location.pathname + window.location.search
             );
           }
+          let hasStored = false;
+          try {
+            hasStored = !!storage.getItem(MEMBER_SEED_KEY);
+          } catch (err) {}
+          if (!hash.startsWith('#k=') && !hasStored) return; // a visitor
+          M = await loadMemberScript();
+          if (!M) return; // no member.js: visitor view
+          const link = M.readLinkSeed(hash);
           const fromLink = link.status === 'found';
           const seed = fromLink ? link.seed : M.loadStoredSeed(storage);
           if (!seed) {

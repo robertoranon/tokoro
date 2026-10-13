@@ -81,6 +81,7 @@ const state = {
   memberMeStatus: 0, // non-zero → /member/me answers with this status
   bandDelayMs: 0, // artificial delay on /member/bands/*
   serverFollowed: new Set(), // band urls followed through POST/DELETE /member/bands/*
+  staticRequests: [], // every static file request: "/tours.html", "/member.js", ...
 };
 let base = '';
 const TYPES = {
@@ -172,6 +173,7 @@ const server = http.createServer(async (req, res) => {
     }
     return;
   }
+  state.staticRequests.push(url.pathname);
   const name = url.pathname.replace(/^\//, '');
   if (!['tours.html', 'shared.js', 'tours.js', 'member.js'].includes(name)) {
     res.writeHead(404);
@@ -747,9 +749,13 @@ try {
   // ── visitors: nothing member-related appears or is requested ──────────────
   {
     state.memberRequests.length = 0;
-    const { page, context } = await newPage(browser);
+    state.staticRequests.length = 0;
+    const { page, context, errors } = await newPage(browser);
     await page.goto(base + '/tours.html');
     await page.waitForSelector('.band-card');
+    await page.waitForLoadState('networkidle');
+    check('visitor: member.js is not downloaded', !state.staticRequests.includes('/member.js'), state.staticRequests);
+    check('visitor: no page errors', errors.length === 0, errors);
     check('visitor: no member bar', await page.isHidden('#memberBar'));
     check('visitor: no suggest pane', await page.isHidden('#suggestPane'));
     check('visitor: no follow buttons', (await page.locator('.follow-btn').count()) === 0);
@@ -786,10 +792,12 @@ try {
       ],
     };
     state.memberRequests.length = 0;
+    state.staticRequests.length = 0;
     const { page, context, errors } = await newPage(browser);
     await page.goto(base + '/tours.html#k=' + seed);
     await page.waitForSelector('.band-card');
     await page.waitForSelector('#memberBar:not([hidden])');
+    check('member: a link loads member.js', state.staticRequests.includes('/member.js'), state.staticRequests);
     check('member: greeting names the member', (await page.textContent('#memberHello')).includes('Anna'));
     check('member: link fragment removed from the address bar', !page.url().includes('#k='), page.url());
     check(
@@ -878,12 +886,38 @@ try {
     await context.close();
 
     // a later visit needs no link
+    state.staticRequests.length = 0;
     const second = await newPage(browser);
     await second.page.addInitScript(s => localStorage.setItem('tokoro_member', s), seed);
     await second.page.goto(base + '/tours.html');
     await second.page.waitForSelector('#memberBar:not([hidden])');
     check('member: stored seed works without the link', true);
+    check('member: a stored seed loads member.js', state.staticRequests.includes('/member.js'), state.staticRequests);
     await second.context.close();
+
+    // member.js fails to load: a stored seed leaves the visitor view intact.
+    {
+      state.memberRequests.length = 0;
+      const broken = await newPage(browser);
+      await broken.page.route('**/member.js', r => r.abort());
+      await broken.page.addInitScript(s => localStorage.setItem('tokoro_member', s), seed);
+      await broken.page.goto(base + '/tours.html');
+      await broken.page.waitForSelector('.band-card');
+      await broken.page.waitForLoadState('networkidle');
+      check(
+        'member.js unavailable: visitor view, no /member requests, no page errors',
+        (await broken.page.isHidden('#memberBar')) &&
+          (await broken.page.locator('.follow-btn').count()) === 0 &&
+          state.memberRequests.length === 0 &&
+          broken.errors.length === 0,
+        [state.memberRequests, broken.errors]
+      );
+      check(
+        'member.js unavailable: the stored seed is kept',
+        (await broken.page.evaluate(() => localStorage.getItem('tokoro_member'))) === seed
+      );
+      await broken.context.close();
+    }
 
     // revoked or unknown: back to the visitor view, nothing stored
     state.memberMe = null;
