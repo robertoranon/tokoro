@@ -1007,6 +1007,79 @@ try {
     } finally {
       state.memberMeStatus = 0;
     }
+    // A browser without WebCrypto Ed25519: a clear note, nothing sent or stored.
+    {
+      const noEd = async (stored) => {
+        const ctx = await newPage(browser);
+        await ctx.page.addInitScript(storedSeed => {
+          const orig = crypto.subtle.importKey.bind(crypto.subtle);
+          crypto.subtle.importKey = (format, data, alg, ...rest) => {
+            const name = typeof alg === 'string' ? alg : alg && alg.name;
+            if (name === 'Ed25519')
+              return Promise.reject(new DOMException('Unrecognized name', 'NotSupportedError'));
+            return orig(format, data, alg, ...rest);
+          };
+          if (storedSeed && !sessionStorage.getItem('seeded')) {
+            localStorage.setItem('tokoro_member', storedSeed);
+            sessionStorage.setItem('seeded', '1');
+          }
+        }, stored);
+        return ctx;
+      };
+      state.memberRequests.length = 0;
+      const old1 = await noEd(null);
+      await old1.page.goto(base + '/tours.html#k=' + seed);
+      await old1.page.waitForSelector('.band-card');
+      await old1.page
+        .waitForFunction(() => document.getElementById('memberNote').textContent.length > 0, null, { timeout: 5000 })
+        .catch(() => {});
+      check(
+        'no Ed25519: the link shows the "too old" note',
+        (await old1.page.isVisible('#memberNote')) &&
+          (await old1.page.textContent('#memberNote')).includes('This browser is too old for personal links'),
+        await old1.page.textContent('#memberNote')
+      );
+      check(
+        'no Ed25519: no /member requests, the link seed is not saved, visitor view',
+        state.memberRequests.length === 0 &&
+          (await old1.page.evaluate(() => localStorage.getItem('tokoro_member'))) === null &&
+          (await old1.page.isHidden('#memberBar')),
+        state.memberRequests
+      );
+      check('no Ed25519: the link is removed from the address bar', !old1.page.url().includes('#k='), old1.page.url());
+      await old1.context.close();
+
+      const other = Buffer.from(Array.from({ length: 32 }, (_, i) => 50 + i)).toString('base64url');
+      const old2 = await noEd(other);
+      await old2.page.goto(base + '/tours.html#k=' + seed);
+      await old2.page.waitForSelector('.band-card');
+      await old2.page
+        .waitForFunction(() => document.getElementById('memberNote').textContent.length > 0, null, { timeout: 5000 })
+        .catch(() => {});
+      check(
+        'no Ed25519: a stored seed is neither cleared nor replaced',
+        (await old2.page.evaluate(() => localStorage.getItem('tokoro_member'))) === other &&
+          state.memberRequests.length === 0,
+        state.memberRequests
+      );
+      await old2.context.close();
+
+      const old3 = await noEd(other);
+      await old3.page.goto(base + '/tours.html');
+      await old3.page.waitForSelector('.band-card');
+      await old3.page
+        .waitForFunction(() => document.getElementById('memberNote').textContent.length > 0, null, { timeout: 5000 })
+        .catch(() => {});
+      check(
+        'no Ed25519: a stored seed alone is kept, with the "too old" note',
+        (await old3.page.evaluate(() => localStorage.getItem('tokoro_member'))) === other &&
+          (await old3.page.textContent('#memberNote')).includes('This browser is too old') &&
+          state.memberRequests.length === 0,
+        [await old3.page.textContent('#memberNote'), state.memberRequests]
+      );
+      await old3.context.close();
+    }
+
     // An unverified link must not replace a different stored seed.
     state.memberMeStatus = 503;
     try {

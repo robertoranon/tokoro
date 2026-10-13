@@ -192,3 +192,24 @@ test('followedSet / isFollowed use normalized urls', () => {
   assert.equal(M.isFollowed(set, 'HTTPS://alpha.example'), true);
   assert.equal(M.isFollowed(set, 'https://beta.example'), false);
 });
+
+test('supportsEd25519: true where WebCrypto has Ed25519', async () => {
+  assert.equal(await M.supportsEd25519(), true);
+});
+
+test('supportsEd25519: false (never throws) when Ed25519 is missing', async () => {
+  const rejecting = {
+    importKey: async () => {
+      throw new DOMException('Unrecognized name', 'NotSupportedError');
+    },
+    exportKey: async () => ({}),
+  };
+  assert.equal(await M.supportsEd25519(rejecting), false);
+  assert.equal(await M.supportsEd25519(null), false);
+  const throwingSync = {
+    importKey: () => {
+      throw new TypeError('sync failure');
+    },
+  };
+  assert.equal(await M.supportsEd25519(throwingSync), false);
+});

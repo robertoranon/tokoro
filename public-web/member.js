@@ -92,6 +92,29 @@ async function importMember(seedB64) {
   return { pubkey: bytesToHex(b64urlDecode(jwk.x)), privateKey };
 }
 
+/**
+ * true when this browser's WebCrypto can import (and export) an Ed25519 key,
+ * which member features need; false otherwise. Never throws. `subtle` is
+ * injectable for tests.
+ */
+async function supportsEd25519(
+  subtle = typeof crypto !== 'undefined' ? crypto.subtle : null
+) {
+  try {
+    if (!subtle) return false;
+    const pkcs8 = new Uint8Array(PKCS8_PREFIX.length + 32);
+    pkcs8.set(PKCS8_PREFIX, 0);
+    pkcs8.fill(7, PKCS8_PREFIX.length); // a fixed test seed
+    const key = await subtle.importKey('pkcs8', pkcs8, 'Ed25519', true, [
+      'sign',
+    ]);
+    const jwk = await subtle.exportKey('jwk', key);
+    return !!(jwk && typeof jwk.x === 'string');
+  } catch {
+    return false;
+  }
+}
+
 function loadStoredSeed(storage) {
   try {
     return (storage && storage.getItem(MEMBER_SEED_KEY)) || null;
@@ -268,6 +291,7 @@ const memberApi = {
   normalizeName,
   readLinkSeed,
   importMember,
+  supportsEd25519,
   loadStoredSeed,
   saveSeed,
   clearSeed,

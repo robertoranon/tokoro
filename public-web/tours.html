@@ -1337,6 +1337,13 @@
           if (!hash.startsWith('#k=') && !hasStored) return; // a visitor
           M = await loadMemberScript();
           if (!M) return; // no member.js: visitor view
+          if (!(await M.supportsEd25519())) {
+            // Not the link's fault: keep any stored seed, save nothing.
+            setMemberNote(
+              'This browser is too old for personal links. Please update it or open the link in another browser.'
+            );
+            return;
+          }
           const link = M.readLinkSeed(hash);
           const fromLink = link.status === 'found';
           const seed = fromLink ? link.seed : M.loadStoredSeed(storage);
