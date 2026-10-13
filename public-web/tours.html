@@ -234,11 +234,16 @@
         overflow: hidden;
       }
       .band-card__summary {
+        position: relative; /* anchors the member's follow button */
         list-style: none;
         cursor: pointer;
         padding: 16px 20px;
         display: grid;
         gap: 4px;
+      }
+      /* Members only: room on the right for the follow button. */
+      #bandList.has-follow .band-card__summary {
+        padding-right: 56px;
       }
       .band-card__summary::-webkit-details-marker {
         display: none;
@@ -309,6 +314,31 @@
         break-inside: avoid;
         padding: 4px 0;
         font-size: 14px;
+      }
+      /* Members only: room on the right of each row for a smaller, fixed
+         follow button (same idea as on the cards: nothing moves on a tap). */
+      .has-follow > .tracked-band {
+        position: relative;
+        min-height: 32px;
+        padding: 6px 40px 6px 0;
+      }
+      .has-follow > .tracked-band .follow-btn {
+        top: 0;
+        right: 0;
+        width: 32px;
+        height: 32px;
+      }
+      .quiet-bands {
+        margin-top: 18px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding-top: 12px;
+      }
+      .quiet-bands__title {
+        padding: 0 16px 8px;
+        font-size: 15px;
+        font-weight: 700;
       }
       .tracked-band__count {
         margin-left: 8px;
@@ -394,17 +424,38 @@
         font-weight: 600;
         margin-right: 8px;
       }
+      /* Fixed box, out of the grid flow, with an SVG icon: following or
+         not, in flight or not, the button never changes size or moves the
+         text around it. */
       .follow-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 40px;
+        height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         border: 0;
         background: transparent;
         color: inherit;
-        font-size: 1.2rem;
-        line-height: 1;
-        padding: 4px 8px;
+        padding: 0;
+        margin: 0;
         cursor: pointer;
+      }
+      .follow-btn svg {
+        display: block;
+        width: 20px;
+        height: 20px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
       }
       .follow-btn[aria-pressed='true'] {
         color: #c0392b;
+      }
+      .follow-btn[aria-pressed='true'] svg {
+        fill: currentColor;
       }
       /* In flight: aria-disabled, not disabled (a click on a disabled button
          inside <summary> can toggle the card in some browsers). */
@@ -703,25 +754,49 @@
           );
         }
 
-        function followBtnHtml(bandKey) {
-          if (!member.ok) return '';
+        // The follow button's attributes, shared by the first render and the
+        // in-place updates so they cannot diverge. null = attribute absent.
+        function followBtnAttrs(bandKey) {
           const on = M.isFollowed(member.followed, bandKey);
           const busy = member.inFlight.has(M.normalizeActUrl(bandKey));
-          return (
+          return {
+            'aria-pressed': String(on),
+            'aria-label': on ? 'Stop following this band' : 'Follow this band',
+            title: on ? 'Following' : 'Follow this band',
+            'aria-disabled': busy ? 'true' : null,
+          };
+        }
+        // Outline heart; CSS fills it when aria-pressed is true.
+        const FOLLOW_ICON =
+          '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+          '<path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>' +
+          '</svg>';
+
+        function followBtnHtml(bandKey) {
+          if (!member.ok) return '';
+          const attrs = followBtnAttrs(bandKey);
+          let html =
             '<button type="button" class="follow-btn" data-follow="' +
             escHtml(bandKey) +
-            '" aria-pressed="' +
-            on +
-            '" aria-label="' +
-            (on ? 'Stop following this band' : 'Follow this band') +
-            '" title="' +
-            (on ? 'Following' : 'Follow this band') +
-            '"' +
-            (busy ? ' aria-disabled="true"' : '') +
-            '>' +
-            (on ? '♥' : '♡') +
-            '</button>'
-          );
+            '"';
+          for (const [name, value] of Object.entries(attrs)) {
+            if (value !== null)
+              html += ' ' + name + '="' + escHtml(value) + '"';
+          }
+          return html + '>' + FOLLOW_ICON + '</button>';
+        }
+
+        // Update every follow button (cards, tracked pane, quiet bands) in
+        // place: no list rebuild, so nothing on the page moves.
+        function syncFollowButtons() {
+          if (!member.ok) return;
+          for (const btn of document.querySelectorAll('[data-follow]')) {
+            const attrs = followBtnAttrs(btn.getAttribute('data-follow'));
+            for (const [name, value] of Object.entries(attrs)) {
+              if (value === null) btn.removeAttribute(name);
+              else btn.setAttribute(name, value);
+            }
+          }
         }
 
         function bandHtml(b) {
@@ -771,26 +846,79 @@
           );
         }
 
+        // A band row (tracked pane, quiet bands): the name linked to the
+        // band's site, then `extra`, then the member's follow button.
+        function bandRowHtml(name, rawUrl, extra) {
+          const url = safeUrl(rawUrl);
+          return (
+            '<li class="tracked-band">' +
+            (url
+              ? '<a href="' +
+                escHtml(url) +
+                '" target="_blank" rel="noopener noreferrer">' +
+                escHtml(name) +
+                ' ↗</a>'
+              : escHtml(name)) +
+            (extra || '') +
+            (url ? followBtnHtml(rawUrl) : '') +
+            '</li>'
+          );
+        }
+
+        // My bands only: followed bands with no upcoming show at all (not
+        // just filtered out). The keyword applies to their names; "New only"
+        // hides them (they have no new show); dates and area do not apply.
+        function quietBands() {
+          if (!member.ok || !member.mine || state.newOnly) return [];
+          const q = T.normalizeText(state.keyword).trim();
+          return M.quietFollowed(
+            member.followed,
+            state.tracked ? state.tracked.bands : [],
+            state.all
+          ).filter(b => !q || T.normalizeText(b.name).includes(q));
+        }
+
+        function quietHtml(quiet) {
+          if (!quiet.length) return '';
+          return (
+            '<section class="quiet-bands" id="quietBands" aria-labelledby="quietTitle">' +
+            '<h2 class="quiet-bands__title" id="quietTitle">Following · no upcoming shows</h2>' +
+            '<ul class="tracked-list has-follow">' +
+            quiet.map(b => bandRowHtml(b.name, b.url, '')).join('') +
+            '</ul></section>'
+          );
+        }
+
         function render() {
           if (!state.ready) return;
           const list = visibleShows();
           const bands = T.groupByBand(list, Date.now());
           const totalBands = T.groupByBand(state.all).length;
+          const quiet = quietBands();
 
+          el('bandList').classList.toggle('has-follow', member.ok);
+          let cards;
           if (!state.all.length) {
-            el('bandList').innerHTML =
-              '<p class="empty-state">No upcoming shows yet.</p>';
-          } else if (!bands.length) {
-            el('bandList').innerHTML =
-              member.ok && member.mine && member.followed.size === 0
-                ? '<p class="empty-state">You are not following any band yet. Switch to All bands and tap ♡ on a band.</p>'
-                : '<p class="empty-state">No shows match your filters.</p>';
-          } else {
-            el('bandList').innerHTML =
+            cards = '<p class="empty-state">No upcoming shows yet.</p>';
+          } else if (bands.length) {
+            cards =
               '<div class="band-list">' +
               bands.map(bandHtml).join('') +
               '</div>';
+          } else if (member.ok && member.mine && member.followed.size === 0) {
+            cards =
+              '<p class="empty-state">You are not following any band yet. Switch to All bands and tap ♡ on a band.</p>';
+          } else if (
+            member.ok &&
+            member.mine &&
+            quiet.length &&
+            !state.all.some(s => M.isFollowed(member.followed, s.bandUrl))
+          ) {
+            cards = ''; // only bands without shows are followed: just their list
+          } else {
+            cards = '<p class="empty-state">No shows match your filters.</p>';
           }
+          el('bandList').innerHTML = cards + quietHtml(quiet);
 
           setStatus(
             state.all.length
@@ -799,10 +927,14 @@
                   totalBands +
                   ' bands · ' +
                   list.length +
-                  (list.length === 1 ? ' show' : ' shows')
+                  (list.length === 1 ? ' show' : ' shows') +
+                  (quiet.length
+                    ? ' · ' + quiet.length + ' following without shows'
+                    : '')
               : ''
           );
           renderPins(bands);
+          syncFollowButtons(); // the tracked pane's hearts
         }
 
         // ── Map (optional: the list works without Leaflet) ─────────────
@@ -1040,27 +1172,22 @@
           pane.hidden = false;
           el('trackedSummary').textContent =
             'Tracked bands (' + rows.length + ')';
+          // Members get a heart on every row (bands without shows included).
+          el('trackedList').classList.toggle('has-follow', member.ok);
           el('trackedList').innerHTML = rows
             .map(r => {
-              const url = safeUrl(r.url);
               const count = state.ready
                 ? r.upcoming
                   ? r.upcoming +
                     (r.upcoming === 1 ? ' upcoming show' : ' upcoming shows')
                   : 'no upcoming shows'
                 : '';
-              return (
-                '<li class="tracked-band">' +
-                (url
-                  ? '<a href="' +
-                    escHtml(url) +
-                    '" target="_blank" rel="noopener noreferrer">' +
-                    escHtml(r.name) +
-                    ' ↗</a>'
-                  : escHtml(r.name)) +
+              return bandRowHtml(
+                r.name,
+                r.url,
                 '<span class="tracked-band__count">' +
-                escHtml(count) +
-                '</span></li>'
+                  escHtml(count) +
+                  '</span>'
               );
             })
             .join('');
@@ -1260,7 +1387,7 @@
           if (was) member.followed.delete(key);
           else member.followed.add(key);
           member.inFlight.add(key);
-          render();
+          refreshFollowView();
           const res = await (
             was ? member.api.unfollow(bandUrl) : member.api.follow(bandUrl)
           ).catch(() => null);
@@ -1270,15 +1397,30 @@
             else member.followed.delete(key);
             setMemberNote('Could not save that change. Please try again.');
           }
-          render();
+          refreshFollowView();
         }
-        el('bandList').addEventListener('click', e => {
+        // All bands: a follow toggle only changes the buttons, so update them
+        // in place. My bands: a card or a "no upcoming shows" row appears or
+        // disappears, so re-render (render() also syncs the tracked pane),
+        // but keep the reader where they were.
+        function refreshFollowView() {
+          if (!member.mine) {
+            syncFollowButtons();
+            return;
+          }
+          const y = window.scrollY;
+          render();
+          window.scrollTo(0, y);
+        }
+        function onFollowClick(e) {
           const btn = e.target.closest('[data-follow]');
           if (!btn) return;
-          e.preventDefault(); // the button sits inside <summary>
+          e.preventDefault(); // on cards the button sits inside <summary>
           e.stopPropagation();
           toggleFollow(btn.getAttribute('data-follow'));
-        });
+        }
+        el('bandList').addEventListener('click', onFollowClick);
+        el('trackedList').addEventListener('click', onFollowClick);
 
         el('suggestForm').addEventListener('submit', async e => {
           e.preventDefault();
@@ -1404,6 +1546,7 @@
           el('suggestPane').hidden = false;
           syncViewButtons();
           renderSuggestions(currentViews());
+          if (trackedDone) renderTracked(); // add the hearts (else load() will)
           render();
           await syncMember();
         }

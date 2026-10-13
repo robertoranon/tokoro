@@ -561,7 +561,8 @@ Treat the link like a house key: anyone who has it can use it as that member (fo
 ### What the member does
 
 - **Open the link once on each device** (phone, laptop). The page says "Hi, <name>", and from then on that device remembers them: next time they just open the tours page normally. The link disappears from the address bar as soon as the page opens.
-- **Follow bands:** tap ♡ on a band. **My bands** shows only the bands they follow; **All bands** shows everything. The page remembers the choice.
+- **Follow bands:** tap ♡ on a band card, or on any band in the **Tracked bands** list (also bands that have no upcoming shows right now). **My bands** shows only the bands they follow; **All bands** shows everything. The page remembers the choice.
+- **Bands without upcoming shows:** in **My bands**, the followed bands that have no upcoming shows are listed under "Following · no upcoming shows", with a link to their website and their ♥ to unfollow. The search box also filters this list by name; "New only" hides it.
 - **Suggest a band:** open **Suggest a band**, type the name and, if they know it, the band's website, then press **Suggest**. Under the form they see their suggestions with a status:
   - **Waiting** — you have not decided yet;
   - **Added** — the band is now on the tours page (and it is followed for them automatically);
