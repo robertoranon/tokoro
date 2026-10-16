@@ -18,11 +18,12 @@ scout-state.json        # scout memory (committed back by the workflow)
 ```
 
 Copy `radar.yml`, `scout.yml` and `tours.yml` from this folder into `.github/workflows/`.
-Tours runs three times a week (Mon, Wed, Fri, 12:00 UTC), each time on one
-third of the sources in `bands.yaml` (`--part 1/3`, `2/3`, `3/3`). A source's
-part comes from a hash of its url, so adding a band never moves the others;
-every source is still checked once a week. A manual run lets you pick a part,
-or `all`. Monday's tours run starts two hours after the radar.
+Tours runs four times a week (Mon, Wed, Fri, Sun, 12:00 UTC): Monday and Friday
+on the first half of the sources in `bands.yaml` (`--part 1/2`), Wednesday and
+Sunday on the second (`--part 2/2`). A source's part comes from a hash of its
+url, so adding a band never moves the others; every source is checked every
+3-4 days. A manual run lets you pick a part, or `all`. Monday's tours run
+starts two hours after the radar.
 After each tours run (even a failed one) the workflow commits `logs/runs.jsonl`
 back to the private repo, and restores it before the next run. That keeps the
 staleness report working (it needs 4 runs of a source) and makes

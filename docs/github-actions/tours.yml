@@ -1,20 +1,20 @@
 # Copy to .github/workflows/tours.yml in the private data repo.
 name: Band tours
 
-# bands.yaml is split in three parts by a stable hash of each source url
-# (`--part N/3`), one part per run: Monday, Wednesday and Friday.
+# bands.yaml is split in two halves by a stable hash of each source url
+# (`--part N/2`): Monday and Friday run part 1, Wednesday and Sunday part 2,
+# so each band is crawled every 3-4 days.
 on:
   schedule:
-    - cron: "0 12 * * 1" # Mondays 12:00 UTC    -> part 1/3
-    - cron: "0 12 * * 3" # Wednesdays 12:00 UTC -> part 2/3
-    - cron: "0 12 * * 5" # Fridays 12:00 UTC    -> part 3/3
+    - cron: "0 12 * * 1,5" # Mon, Fri 12:00 UTC -> part 1/2
+    - cron: "0 12 * * 0,3" # Sun, Wed 12:00 UTC -> part 2/2
   workflow_dispatch:
     inputs:
       part:
         description: "Which part of bands.yaml to run"
         type: choice
-        options: ["1/3", "2/3", "3/3", "all"]
-        default: "1/3"
+        options: ["1/2", "2/2", "all"]
+        default: "1/2"
       retry_failed:
         description: "Only re-run the sources that failed in the last tours run (ignores 'part')"
         type: boolean
@@ -84,9 +84,8 @@ jobs:
           INPUT_RETRY: ${{ inputs.retry_failed }}
         run: |
           case "$EVENT_SCHEDULE" in
-            "0 12 * * 1") PART=1/3 ;;
-            "0 12 * * 3") PART=2/3 ;;
-            "0 12 * * 5") PART=3/3 ;;
+            "0 12 * * 1,5") PART=1/2 ;;
+            "0 12 * * 0,3") PART=2/2 ;;
             *) PART="$INPUT_PART" ;; # manual run
           esac
           ARGS=(--bands "$GITHUB_WORKSPACE/data/bands.yaml")
