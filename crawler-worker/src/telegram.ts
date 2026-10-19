@@ -493,10 +493,20 @@ async function handleMessage(
 ): Promise<void> {
   const chatId = message.chat.id;
 
-  // Tours alert commands: /start <code>, /radar on|off, /stop
-  if (
-    await handleAlertCommand(message, env, text => tg.sendMessage(chatId, text))
+  // Tours alert commands: /start <code>, /radar on|off, /stop. They act on the
+  // chat id of the update, so they only run when the webhook is authenticated
+  // with TELEGRAM_WEBHOOK_SECRET (verified in handleTelegram).
+  const reply = (text: string) => tg.sendMessage(chatId, text);
+  if (env.TELEGRAM_WEBHOOK_SECRET) {
+    if (await handleAlertCommand(message, env, reply)) return;
+  } else if (
+    message.chat.type === 'private' &&
+    message.text &&
+    /^\/(?:start(?:@\S+)?\s+[A-Za-z0-9_-]+|radar(?:@\S+)?(?:\s+\S+)?|stop(?:@\S+)?)$/i.test(
+      message.text.trim()
+    )
   ) {
+    await reply('Telegram alerts are not enabled on this bot yet.');
     return;
   }
 
@@ -760,6 +770,13 @@ async function handleCallbackQuery(
 // Main entry point
 // ---------------------------------------------------------------------------
 
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 export async function handleTelegram(
   request: Request,
   env: Env
@@ -769,10 +786,18 @@ export async function handleTelegram(
     !env.PREVIEW_CACHE ||
     !env.BOT_PRIVKEY ||
     !env.BOT_PUBKEY ||
-    !env.API_WORKER_URL
+    (!env.API_WORKER && !env.API_WORKER_URL)
   ) {
     console.error('Telegram bot: missing required configuration');
     return new Response('OK', { status: 200 });
+  }
+
+  if (env.TELEGRAM_WEBHOOK_SECRET) {
+    const given = request.headers.get('X-Telegram-Bot-Api-Secret-Token') ?? '';
+    if (!timingSafeEqual(given, env.TELEGRAM_WEBHOOK_SECRET)) {
+      console.warn('Telegram bot: invalid webhook secret token');
+      return new Response('Unauthorized', { status: 401 });
+    }
   }
 
   const tg = new TelegramClient(env.TELEGRAM_BOT_TOKEN);
