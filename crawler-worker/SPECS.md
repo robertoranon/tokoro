@@ -328,6 +328,7 @@ Events in the response are `PreparedEvent` objects (geocoded, normalised, unsign
 | Text containing a URL | Crawls in `discover` mode |
 | Photo message | Downloads largest variant, crawls in `image` mode |
 | Image document | Same as photo |
+| `/start <code>`, `/radar on\|off`, `/stop` (private chats only) | Tours alert commands, see "Tours alerts" below |
 | Anything else | Replies with usage hint |
 
 **Confirmation flow:**
@@ -335,6 +336,20 @@ Events in the response are `PreparedEvent` objects (geocoded, normalised, unsign
 1. Bot sends a numbered event summary with two inline buttons: **✅ Publish all** and **📋 Choose one by one**.
 2. **Publish all**: signs and publishes all events immediately, edits the summary message with the tally.
 3. **Choose one by one**: sends each event as a detail card with **✅ Publish** / **❌ Skip** buttons; sends a completion message after the last event.
+
+**Tours alerts:**
+
+Tours members link a private chat to their member identity to get daily digests of new shows and festival editions (`worker/SPECS.md` 7.15). The member requests a code on `tours.html`, which opens `https://t.me/<bot>?start=<code>`; Telegram sends `/start <code>` to the bot. Commands are handled only in private chats (group chats and anything that is not exactly one of these commands fall through to the normal behaviour; plain `/start` without a code keeps its usage hint). `<code>` is `[A-Za-z0-9_-]+`; `/command@botname` forms are accepted.
+
+Each command calls the API worker (service binding `API_WORKER`, else `API_WORKER_URL`) with `POST /telegram/link|settings|unlink`, a JSON body whose `chat_id` is the **string** form of the Telegram chat id, signed with the bot key: headers `X-Pubkey` (`BOT_PUBKEY`), `X-Timestamp` (Unix seconds) and `X-Signature` = Ed25519 over `SHA-256(domain + ":" + body + ":" + timestamp)`, with domains `telegram-link`, `telegram-settings`, `telegram-unlink` (`worker/SPECS.md` 3.6). The API worker must have `TELEGRAM_BOT_PUBKEY` set to `BOT_PUBKEY`.
+
+| Command | Worker call | Reply |
+|---|---|---|
+| `/start <code>` | `POST /telegram/link {code, chat_id}` | 200: "Connected, {name}. You'll get a daily message when your {n} band(s) announce new shows." + radar state line ("Festival radar alerts are off — send /radar on to enable." or "...are on (/radar off to stop them).") + "/stop to disconnect." (name HTML-escaped). 404 or 410: "This link has expired. Open Telegram alerts again from the tours page." 403: "This personal link is no longer active." Other: generic error |
+| `/radar on` / `/radar off` | `POST /telegram/settings {chat_id, radar_alerts}` | "Festival radar alerts are on." / "...are off."; 404: "This chat isn't connected. Open Telegram alerts from your tours page link."; `/radar` with any other argument: "Send /radar on or /radar off." |
+| `/stop` | `POST /telegram/unlink {chat_id}` | "Disconnected. You won't receive alerts."; 404: the "isn't connected" reply |
+
+Any other status or a failed call replies "Something went wrong. Please try again later." The digests themselves are sent by the API worker's 08:00 UTC cron, which needs the same `TELEGRAM_BOT_TOKEN` as this worker (`worker/SPECS.md` 5.6, 7.15.4); this worker sends nothing on a schedule.
 
 **Bot identity:** all published events are attributed to `BOT_PUBKEY`. Generate the keypair once:
 

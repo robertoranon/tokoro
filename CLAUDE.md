@@ -9,7 +9,7 @@ Tokoro is a project that helps in discovering physical, real-world events based 
 1. **Chrome Extension** - Allows a user to request crawling a web page or one of its images to discover and publish events to the API
 2. **Cloudflare Worker (TypeScript)** - Serverless API backend handling events, social graph, and recommendations
 3. **Web Publisher (Static HTML/JS)** - Browser-based event publishing interface hosted on Cloudflare Pages
-4. **Public Web (Static HTML/JS)** - Read-only event query/browse interface hosted on Cloudflare Pages. Includes bookmarklet code that performs web page crawling as the Chrome extension. Also includes `festivals.html`, the festival radar browse page (map + month timeline). Also includes `tours.html`, the band-tours browse page (shows grouped by band); members who open an admin-issued personal link can follow bands (♡), filter to "My bands" and suggest bands (`member.js`).
+4. **Public Web (Static HTML/JS)** - Read-only event query/browse interface hosted on Cloudflare Pages. Includes bookmarklet code that performs web page crawling as the Chrome extension. Also includes `festivals.html`, the festival radar browse page (map + month timeline). Also includes `tours.html`, the band-tours browse page (shows grouped by band); members who open an admin-issued personal link can follow bands (♡), filter to "My bands", suggest bands and connect Telegram alerts (`member.js`).
 5. **Crawler and Crawler-Worker (TypeScript)** - LLM-powered semantic crawler for extracting structured event data from web pages and its combination with the worker (for easier integration into free Cloudflare services). Also includes the band-tours runner (`npm run tours`), which watches band sites and venue listings for new shows.
 6. **Shared** - Common utilities and TypeScript types shared across components
 
@@ -25,6 +25,7 @@ The backend is a single TypeScript Cloudflare Worker that:
 - Executes geo-indexed SQL queries against D1 (SQLite)
 - Handles event expiration via scheduled cron triggers
 - Computes collaborative filtering recommendations
+- Sends a daily Telegram digest (08:00 UTC) of new shows of followed bands and new festival editions to linked members
 
 API Endpoints:
 
@@ -60,6 +61,8 @@ API Endpoints:
 - `GET /member/me` - Member's name, followed bands and own suggestions
 - `POST|DELETE /member/bands/:act_url_b64` - Follow / unfollow a band (base64url site URL)
 - `POST /member/suggestions` - Suggest a band (`name`, optional `url`)
+- `POST /member/telegram/link-code` - One-time code + `t.me` link to connect the member's Telegram chat
+- `POST /telegram/link|settings|unlink` - Called by the bot (signed with the bot key): redeem a code, toggle radar alerts, disconnect
 - `GET|POST /admin/members` - List / create members (admin)
 - `POST /admin/members/:pubkey/revoke`, `DELETE /admin/members/:pubkey` - Revoke / delete a member (admin)
 - `GET /admin/suggestions?status=&detail=1` - Suggestions grouped by band name (admin)
