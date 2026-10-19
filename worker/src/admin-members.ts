@@ -192,10 +192,13 @@ async function deleteMember(
   if (a !== true) return a;
   if (!(await memberExists(env, target)))
     return jsonResponse({ error: 'Member not found' }, 404);
-  // One batch = one transaction: either all three deletes happen or none.
+  // One batch = one transaction: either all the deletes happen or none.
   await env.DB.batch([
     env.DB.prepare('DELETE FROM member_bands WHERE pubkey = ?').bind(target),
     env.DB.prepare('DELETE FROM band_suggestions WHERE pubkey = ?').bind(
+      target
+    ),
+    env.DB.prepare('DELETE FROM telegram_link_codes WHERE pubkey = ?').bind(
       target
     ),
     env.DB.prepare('DELETE FROM members WHERE pubkey = ?').bind(target),

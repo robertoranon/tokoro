@@ -14,6 +14,7 @@ import {
 } from '../../shared/dedup-config';
 import { CORS_HEADERS, jsonResponse } from './http';
 import { routeMemberRequest } from './members';
+import { routeTelegramRequest } from './telegram-link';
 import { routeAdminMemberRequest } from './admin-members';
 
 export interface Env {
@@ -24,6 +25,10 @@ export interface Env {
   LLM_API_KEY?: string; // set via: wrangler secret put LLM_API_KEY
   LLM_PROVIDER?: string; // set via: wrangler secret put LLM_PROVIDER (default: openrouter)
   LLM_MODEL?: string; // set via: wrangler secret put LLM_MODEL (optional override)
+  TELEGRAM_BOT_TOKEN?: string; // set via: wrangler secret put TELEGRAM_BOT_TOKEN (digest sender)
+  TELEGRAM_BOT_USERNAME?: string; // bot username without @, for t.me link codes
+  TELEGRAM_BOT_PUBKEY?: string; // the bot's BOT_PUBKEY; only key allowed on /telegram/*
+  PUBLIC_WEB_URL?: string; // base URL of public-web, for links in digests
 }
 
 interface Event {
@@ -650,8 +655,9 @@ export default {
         return await handleDeleteBlocklist(request, env, targetPubkey);
       }
 
-      // Routes: /member/* and the admin member/suggestion endpoints
+      // Routes: Telegram linking, /member/* and the admin member/suggestion endpoints
       const memberResponse =
+        (await routeTelegramRequest(request, env, path)) ??
         (await routeMemberRequest(request, env, path)) ??
         (await routeAdminMemberRequest(request, env, path));
       if (memberResponse) return memberResponse;
