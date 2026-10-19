@@ -42,6 +42,9 @@ export async function routeTelegramRequest(
 }
 
 async function issueLinkCode(request: Request, env: Env): Promise<Response> {
+  if (!env.TELEGRAM_BOT_USERNAME) {
+    return jsonResponse({ error: 'Telegram not configured' }, 503);
+  }
   const m = await authMember(
     request,
     env,
@@ -49,9 +52,6 @@ async function issueLinkCode(request: Request, env: Env): Promise<Response> {
     LINK_CODE_PATH
   );
   if (m instanceof Response) return m;
-  if (!env.TELEGRAM_BOT_USERNAME) {
-    return jsonResponse({ error: 'Telegram not configured' }, 503);
-  }
   const code = newCode();
   await env.DB.batch([
     env.DB.prepare('DELETE FROM telegram_link_codes WHERE pubkey = ?').bind(
@@ -108,17 +108,14 @@ async function linkChat(
 ): Promise<Response> {
   const code = typeof body.code === 'string' ? body.code : '';
   if (!CODE_RE.test(code)) return jsonResponse({ error: 'Unknown code' }, 404);
+  // Consume the code atomically so two concurrent redemptions cannot both win.
   const row = await env.DB.prepare(
-    'SELECT pubkey, expires_at FROM telegram_link_codes WHERE code = ?'
+    'DELETE FROM telegram_link_codes WHERE code = ? RETURNING pubkey, expires_at'
   )
     .bind(code)
     .first<{ pubkey: string; expires_at: string }>();
   if (!row) return jsonResponse({ error: 'Unknown code' }, 404);
-  const deleteCode = env.DB.prepare(
-    'DELETE FROM telegram_link_codes WHERE code = ?'
-  ).bind(code);
   if (row.expires_at < nowIso()) {
-    await deleteCode.run();
     return jsonResponse({ error: 'Code expired' }, 410);
   }
   const member = await env.DB.prepare(
@@ -127,12 +124,10 @@ async function linkChat(
     .bind(row.pubkey)
     .first<{ name: string; revoked_at: string | null; radar_alerts: number }>();
   if (!member || member.revoked_at) {
-    await deleteCode.run();
     return jsonResponse({ error: 'Not an active member' }, 403);
   }
   // Clear the chat from any other member first: telegram_chat_id is unique.
   await env.DB.batch([
-    deleteCode,
     env.DB.prepare(
       'UPDATE members SET telegram_chat_id = NULL WHERE telegram_chat_id = ? AND pubkey != ?'
     ).bind(chatId, row.pubkey),

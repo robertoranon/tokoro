@@ -147,8 +147,53 @@ describe('POST /telegram/link', () => {
     expect((await link(code, '1')).status).toBe(503);
   });
 
+  it('401 for an expired timestamp and for a signature from another domain', async () => {
+    const body = JSON.stringify({ code: 'a'.repeat(22), chat_id: '1' });
+    const old = await authHeaders(
+      bot,
+      'telegram-link',
+      body,
+      Math.floor(Date.now() / 1000) - 1000
+    );
+    const r1 = await worker.fetch(
+      new Request('https://w.test/telegram/link', {
+        method: 'POST',
+        headers: old,
+        body,
+      }),
+      env
+    );
+    expect(r1.status).toBe(401);
+    const wrong = await authHeaders(bot, 'telegram-settings', body);
+    const r2 = await worker.fetch(
+      new Request('https://w.test/telegram/link', {
+        method: 'POST',
+        headers: wrong,
+        body,
+      }),
+      env
+    );
+    expect(r2.status).toBe(401);
+  });
+
+  it('413 for an oversized body', async () => {
+    const res = await botPost('/telegram/link', 'telegram-link', {
+      code: 'a'.repeat(22),
+      chat_id: '1',
+      pad: 'x'.repeat(9000),
+    });
+    expect(res.status).toBe(413);
+  });
+
   it('400 for a missing or malformed chat_id', async () => {
     expect((await link('a'.repeat(22), 'abc')).status).toBe(400);
+    expect(
+      (
+        await botPost('/telegram/link', 'telegram-link', {
+          code: 'a'.repeat(22),
+        })
+      ).status
+    ).toBe(400);
   });
 });
 
