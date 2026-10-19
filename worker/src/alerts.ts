@@ -2,6 +2,9 @@
 // with radar alerts on, newly announced festival editions. See
 // worker/SPECS.md (Telegram alerts).
 
+import type { Env } from './index';
+import { nowIso } from './members';
+
 export interface AlertEvent {
   id: string;
   title: string;
@@ -205,4 +208,157 @@ export function formatDigest(
     blocks.push(links.join(' · '));
   }
   return blocks.join('\n\n');
+}
+
+export interface DigestOptions {
+  fetchFn?: typeof fetch;
+  today?: string; // "YYYY-MM-DDT00:00:00"; default: the current UTC date
+  sleep?: (ms: number) => Promise<void>;
+}
+
+type SendResult = 'ok' | 'blocked' | 'error';
+
+async function sendTelegram(
+  fetchFn: typeof fetch,
+  token: string,
+  chatId: string,
+  text: string,
+  sleep: (ms: number) => Promise<void>
+): Promise<SendResult> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let res: Response;
+    try {
+      res = await fetchFn(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+        }),
+      });
+    } catch {
+      return 'error';
+    }
+    if (res.ok) return 'ok';
+    if (res.status === 403) return 'blocked';
+    if (res.status === 429 && attempt === 0) {
+      let wait = 1;
+      try {
+        const data = (await res.json()) as any;
+        wait = Number(data?.parameters?.retry_after) || 1;
+      } catch {}
+      await sleep(Math.min(wait, 5) * 1000);
+      continue;
+    }
+    return 'error';
+  }
+  return 'error';
+}
+
+async function loadRecipients(env: Env): Promise<Recipient[]> {
+  const members =
+    (
+      await env.DB.prepare(
+        `SELECT pubkey, name, telegram_chat_id, radar_alerts FROM members
+         WHERE telegram_chat_id IS NOT NULL AND revoked_at IS NULL`
+      ).all<{
+        pubkey: string;
+        name: string;
+        telegram_chat_id: string;
+        radar_alerts: number;
+      }>()
+    ).results || [];
+  const follows =
+    (
+      await env.DB.prepare(
+        `SELECT b.pubkey, b.act_url FROM member_bands b
+         JOIN members m ON m.pubkey = b.pubkey
+         WHERE m.telegram_chat_id IS NOT NULL AND m.revoked_at IS NULL`
+      ).all<{ pubkey: string; act_url: string }>()
+    ).results || [];
+  return members.map(m => ({
+    pubkey: m.pubkey,
+    name: m.name,
+    chat_id: m.telegram_chat_id,
+    radar: m.radar_alerts === 1,
+    bands: follows.filter(f => f.pubkey === m.pubkey).map(f => f.act_url),
+  }));
+}
+
+/** The daily job: one digest per linked member, then every pending flag is cleared. */
+export async function sendAlertDigests(
+  env: Env,
+  opts: DigestOptions = {}
+): Promise<{ sent: number; cleared: number }> {
+  if (!env.TELEGRAM_BOT_TOKEN) return { sent: 0, cleared: 0 };
+  const fetchFn = opts.fetchFn ?? fetch;
+  const today =
+    opts.today ?? new Date().toISOString().slice(0, 10) + 'T00:00:00';
+  const sleep = opts.sleep ?? (ms => new Promise<void>(r => setTimeout(r, ms)));
+
+  const pending =
+    (
+      await env.DB.prepare(
+        `SELECT id, title, start_time, end_time, venue_name, address, url,
+                act_name, act_url, festival_name, festival_url
+         FROM events WHERE alert_pending = 1 AND start_time >= ?`
+      )
+        .bind(today)
+        .all<AlertEvent>()
+    ).results || [];
+  const known = new Set(
+    (
+      (
+        await env.DB.prepare(
+          `SELECT DISTINCT festival_url FROM events
+           WHERE alert_pending = 0 AND festival_url IS NOT NULL AND festival_url != ''
+             AND start_time >= ?`
+        )
+          .bind(today)
+          .all<{ festival_url: string }>()
+      ).results || []
+    ).map(r => r.festival_url)
+  );
+  const shows = pending.filter(e => e.act_url);
+  const editions = newEditions(pending, known);
+  const year = Number(today.slice(0, 4));
+
+  let sent = 0;
+  for (const r of await loadRecipients(env)) {
+    const d = digestFor(r, shows, editions);
+    if (!d) continue;
+    const text = formatDigest(d.shows, d.editions, {
+      year,
+      publicWebUrl: env.PUBLIC_WEB_URL,
+    });
+    const result = await sendTelegram(
+      fetchFn,
+      env.TELEGRAM_BOT_TOKEN,
+      r.chat_id,
+      text,
+      sleep
+    );
+    if (result === 'ok') sent++;
+    else if (result === 'blocked') {
+      await env.DB.prepare(
+        'UPDATE members SET telegram_chat_id = NULL WHERE pubkey = ?'
+      )
+        .bind(r.pubkey)
+        .run();
+    } else {
+      console.error(`[alerts] sending to ${r.pubkey.slice(0, 8)} failed`);
+    }
+  }
+
+  const cleared = (
+    await env.DB.prepare(
+      'UPDATE events SET alert_pending = 0 WHERE alert_pending = 1'
+    ).run()
+  ).meta.changes;
+  await env.DB.prepare('DELETE FROM telegram_link_codes WHERE expires_at < ?')
+    .bind(nowIso())
+    .run();
+  return { sent, cleared };
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   newEditions,
+  sendAlertDigests,
   digestFor,
   formatDigest,
   fmtAlertDate,
@@ -9,6 +10,7 @@ import {
   type AlertEvent,
   type Recipient,
 } from './alerts';
+import { makeD1 } from '../test-support/d1';
 
 const ev = (o: Partial<AlertEvent>): AlertEvent => ({
   id: 'x',
@@ -210,5 +212,189 @@ describe('formatDigest', () => {
       { year: 2026 }
     );
     expect(text).not.toContain('href');
+  });
+});
+
+describe('sendAlertDigests', () => {
+  const TODAY = '2026-10-20T00:00:00';
+
+  async function setup() {
+    const DB = makeD1();
+    const addEvent = (id: string, o: Record<string, unknown>) =>
+      DB.prepare(
+        `INSERT INTO events (id, pubkey, signature, title, lat, lng, geohash5, geohash6,
+           start_time, category, created_at, act_name, act_url, festival_name, festival_url, alert_pending)
+         VALUES (?, 'pk', 'sig', ?, 45, 13, 'u0000', 'u00000', ?, 'music', 'x', ?, ?, ?, ?, ?)`
+      )
+        .bind(
+          id,
+          o.title ?? id,
+          o.start ?? '2026-11-14T21:00:00',
+          o.act_name ?? null,
+          o.act_url ?? null,
+          o.festival_name ?? null,
+          o.festival_url ?? null,
+          o.pending ?? 1
+        )
+        .run();
+    const addMember = async (
+      pk: string,
+      chat: string | null,
+      radar: number,
+      bands: string[],
+      revoked = false
+    ) => {
+      await DB.prepare(
+        'INSERT INTO members (pubkey, name, created_at, revoked_at, telegram_chat_id, radar_alerts) VALUES (?, ?, ?, ?, ?, ?)'
+      )
+        .bind(pk, pk, 'x', revoked ? 'x' : null, chat, radar)
+        .run();
+      for (const b of bands)
+        await DB.prepare(
+          "INSERT INTO member_bands (pubkey, act_url, created_at) VALUES (?, ?, 'x')"
+        )
+          .bind(pk, b)
+          .run();
+    };
+    const sent: { chat_id: string; text: string }[] = [];
+    let status = 200;
+    const fetchFn = async (_url: string, init: any) => {
+      const b = JSON.parse(init.body);
+      sent.push({ chat_id: b.chat_id, text: b.text });
+      return new Response('{}', { status });
+    };
+    const env: any = { DB, TELEGRAM_BOT_TOKEN: 't' };
+    return {
+      DB,
+      env,
+      addEvent,
+      addMember,
+      sent,
+      fetchFn,
+      setStatus: (s: number) => (status = s),
+    };
+  }
+
+  it('sends one message per member with something new, then clears the flags', async () => {
+    const s = await setup();
+    await s.addEvent('a1', {
+      act_name: 'Alpha',
+      act_url: 'https://alpha.example',
+    });
+    await s.addEvent('b1', {
+      act_name: 'Beta',
+      act_url: 'https://beta.example',
+    });
+    await s.addEvent('old', {
+      act_name: 'Alpha',
+      act_url: 'https://alpha.example',
+      start: '2026-10-01T00:00:00',
+    });
+    await s.addEvent('f1', {
+      festival_name: 'Fest',
+      festival_url: 'https://fest.example',
+      start: '2027-06-18T00:00:00',
+    });
+    await s.addMember('anna', '1', 0, ['https://alpha.example']);
+    await s.addMember('bea', '2', 1, []);
+    await s.addMember('cid', '3', 1, ['https://alpha.example'], true); // revoked
+    await s.addMember('dan', null, 1, ['https://alpha.example']); // not linked
+
+    const r = await sendAlertDigests(s.env, {
+      fetchFn: s.fetchFn as any,
+      today: TODAY,
+    });
+
+    expect(s.sent.map(m => m.chat_id).sort()).toEqual(['1', '2']);
+    const annaText = s.sent.find(m => m.chat_id === '1')!.text;
+    expect(annaText).toContain('Alpha');
+    expect(annaText).not.toContain('Beta');
+    expect(annaText).not.toContain('Fest');
+    expect(s.sent.find(m => m.chat_id === '2')!.text).toContain('Fest');
+    expect(r).toEqual({ sent: 2, cleared: 4 });
+    const left = (await s.DB.prepare(
+      'SELECT COUNT(*) AS n FROM events WHERE alert_pending = 1'
+    ).first()) as any;
+    expect(left.n).toBe(0);
+  });
+
+  it('does not announce a festival that already had an upcoming entry', async () => {
+    const s = await setup();
+    await s.addEvent('f0', {
+      festival_url: 'https://fest.example',
+      pending: 0,
+    });
+    await s.addEvent('f1', {
+      festival_url: 'https://fest.example',
+      start: '2026-11-15T00:00:00',
+    });
+    await s.addMember('bea', '2', 1, []);
+    await sendAlertDigests(s.env, { fetchFn: s.fetchFn as any, today: TODAY });
+    expect(s.sent).toEqual([]);
+  });
+
+  it('clears the chat id when the member blocked the bot (403)', async () => {
+    const s = await setup();
+    await s.addEvent('a1', {
+      act_name: 'Alpha',
+      act_url: 'https://alpha.example',
+    });
+    await s.addMember('anna', '1', 0, ['https://alpha.example']);
+    s.setStatus(403);
+    await sendAlertDigests(s.env, { fetchFn: s.fetchFn as any, today: TODAY });
+    const m = (await s.DB.prepare(
+      "SELECT telegram_chat_id FROM members WHERE pubkey = 'anna'"
+    ).first()) as any;
+    expect(m.telegram_chat_id).toBeNull();
+  });
+
+  it('retries once after a 429, waiting retry_after (at most 5 s)', async () => {
+    const s = await setup();
+    await s.addEvent('a1', {
+      act_name: 'Alpha',
+      act_url: 'https://alpha.example',
+    });
+    await s.addMember('anna', '1', 0, ['https://alpha.example']);
+    const waits: number[] = [];
+    let calls = 0;
+    const fetchFn = async () =>
+      ++calls === 1
+        ? new Response(JSON.stringify({ parameters: { retry_after: 30 } }), {
+            status: 429,
+          })
+        : new Response('{}', { status: 200 });
+    const r = await sendAlertDigests(s.env, {
+      fetchFn: fetchFn as any,
+      today: TODAY,
+      sleep: async ms => {
+        waits.push(ms);
+      },
+    });
+    expect(waits).toEqual([5000]);
+    expect(r.sent).toBe(1);
+  });
+
+  it('does nothing without a bot token', async () => {
+    const s = await setup();
+    await s.addEvent('a1', {
+      act_name: 'Alpha',
+      act_url: 'https://alpha.example',
+    });
+    delete s.env.TELEGRAM_BOT_TOKEN;
+    expect(
+      await sendAlertDigests(s.env, { fetchFn: s.fetchFn as any, today: TODAY })
+    ).toEqual({ sent: 0, cleared: 0 });
+  });
+
+  it('deletes expired link codes', async () => {
+    const s = await setup();
+    await s.DB.prepare(
+      "INSERT INTO telegram_link_codes VALUES ('c', 'p', '2000-01-01T00:00:00')"
+    ).run();
+    await sendAlertDigests(s.env, { fetchFn: s.fetchFn as any, today: TODAY });
+    const n = (await s.DB.prepare(
+      'SELECT COUNT(*) AS n FROM telegram_link_codes'
+    ).first()) as any;
+    expect(n.n).toBe(0);
   });
 });

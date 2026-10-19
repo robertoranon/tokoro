@@ -352,6 +352,16 @@ describe('scheduled backup', () => {
     };
   }
 
+  it('the alert cron sends digests and does not back up', async () => {
+    const DB = makeD1(ALL_MIGRATIONS);
+    const bucket = fakeBucket();
+    await worker.scheduled(
+      { cron: '0 8 * * *' } as any,
+      { DB, BACKUP_BUCKET: bucket } as any
+    );
+    expect(bucket.objects.size).toBe(0);
+  });
+
   it('writes events and the member tables to one object per day', async () => {
     const DB = makeD1(ALL_MIGRATIONS);
     await DB.prepare(

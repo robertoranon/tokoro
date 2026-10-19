@@ -16,6 +16,7 @@ import { CORS_HEADERS, jsonResponse } from './http';
 import { routeMemberRequest } from './members';
 import { routeTelegramRequest } from './telegram-link';
 import { routeAdminMemberRequest } from './admin-members';
+import { sendAlertDigests } from './alerts';
 
 export interface Env {
   DB: D1Database;
@@ -459,8 +460,15 @@ export function makeBackupPayload(tables: BackupTables, date: Date): string {
   });
 }
 
+/** The cron entry (wrangler.toml) that sends the Telegram digests. */
+export const ALERT_CRON = '0 8 * * *';
+
 export default {
-  async scheduled(_event: ScheduledEvent, env: Env): Promise<void> {
+  async scheduled(event: ScheduledEvent, env: Env): Promise<void> {
+    if (event.cron === ALERT_CRON) {
+      await sendAlertDigests(env);
+      return;
+    }
     // 1. Expire old events
     const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
     const cutoffStr = formatLocalDateTime(cutoff);

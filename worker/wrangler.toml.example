@@ -10,7 +10,8 @@ database_name = "tokoro-db"
 database_id = "YOUR_D1_DATABASE_ID"
 
 [triggers]
-crons = ["0 2 * * *"]
+# 02:00 UTC: expire old events + R2 backup. 08:00 UTC: Telegram alert digests.
+crons = ["0 2 * * *", "0 8 * * *"]
 
 [[r2_buckets]]
 binding = "BACKUP_BUCKET"
@@ -26,3 +27,7 @@ bucket_name = "tokoro-backups"
 # - LLM_API_KEY: API key for LLM provider (used for duplicate detection)
 # - LLM_PROVIDER: LLM provider name (default: openrouter)
 # - LLM_MODEL: Optional model override
+# - TELEGRAM_BOT_TOKEN: same token as the crawler-worker bot; enables the 08:00 digests
+# - TELEGRAM_BOT_USERNAME: bot username without @ (for t.me link codes)
+# - TELEGRAM_BOT_PUBKEY: the bot's BOT_PUBKEY; the only key accepted on /telegram/*
+# - PUBLIC_WEB_URL: public-web base URL, for the links at the end of a digest
