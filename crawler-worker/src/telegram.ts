@@ -7,6 +7,7 @@
  */
 
 import { Env } from './types';
+import { handleAlertCommand } from './telegram-alerts';
 import { PreparedEvent } from './event-types';
 import { WorkerCrawler } from './crawler-adapter';
 import {
@@ -491,6 +492,13 @@ async function handleMessage(
   tg: TelegramClient
 ): Promise<void> {
   const chatId = message.chat.id;
+
+  // Tours alert commands: /start <code>, /radar on|off, /stop
+  if (
+    await handleAlertCommand(message, env, text => tg.sendMessage(chatId, text))
+  ) {
+    return;
+  }
 
   // Photo message
   if (message.photo && message.photo.length > 0) {
