@@ -147,6 +147,28 @@ describe('digestFor', () => {
 });
 
 describe('formatDigest', () => {
+  it('escapes dates and edition ranges', () => {
+    const text = formatDigest(
+      [
+        ev({
+          act_name: 'A',
+          act_url: 'https://a.example',
+          start_time: '2027-01-01T<b>x',
+        }),
+      ],
+      [
+        {
+          festival_url: 'https://f.example',
+          name: 'F',
+          start: '2027-01-01T<b>x',
+          end: '2027-01-02T<b>x',
+          place: null,
+        },
+      ],
+      { year: 2027 }
+    );
+    expect(text).not.toContain('<b>x');
+  });
   it('groups shows by band (alphabetical), escapes text and adds links', () => {
     const text = formatDigest(
       [

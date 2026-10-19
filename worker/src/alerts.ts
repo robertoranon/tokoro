@@ -194,7 +194,7 @@ export function formatDigest(
         const place = clip(
           [e.venue_name, e.address].filter(Boolean).join(', ')
         );
-        const date = fmtAlertDate(e.start_time, opts.year);
+        const date = esc(fmtAlertDate(e.start_time, opts.year));
         const a = link(e.url, 'page');
         const cost =
           2 +
@@ -217,7 +217,7 @@ export function formatDigest(
     const lines = ['🎪 <b>New festival editions</b>'];
     for (const ed of editions) {
       const name = clip(ed.name);
-      const range = fmtDayRange(ed.start, ed.end);
+      const range = esc(fmtDayRange(ed.start, ed.end));
       const place = ed.place ? clip(ed.place) : '';
       const a = link(ed.festival_url, 'site');
       const cost =

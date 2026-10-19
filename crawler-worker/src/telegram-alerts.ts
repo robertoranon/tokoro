@@ -102,7 +102,7 @@ export async function handleAlertCommand(
   const text = message.text.trim();
   const chat_id = String(message.chat.id);
 
-  const start = text.match(/^\/start(?:@\S+)?\s+([A-Za-z0-9_-]+)$/);
+  const start = text.match(/^\/start(?:@\S+)?\s+([A-Za-z0-9_-]+)$/i);
   const radar = text.match(/^\/radar(?:@\S+)?(?:\s+(\S+))?$/i);
   const stop = /^\/stop(?:@\S+)?$/i.test(text);
   if (!start && !radar && !stop) return false;

@@ -610,6 +610,14 @@ export default {
                 url: 'Band site (optional)',
               },
             },
+            'POST /member/telegram/link-code': {
+              description:
+                'Issue a one-time code to link a Telegram chat for alerts (signed member request)',
+            },
+            'POST /telegram/link|settings|unlink': {
+              description:
+                'Link, configure or unlink a Telegram chat (signed by the bot key; used by the crawler-worker bot)',
+            },
           },
         });
       }

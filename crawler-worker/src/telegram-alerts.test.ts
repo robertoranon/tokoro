@@ -72,6 +72,11 @@ describe('handleAlertCommand', () => {
     expect(replies[0]).toContain('Connected, Anna');
     expect(replies[0]).toContain('3 bands');
     expect(replies[0]).toContain('/radar on');
+    // the command is case-insensitive, like /radar and /stop
+    expect(await handleAlertCommand(dm('/START abcDEF'), env, reply)).toBe(
+      true
+    );
+    expect(calls[1].body.code).toBe('abcDEF');
   });
 
   it('/start with an expired or unknown code explains what to do', async () => {

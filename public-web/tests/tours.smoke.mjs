@@ -1043,7 +1043,7 @@ try {
       await tgPage.page.waitForSelector('#memberBar:not([hidden])');
       check(
         'telegram: button shows the linked state',
-        (await tgPage.page.textContent('#telegramBtn')).includes('on')
+        (await tgPage.page.textContent('#telegramBtn')).includes('alerts: on')
       );
       await tgPage.page.click('#telegramBtn');
       await tgPage.page.waitForURL('https://t.me/**');
