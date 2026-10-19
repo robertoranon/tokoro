@@ -548,6 +548,9 @@
           >
             My bands
           </button>
+          <button id="telegramBtn" class="toggle" type="button">
+            🔔 Telegram alerts
+          </button>
         </div>
         <p
           id="statusLine"
@@ -1324,6 +1327,30 @@
         }
         el('allBandsBtn').addEventListener('click', () => setMine(false));
         el('myBandsBtn').addEventListener('click', () => setMine(true));
+        function syncTelegramButton(telegram) {
+          el('telegramBtn').textContent =
+            telegram && telegram.linked
+              ? '🔔 Telegram alerts: on'
+              : '🔔 Telegram alerts';
+        }
+        el('telegramBtn').addEventListener('click', async () => {
+          if (!member.ok) return;
+          const btn = el('telegramBtn');
+          btn.disabled = true;
+          let res;
+          try {
+            res = await member.api.telegramLinkCode();
+          } catch (err) {
+            res = null; // offline
+          }
+          btn.disabled = false;
+          const url = res && res.ok && res.data && res.data.bot_url;
+          if (typeof url !== 'string' || !/^https:\/\/t\.me\//.test(url)) {
+            setMemberNote('Could not start Telegram alerts. Please try again.');
+            return;
+          }
+          window.location.assign(url);
+        });
 
         async function toggleFollow(bandUrl) {
           if (!member.ok) return;
@@ -1489,6 +1516,7 @@
             ? 'Hi, ' + member.name
             : 'Hi';
           el('memberBar').hidden = false;
+          syncTelegramButton(res.data.telegram);
           el('suggestPane').hidden = false;
           syncViewButtons();
           renderSuggestions(currentViews());
