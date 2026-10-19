@@ -66,6 +66,7 @@ describe('GET /member/me', () => {
       name: 'Anna',
       bands: [],
       suggestions: [],
+      telegram: { linked: false, radar_alerts: false },
     });
   });
 

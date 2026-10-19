@@ -2,7 +2,7 @@
 // run real SQL. Supports prepare().bind().run()/first()/all() and
 // batch([...]) (one transaction, rolled back when a statement fails).
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const nodeRequire = createRequire(import.meta.url);
@@ -56,10 +56,17 @@ function statement(db: any, sql: string, params: unknown[]) {
   };
 }
 
+const MIGRATIONS_DIR = fileURLToPath(
+  new URL('../migrations/', import.meta.url)
+);
+
+/** Every migration file, in order (0001_…, 0002_…). */
+export const ALL_MIGRATIONS: string[] = readdirSync(MIGRATIONS_DIR)
+  .filter(f => f.endsWith('.sql'))
+  .sort();
+
 /** A fresh database with the named migration files applied (from worker/migrations). */
-export function makeD1(
-  migrations: string[] = ['0007_add_members.sql']
-): D1Database {
+export function makeD1(migrations: string[] = ALL_MIGRATIONS): D1Database {
   const db = new DatabaseSync(':memory:');
   for (const name of migrations) {
     const file = fileURLToPath(

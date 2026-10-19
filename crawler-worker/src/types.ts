@@ -24,6 +24,7 @@ export interface Env {
   BOT_PRIVKEY?: string; // Ed25519 private key, hex-encoded
   BOT_PUBKEY?: string; // Ed25519 public key, hex-encoded
   API_WORKER_URL?: string; // Base URL of Tokoro API worker (no trailing slash)
+  TELEGRAM_WEBHOOK_SECRET?: string; // Value passed as secret_token to setWebhook; Telegram sends it in X-Telegram-Bot-Api-Secret-Token
 
   // WhatsApp bot secrets (optional — only needed when using /whatsapp endpoint)
   WHATSAPP_TOKEN?: string; // Permanent system user token from Meta Business

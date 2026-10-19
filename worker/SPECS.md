@@ -24,7 +24,7 @@ This specification is implementation-agnostic and provides sufficient detail to 
 
 ### 2.1 Database Tables
 
-The worker interacts with five SQLite tables: `events`, `blocklist`, and the three member tables (`members`, `member_bands`, `band_suggestions`).
+The worker interacts with five SQLite tables: `events`, `blocklist`, and the three member tables (`members`, `member_bands`, `band_suggestions`), plus `telegram_link_codes` for the Telegram alerts (section 7.15).
 
 #### Events Table
 
@@ -50,6 +50,7 @@ CREATE TABLE events (
   festival_url  TEXT,                   -- optional festival homepage URL (used as festival ID)
   act_name      TEXT,                   -- optional band name (unsigned metadata, band tours)
   act_url       TEXT,                   -- optional band canonical site URL (unsigned metadata; grouping/filter key)
+  alert_pending INTEGER NOT NULL DEFAULT 0, -- Telegram digest state: 0 = none/processed, 1 = in the next digest, 2 = claimed by a running digest job (section 7.15)
   created_at  TEXT NOT NULL,          -- ISO 8601 format
   updated_at  TEXT                    -- ISO 8601 format, updated on edit
 );
@@ -59,6 +60,7 @@ CREATE INDEX idx_geohash5_time ON events (geohash5, start_time);
 CREATE INDEX idx_category_time ON events (category, start_time);
 CREATE INDEX idx_festival_url ON events (festival_url);
 CREATE INDEX idx_act_url ON events (act_url);
+CREATE INDEX idx_events_alert_pending ON events (alert_pending);
 ```
 
 #### Blocklist Table
@@ -83,8 +85,11 @@ CREATE TABLE members (
   pubkey      TEXT PRIMARY KEY,       -- member public key (64 hex chars, lower-case)
   name        TEXT NOT NULL,          -- display name chosen by the admin (1-60 chars)
   created_at  TEXT NOT NULL,          -- ISO 8601 format
-  revoked_at  TEXT                    -- ISO 8601 format; non-null = revoked
+  revoked_at  TEXT,                   -- ISO 8601 format; non-null = revoked
+  telegram_chat_id TEXT,              -- linked private Telegram chat (digits, optional leading '-'); null = not linked
+  radar_alerts INTEGER NOT NULL DEFAULT 0 -- 1 = also receive new festival editions
 );
+CREATE UNIQUE INDEX idx_members_telegram ON members (telegram_chat_id);
 
 CREATE TABLE member_bands (
   pubkey      TEXT NOT NULL,          -- member public key
@@ -105,7 +110,15 @@ CREATE TABLE band_suggestions (
   created_at    TEXT NOT NULL         -- ISO 8601 format
 );
 CREATE INDEX idx_suggestions_status ON band_suggestions (status, created_at);
+
+CREATE TABLE telegram_link_codes (
+  code        TEXT PRIMARY KEY,       -- 22 chars base64url, 128 random bits
+  pubkey      TEXT NOT NULL,          -- member who requested it
+  expires_at  TEXT NOT NULL           -- ISO 8601 format, request time + 15 minutes
+);
 ```
+
+Because `alert_pending` defaults to 0, events that exist when the migration (`0008_add_telegram_alerts.sql`) is applied never trigger alerts: enabling the feature sends no backlog.
 
 `member_bands.act_url` is not checked against the list of tracked bands (the worker does not know it). A row for a band that is no longer tracked is harmless; clients ignore URLs that are not in their tracked list. The tables have no foreign keys: deleting a member deletes its rows explicitly (section 7.12).
 
@@ -240,7 +253,9 @@ The member endpoints (`/member/*`) and the admin member/suggestion endpoints (`/
    - Member endpoints: the pubkey must exist in `members` with `revoked_at IS NULL`, else `403 {"error": "Forbidden", "message": "Not an active member"}`.
    - Admin endpoints: if `ADMIN_PUBKEY` is not configured → `503 {"error": "Admin not configured"}` (checked **before** steps 1-3); the pubkey must equal `ADMIN_PUBKEY` (case-insensitive), else `403 {"error": "Unauthorized"}`.
 
-**Endpoints with a body** (`POST /member/suggestions`, `POST /admin/members`, `POST /admin/suggestions/reject`, `POST /admin/suggestions/link`) are signed over the raw body, so the body must be read before step 3. To avoid buffering bodies for unauthenticated requests, the order of checks is:
+   - Telegram bot endpoints (`POST /telegram/*`): if `TELEGRAM_BOT_PUBKEY` is not configured → `503 {"error": "Telegram not configured"}` (checked **before** steps 1-3); the pubkey must equal it (case-insensitive), else `403 {"error": "Unauthorized"}`.
+
+**Endpoints with a body** (`POST /member/suggestions`, `POST /admin/members`, `POST /admin/suggestions/reject`, `POST /admin/suggestions/link`, `POST /telegram/*`) are signed over the raw body, so the body must be read before step 3. To avoid buffering bodies for unauthenticated requests, the order of checks is:
 
 1. `Content-Length` header present and greater than 8192 bytes → `413 {"error": "Payload too large"}` (before any other check).
 2. Admin endpoints only: `ADMIN_PUBKEY` not configured → `503`.
@@ -257,6 +272,10 @@ The member endpoints (`/member/*`) and the admin member/suggestion endpoints (`/
 | `band-follow` | `POST /member/bands/:act_url_b64` | the normalized `act_url` (decoded from the path, then `normalizeActUrl`) |
 | `band-unfollow` | `DELETE /member/bands/:act_url_b64` | the normalized `act_url` |
 | `band-suggest` | `POST /member/suggestions` | the raw JSON request body, byte for byte |
+| `telegram-link-code` | `POST /member/telegram/link-code` | the literal string `/member/telegram/link-code` |
+| `telegram-link` | `POST /telegram/link` | the raw JSON request body |
+| `telegram-settings` | `POST /telegram/settings` | the raw JSON request body |
+| `telegram-unlink` | `POST /telegram/unlink` | the raw JSON request body |
 | `admin-read` | `GET /admin/members`, `GET /admin/suggestions`, `GET /admin/band-followers` | the request path with its query string exactly as sent (URL pathname + search, e.g. `/admin/suggestions?detail=1`; without a query, just the path such as `/admin/suggestions`). A signature for one query is refused (`401`) for any other, so a captured read cannot be replayed with `?detail=1` added |
 | `admin-member` | `POST /admin/members` | the raw JSON request body |
 | `admin-member-revoke` | `POST /admin/members/:pubkey/revoke` | the target pubkey from the path, lower-cased |
@@ -538,6 +557,15 @@ Then apply `are_events_similar()` to each result.
 |---|---|---|
 | `ALLOWED_PUBKEYS` | Comma-separated Ed25519 public keys (hex) permitted to publish events via `POST /events`. When set, any pubkey not in the list is rejected with `403 Forbidden`. When absent, any valid signature is accepted. Should always include the crawler CLI's `CRAWLER_PUBKEY` for automated publishing. Set via `wrangler secret put ALLOWED_PUBKEYS`. | — (all valid signatures accepted) |
 
+**Telegram alerts (section 7.15):**
+
+| Variable | Description | Default |
+|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | Secret (`wrangler secret put TELEGRAM_BOT_TOKEN`); same bot token as the crawler-worker. Used by the digest job to call `sendMessage`. When unset the digest job does nothing. | — |
+| `TELEGRAM_BOT_USERNAME` | Bot username without `@`, used to build the `t.me` link. When unset, `POST /member/telegram/link-code` answers `503`. | — |
+| `TELEGRAM_BOT_PUBKEY` | The bot's `BOT_PUBKEY` (hex); the only key accepted on `POST /telegram/*`. When unset those endpoints answer `503`. | — |
+| `PUBLIC_WEB_URL` | Base URL of the public web (e.g. `https://tokoro.example`), used for the "All shows" / "Festivals" links in digests. When unset the links line is left out. | — |
+
 **LLM duplicate detection:**
 
 | Variable | Description | Default |
@@ -783,7 +811,7 @@ Optional unsigned metadata fields `festival_name`, `festival_url`, `act_name` an
 6. Check for duplicate events (see section 5)
 7. Generate event ID (see section 6)
 8. Convert `tags` array to JSON string for storage
-9. Insert into database
+9. Insert into database, with `alert_pending = 1` when `act_url` or `festival_url` is non-empty, else `0` (section 7.15)
 
 **Response (201 Created):**
 
@@ -939,7 +967,7 @@ Signature verification precedes the event lookup, so an unauthenticated caller c
 
 The second form is returned when the event already carries the same act (repeat requests are idempotent and write nothing).
 
-**What changes:** only `act_name` and `act_url` are written. The endpoint never overwrites an existing act. `signature`, `created_at` and `updated_at` are left untouched, and the event remains valid because these fields are not part of the signed event data.
+**What changes:** only `act_name` and `act_url` are written, plus `alert_pending = 1` when the band is attached (adopted shows keep an old `created_at`, so the flag is what puts them into the next Telegram digest, section 7.15). `PUT /events/:id` never changes `alert_pending`, so edits and re-dates do not re-alert. The endpoint never overwrites an existing act. `signature`, `created_at` and `updated_at` are left untouched, and the event remains valid because these fields are not part of the signed event data.
 
 **Trust model:** any allowlisted key may tag any untagged event, regardless of who published it, so the allowlist is the access control. `ALLOWED_PUBKEYS` MUST be set in production; when it is not set, any non-blocklisted key with a valid signature can attach an act to any event that has none.
 
@@ -1033,7 +1061,7 @@ DELETE /admin/blocklist/<target_pubkey>
 
 ### 7.11 Member Endpoints
 
-Members are people the admin has given a personal key (section 7.12) so they can follow tracked bands on the tours page and suggest new ones. All three endpoints are signed as described in section 3.6 and require an active member (`403` for an unknown or revoked key). The request paths are matched exactly; any other method or path under `/member/` returns `404 {"error": "Not found"}`.
+Members are people the admin has given a personal key (section 7.12) so they can follow tracked bands on the tours page and suggest new ones. All endpoints are signed as described in section 3.6 and require an active member (`403` for an unknown or revoked key). The request paths are matched exactly; any other method or path under `/member/` returns `404 {"error": "Not found"}`.
 
 #### 7.11.1 GET /member/me
 
@@ -1055,10 +1083,12 @@ Members are people the admin has given a personal key (section 7.12) so they can
       "reject_reason": null,
       "created_at": "2026-10-13T10:00:00"
     }
-  ]
+  ],
+  "telegram": { "linked": true, "radar_alerts": false }
 }
 ```
 
+- `telegram`: `linked` is true when the member has a connected Telegram chat; `radar_alerts` is the opt-in for festival editions (section 7.15).
 - `bands`: the member's followed normalized band URLs, oldest follow first (ties by URL).
 - `suggestions`: all of the member's suggestions in any status, newest first (`id` descending).
 
@@ -1169,7 +1199,7 @@ Signed with domain `admin-member-revoke` over the lower-cased `:pubkey`. Sets `r
 
 #### 7.12.4 DELETE /admin/members/:pubkey (Delete Member)
 
-Signed with domain `admin-member-delete` over the lower-cased `:pubkey`. Deletes the member's rows from `member_bands`, then `band_suggestions`, then `members`, as one atomic unit (a D1 `batch`, which runs as a single transaction): either all three deletes take effect or, if any of them fails, none does and the request fails (`500`) with the member and their data unchanged.
+Signed with domain `admin-member-delete` over the lower-cased `:pubkey`. Deletes the member's rows from `member_bands`, then `band_suggestions`, then `telegram_link_codes`, then `members`, as one atomic unit (a D1 `batch`, which runs as a single transaction): either all four deletes take effect or, if any of them fails, none does and the request fails (`500`) with the member and their data unchanged.
 
 **Response (200 OK):** `{ "message": "Member deleted", "pubkey": "<pubkey>" }`
 
@@ -1264,9 +1294,90 @@ Only follows of active members count: follows of revoked members (`revoked_at` s
 [ { "act_url": "https://band.example", "followers": 3 } ]
 ```
 
+### 7.15 Telegram Alerts
+
+Tours members can connect one private Telegram chat and receive a daily digest of new shows by the bands they follow and, if they opt in, of newly announced festival editions. The API worker detects new items and sends the digests from its cron; the crawler-worker bot only handles linking and settings commands (`crawler-worker/SPECS.md` 3.6).
+
+#### 7.15.1 POST /member/telegram/link-code
+
+**Request:** `POST /member/telegram/link-code`, no body, signed with domain `telegram-link-code` over `/member/telegram/link-code` (section 3.6).
+
+**Order of checks:** `TELEGRAM_BOT_USERNAME` not configured → `503 {"error": "Telegram not configured"}` (before authentication); then member authentication (`401`, `403`).
+
+**Response (200 OK):**
+
+```json
+{ "code": "<22 chars base64url>", "bot_url": "https://t.me/<TELEGRAM_BOT_USERNAME>?start=<code>" }
+```
+
+The code is 128 random bits, valid for 15 minutes, single use. A fresh request deletes all older codes of the same member (delete and insert run as one batch).
+
+#### 7.15.2 Bot endpoints (POST /telegram/link, /telegram/settings, /telegram/unlink)
+
+Signed by the bot as described in section 3.6 (domains `telegram-link`, `telegram-settings`, `telegram-unlink`; payload the raw body; authorization by `TELEGRAM_BOT_PUBKEY`; `503` if unconfigured, `413`/`401`/`403` as in 3.6). Any other method or path is not handled by these routes. The body must be a JSON object (`400 {"error": "Invalid JSON"}` / `{"error": "Invalid body"}`) with `chat_id` a **JSON string** of 1-20 digits with an optional leading `-` (a number is rejected: `400 {"error": "chat_id is required"}`; the bot sends the decimal string of the Telegram chat id).
+
+| Endpoint | Body | Behaviour | Success (200) |
+|---|---|---|---|
+| `POST /telegram/link` | `{code, chat_id}` | Redeems a link code (below) | `{name, bands, radar_alerts}` (`bands` = number of followed bands) |
+| `POST /telegram/settings` | `{chat_id, radar_alerts}` (boolean required, else `400 {"error": "radar_alerts must be true or false"}`) | Sets `radar_alerts` of the member linked to the chat | `{radar_alerts}` |
+| `POST /telegram/unlink` | `{chat_id}` | Sets `telegram_chat_id` to null for the chat | `{unlinked: true}` |
+
+`settings` and `unlink` answer `404 {"error": "Chat not linked"}` when no member has that chat.
+
+**Redeeming a code (`/telegram/link`):**
+
+1. A code that is not 22 base64url characters → `404 {"error": "Unknown code"}`.
+2. The code row is consumed atomically (`DELETE ... RETURNING`), so two concurrent redemptions cannot both succeed. No row → `404 {"error": "Unknown code"}`. The code is consumed in every case below too.
+3. `expires_at` earlier than now → `410 {"error": "Code expired"}`.
+4. The member does not exist or is revoked → `403 {"error": "Not an active member"}`.
+5. The chat is removed from any other member (`telegram_chat_id` is unique) and set on this member (one batch). Linking again from another chat replaces the member's previous chat.
+
+A revoked member keeps the chat id but receives no digests. Deleting a member deletes their link codes (section 7.12.4).
+
+#### 7.15.3 Flagging new items (`alert_pending`)
+
+`alert_pending` is 0 (none / already processed), 1 (to be included in the next digest) or 2 (claimed by a digest job that is running). It is set to 1 by `POST /events` when the event has a non-empty `act_url` or `festival_url`, and by `POST /events/:id/act` when it attaches a band. `PUT /events/:id` never changes it. A flag is used instead of `created_at` because `created_at` is client-supplied and stays old on adopted events.
+
+#### 7.15.4 Digest job
+
+Runs from the `0 8 * * *` cron (section 8.3). Does nothing when `TELEGRAM_BOT_TOKEN` is unset. `today` is the UTC date as `YYYY-MM-DDT00:00:00`.
+
+1. **Claim:** `UPDATE events SET alert_pending = 2 WHERE alert_pending = 1`, then select the claimed events with `start_time >= today`. Events published while the job runs stay at 1 and go into the next digest.
+2. **New shows:** claimed events with an `act_url`.
+3. **New editions:** claimed events with a `festival_url`, grouped by `festival_url` (compared lower-case, trailing slashes ignored). A group is a new edition when **no** event with that `festival_url` has `alert_pending = 0`, whatever its date. This relies on the daily expiry (section 8.1) deleting events 2 days after they end: a processed entry still in the database means the edition is running or upcoming, so it is not announced again; a festival seen for the first time, or whose next edition appears after the last one expired, is announced. An edition is shown with its name (the first non-empty `festival_name` of the group, else the earliest entry's title), the date range from the earliest start to the latest end (or start) of the group, the earliest entry's `venue_name` (else `address`), and a link to `festival_url`.
+4. **Recipients:** members with `telegram_chat_id` not null and `revoked_at` null, with their `member_bands`. A show matches when its `act_url` equals a followed URL after lower-casing and dropping trailing slashes (the rule `tours.html` uses).
+5. **Per recipient:** their shows (followed bands only) plus all new editions if `radar_alerts = 1`. A recipient with nothing is skipped; otherwise one message is sent with `POST https://api.telegram.org/bot<TOKEN>/sendMessage` (`chat_id`, `text`, `parse_mode: "HTML"`, `disable_web_page_preview: true`). At most one message per member per day.
+6. **Send errors:** `403` from Telegram (bot blocked) sets that member's `telegram_chat_id` to null. `429` waits `min(parameters.retry_after, 5)` seconds (1 if absent) and retries once. Any other error (including a network failure) is logged and the member is skipped; their items are not re-sent.
+7. **Send budget:** at most 45 messages per run (`MAX_SENDS_PER_RUN`, to stay under the Workers free plan's 50 subrequests). If more recipients have something to send, a warning is logged and the extra members are skipped that day (they miss those items).
+8. **Finish:** `UPDATE events SET alert_pending = 0 WHERE alert_pending = 2` (this also clears claimed past events and claimed events nobody follows), then `telegram_link_codes` rows with `expires_at` earlier than now are deleted. Flags are cleared once after all sends: if a run crashes midway, members already messaged get the same items again on the next run.
+
+**Message format** (text of API data is HTML-escaped; only `http(s)` URLs become links; fields are clipped to 80 characters with an ellipsis):
+
+```
+🎸 <b>New shows</b>
+<b>Band Name</b>
+• Fri 14 Nov · Venue, Address · <a href="url">page</a>
+• Sat 15 Nov 21:00 · ...
+<b>Other Band</b>
+• ...
+
+🎪 <b>New festival editions</b>
+• <b>Festival Name</b> · 18–21 Jun 2027 · Place · <a href="url">site</a>
+
+…and N more
+
+<a href="PUBLIC_WEB_URL/tours.html">All shows</a> · <a href="PUBLIC_WEB_URL/festivals.html">Festivals</a>
+```
+
+- Bands are in alphabetical order, shows within a band by start time. Show dates are `Ddd D Mon` (weekday, day, month), with the year when it is not the current year and the `HH:MM` time when it is not midnight. Edition ranges are `18 Jun 2027`, `18–21 Jun 2027`, `30 Jun – 2 Jul 2027` or `30 Dec 2026 – 2 Jan 2027`.
+- A message has at most 25 item lines (`MAX_DIGEST_LINES`) and about 3800 visible characters (`MAX_DIGEST_CHARS`; Telegram allows 4096). Items past either limit are counted in a `…and N more` line before the links.
+- The links line is omitted when `PUBLIC_WEB_URL` is not set; "All shows" appears only when the message has shows, "Festivals" only when it has editions.
+
 ---
 
 ## 8. Scheduled Tasks (Cron Triggers)
+
+`wrangler.toml` declares two crons: `0 2 * * *` (event expiration and backup, sections 8.1 and 8.2) and `0 8 * * *` (Telegram digests, section 8.3). The scheduled handler branches on the cron expression that fired: `0 8 * * *` runs only the digest job, any other expression runs expiration and backup. `wrangler.toml.example` carries both.
 
 ### 8.1 Event Expiration Cleanup
 
@@ -1306,6 +1417,10 @@ The 2-day grace period ensures events that have just ended remain visible briefl
 **Example R2 key:** `backups/backup-2026-03-26.json`
 
 **Retention policy:** At most 7 daily snapshots are kept. Additionally, if total R2 storage exceeds 10 GB, the oldest snapshots are removed until the storage cap is satisfied.
+
+### 8.3 Telegram Alert Digests
+
+**Schedule:** Daily at 08:00 UTC (`0 8 * * *`). Runs the digest job of section 7.15.4. Deployment: apply `worker/migrations/0008_add_telegram_alerts.sql` to the remote database **before** deploying a Worker version that includes it, e.g. `wrangler d1 execute tokoro-db --remote --file=migrations/0008_add_telegram_alerts.sql` (see `worker/README.md`), and add the second cron to the (gitignored) `wrangler.toml`.
 
 ---
 
@@ -1576,6 +1691,7 @@ The reference implementation covers these in `worker/src/band-keys.test.ts`, `me
 
 ### 11.5 Scheduled Tasks
 - [x] Cron trigger: delete expired events (2-day grace period, runs at 02:00 UTC)
+- [x] Cron trigger: send Telegram alert digests (runs at 08:00 UTC, section 7.15.4)
 - [x] Cron trigger: back up events table to R2 (`BACKUP_BUCKET`) with 7-snapshot and 10 GB retention
 
 ### 11.6 Testing
@@ -1596,7 +1712,10 @@ The reference implementation (TypeScript/Cloudflare Workers) can be found in:
 - `worker/src/member-auth.ts` — signed-request message and verification (section 3.6)
 - `worker/src/members.ts` — member endpoints (section 7.11)
 - `worker/src/admin-members.ts` — admin member and suggestion endpoints (sections 7.12-7.14)
+- `worker/src/telegram-link.ts` — link-code and bot endpoints (section 7.15.1-7.15.2)
+- `worker/src/alerts.ts` — digest selection, formatting and sending (section 7.15.4)
 - `worker/migrations/0007_add_members.sql` — member tables
+- `worker/migrations/0008_add_telegram_alerts.sql` — Telegram alert columns and link codes
 
 Key dependencies:
 - `@noble/ed25519` — Ed25519 signature library

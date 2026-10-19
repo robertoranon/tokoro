@@ -20,7 +20,7 @@ interface ActiveMember {
 }
 
 /** The active member behind a signed request, or the error Response to return. */
-async function authMember(
+export async function authMember(
   request: Request,
   env: Env,
   domain: string,
@@ -75,10 +75,19 @@ async function handleMemberMe(request: Request, env: Env): Promise<Response> {
   )
     .bind(m.pubkey)
     .all();
+  const tg = await env.DB.prepare(
+    'SELECT telegram_chat_id, radar_alerts FROM members WHERE pubkey = ?'
+  )
+    .bind(m.pubkey)
+    .first<{ telegram_chat_id: string | null; radar_alerts: number }>();
   return jsonResponse({
     name: m.name,
     bands: (bands.results || []).map(r => r.act_url),
     suggestions: suggestions.results || [],
+    telegram: {
+      linked: !!tg?.telegram_chat_id,
+      radar_alerts: tg?.radar_alerts === 1,
+    },
   });
 }
 

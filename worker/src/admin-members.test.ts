@@ -170,6 +170,11 @@ describe('members', () => {
       .bind(anna.pubkey, 'https://a.example', 'x')
       .run();
     await addSuggestion(anna.pubkey, 'Beta');
+    await env.DB.prepare(
+      "INSERT INTO telegram_link_codes (code, pubkey, expires_at) VALUES ('c', ?, '2999-01-01T00:00:00')"
+    )
+      .bind(anna.pubkey)
+      .run();
     await call(
       admin,
       'DELETE',
@@ -185,6 +190,13 @@ describe('members', () => {
     ).first();
     expect(f.n).toBe(0);
     expect(s.n).toBe(0);
+    expect(
+      (
+        (await env.DB.prepare(
+          'SELECT COUNT(*) AS n FROM telegram_link_codes'
+        ).first()) as any
+      ).n
+    ).toBe(0);
   });
 });
 

@@ -5,7 +5,7 @@ import './crypto'; // configures ed.etc.sha512Async
 import worker from './index';
 import { normalizeActUrl, normalizeName } from './band-keys';
 import { makeD1 } from '../test-support/d1';
-import { makeKey, toHex } from '../test-support/sign';
+import { authHeaders, makeKey, toHex } from '../test-support/sign';
 
 const nodeRequire = createRequire(import.meta.url);
 const M = nodeRequire('../../public-web/member.js');
@@ -14,8 +14,9 @@ const AM = nodeRequire('../../admin/members-admin.js');
 async function setup() {
   const admin = await makeKey();
   const env: any = {
-    DB: makeD1(['0005_add_blocklist.sql', '0007_add_members.sql']),
+    DB: makeD1(),
     ADMIN_PUBKEY: admin.pubkey,
+    TELEGRAM_BOT_USERNAME: 'tokoro_bot',
   };
   const fetchFn = (url: string, init: RequestInit) =>
     worker.fetch(new Request(url, init), env);
@@ -29,6 +30,35 @@ async function setup() {
 }
 
 describe('browser and admin clients against the Worker', () => {
+  it('links Telegram: the browser asks for a code, the bot redeems it', async () => {
+    const { env, fetchFn, adminApi } = await setup();
+    const bot = await makeKey();
+    env.TELEGRAM_BOT_PUBKEY = bot.pubkey;
+    const { seed } = await adminApi.createMember('Anna');
+    const api = M.createMemberApi(
+      fetchFn,
+      'https://w.test',
+      await M.importMember(M.b64urlEncode(seed))
+    );
+
+    const issued = await api.telegramLinkCode();
+    expect(issued.ok).toBe(true);
+    const code = new URL(issued.data.bot_url).searchParams.get('start');
+
+    const body = JSON.stringify({ code, chat_id: '555' });
+    const headers = await authHeaders(bot, 'telegram-link', body);
+    const res = await fetchFn('https://w.test/telegram/link', {
+      method: 'POST',
+      headers,
+      body,
+    });
+    expect(res.status).toBe(200);
+    expect((await api.me()).data.telegram).toEqual({
+      linked: true,
+      radar_alerts: false,
+    });
+  });
+
   it('runs the whole flow through the real signing code on both sides', async () => {
     const { fetchFn, adminApi } = await setup();
 

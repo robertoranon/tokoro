@@ -315,11 +315,13 @@ Events in the response are `PreparedEvent` objects (geocoded, normalised, unsign
    wrangler secret put BOT_PRIVKEY   # Ed25519 private key, hex
    wrangler secret put BOT_PUBKEY    # Ed25519 public key, hex
    wrangler secret put API_WORKER_URL # e.g. https://tokoro-worker.xyz.workers.dev
+   wrangler secret put TELEGRAM_WEBHOOK_SECRET # 1-256 chars of A-Z a-z 0-9 _ -
    ```
-3. Register the webhook after deploying:
+3. Register the webhook after deploying, passing the same secret:
    ```bash
-   curl "https://api.telegram.org/bot{TOKEN}/setWebhook?url=https://{worker-host}/telegram"
+   curl "https://api.telegram.org/bot{TOKEN}/setWebhook?url=https://{worker-host}/telegram&secret_token={SECRET}"
    ```
+   Telegram then sends the secret in the `X-Telegram-Bot-Api-Secret-Token` header of every update. When `TELEGRAM_WEBHOOK_SECRET` is set, requests whose header does not match (constant-time comparison) get `401 Unauthorized` and are not processed. When it is unset the webhook is unauthenticated (backward compatible) and tours alert commands are disabled.
 
 **Supported message types:**
 
@@ -328,6 +330,7 @@ Events in the response are `PreparedEvent` objects (geocoded, normalised, unsign
 | Text containing a URL | Crawls in `discover` mode |
 | Photo message | Downloads largest variant, crawls in `image` mode |
 | Image document | Same as photo |
+| `/start <code>`, `/radar on\|off`, `/stop` (private chats only) | Tours alert commands, see "Tours alerts" below |
 | Anything else | Replies with usage hint |
 
 **Confirmation flow:**
@@ -335,6 +338,20 @@ Events in the response are `PreparedEvent` objects (geocoded, normalised, unsign
 1. Bot sends a numbered event summary with two inline buttons: **✅ Publish all** and **📋 Choose one by one**.
 2. **Publish all**: signs and publishes all events immediately, edits the summary message with the tally.
 3. **Choose one by one**: sends each event as a detail card with **✅ Publish** / **❌ Skip** buttons; sends a completion message after the last event.
+
+**Tours alerts:**
+
+Tours members link a private chat to their member identity to get daily digests of new shows and festival editions (`worker/SPECS.md` 7.15). The member requests a code on `tours.html`, which opens `https://t.me/<bot>?start=<code>`; Telegram sends `/start <code>` to the bot. Alert commands act on the chat id of the update, so they are enabled only when `TELEGRAM_WEBHOOK_SECRET` is configured (and the request passed the secret check); otherwise a private-chat `/start <code>`, `/radar` or `/stop` is answered with "Telegram alerts are not enabled on this bot yet." and nothing is sent to the API worker. Commands are handled only in private chats (group chats and anything that is not exactly one of these commands fall through to the normal behaviour; plain `/start` without a code keeps its usage hint). `<code>` is `[A-Za-z0-9_-]+`; `/command@botname` forms are accepted.
+
+Each command calls the API worker (service binding `API_WORKER`, else `API_WORKER_URL`) with `POST /telegram/link|settings|unlink`, a JSON body whose `chat_id` is the **string** form of the Telegram chat id, signed with the bot key: headers `X-Pubkey` (`BOT_PUBKEY`), `X-Timestamp` (Unix seconds) and `X-Signature` = Ed25519 over `SHA-256(domain + ":" + body + ":" + timestamp)`, with domains `telegram-link`, `telegram-settings`, `telegram-unlink` (`worker/SPECS.md` 3.6). The API worker must have `TELEGRAM_BOT_PUBKEY` set to `BOT_PUBKEY`.
+
+| Command | Worker call | Reply |
+|---|---|---|
+| `/start <code>` | `POST /telegram/link {code, chat_id}` | 200: "Connected, {name}. You'll get a daily message when your {n} band(s) announce new shows." + radar state line ("Festival radar alerts are off — send /radar on to enable." or "...are on (/radar off to stop them).") + "/stop to disconnect." (name HTML-escaped). 404 or 410: "This link has expired. Open Telegram alerts again from the tours page." 403: "This personal link is no longer active." Other: generic error |
+| `/radar on` / `/radar off` | `POST /telegram/settings {chat_id, radar_alerts}` | "Festival radar alerts are on." / "...are off."; 404: "This chat isn't connected. Open Telegram alerts from your tours page link."; `/radar` with any other argument: "Send /radar on or /radar off." |
+| `/stop` | `POST /telegram/unlink {chat_id}` | "Disconnected. You won't receive alerts."; 404: the "isn't connected" reply |
+
+Any other status or a failed call replies "Something went wrong. Please try again later." The digests themselves are sent by the API worker's 08:00 UTC cron, which needs the same `TELEGRAM_BOT_TOKEN` as this worker (`worker/SPECS.md` 5.6, 7.15.4); this worker sends nothing on a schedule.
 
 **Bot identity:** all published events are attributed to `BOT_PUBKEY`. Generate the keypair once:
 
@@ -356,7 +373,8 @@ console.log('BOT_PUBKEY=' + hex(pubkey));
 | `TELEGRAM_BOT_TOKEN` | Yes | From @BotFather |
 | `BOT_PRIVKEY` | Yes | Ed25519 private key hex |
 | `BOT_PUBKEY` | Yes | Ed25519 public key hex |
-| `API_WORKER_URL` | Yes | Base URL of Tokoro API worker |
+| `API_WORKER_URL` | Yes (unless the `API_WORKER` binding is present) | Base URL of Tokoro API worker |
+| `TELEGRAM_WEBHOOK_SECRET` | Recommended; required for tours alerts | `secret_token` given to `setWebhook`; verified against `X-Telegram-Bot-Api-Secret-Token` |
 
 ### 3.7 GET /whatsapp and POST /whatsapp (WhatsApp Bot Webhook)
 
@@ -889,6 +907,7 @@ See `../crawler/SPECS.md` section 10 for detailed provider specifications.
 | `TELEGRAM_BOT_TOKEN`  | Yes      | Bot token from @BotFather                                    |
 | `BOT_PRIVKEY`         | Yes      | Ed25519 private key hex — bot's signing identity             |
 | `BOT_PUBKEY`          | Yes      | Ed25519 public key hex — bot's Tokoro identity               |
+| `TELEGRAM_WEBHOOK_SECRET` | Recommended | `secret_token` passed to `setWebhook`; requests with a different `X-Telegram-Bot-Api-Secret-Token` get 401. Required for tours alert commands |
 | `API_WORKER_URL`      | No       | API worker URL (fallback for local dev; production uses the service binding) |
 
 **WhatsApp bot secrets (only required when using the `/whatsapp` endpoint):**

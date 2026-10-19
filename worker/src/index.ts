@@ -14,7 +14,9 @@ import {
 } from '../../shared/dedup-config';
 import { CORS_HEADERS, jsonResponse } from './http';
 import { routeMemberRequest } from './members';
+import { routeTelegramRequest } from './telegram-link';
 import { routeAdminMemberRequest } from './admin-members';
+import { sendAlertDigests } from './alerts';
 
 export interface Env {
   DB: D1Database;
@@ -24,6 +26,10 @@ export interface Env {
   LLM_API_KEY?: string; // set via: wrangler secret put LLM_API_KEY
   LLM_PROVIDER?: string; // set via: wrangler secret put LLM_PROVIDER (default: openrouter)
   LLM_MODEL?: string; // set via: wrangler secret put LLM_MODEL (optional override)
+  TELEGRAM_BOT_TOKEN?: string; // set via: wrangler secret put TELEGRAM_BOT_TOKEN (digest sender)
+  TELEGRAM_BOT_USERNAME?: string; // bot username without @, for t.me link codes
+  TELEGRAM_BOT_PUBKEY?: string; // the bot's BOT_PUBKEY; only key allowed on /telegram/*
+  PUBLIC_WEB_URL?: string; // base URL of public-web, for links in digests
 }
 
 interface Event {
@@ -365,6 +371,14 @@ export type AdoptDecision = 'adopt' | 'already' | 'conflict';
 
 const stripSlash = (s: string) => s.trim().replace(/\/$/, '');
 
+/** 1 when a new event should appear in the next Telegram digest (band shows and festival entries). */
+export function alertPendingFor(e: {
+  act_url?: string | null;
+  festival_url?: string | null;
+}): 0 | 1 {
+  return e.act_url || e.festival_url ? 1 : 0;
+}
+
 // What to do with an event that someone wants to attach an act to.
 export function decideAdopt(
   existingActUrl: string | null | undefined,
@@ -446,8 +460,15 @@ export function makeBackupPayload(tables: BackupTables, date: Date): string {
   });
 }
 
+/** The cron entry (wrangler.toml) that sends the Telegram digests. */
+export const ALERT_CRON = '0 8 * * *';
+
 export default {
-  async scheduled(_event: ScheduledEvent, env: Env): Promise<void> {
+  async scheduled(event: ScheduledEvent, env: Env): Promise<void> {
+    if (event.cron === ALERT_CRON) {
+      await sendAlertDigests(env);
+      return;
+    }
     // 1. Expire old events
     const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
     const cutoffStr = formatLocalDateTime(cutoff);
@@ -589,6 +610,14 @@ export default {
                 url: 'Band site (optional)',
               },
             },
+            'POST /member/telegram/link-code': {
+              description:
+                'Issue a one-time code to link a Telegram chat for alerts (signed member request)',
+            },
+            'POST /telegram/link|settings|unlink': {
+              description:
+                'Link, configure or unlink a Telegram chat (signed by the bot key; used by the crawler-worker bot)',
+            },
           },
         });
       }
@@ -642,8 +671,9 @@ export default {
         return await handleDeleteBlocklist(request, env, targetPubkey);
       }
 
-      // Routes: /member/* and the admin member/suggestion endpoints
+      // Routes: Telegram linking, /member/* and the admin member/suggestion endpoints
       const memberResponse =
+        (await routeTelegramRequest(request, env, path)) ??
         (await routeMemberRequest(request, env, path)) ??
         (await routeAdminMemberRequest(request, env, path));
       if (memberResponse) return memberResponse;
@@ -1124,8 +1154,8 @@ async function handlePostEvent(request: Request, env: Env): Promise<Response> {
 			id, pubkey, signature, title, description, url, venue_name, address,
 			lat, lng, geohash5, geohash6, start_time, end_time,
 			category, tags, created_at, festival_name, festival_url,
-			act_name, act_url
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			act_name, act_url, alert_pending
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
   )
     .bind(
@@ -1149,7 +1179,8 @@ async function handlePostEvent(request: Request, env: Env): Promise<Response> {
       event.festival_name || null,
       event.festival_url || null,
       event.act_name || null,
-      event.act_url || null
+      event.act_url || null,
+      alertPendingFor(event)
     )
     .run();
 
@@ -1306,7 +1337,7 @@ async function handleAdoptAct(
   }
 
   await env.DB.prepare(
-    'UPDATE events SET act_name = ?, act_url = ? WHERE id = ?'
+    'UPDATE events SET act_name = ?, act_url = ?, alert_pending = 1 WHERE id = ?'
   )
     .bind(v.actName, v.actUrl, eventId)
     .run();

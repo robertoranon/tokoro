@@ -127,6 +127,11 @@ const server = http.createServer(async (req, res) => {
       }
       return;
     }
+    if (url.pathname === '/member/telegram/link-code') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ code: 'abc', bot_url: 'https://t.me/tokoro_bot?start=abc' }));
+      return;
+    }
     if (url.pathname === '/member/suggestions') {
       const b = JSON.parse(raw);
       state.memberMe.suggestions.unshift({
@@ -1019,6 +1024,36 @@ try {
         (await broken.page.evaluate(() => localStorage.getItem('tokoro_member'))) === seed
       );
       await broken.context.close();
+    }
+
+    // Telegram alerts: the button asks for a code and opens the bot link
+    state.memberMe = {
+      name: 'Anna',
+      bands: [],
+      suggestions: [],
+      telegram: { linked: true, radar_alerts: false },
+    };
+    {
+      const tgPage = await newPage(browser);
+      await tgPage.page.route('https://t.me/**', r =>
+        r.fulfill({ status: 200, contentType: 'text/html', body: 'telegram' })
+      );
+      await tgPage.page.addInitScript(s => localStorage.setItem('tokoro_member', s), seed);
+      await tgPage.page.goto(base + '/tours.html');
+      await tgPage.page.waitForSelector('#memberBar:not([hidden])');
+      check(
+        'telegram: button shows the linked state',
+        (await tgPage.page.textContent('#telegramBtn')).includes('alerts: on')
+      );
+      await tgPage.page.click('#telegramBtn');
+      await tgPage.page.waitForURL('https://t.me/**');
+      check('telegram: opens the bot link', tgPage.page.url() === 'https://t.me/tokoro_bot?start=abc', tgPage.page.url());
+      check(
+        'telegram: asked the worker for a code',
+        state.memberRequests.includes('POST /member/telegram/link-code'),
+        state.memberRequests
+      );
+      await tgPage.context.close();
     }
 
     // revoked or unknown: back to the visitor view, nothing stored

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   parseWindowParam,
   eventsToICal,
@@ -20,17 +20,8 @@ import {
   BACKUP_TABLES,
 } from './index';
 import worker from './index';
-import { makeD1 } from '../test-support/d1';
+import { makeD1, ALL_MIGRATIONS } from '../test-support/d1';
 
-const ALL_MIGRATIONS = [
-  '0001_create_events_table.sql',
-  '0002_add_address_field.sql',
-  '0003_convert_timestamps_to_text.sql',
-  '0004_add_festival_fields.sql',
-  '0005_add_blocklist.sql',
-  '0006_add_act_fields.sql',
-  '0007_add_members.sql',
-];
 import { verifyActSignature, actMessage } from './crypto';
 import { isDuplicate } from '../../shared/llm/duplicate-check';
 import { encode as geohashEncode, neighbors } from './geohash';
@@ -361,6 +352,40 @@ describe('scheduled backup', () => {
     };
   }
 
+  it('the alert cron sends digests and does not back up', async () => {
+    const DB = makeD1(ALL_MIGRATIONS);
+    await DB.prepare(
+      'INSERT INTO members (pubkey, name, created_at, telegram_chat_id) VALUES (?, ?, ?, ?)'
+    )
+      .bind('p1', 'Ann', '2026-10-01T00:00:00', '42')
+      .run();
+    await DB.prepare(
+      'INSERT INTO member_bands (pubkey, act_url, created_at) VALUES (?, ?, ?)'
+    )
+      .bind('p1', 'https://band.example', '2026-10-01T00:00:00')
+      .run();
+    await DB.prepare(
+      `INSERT INTO events (id, pubkey, signature, title, lat, lng, geohash5, geohash6,
+         start_time, category, created_at, act_name, act_url, alert_pending)
+       VALUES ('e1', 'pk', 'sig', 'Show', 45, 13, 'u0000', 'u00000', '2999-01-01T20:00:00',
+         'music', 'x', 'Band', 'https://band.example', 1)`
+    ).run();
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const bucket = fakeBucket();
+      await worker.scheduled(
+        { cron: '0 8 * * *' } as any,
+        { DB, BACKUP_BUCKET: bucket, TELEGRAM_BOT_TOKEN: 't' } as any
+      );
+      expect(bucket.objects.size).toBe(0);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect((fetchMock.mock.calls[0] as any)[0]).toContain('/sendMessage');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('writes events and the member tables to one object per day', async () => {
     const DB = makeD1(ALL_MIGRATIONS);
     await DB.prepare(
@@ -398,6 +423,8 @@ describe('scheduled backup', () => {
         name: 'Ann',
         created_at: '2026-10-01T00:00:00',
         revoked_at: null,
+        telegram_chat_id: null,
+        radar_alerts: 0,
       },
     ]);
     expect(parsed.tables.member_bands[0].act_url).toBe('https://band.example');

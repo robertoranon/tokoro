@@ -20,3 +20,4 @@ workers_dev = true
 # - CRAWLER_API_KEYS: Comma-separated list of allowed API keys
 # - LLM_API_KEY: API key for LLM provider (OpenAI, Anthropic, etc.)
 # - LLM_PROVIDER: LLM provider name (openai, anthropic, openrouter, ollama)
+# - TELEGRAM_WEBHOOK_SECRET: secret_token passed to Telegram setWebhook (enables webhook auth and tours alerts)
