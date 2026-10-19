@@ -213,3 +213,14 @@ test('supportsEd25519: false (never throws) when Ed25519 is missing', async () =
   };
   assert.equal(await M.supportsEd25519(throwingSync), false);
 });
+
+test('telegramLinkCode signs a POST to the link-code endpoint', async () => {
+  const member = await M.importMember(RFC_SEED_B64);
+  const calls = [];
+  const api = M.createMemberApi(async (url, init) => { calls.push({ url, init }); return jsonRes(200, { code: 'c', bot_url: 'https://t.me/b?start=c' }); }, 'https://w.test', member);
+  const res = await api.telegramLinkCode();
+  assert.equal(res.data.bot_url, 'https://t.me/b?start=c');
+  assert.equal(calls[0].url, 'https://w.test/member/telegram/link-code');
+  assert.equal(calls[0].init.method, 'POST');
+  assert.equal(await verifies(member, calls[0].init.headers, 'telegram-link-code', '/member/telegram/link-code'), true);
+});

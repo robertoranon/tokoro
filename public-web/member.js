@@ -278,6 +278,13 @@ function createMemberApi(
       const body = JSON.stringify(obj);
       return call('POST', '/member/suggestions', 'band-suggest', body, body);
     },
+    telegramLinkCode: () =>
+      call(
+        'POST',
+        '/member/telegram/link-code',
+        'telegram-link-code',
+        '/member/telegram/link-code'
+      ),
   };
 }
 
