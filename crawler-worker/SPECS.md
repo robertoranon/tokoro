@@ -323,6 +323,9 @@ Events in the response are `PreparedEvent` objects (geocoded, normalised, unsign
    ```
    Telegram then sends the secret in the `X-Telegram-Bot-Api-Secret-Token` header of every update. When `TELEGRAM_WEBHOOK_SECRET` is set, requests whose header does not match (constant-time comparison) get `401 Unauthorized` and are not processed. When it is unset the webhook is unauthenticated (backward compatible) and tours alert commands are disabled.
 
+   On a bot that is already live, set the secret and call `setWebhook` back to back: in between, Telegram's updates are rejected with `401` (Telegram retries them). If `setWebhook` cannot be called, deleting `TELEGRAM_WEBHOOK_SECRET` restores the unauthenticated behaviour.
+4. For tours alerts, the API worker also needs `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` and `TELEGRAM_BOT_PUBKEY` set to this bot's `BOT_PUBKEY` (`worker/SPECS.md` section 7.15).
+
 **Supported message types:**
 
 | Input | Behaviour |

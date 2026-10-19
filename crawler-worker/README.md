@@ -492,6 +492,7 @@ The bot parses the query with the LLM, geocodes the location, queries the API, a
    wrangler secret put BOT_PRIVKEY
    wrangler secret put BOT_PUBKEY
    wrangler secret put TELEGRAM_BOT_USERNAME   # bot username without @, needed for group queries
+   wrangler secret put TELEGRAM_WEBHOOK_SECRET # random, 1-256 chars of A-Z a-z 0-9 _ - (e.g. openssl rand -hex 32)
    ```
 
 4. Add the Service Binding to `wrangler.toml` (required — Workers cannot call other Workers via `workers.dev` URLs):
@@ -506,10 +507,14 @@ The bot parses the query with the LLM, geocodes the location, queries the API, a
 
    ```bash
    npm run deploy
-   curl "https://api.telegram.org/bot{TOKEN}/setWebhook?url=https://tokoro-crawler-worker.{subdomain}.workers.dev/telegram"
+   curl "https://api.telegram.org/bot{TOKEN}/setWebhook?url=https://tokoro-crawler-worker.{subdomain}.workers.dev/telegram&secret_token={SECRET}"
    ```
 
-**Bot identity:** all events the bot publishes appear under `BOT_PUBKEY` in the Tokoro API. The keypair is permanent — keep `BOT_PRIVKEY` safe and back it up.
+   `{SECRET}` is the `TELEGRAM_WEBHOOK_SECRET` value. Once the secret is set, updates without it get `401`, so on a bot that is already live run `setWebhook` right after `wrangler secret put TELEGRAM_WEBHOOK_SECRET` (Telegram retries the updates rejected in between). If `setWebhook` fails, delete the secret (`wrangler secret delete TELEGRAM_WEBHOOK_SECRET`) to bring the bot back until you can retry.
+
+6. **Tours alerts (optional):** with the webhook secret set, the bot also handles `/start <code>`, `/radar on|off` and `/stop` for tours members. The digests are sent by the API worker, which needs `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_BOT_PUBKEY` (= this bot's `BOT_PUBKEY`) and `PUBLIC_WEB_URL`; see "Telegram alerts (setup)" in `worker/README.md`. Without the webhook secret these commands reply that alerts are not enabled.
+
+**Bot identity:** all events the bot publishes appear under `BOT_PUBKEY` in the Tokoro API. The keypair is permanent — keep `BOT_PRIVKEY` safe and back it up, and note `BOT_PUBKEY` too: wrangler cannot read secrets back, and the API worker needs it for tours alerts.
 
 ---
 

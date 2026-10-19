@@ -211,6 +211,8 @@ These endpoints are authenticated with headers, not body fields: `X-Pubkey`, `X-
 | `POST /member/bands/:act_url_b64` | member | follow a band (base64url site URL) |
 | `DELETE /member/bands/:act_url_b64` | member | unfollow a band |
 | `POST /member/suggestions` | member | suggest a band `{name, url?}` |
+| `POST /member/telegram/link-code` | member | one-time code and `t.me` link to connect a Telegram chat |
+| `POST /telegram/link`, `/telegram/settings`, `/telegram/unlink` | bot | redeem a link code, toggle radar alerts, disconnect a chat |
 | `GET /admin/members` | admin | list members with followed-band counts |
 | `POST /admin/members` | admin | create a member `{pubkey, name}` |
 | `POST /admin/members/:pubkey/revoke` | admin | revoke a member's link |
@@ -220,7 +222,24 @@ These endpoints are authenticated with headers, not body fields: `X-Pubkey`, `X-
 | `POST /admin/suggestions/link` | admin | link `{ids, act_url}` to a tracked band and follow it for the suggesters |
 | `GET /admin/band-followers` | admin | follower count per band |
 
-Request and response bodies, status codes and error messages: `SPECS.md` sections 7.11-7.14.
+Request and response bodies, status codes and error messages: `SPECS.md` sections 7.11-7.15.
+
+### Telegram alerts (setup)
+
+Linked members get a daily digest at 08:00 UTC (second cron in `wrangler.toml`) with new shows of the bands they follow and, if they send `/radar on` to the bot, new festival editions (`SPECS.md` section 7.15). The bot side (linking commands) runs in `crawler-worker`, which must have `TELEGRAM_WEBHOOK_SECRET` set (see `crawler-worker/README.md`).
+
+Set on this worker, from `worker/`:
+
+```bash
+wrangler secret put TELEGRAM_BOT_TOKEN      # same token as the crawler-worker bot
+wrangler secret put TELEGRAM_BOT_USERNAME   # bot username without @ (getMe → result.username)
+wrangler secret put TELEGRAM_BOT_PUBKEY     # the crawler-worker's BOT_PUBKEY (hex)
+wrangler secret put PUBLIC_WEB_URL          # e.g. https://tokoro-query.pages.dev, for the digest links
+```
+
+Until these are set, the digest job does nothing and the Telegram endpoints answer `503`. Wrangler cannot read secret values back, so keep the bot token and `BOT_PUBKEY` somewhere safe. The bot's `BOT_PUBKEY` is also the author key of every event the bot publishes.
+
+When piping values into `wrangler secret put` from zsh (the macOS default shell), use `read -r "VAR?prompt: "` instead of bash's `read -p`, and do not use `USERNAME` as a variable name: zsh reserves it for your login name.
 
 ## Authentication & Security
 
@@ -471,6 +490,8 @@ npm run deploy
 
 ### Manual local backup (SQL dump)
 
+Exports the production (remote) database to a local file.
+
 ```bash
 # From project root — saves backup-YYYY-MM-DD.sql to current directory
 ./scripts/backup-local.sh
@@ -484,10 +505,10 @@ npm run deploy
 Download a backup file from R2:
 
 ```bash
-wrangler r2 object get tokoro-backups/backups/backup-2026-03-26.json --file backup.json
+wrangler r2 object get tokoro-backups/backups/backup-2026-03-26.json --file backup.json --remote
 ```
 
-Then restore it (events, member tables and blocklist; older backups restore just the tables they contain, e.g. only the events, or everything but the blocklist):
+Then restore it into the production database (events, member tables and blocklist; older backups restore just the tables they contain, e.g. only the events, or everything but the blocklist):
 
 ```bash
 # From project root
@@ -502,9 +523,7 @@ Then restore it (events, member tables and blocklist; older backups restore just
 
 ### List backups in R2
 
-```bash
-wrangler r2 object list tokoro-backups --prefix backups/
-```
+Wrangler has no command to list objects. Backups are named `backups/backup-YYYY-MM-DD.json` (the last 7 days), so fetch one by date, or browse the bucket in the Cloudflare dashboard (R2 → `tokoro-backups`).
 
 ## Deployment Checklist
 

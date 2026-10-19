@@ -4,12 +4,12 @@ set -euo pipefail
 # Usage: ./scripts/restore-from-backup.sh <backup-file.json>
 # Restores events, the member tables (members, member_bands,
 # band_suggestions) and the blocklist from a JSON backup file (produced by the
-# Worker R2 backup) into the D1 database using wrangler d1 execute. Older
+# Worker R2 backup) into the remote (production) D1 database using wrangler d1 execute. Older
 # backups restore just the tables they contain (e.g. only events, or no
 # blocklist).
 #
 # WARNING: This inserts rows — it does NOT clear the tables first.
-# Run manually: wrangler d1 execute tokoro-db --command "DELETE FROM events"
+# Run manually: wrangler d1 execute tokoro-db --remote --command "DELETE FROM events"
 # (and likewise for the member tables and the blocklist) before restoring if you want a clean slate.
 
 if [ $# -lt 1 ]; then
@@ -58,6 +58,6 @@ EOF
 
 cd "$(dirname "$0")/../worker"
 echo "Executing SQL against $DB_NAME ..."
-npx wrangler d1 execute "$DB_NAME" --file "$SQL_FILE"
+npx wrangler d1 execute "$DB_NAME" --remote --file "$SQL_FILE"
 rm "$SQL_FILE"
 echo "Restore complete."
