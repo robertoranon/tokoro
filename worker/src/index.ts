@@ -365,6 +365,14 @@ export type AdoptDecision = 'adopt' | 'already' | 'conflict';
 
 const stripSlash = (s: string) => s.trim().replace(/\/$/, '');
 
+/** 1 when a new event should appear in the next Telegram digest (band shows and festival entries). */
+export function alertPendingFor(e: {
+  act_url?: string | null;
+  festival_url?: string | null;
+}): 0 | 1 {
+  return e.act_url || e.festival_url ? 1 : 0;
+}
+
 // What to do with an event that someone wants to attach an act to.
 export function decideAdopt(
   existingActUrl: string | null | undefined,
@@ -1124,8 +1132,8 @@ async function handlePostEvent(request: Request, env: Env): Promise<Response> {
 			id, pubkey, signature, title, description, url, venue_name, address,
 			lat, lng, geohash5, geohash6, start_time, end_time,
 			category, tags, created_at, festival_name, festival_url,
-			act_name, act_url
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			act_name, act_url, alert_pending
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
   )
     .bind(
@@ -1149,7 +1157,8 @@ async function handlePostEvent(request: Request, env: Env): Promise<Response> {
       event.festival_name || null,
       event.festival_url || null,
       event.act_name || null,
-      event.act_url || null
+      event.act_url || null,
+      alertPendingFor(event)
     )
     .run();
 
@@ -1306,7 +1315,7 @@ async function handleAdoptAct(
   }
 
   await env.DB.prepare(
-    'UPDATE events SET act_name = ?, act_url = ? WHERE id = ?'
+    'UPDATE events SET act_name = ?, act_url = ?, alert_pending = 1 WHERE id = ?'
   )
     .bind(v.actName, v.actUrl, eventId)
     .run();
