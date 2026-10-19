@@ -28,7 +28,7 @@ beforeEach(async () => {
   admin = await makeKey();
   anna = await makeKey();
   env = {
-    DB: makeD1(['0005_add_blocklist.sql', '0007_add_members.sql']),
+    DB: makeD1(),
     ADMIN_PUBKEY: admin.pubkey,
   };
 });

@@ -14,7 +14,7 @@ const AM = nodeRequire('../../admin/members-admin.js');
 async function setup() {
   const admin = await makeKey();
   const env: any = {
-    DB: makeD1(['0005_add_blocklist.sql', '0007_add_members.sql']),
+    DB: makeD1(),
     ADMIN_PUBKEY: admin.pubkey,
   };
   const fetchFn = (url: string, init: RequestInit) =>

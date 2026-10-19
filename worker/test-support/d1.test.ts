@@ -72,3 +72,21 @@ describe('makeD1 batch', () => {
     expect(await count(db, 'members')).toBe(2);
   });
 });
+
+describe('makeD1 default schema', () => {
+  it('applies every migration, including the telegram alert columns', async () => {
+    const db = makeD1();
+    await db
+      .prepare(
+        'INSERT INTO members (pubkey, name, created_at) VALUES (?, ?, ?)'
+      )
+      .bind('p1', 'Ann', 'x')
+      .run();
+    const m = (await db
+      .prepare('SELECT telegram_chat_id, radar_alerts FROM members')
+      .first()) as any;
+    expect(m).toEqual({ telegram_chat_id: null, radar_alerts: 0 });
+    expect(await count(db, 'telegram_link_codes')).toBe(0);
+    expect(await count(db, 'events')).toBe(0);
+  });
+});

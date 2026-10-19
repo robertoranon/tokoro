@@ -20,17 +20,8 @@ import {
   BACKUP_TABLES,
 } from './index';
 import worker from './index';
-import { makeD1 } from '../test-support/d1';
+import { makeD1, ALL_MIGRATIONS } from '../test-support/d1';
 
-const ALL_MIGRATIONS = [
-  '0001_create_events_table.sql',
-  '0002_add_address_field.sql',
-  '0003_convert_timestamps_to_text.sql',
-  '0004_add_festival_fields.sql',
-  '0005_add_blocklist.sql',
-  '0006_add_act_fields.sql',
-  '0007_add_members.sql',
-];
 import { verifyActSignature, actMessage } from './crypto';
 import { isDuplicate } from '../../shared/llm/duplicate-check';
 import { encode as geohashEncode, neighbors } from './geohash';
@@ -398,6 +389,8 @@ describe('scheduled backup', () => {
         name: 'Ann',
         created_at: '2026-10-01T00:00:00',
         revoked_at: null,
+        telegram_chat_id: null,
+        radar_alerts: 0,
       },
     ]);
     expect(parsed.tables.member_bands[0].act_url).toBe('https://band.example');
