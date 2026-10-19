@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   newEditions,
   sendAlertDigests,
@@ -7,6 +7,7 @@ import {
   fmtAlertDate,
   fmtDayRange,
   MAX_DIGEST_LINES,
+  MAX_SENDS_PER_RUN,
   type AlertEvent,
   type Recipient,
 } from './alerts';
@@ -108,6 +109,19 @@ describe('newEditions', () => {
   });
 });
 
+describe('newEditions url keys', () => {
+  it('ignores case and trailing slash when matching known festivals', () => {
+    const e = ev({ festival_url: 'https://fest.example' });
+    expect(newEditions([e], new Set(['https://fest.example']))).toHaveLength(0);
+    expect(
+      newEditions(
+        [e],
+        new Set(['https://fest.example/'.toLowerCase().replace(/\/+$/, '')])
+      )
+    ).toEqual([]);
+  });
+});
+
 describe('digestFor', () => {
   const shows = [
     ev({ id: 's1', act_url: 'https://Alpha.example', act_name: 'Alpha' }),
@@ -197,6 +211,33 @@ describe('formatDigest', () => {
       MAX_DIGEST_LINES
     );
     expect(text.endsWith('…and 5 more')).toBe(true);
+  });
+
+  it('stays within the Telegram length limit', () => {
+    const long = 'V'.repeat(150);
+    const many = Array.from({ length: 25 }, (_, i) =>
+      ev({
+        act_name: `${i} ${long}`,
+        act_url: `https://a${i}.example`,
+        start_time: `2026-12-${String(i + 1).padStart(2, '0')}T20:00:00`,
+        venue_name: long,
+        address: long,
+      })
+    );
+    const text = formatDigest(many, [], {
+      year: 2026,
+      publicWebUrl: 'https://t.example',
+    });
+    const plain = text
+      .replace(/<[^>]+>/g, '')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&');
+    expect(plain.length).toBeLessThanOrEqual(4096);
+    expect(text).toMatch(
+      /…and \d+ more\n\n<a href="https:\/\/t\.example\/tours\.html">/
+    );
   });
 
   it('never links a non-http url', () => {
@@ -396,5 +437,99 @@ describe('sendAlertDigests', () => {
       'SELECT COUNT(*) AS n FROM telegram_link_codes'
     ).first()) as any;
     expect(n.n).toBe(0);
+  });
+
+  it('a 500 for one member does not stop the others; flags are still cleared', async () => {
+    const s = await setup();
+    await s.addEvent('a1', {
+      act_name: 'Alpha',
+      act_url: 'https://alpha.example',
+    });
+    await s.addMember('anna', '1', 0, ['https://alpha.example']);
+    await s.addMember('bea', '2', 0, ['https://alpha.example']);
+    const sent: string[] = [];
+    const fetchFn = async (_u: string, init: any) => {
+      const b = JSON.parse(init.body);
+      sent.push(b.chat_id);
+      return new Response('{}', { status: b.chat_id === '1' ? 500 : 200 });
+    };
+    const r = await sendAlertDigests(s.env, {
+      fetchFn: fetchFn as any,
+      today: TODAY,
+    });
+    expect(sent.sort()).toEqual(['1', '2']);
+    expect(r.sent).toBe(1);
+    const left = (await s.DB.prepare(
+      'SELECT COUNT(*) AS n FROM events WHERE alert_pending != 0'
+    ).first()) as any;
+    expect(left.n).toBe(0);
+  });
+
+  it('leaves past pending events out of messages but clears them', async () => {
+    const s = await setup();
+    await s.addEvent('old', {
+      act_name: 'Alpha',
+      act_url: 'https://alpha.example',
+      start: '2026-10-01T00:00:00',
+    });
+    await s.addMember('anna', '1', 0, ['https://alpha.example']);
+    const r = await sendAlertDigests(s.env, {
+      fetchFn: s.fetchFn as any,
+      today: TODAY,
+    });
+    expect(s.sent).toEqual([]);
+    expect(r.cleared).toBe(1);
+  });
+
+  it('keeps events flagged while sending pending for the next run', async () => {
+    const s = await setup();
+    await s.addEvent('a1', {
+      act_name: 'Alpha',
+      act_url: 'https://alpha.example',
+    });
+    await s.addMember('anna', '1', 0, ['https://alpha.example']);
+    const fetchFn = async () => {
+      await s.addEvent('late', {
+        act_name: 'Alpha',
+        act_url: 'https://alpha.example',
+      });
+      return new Response('{}', { status: 200 });
+    };
+    await sendAlertDigests(s.env, { fetchFn: fetchFn as any, today: TODAY });
+    const late = (await s.DB.prepare(
+      "SELECT alert_pending AS p FROM events WHERE id = 'late'"
+    ).first()) as any;
+    expect(late.p).toBe(1);
+  });
+
+  it('does not re-announce a festival whose processed entry already started', async () => {
+    const s = await setup();
+    await s.addEvent('f0', {
+      festival_url: 'https://fest.example',
+      start: '2026-10-19T00:00:00',
+      pending: 0,
+    });
+    await s.addEvent('f1', {
+      festival_url: 'https://Fest.example/',
+      start: '2026-10-21T00:00:00',
+    });
+    await s.addMember('bea', '2', 1, []);
+    await sendAlertDigests(s.env, { fetchFn: s.fetchFn as any, today: TODAY });
+    expect(s.sent).toEqual([]);
+  });
+
+  it('sends to at most MAX_SENDS_PER_RUN members and warns', async () => {
+    const s = await setup();
+    await s.addEvent('a1', {
+      act_name: 'Alpha',
+      act_url: 'https://alpha.example',
+    });
+    for (let i = 0; i < MAX_SENDS_PER_RUN + 1; i++)
+      await s.addMember('m' + i, String(i), 0, ['https://alpha.example']);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await sendAlertDigests(s.env, { fetchFn: s.fetchFn as any, today: TODAY });
+    expect(s.sent).toHaveLength(MAX_SENDS_PER_RUN);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 });

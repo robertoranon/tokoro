@@ -36,6 +36,10 @@ export interface Edition {
 }
 
 export const MAX_DIGEST_LINES = 25;
+/** Visible-text budget; Telegram rejects messages over 4096 characters. */
+export const MAX_DIGEST_CHARS = 3800;
+/** Worker subrequest ceiling (50 on the free plan) minus DB and slack. */
+export const MAX_SENDS_PER_RUN = 45;
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = [
@@ -55,6 +59,9 @@ const MONTHS = [
 
 /** The comparison key for band urls used by tours.html: lower-case, no trailing slash. */
 export const bandKey = (u: string) => u.toLowerCase().replace(/\/+$/, '');
+
+const clip = (s: string, n = 80) =>
+  s.length > n ? s.slice(0, n - 1) + '…' : s;
 
 function parts(ts: string) {
   const y = Number(ts.slice(0, 4));
@@ -99,7 +106,9 @@ function link(url: string | null, label: string): string | null {
 
 /**
  * Festivals that gain an upcoming entry while having none already processed:
- * `known` holds the festival_url of every upcoming entry with alert_pending = 0.
+ * `known` holds the bandKey of the festival_url of every processed
+ * entry (alert_pending = 0); expiry deletes old entries, so any left means the
+ * edition is current.
  */
 export function newEditions(
   pending: AlertEvent[],
@@ -107,15 +116,18 @@ export function newEditions(
 ): Edition[] {
   const groups = new Map<string, AlertEvent[]>();
   for (const e of pending) {
-    if (!e.festival_url || known.has(e.festival_url)) continue;
-    const g = groups.get(e.festival_url) || [];
+    if (!e.festival_url) continue;
+    const k = bandKey(e.festival_url);
+    if (known.has(k)) continue;
+    const g = groups.get(k) || [];
     g.push(e);
-    groups.set(e.festival_url, g);
+    groups.set(k, g);
   }
   const out: Edition[] = [];
-  for (const [festival_url, list] of groups) {
+  for (const list of groups.values()) {
     list.sort((x, y) => (x.start_time < y.start_time ? -1 : 1));
     const first = list[0];
+    const festival_url = first.festival_url!;
     const end = list
       .map(e => e.end_time || e.start_time)
       .reduce((m, t) => (t > m ? t : m));
@@ -149,9 +161,17 @@ export function formatDigest(
   opts: { year: number; publicWebUrl?: string }
 ): string {
   let used = 0;
+  let chars = 0;
   let omitted = 0;
-  const take = () =>
-    used < MAX_DIGEST_LINES ? (used++, true) : (omitted++, false);
+  const take = (cost: number) => {
+    if (used < MAX_DIGEST_LINES && chars + cost <= MAX_DIGEST_CHARS) {
+      used++;
+      chars += cost;
+      return true;
+    }
+    omitted++;
+    return false;
+  };
   const blocks: string[] = [];
 
   if (shows.length) {
@@ -169,16 +189,26 @@ export function formatDigest(
     for (const b of bands) {
       b.list.sort((x, y) => (x.start_time < y.start_time ? -1 : 1));
       const items: string[] = [];
+      const name = clip(b.name);
       for (const e of b.list) {
-        if (!take()) continue;
-        const place = [e.venue_name, e.address].filter(Boolean).join(', ');
-        const bits = [fmtAlertDate(e.start_time, opts.year)];
-        if (place) bits.push(esc(place));
+        const place = clip(
+          [e.venue_name, e.address].filter(Boolean).join(', ')
+        );
+        const date = fmtAlertDate(e.start_time, opts.year);
         const a = link(e.url, 'page');
+        const cost =
+          2 +
+          date.length +
+          (place ? 3 + place.length : 0) +
+          (a ? 7 : 0) +
+          (items.length ? 0 : name.length + 1);
+        if (!take(cost)) continue;
+        const bits = [date];
+        if (place) bits.push(esc(place));
         if (a) bits.push(a);
         items.push('• ' + bits.join(' · '));
       }
-      if (items.length) lines.push(`<b>${esc(b.name)}</b>`, ...items);
+      if (items.length) lines.push(`<b>${esc(name)}</b>`, ...items);
     }
     if (lines.length > 1) blocks.push(lines.join('\n'));
   }
@@ -186,10 +216,20 @@ export function formatDigest(
   if (editions.length) {
     const lines = ['🎪 <b>New festival editions</b>'];
     for (const ed of editions) {
-      if (!take()) continue;
-      const bits = [`<b>${esc(ed.name)}</b>`, fmtDayRange(ed.start, ed.end)];
-      if (ed.place) bits.push(esc(ed.place));
+      const name = clip(ed.name);
+      const range = fmtDayRange(ed.start, ed.end);
+      const place = ed.place ? clip(ed.place) : '';
       const a = link(ed.festival_url, 'site');
+      const cost =
+        2 +
+        name.length +
+        3 +
+        range.length +
+        (place ? 3 + place.length : 0) +
+        (a ? 7 : 0);
+      if (!take(cost)) continue;
+      const bits = [`<b>${esc(name)}</b>`, range];
+      if (place) bits.push(esc(place));
       if (a) bits.push(a);
       lines.push('• ' + bits.join(' · '));
     }
@@ -278,12 +318,18 @@ async function loadRecipients(env: Env): Promise<Recipient[]> {
          WHERE m.telegram_chat_id IS NOT NULL AND m.revoked_at IS NULL`
       ).all<{ pubkey: string; act_url: string }>()
     ).results || [];
+  const byMember = new Map<string, string[]>();
+  for (const f of follows) {
+    const l = byMember.get(f.pubkey) || [];
+    l.push(f.act_url);
+    byMember.set(f.pubkey, l);
+  }
   return members.map(m => ({
     pubkey: m.pubkey,
     name: m.name,
     chat_id: m.telegram_chat_id,
     radar: m.radar_alerts === 1,
-    bands: follows.filter(f => f.pubkey === m.pubkey).map(f => f.act_url),
+    bands: byMember.get(m.pubkey) || [],
   }));
 }
 
@@ -298,12 +344,16 @@ export async function sendAlertDigests(
     opts.today ?? new Date().toISOString().slice(0, 10) + 'T00:00:00';
   const sleep = opts.sleep ?? (ms => new Promise<void>(r => setTimeout(r, ms)));
 
+  // Claim the flags first: events flagged while sending stay pending for tomorrow.
+  await env.DB.prepare(
+    'UPDATE events SET alert_pending = 2 WHERE alert_pending = 1'
+  ).run();
   const pending =
     (
       await env.DB.prepare(
         `SELECT id, title, start_time, end_time, venue_name, address, url,
                 act_name, act_url, festival_name, festival_url
-         FROM events WHERE alert_pending = 1 AND start_time >= ?`
+         FROM events WHERE alert_pending = 2 AND start_time >= ?`
       )
         .bind(today)
         .all<AlertEvent>()
@@ -313,22 +363,26 @@ export async function sendAlertDigests(
       (
         await env.DB.prepare(
           `SELECT DISTINCT festival_url FROM events
-           WHERE alert_pending = 0 AND festival_url IS NOT NULL AND festival_url != ''
-             AND start_time >= ?`
-        )
-          .bind(today)
-          .all<{ festival_url: string }>()
+           WHERE alert_pending = 0 AND festival_url IS NOT NULL AND festival_url != ''`
+        ).all<{ festival_url: string }>()
       ).results || []
-    ).map(r => r.festival_url)
+    ).map(r => bandKey(r.festival_url))
   );
   const shows = pending.filter(e => e.act_url);
   const editions = newEditions(pending, known);
   const year = Number(today.slice(0, 4));
 
   let sent = 0;
-  for (const r of await loadRecipients(env)) {
-    const d = digestFor(r, shows, editions);
-    if (!d) continue;
+  const targets = (await loadRecipients(env))
+    .map(r => ({ r, d: digestFor(r, shows, editions) }))
+    .filter(t => t.d);
+  if (targets.length > MAX_SENDS_PER_RUN) {
+    console.warn(
+      `[alerts] ${targets.length} recipients exceed MAX_SENDS_PER_RUN; extra members are skipped this run`
+    );
+  }
+  for (const { r, d: dg } of targets.slice(0, MAX_SENDS_PER_RUN)) {
+    const d = dg!;
     const text = formatDigest(d.shows, d.editions, {
       year,
       publicWebUrl: env.PUBLIC_WEB_URL,
@@ -354,7 +408,7 @@ export async function sendAlertDigests(
 
   const cleared = (
     await env.DB.prepare(
-      'UPDATE events SET alert_pending = 0 WHERE alert_pending = 1'
+      'UPDATE events SET alert_pending = 0 WHERE alert_pending = 2'
     ).run()
   ).meta.changes;
   await env.DB.prepare('DELETE FROM telegram_link_codes WHERE expires_at < ?')
