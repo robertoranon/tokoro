@@ -4,11 +4,12 @@ A static HTML page (`admin.html`) for the instance admin. No build step: open it
 
 ## What it does
 
-The page has three tabs:
+The page has four tabs:
 
 - **Events**: search events (by id, title, publisher pubkey, date range, category) and delete them. Deletes are signed with the admin key, which may delete any event.
 - **Members**: create members for the tours page ("My bands"), revoke them, or delete them with their followed bands and suggestions. Creating a member generates a new key in the browser and shows the member's **personal link** (`<public site>/tours.html#k=…`) with a QR code, once; the private key is not stored anywhere.
 - **Suggestions**: the bands members suggested, grouped by name and most requested first ("Show who asked" adds member names). Select bands to copy them as a list for `npm run bands-scout`, reject them with an optional reason, or link them to a band that is already tracked. Below, the follower count of each band.
+- **Conflicts**: pairs of shows of one band on the same day that the worker held back from public listings (the badge counts the open ones; the Events tab shows held events too). For each conflict, **Delete this one** removes the wrong show, **Keep both** records that the band plays twice, and a crawler proposal ("Proposed by crawler: delete ...", raised when a source no longer lists a show) is accepted with **Apply**. Resolving releases the held events. Use the status filter to review kept and resolved conflicts.
 
 The blocklist has API endpoints (`/admin/blocklist`) but no UI on this page.
 
@@ -29,14 +30,15 @@ Saved in the browser's `localStorage`:
 
 - `admin.html`: the page
 - `members-admin.js`: the admin API client for members and suggestions (signed requests), plus `buildMemberLink` and `bandsTxt`. A classic script: `window.TokoroAdminMembers` in the browser, `require()` in Node
-- `tests/members-admin.test.mjs`: tests for the pure helpers
+- `conflicts-admin.js`: the signed client for the Conflicts tab (`window.TokoroAdminConflicts`, `require()` in Node)
+- `tests/members-admin.test.mjs`, `tests/conflicts-admin.test.mjs`: tests for the clients and helpers
 
 ## Tests
 
 From the repo root:
 
 ```bash
-node admin/tests/members-admin.test.mjs
+node --test admin/tests/*.test.mjs
 ```
 
 The admin client is also exercised against the real Worker by `worker/src/contract.test.ts` (`cd worker && npx vitest run`).

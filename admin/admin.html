@@ -174,12 +174,14 @@
       }
       #status.error,
       #m-status.error,
-      #s-status.error {
+      #s-status.error,
+      #c-status.error {
         color: #c53030;
       }
       #status.success,
       #m-status.success,
-      #s-status.success {
+      #s-status.success,
+      #c-status.success {
         color: #276749;
       }
 
@@ -363,6 +365,13 @@
         aria-pressed="false"
       >
         Suggestions
+      </button>
+      <button
+        class="btn btn-secondary"
+        data-tab="conflicts"
+        aria-pressed="false"
+      >
+        Conflicts <span id="c-badge" hidden></span>
       </button>
     </nav>
 
@@ -554,6 +563,24 @@
           <ul id="s-followers"></ul>
         </div>
       </div>
+
+      <div id="tab-conflicts" hidden>
+        <div class="card">
+          <h2>Conflicting shows</h2>
+          <p>
+            Two shows of one band on the same day. Delete the wrong one, or keep
+            both when the band really plays twice.
+          </p>
+          <label for="c-filter">Status</label>
+          <select id="c-filter">
+            <option value="open" selected>open</option>
+            <option value="kept">kept</option>
+            <option value="resolved">resolved</option>
+          </select>
+          <div id="c-status"></div>
+          <div id="c-list"></div>
+        </div>
+      </div>
     </main>
 
     <!-- Settings Modal -->
@@ -621,6 +648,7 @@
     <!-- Local config: copy config.local.js.example to config.local.js at project root -->
     <script src="../config.local.js"></script>
     <script src="./members-admin.js"></script>
+    <script src="./conflicts-admin.js"></script>
     <script type="module">
       import * as ed from 'https://esm.sh/@noble/ed25519@2';
 
@@ -914,6 +942,7 @@
         if (fromVal) params.set('from', datetimeLocalToISO(fromVal));
         if (toVal) params.set('to', datetimeLocalToISO(toVal));
         if (category) params.set('category', category);
+        params.set('include_held', '1'); // the admin sees held events too
 
         // Only the no-params path supports pagination
         const isNoParams = !pubkey && !fromVal && !toVal && !category;
@@ -986,6 +1015,7 @@
             if (fromVal) params.set('from', datetimeLocalToISO(fromVal));
             if (toVal) params.set('to', datetimeLocalToISO(toVal));
             if (category) params.set('category', category);
+            params.set('include_held', '1');
             // The pubkey path answers one plain array; the browse path pages
             if (!pubkey) params.set('offset', String(offset));
             const res = await fetch(`${workerUrl}/events?${params}`);
@@ -1216,7 +1246,7 @@
       }
 
       function showTab(name) {
-        for (const t of ['events', 'members', 'suggestions']) {
+        for (const t of ['events', 'members', 'suggestions', 'conflicts']) {
           document.getElementById('tab-' + t).hidden = t !== name;
         }
         document
@@ -1226,6 +1256,7 @@
           );
         if (name === 'members') refreshMembers();
         if (name === 'suggestions') refreshSuggestions();
+        if (name === 'conflicts') refreshConflicts();
       }
       document
         .querySelectorAll('[data-tab]')
@@ -1444,6 +1475,146 @@
           refreshSuggestions(failures > 0);
         });
 
+      // ── Conflicts ─────────────────────────────────────────────────────────
+      function conflictsApi() {
+        const s = loadSettings();
+        if (!s.workerUrl || !s.privKey) {
+          throw new Error(
+            'Set the Worker URL and the admin private key in Settings first.'
+          );
+        }
+        return window.TokoroAdminConflicts.createConflictsApi({
+          ed,
+          fetchFn: window.fetch.bind(window),
+          workerUrl: s.workerUrl,
+          privKeyHex: s.privKey,
+        });
+      }
+      function el(tag, text, className) {
+        const e = document.createElement(tag);
+        if (text !== undefined) e.textContent = text;
+        if (className) e.className = className;
+        return e;
+      }
+      async function refreshConflictBadge() {
+        const badge = document.getElementById('c-badge');
+        try {
+          const { conflicts } = await conflictsApi().list('open');
+          badge.textContent = String(conflicts.length);
+          badge.hidden = conflicts.length === 0;
+        } catch (e) {
+          badge.hidden = true;
+        }
+      }
+      async function resolveConflict(id, body, confirmText) {
+        if (confirmText && !confirm(confirmText)) return;
+        try {
+          await conflictsApi().resolve(id, body);
+          showToast('Conflict updated');
+        } catch (e) {
+          say('c-status', e.message, 'error');
+          return;
+        }
+        refreshConflicts(true);
+      }
+      function conflictCard(c) {
+        const card = el('div', undefined, 'card');
+        card.append(
+          el('h3', c.act_name || c.act_url),
+          el(
+            'p',
+            c.day + ' · ' + c.status + ' · created ' + (c.created_at || '')
+          )
+        );
+        const byId = new Map(c.events.map(ev => [ev.id, ev]));
+        for (const ev of c.events) {
+          const row = el('div');
+          const title = ev.url ? el('a', ev.title) : el('strong', ev.title);
+          if (ev.url) {
+            title.href = ev.url;
+            title.target = '_blank';
+            title.rel = 'noopener noreferrer';
+          }
+          const place = ev.venue_name || ev.address || '';
+          row.append(
+            title,
+            el(
+              'span',
+              ' — ' +
+                [place, ev.start_time, String(ev.id).slice(0, 8)]
+                  .filter(Boolean)
+                  .join(' · ') +
+                ' '
+            )
+          );
+          if (c.status === 'open') {
+            row.append(
+              button('Delete this one', () =>
+                resolveConflict(
+                  c.id,
+                  { action: 'delete', event_id: ev.id },
+                  'Delete "' + ev.title + '"? This cannot be undone.'
+                )
+              )
+            );
+          }
+          card.append(row);
+        }
+        for (const p of c.proposals || []) {
+          const ev = byId.get(p.event_id);
+          const row = el(
+            'p',
+            'Proposed by crawler: delete ' +
+              (ev ? ev.title : p.event_id) +
+              ' — ' +
+              (p.reason || '') +
+              ' '
+          );
+          if (c.status === 'open') {
+            row.append(
+              button('Apply', () =>
+                resolveConflict(c.id, {
+                  action: 'apply_proposal',
+                  proposal_id: p.id,
+                })
+              )
+            );
+          }
+          card.append(row);
+        }
+        if (c.status === 'open') {
+          card.append(
+            button('Keep both', () =>
+              resolveConflict(
+                c.id,
+                { action: 'keep_both' },
+                'Keep both shows? They will not be flagged again.'
+              )
+            )
+          );
+        }
+        return card;
+      }
+      async function refreshConflicts(keepStatus = false) {
+        const status = document.getElementById('c-filter').value;
+        const list = document.getElementById('c-list');
+        if (!keepStatus) say('c-status', 'Loading…');
+        try {
+          const { conflicts } = await conflictsApi().list(status);
+          list.replaceChildren(...conflicts.map(conflictCard));
+          say(
+            'c-status',
+            conflicts.length ? '' : 'No ' + status + ' conflicts'
+          );
+        } catch (e) {
+          say('c-status', e.message, 'error');
+        }
+        refreshConflictBadge();
+      }
+      document
+        .getElementById('c-filter')
+        .addEventListener('change', () => refreshConflicts());
+
       // ── Init ──────────────────────────────────────────────────────────────────
 
       function init() {
@@ -1451,6 +1622,8 @@
         const { workerUrl } = loadSettings();
         if (!workerUrl) {
           openSettings();
+        } else {
+          refreshConflictBadge();
         }
       }
 
