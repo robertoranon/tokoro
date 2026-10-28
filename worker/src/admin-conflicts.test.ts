@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as ed from '@noble/ed25519';
 import { routeAdminConflictRequest } from './admin-conflicts';
 import worker from './index';
 import { reevaluateConflicts } from './conflicts';
 import { proposalMessage } from './crypto';
+import { notifyConflict } from './alerts';
 import { makeD1, ALL_MIGRATIONS } from '../test-support/d1';
 import {
   makeKey,
@@ -11,6 +12,19 @@ import {
   toHex,
   type TestKey,
 } from '../test-support/sign';
+
+vi.mock('./alerts', async importOriginal => ({
+  ...(await importOriginal<typeof import('./alerts')>()),
+  notifyConflict: vi.fn(async () => {}),
+}));
+
+vi.mock('./conflicts', async importOriginal => {
+  const actual = await importOriginal<typeof import('./conflicts')>();
+  return {
+    ...actual,
+    reevaluateConflicts: vi.fn(actual.reevaluateConflicts),
+  };
+});
 
 const BAND = 'https://band.example';
 const DAY = '2030-06-18';
@@ -435,5 +449,189 @@ describe('POST /conflicts/proposals', () => {
     await propose(crawler, 'cork', 'x');
     await resolve(id, { action: 'delete', event_id: 'cork' });
     expect(await proposalCount()).toBe(0);
+  });
+});
+
+describe('POST /admin/conflicts/sweep', () => {
+  const sweep = (key = admin, domain = 'admin-conflict-sweep') =>
+    adminCall(key, 'POST', '/admin/conflicts/sweep', domain, '{}', '{}');
+
+  /** A raw event row: band, day, place, optional end_time. */
+  const insert = (
+    id: string,
+    act: string,
+    day: string,
+    lat: number,
+    lng: number,
+    end: string | null = null
+  ) =>
+    env.DB.prepare(
+      `INSERT INTO events (id,pubkey,signature,title,lat,lng,geohash5,geohash6,
+         start_time,end_time,category,created_at,act_name,act_url)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+    ).bind(
+      id,
+      'p',
+      's',
+      'Show ' + id,
+      lat,
+      lng,
+      'g5',
+      'g6',
+      `${day}T20:00:00`,
+      end,
+      'music',
+      '2026-01-01T00:00:00',
+      'Band ' + act,
+      act
+    );
+
+  it('creates one conflict for existing same-day duplicates, idempotently', async () => {
+    const TOTO = 'https://toto.example/';
+    await env.DB.batch([
+      // TOTO-like: Dublin and Cork the same day, no venue names.
+      insert('dublin', TOTO, DAY, 53.35, -6.26),
+      insert('cork', TOTO, DAY, 51.9, -8.47),
+      // A harmless single event of another band.
+      insert('solo', 'https://solo.example', DAY, 45.4, 12.3),
+      // A range plus a single show elsewhere on its first day.
+      insert(
+        'fest',
+        'https://fest.example',
+        DAY,
+        47.9,
+        9.0,
+        '2030-06-20T00:00:00'
+      ),
+      insert('club', 'https://fest.example', DAY, 48.1, 11.5),
+    ]);
+    vi.mocked(notifyConflict).mockClear();
+    const res = await sweep();
+    expect(res.status).toBe(200);
+    const body: any = await res.json();
+    expect(body).toMatchObject({ conflicts_created: 1, failed: 0 });
+    // Only the TOTO day can conflict: the single event, and the range with
+    // one single show, are never scanned.
+    expect(body.scanned).toBe(1);
+    expect(body.truncated).toBeUndefined();
+    const all = (
+      await env.DB.prepare('SELECT act_url, day, status FROM conflicts').all()
+    ).results;
+    expect(all).toEqual([
+      { act_url: 'https://toto.example', day: DAY, status: 'open' },
+    ]);
+    expect((await row('dublin')).held).toBe(1);
+    expect((await row('cork')).held).toBe(1);
+    expect((await row('solo')).held).toBe(0);
+    expect((await row('fest')).held).toBe(0);
+    expect((await row('club')).held).toBe(0);
+    expect(vi.mocked(notifyConflict)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(notifyConflict).mock.calls[0][1].day).toBe(DAY);
+
+    const again: any = await (await sweep()).json();
+    expect(again.conflicts_created).toBe(0);
+    expect(vi.mocked(notifyConflict)).toHaveBeenCalledTimes(1);
+    expect(
+      (
+        (await env.DB.prepare(
+          'SELECT COUNT(*) AS n FROM conflicts'
+        ).first()) as any
+      ).n
+    ).toBe(1);
+  });
+
+  it('a notification failure is logged and the sweep goes on', async () => {
+    await openConflict(); // existing: not counted again
+    await env.DB.batch([
+      insert('a1', 'https://a.example', DAY, 53.35, -6.26),
+      insert('a2', 'https://a.example', DAY, 51.9, -8.47),
+    ]);
+    vi.mocked(notifyConflict).mockClear();
+    vi.mocked(notifyConflict).mockRejectedValueOnce(new Error('tg down'));
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const body: any = await (await sweep()).json();
+    expect(body).toMatchObject({ conflicts_created: 1, failed: 0 });
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
+  });
+
+  it('a failing band-day is counted and logged, the others still run', async () => {
+    await env.DB.batch([
+      insert('a1', 'https://a.example', DAY, 53.35, -6.26),
+      insert('a2', 'https://a.example', DAY, 51.9, -8.47),
+      insert('b1', 'https://b.example', DAY, 53.35, -6.26),
+      insert('b2', 'https://b.example', DAY, 51.9, -8.47),
+    ]);
+    vi.mocked(reevaluateConflicts).mockRejectedValueOnce(new Error('d1 down'));
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const body: any = await (await sweep()).json();
+    expect(body).toEqual({ scanned: 2, conflicts_created: 1, failed: 1 });
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
+  });
+
+  it('processes at most 200 band-days per call and flags the rest', async () => {
+    const stmts = [];
+    for (let i = 0; i < 201; i++) {
+      const act = `https://b${i}.example`;
+      stmts.push(insert(`x${i}`, act, DAY, 53.35, -6.26));
+      stmts.push(insert(`y${i}`, act, DAY, 51.9, -8.47));
+    }
+    await env.DB.batch(stmts);
+    vi.mocked(notifyConflict).mockClear();
+    const first: any = await (await sweep()).json();
+    expect(first).toEqual({
+      scanned: 200,
+      conflicts_created: 200,
+      failed: 0,
+      truncated: true,
+    });
+    const second: any = await (await sweep()).json();
+    expect(second).toEqual({ scanned: 1, conflicts_created: 1, failed: 0 });
+    expect(vi.mocked(notifyConflict)).toHaveBeenCalledTimes(201);
+  });
+
+  it('503 / 403 / 401 like the other admin endpoints', async () => {
+    const other = await makeKey();
+    expect((await sweep(other)).status).toBe(403);
+    const unsigned = (await routeAdminConflictRequest(
+      new Request('https://w.test/admin/conflicts/sweep', {
+        method: 'POST',
+        body: '{}',
+      }),
+      env,
+      '/admin/conflicts/sweep'
+    ))!;
+    expect(unsigned.status).toBe(401);
+    env.ADMIN_PUBKEY = undefined;
+    expect((await sweep()).status).toBe(503);
+  });
+
+  it('an admin-read signature cannot be replayed on the sweep', async () => {
+    await env.DB.batch([
+      insert('a1', 'https://a.example', DAY, 53.35, -6.26),
+      insert('a2', 'https://a.example', DAY, 51.9, -8.47),
+    ]);
+    expect((await sweep(admin, 'admin-read')).status).toBe(401);
+    expect(
+      (
+        (await env.DB.prepare(
+          'SELECT COUNT(*) AS n FROM conflicts'
+        ).first()) as any
+      ).n
+    ).toBe(0);
+  });
+
+  it('is routed by the worker', async () => {
+    const headers = await authHeaders(admin, 'admin-conflict-sweep', '{}');
+    const res = await worker.fetch(
+      new Request('https://w.test/admin/conflicts/sweep', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: '{}',
+      }),
+      env
+    );
+    expect(res.status).toBe(200);
   });
 });

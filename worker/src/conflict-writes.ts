@@ -6,6 +6,33 @@ import { reevaluateConflicts } from './conflicts';
 import { notifyConflict } from './alerts';
 
 /**
+ * Re-check the conflict state of one (act_url, day) and notify when a conflict
+ * is newly created. Never throws: a reevaluation failure is logged and gives
+ * 'failed'; a notification failure is logged and the result is still
+ * 'created' (the conflict exists).
+ */
+export async function reevaluateAndNotify(
+  env: Env,
+  actUrl: string,
+  day: string
+): Promise<'created' | 'unchanged' | 'failed'> {
+  let created;
+  try {
+    ({ created } = await reevaluateConflicts(env, actUrl, day));
+  } catch (err) {
+    console.error(`reevaluateConflicts failed for ${actUrl} on ${day}:`, err);
+    return 'failed';
+  }
+  if (!created) return 'unchanged';
+  try {
+    await notifyConflict(env, created);
+  } catch (err) {
+    console.error('notifyConflict failed:', err);
+  }
+  return 'created';
+}
+
+/**
  * Re-check the conflict state of each (act_url, day) pair touched by a write
  * and notify on a newly created conflict. A notification failure is logged and
  * never fails the write; neither does a reevaluation failure (logged, and the
@@ -24,22 +51,6 @@ export async function reevaluateAfterWrite(
     seen.add(key);
     // The write has already committed: a failure here is logged, never a 500.
     // The next write touching this band-day corrects its conflict state.
-    let created;
-    try {
-      ({ created } = await reevaluateConflicts(env, p.actUrl, day));
-    } catch (err) {
-      console.error(
-        `reevaluateConflicts failed for ${p.actUrl} on ${day}:`,
-        err
-      );
-      continue;
-    }
-    if (created) {
-      try {
-        await notifyConflict(env, created);
-      } catch (err) {
-        console.error('notifyConflict failed:', err);
-      }
-    }
+    await reevaluateAndNotify(env, p.actUrl, day);
   }
 }

@@ -577,6 +577,9 @@
             <option value="kept">kept</option>
             <option value="resolved">resolved</option>
           </select>
+          <button type="button" class="btn btn-secondary" id="c-sweep">
+            Scan existing data
+          </button>
           <div id="c-status"></div>
           <div id="c-list"></div>
         </div>
@@ -1615,6 +1618,30 @@
       document
         .getElementById('c-filter')
         .addEventListener('change', () => refreshConflicts());
+      // Conflicts already in the data are found only by this explicit scan.
+      document.getElementById('c-sweep').addEventListener('click', async e => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        say('c-status', 'Scanning…');
+        try {
+          const r = await conflictsApi().sweep();
+          let msg =
+            'Scanned ' +
+            r.scanned +
+            ' band-days, ' +
+            r.conflicts_created +
+            ' new conflicts';
+          if (r.failed) msg += ', ' + r.failed + ' failed';
+          if (r.truncated) msg += '. More remain: scan again.';
+          // The list refresh rewrites c-status, so the result is shown after it.
+          await refreshConflicts(true);
+          say('c-status', msg, r.failed ? 'error' : '');
+        } catch (err) {
+          say('c-status', err.message, 'error');
+        } finally {
+          btn.disabled = false;
+        }
+      });
 
       // ── Init ──────────────────────────────────────────────────────────────────
 

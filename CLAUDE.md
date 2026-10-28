@@ -71,6 +71,7 @@ API Endpoints:
 - `GET /admin/band-followers` - Follower count per band (admin)
 - `GET /admin/conflicts?status=` - Conflicts with their events (held included) and proposals (admin)
 - `POST /admin/conflicts/:id/resolve` - `keep_both`, `delete` an event, or `apply_proposal` (admin)
+- `POST /admin/conflicts/sweep` - Detect conflicts already in the data, up to 200 band-days per call (`truncated: true` when more remain; admin, explicit only)
 
 ### Data Model
 

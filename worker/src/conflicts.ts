@@ -22,7 +22,7 @@ export interface ConflictEventRow {
 }
 
 /** Two events closer than this in both axes (degrees) are the same place. */
-const SAME_PLACE_DEG = 0.005;
+export const SAME_PLACE_DEG = 0.005;
 
 /** True when the end falls on a later day than the start. */
 export function isRange(e: {

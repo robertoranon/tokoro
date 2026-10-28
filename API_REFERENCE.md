@@ -73,6 +73,7 @@ Signed by `ADMIN_PUBKEY` (`503` when it is not configured). A conflict is one ba
 | ------ | --------------------------------- | ----------- |
 | `GET`  | `/admin/conflicts?status=`        | `{conflicts: [{id, act_url, act_name, day, status, created_at, resolved_at, events, proposals}]}`; `status` = `open` (default), `kept` or `resolved`; `events` are full rows, held ones included |
 | `POST` | `/admin/conflicts/:id/resolve`    | `{action: "keep_both"}` (status `kept`, events shown again), `{action: "delete", event_id}` or `{action: "apply_proposal", proposal_id}` (delete the event, then re-check the band-day); `404` unknown conflict/proposal, `400` conflict not open or event not in it |
+| `POST` | `/admin/conflicts/sweep`         | Detect conflicts already in the data (explicit, never automatic): re-checks up to 200 band-days with two or more single-day shows at different places and no open conflict, notifies each new conflict → `{scanned, conflicts_created, failed}` plus `truncated: true` when more remain (run it again) |
 
 Bodies, status codes and error messages: [`worker/SPECS.md`](worker/SPECS.md) sections 7.11-7.14 and 7.16.
 
@@ -137,10 +138,11 @@ The signed message is `SHA-256("<domain>:<payload>:<timestamp>")`. The timestamp
 | `admin-suggestion-reject` | `POST /admin/suggestions/reject`                                | raw JSON body                           |
 | `admin-suggestion-link`   | `POST /admin/suggestions/link`                                  | raw JSON body                           |
 | `admin-conflict-resolve`  | `POST /admin/conflicts/:id/resolve`                             | raw JSON body                           |
+| `admin-conflict-sweep`    | `POST /admin/conflicts/sweep`                                   | raw JSON body (`{}`)                    |
 
 A normalized band URL is scheme + host[:port] + path, lower-case scheme and host, without query, fragment or trailing slash (http/https only), at most 500 characters (a suggestion `url` or link `act_url` that is longer after normalization → `400`). CORS allows the three headers.
 
-Endpoints with a JSON body (`POST /member/suggestions`, `POST /admin/members`, `POST /admin/suggestions/reject`, `POST /admin/suggestions/link`, `POST /admin/conflicts/:id/resolve`) accept at most 8 KB and check the cheap things before reading it: a `Content-Length` above 8 KB → `413 {"error": "Payload too large"}` (before any auth check); for the admin endpoints, `503` when the admin is not configured; malformed headers or a timestamp outside the window → `401`; a body that turns out larger than 8 KB → `413`; then the signature (`401`) and the member/admin check (`403`).
+Endpoints with a JSON body (`POST /member/suggestions`, `POST /admin/members`, `POST /admin/suggestions/reject`, `POST /admin/suggestions/link`, `POST /admin/conflicts/:id/resolve`, `POST /admin/conflicts/sweep`) accept at most 8 KB and check the cheap things before reading it: a `Content-Length` above 8 KB → `413 {"error": "Payload too large"}` (before any auth check); for the admin endpoints, `503` when the admin is not configured; malformed headers or a timestamp outside the window → `401`; a body that turns out larger than 8 KB → `413`; then the signature (`401`) and the member/admin check (`403`).
 
 ---
 

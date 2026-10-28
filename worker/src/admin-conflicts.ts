@@ -7,8 +7,12 @@ import {
   readPayload,
   parseJson,
 } from './admin-members';
-import { purgeConflictLinks, releaseStatements } from './conflicts';
-import { reevaluateAfterWrite } from './conflict-writes';
+import {
+  purgeConflictLinks,
+  releaseStatements,
+  SAME_PLACE_DEG,
+} from './conflicts';
+import { reevaluateAfterWrite, reevaluateAndNotify } from './conflict-writes';
 import { verifyProposalSignature } from './crypto';
 import { nowIso } from './members';
 
@@ -17,6 +21,8 @@ const HEX_128 = /^[0-9a-f]{128}$/i;
 const MAX_REASON = 200;
 const MAX_EVENT_ID = 128;
 const STATUSES = ['open', 'kept', 'resolved'];
+/** Band-days checked per sweep call; the admin runs it again for the rest. */
+export const SWEEP_LIMIT = 200;
 
 interface ConflictRow {
   id: number;
@@ -38,6 +44,8 @@ export async function routeAdminConflictRequest(
     return listConflicts(request, env);
   const res = path.match(/^\/admin\/conflicts\/([^/]+)\/resolve$/);
   if (m === 'POST' && res) return resolveConflict(request, env, res[1]);
+  if (m === 'POST' && path === '/admin/conflicts/sweep')
+    return sweepConflicts(request, env);
   return null;
 }
 
@@ -95,6 +103,59 @@ async function listConflicts(request: Request, env: Env): Promise<Response> {
     });
   }
   return jsonResponse({ conflicts: out });
+}
+
+/**
+ * Detects conflicts already in the data (worker/SPECS.md 7.16): every band-day
+ * that could hold a conflict is reevaluated, as a write would. Candidates are
+ * band-days with 2 or more single-day events spread more than the same-place
+ * tolerance apart and no open conflict yet; any other band-day would be a
+ * no-op for reevaluateConflicts, and skipping open ones lets a rerun progress
+ * past a truncated call.
+ */
+async function sweepConflicts(request: Request, env: Env): Promise<Response> {
+  const raw = await readAdminBody(request, env);
+  if (raw instanceof Response) return raw;
+  const a = await authAdmin(request, env, 'admin-conflict-sweep', raw);
+  if (a !== true) return a;
+
+  const candidates = (
+    await env.DB.prepare(
+      `SELECT RTRIM(act_url,'/') AS act, substr(start_time,1,10) AS day
+       FROM events
+       WHERE act_url IS NOT NULL AND RTRIM(act_url,'/') <> ''
+         AND (end_time IS NULL OR end_time = ''
+              OR substr(end_time,1,10) <= substr(start_time,1,10))
+       GROUP BY RTRIM(act_url,'/'), substr(start_time,1,10)
+       HAVING COUNT(*) >= 2
+         AND (MAX(lat) - MIN(lat) > ? OR MAX(lng) - MIN(lng) > ?)
+         AND NOT EXISTS (
+           SELECT 1 FROM conflicts c
+           WHERE c.act_url = RTRIM(events.act_url,'/')
+             AND c.day = substr(events.start_time,1,10)
+             AND c.status = 'open')
+       ORDER BY act, day
+       LIMIT ?`
+    )
+      .bind(SAME_PLACE_DEG, SAME_PLACE_DEG, SWEEP_LIMIT + 1)
+      .all<{ act: string; day: string }>()
+  ).results;
+
+  const batch = candidates.slice(0, SWEEP_LIMIT);
+  let created = 0;
+  let failed = 0;
+  for (const c of batch) {
+    const r = await reevaluateAndNotify(env, c.act, c.day);
+    if (r === 'created') created++;
+    else if (r === 'failed') failed++;
+  }
+  const out: Record<string, unknown> = {
+    scanned: batch.length,
+    conflicts_created: created,
+    failed,
+  };
+  if (candidates.length > SWEEP_LIMIT) out.truncated = true;
+  return jsonResponse(out);
 }
 
 async function linkedIds(env: Env, conflictId: number): Promise<string[]> {

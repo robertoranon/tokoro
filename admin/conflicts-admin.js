@@ -60,6 +60,17 @@ function createConflictsApi({ ed, fetchFn, workerUrl, privKeyHex }) {
         body
       );
     },
+    // Detects conflicts already in the data; payload = the raw body "{}".
+    sweep: () => {
+      const body = '{}';
+      return call(
+        'POST',
+        '/admin/conflicts/sweep',
+        'admin-conflict-sweep',
+        body,
+        body
+      );
+    },
   };
 }
 

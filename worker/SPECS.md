@@ -314,6 +314,7 @@ The member endpoints (`/member/*`) and the admin endpoints (`/admin/members*`, `
 | `admin-suggestion-reject` | `POST /admin/suggestions/reject` | the raw JSON request body |
 | `admin-suggestion-link` | `POST /admin/suggestions/link` | the raw JSON request body |
 | `admin-conflict-resolve` | `POST /admin/conflicts/:id/resolve` | the raw JSON request body |
+| `admin-conflict-sweep` | `POST /admin/conflicts/sweep` | the raw JSON request body (the admin page sends `{}`) |
 
 **Normalization rules** (shared by the worker and the public-web client `member.js`; both MUST behave identically):
 
@@ -1472,6 +1473,18 @@ Conflicts (section 2.1) hide the events of a band that appear at two places on o
 - `{ "action": "apply_proposal", "proposal_id": <integer> }`: as `delete`, for the proposal's event.
 
 **Errors:** `404 {"error": "Conflict not found"}` for an unknown or non-numeric `:id`; `404 {"error": "Proposal not found"}`; `400` for invalid JSON, an unknown `action`, a missing `event_id` / non-integer `proposal_id`, a conflict that is not `open` (`Conflict is not open`), or an event that is not linked to this conflict (`Event is not part of this conflict`, also for a proposal of another conflict); `401` / `403` / `503` as the other admin endpoints.
+
+#### 7.16.4 POST /admin/conflicts/sweep (Detect Conflicts in Existing Data)
+
+Conflicts are otherwise detected only after a write (the reconcile of section 2.1), so band-days that already held two places before conflict detection existed, or whose reconcile failed, are never found. This endpoint is the explicit backfill: it never runs on its own (no cron), only when the admin calls it.
+
+**Request:** `POST /admin/conflicts/sweep`, signed with domain `admin-conflict-sweep` over the raw body (section 3.6; the body limits and check order of that section apply: `readAdminBody`, then the admin signature, before any database access). The body is not otherwise read; the admin page sends `{}`.
+
+**Effect:** selects the candidate band-days, grouping the events with a non-empty `act_url` by `RTRIM(act_url, '/')` and `substr(start_time, 1, 10)`, counting only single-day events (no `end_time`, or one on the start date; ranges never conflict), and keeping the groups with `COUNT(*) >= 2` whose latitudes or longitudes spread more than the same-place tolerance (0.005 degrees; a smaller spread is one place, so no conflict) and that have no `open` conflict yet (an open conflict is kept up to date by writes). Every other band-day would be a no-op for the reconcile. Candidates are ordered by band URL, then day, and at most 200 are processed per call. For each, the reconcile of section 2.1 runs and `notifyConflict` is called when it creates a conflict (the same helper as after a write); a failure of either is logged and the sweep goes on (a reconcile failure is counted in `failed`, a notification failure is not). A band-day whose kept conflict covers the same event set stays kept, so running the sweep twice creates nothing new.
+
+**Response (200 OK):** `{ "scanned": <band-days processed>, "conflicts_created": <n>, "failed": <n> }`, plus `"truncated": true` when more than 200 candidates were found; the admin runs the sweep again for the rest (the days that became conflicts are no longer candidates).
+
+**Errors:** `401` / `403` / `503` / `413` as the other admin endpoints.
 
 ---
 

@@ -49,6 +49,18 @@ test('resolve signs the exact raw body it sends with admin-conflict-resolve', as
   assert.equal(signed[0], digest('admin-conflict-resolve', sent[0].init.body, ts));
 });
 
+test('sweep posts {} signed with admin-conflict-sweep and returns the counts', async () => {
+  const counts = { scanned: 3, conflicts_created: 1, failed: 0 };
+  const { api, sent, signed } = setup({ ok: true, status: 200, json: async () => counts });
+  assert.deepEqual(await api.sweep(), counts);
+  assert.equal(sent[0].url, 'https://w.test/admin/conflicts/sweep');
+  assert.equal(sent[0].init.method, 'POST');
+  assert.equal(sent[0].init.body, '{}');
+  assert.equal(sent[0].init.headers['Content-Type'], 'application/json');
+  const ts = sent[0].init.headers['X-Timestamp'];
+  assert.equal(signed[0], digest('admin-conflict-sweep', '{}', ts));
+});
+
 test('admin-read and admin-conflict-resolve signatures differ for the same payload', async () => {
   const p = '{"action":"keep_both"}';
   assert.notEqual(digest('admin-read', p, '1'), digest('admin-conflict-resolve', p, '1'));
@@ -58,6 +70,7 @@ test('HTTP errors reject with the server error', async () => {
   const { api } = setup({ ok: false, status: 403, json: async () => ({ error: 'forbidden' }) });
   await assert.rejects(api.list('open'), /forbidden/);
   await assert.rejects(api.resolve('c1', { action: 'keep_both' }), /forbidden/);
+  await assert.rejects(api.sweep(), /forbidden/);
 });
 
 test('safeHttpUrl keeps http(s) urls and rejects everything else', () => {
