@@ -584,6 +584,7 @@ Tick one or more bands, then:
   5. Redeploy the public web (`./scripts/deploy-public-web.sh`). This refreshes the list of tracked bands; only then do members see **Added**, and the band is followed for them.
 
   The suggestions stay in the Suggestions tab until you link or reject them. Once the band is on the tours page you can clear them with **Link selected to an existing band** (below).
+- **Find bands from a playlist instead:** `bands-scout` also accepts an Apple Music/iTunes XML playlist, a Spotify CSV export (made with Exportify) or the link of a public Spotify playlist, for example `npm run bands-scout -- https://open.spotify.com/playlist/<id>`. It takes the artists from the tracks (`--min-tracks 2` keeps only artists with at least two) and asks you to confirm each band before adding it (`--yes` skips the questions). Spotify links only cover the first ~100 tracks; use the CSV for long playlists. Details in [`crawler/README.md`](crawler/README.md).
 - **Reject selected:** type an optional reason (members see it) and confirm.
 - **Link selected to an existing band:** use this when the band is already tracked under another name or website (the page cannot match it on its own), or to clear suggestions you have already added. Paste the band's website as written in `bands.yaml` (its `url`). The members who suggested it follow the band right away and see **Added**.
 

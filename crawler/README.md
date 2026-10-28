@@ -276,7 +276,10 @@ Legitimate parallel events (different stages or acts running at the same time) a
   printf 'Band A\nBand B | https://bandb.example\n' > list.txt
   npm run bands-scout -- list.txt --dry-run   # preview, writes nothing
   npm run bands-scout -- list.txt             # add the entries to bands.yaml
+  npm run bands-scout -- playlist.xml --min-tracks 2 --dry-run   # Apple Music/iTunes XML, or a Spotify CSV export (Exportify)
   ```
+
+  The input can also be a playlist export: an Apple Music/iTunes XML playlist, or a Spotify CSV exported with Exportify (Spotify has no XML export). A public Spotify playlist link also works (`npm run bands-scout -- https://open.spotify.com/playlist/<id>`), with no credentials, but Spotify's page only lists the first ~100 tracks and splits artist names containing a comma, so use the CSV export for long playlists. With any playlist input, the scout asks you to confirm each band it found before writing it (`y`/`N`/`a`=all/`q`=quit); pass `--yes` to skip the questions. The artists are taken from the tracks, most tracks first; `--min-tracks N` skips artists with fewer than N tracks, which keeps a big playlist from triggering a search per artist.
 
   The list can also come from members' suggestions: in the admin page's Suggestions tab, tick the bands and press **Copy list for bands-scout**, then save the text as a file (e.g. `bands.txt`) and run `npm run bands-scout -- bands.txt`. Members see their suggestion as *Added* only after the next public-web deploy regenerates `tracked-bands.json` (see `HOW-TO-USE.md` section 10)
 

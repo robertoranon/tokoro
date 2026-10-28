@@ -1,5 +1,11 @@
 import { parseBandList } from '../src/tours/band-list.js';
 import {
+  fetchSpotifyPlaylist,
+  parsePlaylist,
+  playlistToBandListText,
+  spotifyPlaylistId,
+} from '../src/tours/playlist.js';
+import {
   countDateMentions,
   looksLikeShowListing,
   saysNoEvents,
@@ -19,6 +25,7 @@ import {
 } from '../src/tours/band-finder.js';
 import {
   parseArgs,
+  confirmBands,
   formatReport,
   type ScoutReport,
 } from '../src/bands-scout.js';
@@ -956,6 +963,177 @@ sources:
     assert(!saysNoEvents('We have no idea what comes next'), 'unrelated "no"');
   }
 
+  console.log('\n=== parsePlaylist ===\n');
+  {
+    const track = (artist: string) =>
+      `<key>1</key><dict><key>Name</key><string>Song</string><key>Album Artist</key><string>VA</string><key>Artist</key><string>${artist}</string></dict>`;
+    const xml = `<?xml version="1.0"?><plist version="1.0"><dict><key>Tracks</key><dict>${[
+      'Sigur R&#243;s',
+      'Mogwai',
+      'Mogwai feat. Someone',
+      'Godspeed You! Black Emperor',
+      'Sigur Ros',
+      'Mogwai',
+      'Nick &amp; June | x',
+    ]
+      .map(track)
+      .join('')}</dict></dict></plist>`;
+    const a = parsePlaylist(xml);
+    assert(a?.format === 'apple-xml', 'Apple XML detected');
+    assert(
+      a?.artists.map(x => `${x.name}:${x.tracks}`).join(',') ===
+        'Mogwai:3,Sigur Rós:2,Godspeed You! Black Emperor:1,Nick & June x:1',
+      'artists ranked by tracks, entities decoded, feat. stripped, accents merged, | removed, Album Artist ignored'
+    );
+    assert(
+      playlistToBandListText(a!, 2) === 'Mogwai\nSigur Rós',
+      'min tracks filters'
+    );
+
+    const csv = [
+      'Track URI,Track Name,Album Name,Artist Name(s),Release Date',
+      'spotify:track:1,"Hello, World",Alb,Low;Other,2020',
+      'spotify:track:2,Two,Alb,"Low",2020',
+      'spotify:track:3,"Multi\nline",Alb,"Tool",2020',
+    ].join('\r\n');
+    const c = parsePlaylist(csv);
+    assert(c?.format === 'spotify-csv', 'Spotify CSV detected');
+    assert(
+      c?.artists.map(x => `${x.name}:${x.tracks}`).join(',') === 'Low:2,Tool:1',
+      'first artist of a track used, quoted fields handled'
+    );
+
+    assert(
+      parsePlaylist('Mogwai\nLow\n') === null,
+      'plain list is not a playlist'
+    );
+    assert(parsePlaylist('') === null, 'empty is not a playlist');
+    assert(
+      parsePlaylist('<html><body>x</body></html>') === null,
+      'non-plist XML is not a playlist'
+    );
+  }
+
+  console.log('\n=== Spotify playlist link ===\n');
+  {
+    assert(
+      spotifyPlaylistId(
+        'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M?si=abc'
+      ) === '37i9dQZF1DXcBWIGoYBM5M',
+      'id from link'
+    );
+    assert(
+      spotifyPlaylistId('https://open.spotify.com/intl-it/playlist/AbC123') ===
+        'AbC123',
+      'id from localized link'
+    );
+    assert(
+      spotifyPlaylistId('spotify:playlist:AbC123') === 'AbC123',
+      'id from URI'
+    );
+    assert(
+      spotifyPlaylistId('https://evil.example/playlist/AbC123') === null,
+      'other hosts rejected'
+    );
+    assert(spotifyPlaylistId('list.txt') === null, 'file name is not a link');
+    const data = {
+      props: {
+        pageProps: {
+          state: {
+            data: {
+              entity: {
+                trackList: [
+                  { subtitle: 'Low, Other' },
+                  { subtitle: 'Low' },
+                  { subtitle: 'Tool' },
+                ],
+              },
+            },
+          },
+        },
+      },
+    };
+    const html = `<html><script id="__NEXT_DATA__" type="application/json">${JSON.stringify(data)}</script></html>`;
+    let url = '';
+    const ok = (async (u: string) => {
+      url = u;
+      return new Response(html);
+    }) as unknown as typeof fetch;
+    const r = await fetchSpotifyPlaylist(
+      'https://open.spotify.com/playlist/AbC123',
+      ok
+    );
+    assert(
+      url === 'https://open.spotify.com/embed/playlist/AbC123',
+      'embed page requested'
+    );
+    assert(
+      r.format === 'spotify-url' &&
+        r.artists.map(x => `${x.name}:${x.tracks}`).join(',') ===
+          'Low:2,Tool:1',
+      'artists read, first of each track'
+    );
+    const bad = (async () =>
+      new Response('<html></html>')) as unknown as typeof fetch;
+    let msg = '';
+    try {
+      await fetchSpotifyPlaylist('spotify:playlist:AbC123', bad);
+    } catch (e) {
+      msg = String(e);
+    }
+    assert(
+      /Exportify/.test(msg),
+      'unreadable page → error pointing to the CSV route'
+    );
+    const nf = (async () =>
+      new Response('', { status: 404 })) as unknown as typeof fetch;
+    msg = '';
+    try {
+      await fetchSpotifyPlaylist('spotify:playlist:AbC123', nf);
+    } catch (e) {
+      msg = String(e);
+    }
+    assert(/404/.test(msg), 'HTTP error reported');
+  }
+
+  console.log('\n=== confirmBands ===\n');
+  {
+    const mk = (n: string) => ({
+      name: n,
+      url: `https://${n}.example`,
+      tourUrl: `https://${n}.example/live`,
+      note: 'n',
+    });
+    const run = async (answers: string[]) => {
+      const asked: string[] = [];
+      const r = await confirmBands([mk('a'), mk('b'), mk('c')], async q => {
+        asked.push(q);
+        return answers.shift() ?? 'n';
+      });
+      return { ...r, asked: asked.length };
+    };
+    let r = await run(['y', 'n', 'y']);
+    assert(
+      r.accepted.map(b => b.name).join() === 'a,c' && r.declined.join() === 'b',
+      'y/n per band'
+    );
+    r = await run(['', 'yes', 'N']);
+    assert(
+      r.accepted.map(b => b.name).join() === 'b' && r.declined.join() === 'a,c',
+      'empty answer means no'
+    );
+    r = await run(['a']);
+    assert(
+      r.accepted.length === 3 && r.asked === 1,
+      '"a" accepts this and all remaining'
+    );
+    r = await run(['y', 'q']);
+    assert(
+      r.accepted.map(b => b.name).join() === 'a' && r.declined.join() === 'b,c',
+      '"q" declines the rest'
+    );
+  }
+
   console.log('\n=== parseArgs ===\n');
   {
     const a = parseArgs(['node', 'x', 'list.txt']);
@@ -1010,6 +1188,7 @@ sources:
       errors: [{ name: 'F Band', error: 'boom' }],
       sourceSkipped: [{ name: 'A Band', tourUrl: 'https://a.example/live' }],
       invalidLines: ['!!!'],
+      declined: ['G Band'],
     };
     const out = formatReport(report);
     assert(
@@ -1028,12 +1207,42 @@ sources:
     );
     assert(out.includes('F Band') && out.includes('boom'), 'errors listed');
     assert(out.includes('!!!'), 'invalid input lines listed');
+    assert(
+      /Declined/.test(out) && out.includes('G Band') && /1 declined/.test(out),
+      'declined bands listed'
+    );
     assert(!/dry run/i.test(out), 'no dry-run banner on a real run');
     assert(
       /dry run/i.test(formatReport({ ...report, dryRun: true })),
       'dry-run banner on a dry run'
     );
     assert(/2 added/.test(out), 'totals');
+  }
+
+  {
+    assert(
+      parseArgs(['node', 'x', 'p.xml', '--min-tracks', '3']).minTracks === 3,
+      '--min-tracks parsed'
+    );
+    assert(
+      parseArgs(['node', 'x', 'p.xml']).minTracks === 1,
+      '--min-tracks defaults to 1'
+    );
+    let threw = false;
+    try {
+      parseArgs(['node', 'x', 'p.xml', '--min-tracks', '0']);
+    } catch {
+      threw = true;
+    }
+    assert(threw, '--min-tracks 0 rejected');
+    assert(
+      parseArgs(['node', 'x', 'p.xml', '--yes']).yes === true,
+      '--yes parsed'
+    );
+    assert(
+      parseArgs(['node', 'x', 'p.xml']).yes === false,
+      '--yes off by default'
+    );
   }
 
   console.log(`\n${passed} passed, ${failed} failed`);

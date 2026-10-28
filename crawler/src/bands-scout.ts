@@ -1,8 +1,16 @@
 import { fileURLToPath } from 'url';
+import { createInterface } from 'readline/promises';
 import { loadEnv, buildLLM } from './setup.js';
 import { HTMLFetcher, type BrowserEngine } from './extractors/html-fetcher.js';
 import { JinaFetcher } from './extractors/jina-fetcher.js';
 import { parseBandList } from './tours/band-list.js';
+import {
+  fetchSpotifyPlaylist,
+  parsePlaylist,
+  playlistToBandListText,
+  spotifyPlaylistId,
+  type PlaylistArtists,
+} from './tours/playlist.js';
 import { parseBandsConfig, type BandsConfig } from './tours/bands-config.js';
 import {
   appendBands,
@@ -19,6 +27,10 @@ export interface ScoutArgs {
   bandsFile: string;
   dryRun: boolean;
   fetcher: 'playwright' | 'jina';
+  /** Playlist input only: skip artists with fewer tracks than this. */
+  minTracks: number;
+  /** Playlist input only: add every found band without asking. */
+  yes: boolean;
 }
 
 export function parseArgs(argv: string[]): ScoutArgs {
@@ -26,13 +38,25 @@ export function parseArgs(argv: string[]): ScoutArgs {
     bandsFile: 'bands.yaml',
     dryRun: false,
     fetcher: 'playwright',
+    minTracks: 1,
+    yes: false,
   };
   const rest = argv.slice(2);
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (a === '--dry-run') args.dryRun = true;
+    else if (a === '--yes') args.yes = true;
     else if (a === '--bands') args.bandsFile = rest[++i] ?? '';
-    else if (a === '--fetcher') {
+    else if (a === '--min-tracks') {
+      const v = rest[++i];
+      const n = Number(v);
+      if (!v || !Number.isInteger(n) || n < 1) {
+        throw new Error(
+          `Invalid --min-tracks "${v}". Must be a whole number >= 1`
+        );
+      }
+      args.minTracks = n;
+    } else if (a === '--fetcher') {
       const v = rest[++i];
       if (v !== 'playwright' && v !== 'jina') {
         throw new Error(`Invalid --fetcher "${v}". Must be: playwright, jina`);
@@ -50,6 +74,46 @@ export function parseArgs(argv: string[]): ScoutArgs {
   return args;
 }
 
+/**
+ * Asks, band by band, whether to add it. Answers: y (yes), n or empty (no),
+ * a (yes to this and all the rest), q (no to this and all the rest).
+ */
+export async function confirmBands(
+  found: NewBand[],
+  ask: (question: string) => Promise<string>
+): Promise<{ accepted: NewBand[]; declined: string[] }> {
+  const accepted: NewBand[] = [];
+  const declined: string[] = [];
+  let mode: 'ask' | 'all' | 'none' = 'ask';
+  for (let i = 0; i < found.length; i++) {
+    const b = found[i];
+    if (mode === 'ask') {
+      console.log(
+        `\n${b.name}\n  site: ${b.url}\n  tour page: ${b.tourUrl ?? '(none found)'}\n  ${b.note}`
+      );
+      const answer = (
+        await ask(
+          `Add ${b.name} (${i + 1}/${found.length})? [y/N/a=all/q=quit] `
+        )
+      )
+        .trim()
+        .toLowerCase();
+      if (answer === 'a' || answer === 'all') mode = 'all';
+      else if (answer === 'q' || answer === 'quit') mode = 'none';
+      else if (answer === 'y' || answer === 'yes') {
+        accepted.push(b);
+        continue;
+      } else {
+        declined.push(b.name);
+        continue;
+      }
+    }
+    if (mode === 'all') accepted.push(b);
+    else declined.push(b.name);
+  }
+  return { accepted, declined };
+}
+
 export interface ScoutReport {
   dryRun: boolean;
   added: NewBand[];
@@ -59,6 +123,8 @@ export interface ScoutReport {
   errors: { name: string; error: string }[];
   sourceSkipped: { name: string; tourUrl: string }[];
   invalidLines: string[];
+  /** Found, but the user declined to add them (playlist input). */
+  declined: string[];
 }
 
 export function formatReport(r: ScoutReport): string {
@@ -93,6 +159,10 @@ export function formatReport(r: ScoutReport): string {
     );
     for (const n of r.notSearched) out.push(`  - ${n}`);
   }
+  if (r.declined.length) {
+    out.push('\nDeclined (not added):');
+    for (const n of r.declined) out.push(`  - ${n}`);
+  }
   if (r.errors.length) {
     out.push('\nErrors:');
     for (const e of r.errors) out.push(`  - ${e.name}: ${e.error}`);
@@ -102,10 +172,42 @@ export function formatReport(r: ScoutReport): string {
     for (const l of r.invalidLines) out.push(`  - ${l}`);
   }
   out.push(
-    `\n${r.added.length} added, ${r.alreadyPresent.length} already present, ${r.noSite.length} no site, ${r.notSearched.length} not searched, ${r.errors.length} errors`
+    `\n${r.added.length} added, ${r.alreadyPresent.length} already present, ${r.noSite.length} no site, ${r.notSearched.length} not searched, ${r.errors.length} errors${r.declined.length ? `, ${r.declined.length} declined` : ''}`
   );
   return out.join('\n');
 }
+
+export const USAGE = `Usage: npm run bands-scout -- <input> [options]   (note the --)
+
+Finds each band's official site and tour page, and adds the missing entries
+to bands.yaml.
+
+<input> is one of:
+  bands.txt               one band per line; "Name | https://site" skips the search
+  playlist.xml            Apple Music / iTunes XML playlist export
+  playlist.csv            Spotify playlist exported with Exportify (all tracks)
+  <spotify link>          public playlist, https://open.spotify.com/playlist/<id>
+                          (only the first ~100 tracks; use the CSV for more)
+
+Options:
+  --bands <path>          bands.yaml to extend (default: bands.yaml, must exist)
+  --dry-run               look everything up and report, but write nothing
+  --min-tracks <n>        playlists only: skip artists with fewer than n tracks
+  --yes                   playlists only: add every band found without asking
+  --fetcher <engine>      playwright (default) or jina
+
+With a playlist you are asked to confirm each band before it is added
+(y / N / a = all / q = quit).
+
+Needs: your LLM settings in .env, and BRAVE_SEARCH_API_KEY for bands without
+a "| https://site" hint.
+
+Examples:
+  npm run bands-scout -- bands.txt --dry-run
+  npm run bands-scout -- playlist.xml --min-tracks 2
+  npm run bands-scout -- https://open.spotify.com/playlist/<id> --dry-run
+
+Details: crawler/README.md, crawler/SPECS.md section 4.11`;
 
 async function main() {
   await loadEnv();
@@ -117,15 +219,31 @@ async function main() {
     process.exit(1);
   }
   if (!args.inputFile) {
-    console.error(
-      'Usage: npm run bands-scout -- <bands.txt> [--bands bands.yaml] [--dry-run] [--fetcher playwright|jina]'
-    );
+    console.error(USAGE);
     process.exit(1);
   }
 
-  const listText = await readIfExists(args.inputFile);
-  if (listText === null) {
-    console.error(`Error: ${args.inputFile} not found.`);
+  let playlist: PlaylistArtists | null = null;
+  let listText: string | null = null;
+  if (spotifyPlaylistId(args.inputFile)) {
+    try {
+      playlist = await fetchSpotifyPlaylist(args.inputFile);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  } else {
+    listText = await readIfExists(args.inputFile);
+    if (listText === null) {
+      console.error(`Error: ${args.inputFile} not found.`);
+      process.exit(1);
+    }
+    playlist = parsePlaylist(listText);
+  }
+  if (playlist && !args.dryRun && !args.yes && !process.stdin.isTTY) {
+    console.error(
+      'Error: a playlist needs your confirmation for each band, but this is not an interactive terminal. Run it in a terminal, or pass --yes to add every band found (or --dry-run to preview).'
+    );
     process.exit(1);
   }
   const yamlText = await readIfExists(args.bandsFile);
@@ -145,7 +263,19 @@ async function main() {
     process.exit(1);
   }
 
-  const list = parseBandList(listText);
+  let listSource = listText ?? '';
+  if (playlist) {
+    listSource = playlistToBandListText(playlist, args.minTracks);
+    const label = {
+      'apple-xml': 'Apple Music/iTunes XML',
+      'spotify-csv': 'Spotify CSV',
+      'spotify-url': 'Spotify link',
+    }[playlist.format];
+    console.log(
+      `Read ${label} playlist: ${playlist.artists.length} artists, ${listSource ? listSource.split('\n').length : 0} with at least ${args.minTracks} track(s).`
+    );
+  }
+  const list = parseBandList(listSource);
   const report: ScoutReport = {
     dryRun: args.dryRun,
     added: [],
@@ -155,6 +285,7 @@ async function main() {
     errors: [],
     sourceSkipped: [],
     invalidLines: list.invalid,
+    declined: [],
   };
 
   // Names already in bands.yaml need no search at all.
@@ -222,10 +353,27 @@ async function main() {
     }
   }
 
+  // Playlist input finds many bands the user never named, so each one is
+  // confirmed before it is written (a dry run writes nothing, so no questions).
+  let toAdd = found;
+  if (playlist && !args.dryRun && !args.yes && found.length > 0) {
+    const rl = createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    try {
+      const r = await confirmBands(found, q => rl.question(q));
+      toAdd = r.accepted;
+      report.declined = r.declined;
+    } finally {
+      rl.close();
+    }
+  }
+
   try {
     const result = appendBands(
       yamlText,
-      found,
+      toAdd,
       new Date().toISOString().slice(0, 10)
     );
     report.added = result.added;
