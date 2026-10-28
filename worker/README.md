@@ -237,7 +237,7 @@ wrangler secret put TELEGRAM_BOT_PUBKEY     # the crawler-worker's BOT_PUBKEY (h
 wrangler secret put PUBLIC_WEB_URL          # e.g. https://tokoro-query.pages.dev, for the digest links
 ```
 
-Optional admin chat: set `ADMIN_TELEGRAM_CHAT_ID` to receive one message per new conflict (any band) and every digest alert (all bands and festival editions, not only followed ones). To find the chat id, send any message to the bot, then open `https://api.telegram.org/bot<TOKEN>/getUpdates` and read `message.chat.id` (negative for groups).
+Optional admin chat: set `ADMIN_TELEGRAM_CHAT_ID` to receive one message per new conflict (any band) and every digest alert (all bands and festival editions, not only followed ones). Create a Telegram group with only you and the bot (the bot stays silent in groups unless addressed as `@bot events ...`). The bot has a webhook, so `getUpdates` answers 409 and cannot be used to find the chat id. Instead add @RawDataBot (or @getidsbot) to the group for a moment, read the `chat.id` it replies with (a negative number, `-100…` for supergroups), then remove it. If the group is later converted to a supergroup its id changes, so check the id after setting the group up. To test, call `https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<ID>&text=test`.
 
 ```bash
 wrangler secret put ADMIN_TELEGRAM_CHAT_ID  # e.g. 123456789

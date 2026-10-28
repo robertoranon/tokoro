@@ -1423,7 +1423,7 @@ Runs from the `0 8 * * *` cron (section 8.3). Does nothing when `TELEGRAM_BOT_TO
 
 #### 7.15.5 Admin chat
 
-A separate chat identified by `ADMIN_TELEGRAM_CHAT_ID` (not a member; found via `getUpdates`, `message.chat.id`). Nothing is sent when it or `TELEGRAM_BOT_TOKEN` is unset.
+A separate chat identified by `ADMIN_TELEGRAM_CHAT_ID` (not a member; a group with the bot, its id found with a helper bot such as @RawDataBot because the bot's webhook prevents `getUpdates`). Nothing is sent when it or `TELEGRAM_BOT_TOKEN` is unset.
 
 - **Conflict notice:** `notifyConflict` sends one message per newly created conflict, for any band: the band name (`act_name`; if null, the host of the first event URL, else "Unnamed band"), the day, one line per event with title and place (`venue_name`, else `address`), all HTML-escaped, a line telling the admin to resolve it in the admin page's Conflicts tab, and a link to `ADMIN_PAGE_URL` when set. Failures are logged, never thrown.
 - **Digest:** the digest job (7.15.4) adds the admin chat as a recipient with `radar_alerts` on and every `act_url` of the claimed shows as followed, so it receives all new shows and all new editions. It is sent first and counts toward the send budget, so it is never the one skipped. A `403` from the admin chat is only logged; no member's `telegram_chat_id` changes.
