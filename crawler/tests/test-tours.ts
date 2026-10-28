@@ -1799,15 +1799,37 @@ sources:
       ) === undefined,
       'a stored show without a venue is never matched by venue'
     );
+    // Neither side names a venue (a show known only by its city): the band's one
+    // show of that day is the same show, wherever the geocoder put it this time.
+    for (const blank of [null, '']) {
+      assert(
+        matchShow(
+          [mk({ venue_name: blank })],
+          '2030-02-12T20:00:00',
+          tas.lat,
+          tas.lng,
+          ''
+        )?.id === 'old',
+        `no venue on either side (${blank === null ? 'null' : "''"}): the band's only show that day matches`
+      );
+    }
     assert(
       matchShow(
-        [mk({ venue_name: '' })],
+        [mk({ venue_name: null }), mk({ id: 'two', venue_name: null })],
         '2030-02-12T20:00:00',
-        undefined,
-        undefined,
-        ''
+        tas.lat,
+        tas.lng
       ) === undefined,
-      'empty venue names never match each other'
+      'no venue on either side but two shows that day: ambiguous, no match'
+    );
+    assert(
+      matchShow(
+        [mk({ venue_name: null, start_time: '2030-02-13T00:00:00' })],
+        '2030-02-12T20:00:00',
+        tas.lat,
+        tas.lng
+      ) === undefined,
+      'no venue on either side, another day: no match'
     );
     const near = mk({
       id: 'near',
@@ -2078,6 +2100,46 @@ sources:
         Asheville: [
           row(35.6, -82.55, 0.6, 'us', 'Asheville, North Carolina, USA'),
         ],
+        // Real Nominatim answers: admin areas outrank the city itself.
+        Trento: [
+          row(
+            46.103,
+            11.1297,
+            0.729,
+            'it',
+            'Provincia di Trento, Trentino-Alto Adige/Südtirol, Italia'
+          ),
+          row(
+            46.0664,
+            11.1258,
+            0.6575,
+            'it',
+            "Trento, Territorio Val d'Adige, Provincia di Trento, Italia"
+          ),
+          row(
+            8.0435,
+            126.0633,
+            0.3495,
+            'ph',
+            'Trento, Agusan del Sur, Caraga, Philippines'
+          ),
+          row(
+            46.4415,
+            11.2821,
+            0.735,
+            'it',
+            'Trentino-Alto Adige/Südtirol, Italia'
+          ),
+        ],
+        // The same city twice, listed in a different order per query.
+        Katowice: [
+          row(50.2599, 19.0216, 0.672, 'pl', 'Katowice, województwo śląskie'),
+          row(50.2137, 19.0059, 0.672, 'pl', 'Katowice, województwo śląskie'),
+        ],
+        'Katowice, Poland': [
+          row(50.2137, 19.0059, 0.672, 'pl', 'Katowice, województwo śląskie'),
+          row(50.2599, 19.0216, 0.672, 'pl', 'Katowice, województwo śląskie'),
+        ],
         Nowhere: [],
         Limited: 429,
       };
@@ -2149,8 +2211,8 @@ sources:
       const NA = { lat: 37, lng: -80 };
       assert(pickCandidate([], NA) === undefined, 'no candidates → undefined');
       assert(
-        pickCandidate(durham)?.countryCode === 'GB',
-        'without a bias the first candidate is used, as before'
+        pickCandidate(durham)?.countryCode === 'US',
+        'without a bias, the place named "Durham" beats "County Durham" (same importance)'
       );
       assert(
         pickCandidate(durham, NA)?.displayName.includes('North Carolina') ===
@@ -2181,11 +2243,28 @@ sources:
         'missing importance (0) ties everything: nearest wins'
       );
 
+      // A place named like the query beats a larger area that merely contains it
+      const trento = await geocodeCandidates('Trento');
+      assert(
+        pickCandidate(trento)?.lat === 46.0664,
+        'a query for "Trento" picks the city, not the province or region'
+      );
+      assert(
+        pickCandidate(trento, { lat: 46.5, lng: 11.3 })?.lat === 46.0664,
+        'whatever the bias, the same-named city wins over a nearer region'
+      );
+      const kat = await geocodeCandidates('Katowice');
+      const katPl = await geocodeCandidates('Katowice, Poland');
+      assert(
+        pickCandidate(kat)?.lat === pickCandidate(katPl)?.lat,
+        'identical candidates listed in another order give the same point'
+      );
+
       // geocodeAddress
       stub();
       assert(
-        (await geocodeAddress('Durham'))?.lat === 54.67,
-        'geocodeAddress without a bias is unchanged (first candidate)'
+        (await geocodeAddress('Durham'))?.lat === 36.0,
+        'geocodeAddress without a bias prefers the place named like the query'
       );
       const biased = await geocodeAddress('Durham', undefined, { bias: NA });
       assert(
@@ -2293,8 +2372,8 @@ sources:
 
       const plain = await normalizer.normalize(event);
       assert(
-        plain?.lat === 54.67,
-        'without a bias: the first candidate, as before'
+        plain?.lat === 36.0,
+        'without a bias: the place named like the query'
       );
       const biased = await normalizer.normalize(event, {
         geoBias: { lat: 37, lng: -80 },

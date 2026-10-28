@@ -549,6 +549,10 @@ Then apply `are_events_similar()` to each result.
 }
 ```
 
+### 5.5.1 Same Band, Same Date
+
+Before the proximity check above, a new event with an `act_url` is compared with the existing events of that band: if any event has the same `act_url` (compared without a trailing `/`) and the same local date (the first 10 characters of `start_time`), the new event is rejected with the same 409 response (`message`: "This band already has an event on that date", `existing_event_id`: that event). Distance and time of day are ignored, but two events that each name a venue and name different ones (compared trimmed and case-insensitively) are not matched: a tour page listing Rock im Park and Rock am Ring on one date reports two places, and a person must decide which is right. A band plays one place a day, and the proximity check cannot see a duplicate whose coordinates disagree (the same city geocoded to two points 5 to 40 km apart). The crawler treats this 409 like any other: it attaches the band to the existing event if it has none, and otherwise leaves it alone. Events without an `act_url` are not affected.
+
 ### 5.6 Environment Variables and Secrets
 
 **Allowlist:**

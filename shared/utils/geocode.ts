@@ -15,6 +15,12 @@ export interface GeoCandidate {
   displayName: string;
   /** Upper-case ISO 3166-1 alpha-2, or '' when unknown. */
   countryCode: string;
+  /**
+   * True when the place's own name (first display-name segment) is the one the
+   * query asks for. "Trento" names the city, not the province or region whose
+   * display name merely contains it.
+   */
+  nameMatch?: boolean;
 }
 
 /** A point the places on a page cluster around. */
@@ -47,6 +53,16 @@ interface NominatimRow {
   display_name: string;
   importance?: number;
   address?: { country_code?: string };
+}
+
+/** The text before the first comma, lower-cased and without accents. */
+function firstSegment(text: string): string {
+  return text
+    .split(',')[0]
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
 }
 
 /** The top 5 Nominatim candidates for a query, best first. */
@@ -84,12 +100,14 @@ export async function geocodeCandidates(
   }
 
   const rows = (await response.json()) as NominatimRow[];
+  const asked = firstSegment(query);
   const candidates = rows.map(r => ({
     lat: parseFloat(r.lat),
     lng: parseFloat(r.lon),
     importance: typeof r.importance === 'number' ? r.importance : 0,
     displayName: r.display_name,
     countryCode: (r.address?.country_code ?? '').toUpperCase(),
+    nameMatch: asked !== '' && firstSegment(r.display_name) === asked,
   }));
   candidateCache.set(key, candidates);
   return candidates;
@@ -106,12 +124,30 @@ function haversineKm(a: GeoBias, b: GeoBias): number {
   return R * 2 * Math.asin(Math.sqrt(s));
 }
 
+/** Most important first; equal ones in a fixed order (see `pickCandidate`). */
+function byRank(a: GeoCandidate, b: GeoCandidate): number {
+  return (
+    b.importance - a.importance ||
+    a.displayName.localeCompare(b.displayName) ||
+    b.lat - a.lat ||
+    b.lng - a.lng
+  );
+}
+
 /**
- * Without a bias: the first (best-ranked) candidate, as geocoding always did.
- * With one: among the candidates whose importance is within `margin` of the
- * best, the one nearest the bias. A clear winner (a big city against a village
- * of the same name) is never overridden; a tie ("Durham": England and North
- * Carolina at 0.619 each) goes to the place the rest of the page points to.
+ * Candidates named exactly like the query beat the rest: "Trento" is the city,
+ * not the province or region that outrank it in importance. If none is named
+ * like the query, all compete.
+ *
+ * Without a bias: the most important candidate. With one: among the candidates
+ * whose importance is within `margin` of the best, the one nearest the bias. A
+ * clear winner (a big city against a village of the same name) is never
+ * overridden; a tie ("Durham": England and North Carolina at 0.619 each) goes
+ * to the place the rest of the page points to.
+ *
+ * Candidates that still tie are ordered by display name, then coordinates, not
+ * by Nominatim's response order, which flips for identical rows between
+ * queries and made one show land on two different points of the same city.
  */
 export function pickCandidate(
   candidates: GeoCandidate[],
@@ -119,9 +155,10 @@ export function pickCandidate(
   margin = 0.05
 ): GeoCandidate | undefined {
   if (candidates.length === 0) return undefined;
-  if (!bias) return candidates[0];
-  const best = Math.max(...candidates.map(c => c.importance));
-  const tied = candidates.filter(c => c.importance >= best - margin);
+  const named = candidates.filter(c => c.nameMatch);
+  const pool = [...(named.length > 0 ? named : candidates)].sort(byRank);
+  if (!bias) return pool[0];
+  const tied = pool.filter(c => c.importance >= pool[0].importance - margin);
   return tied.reduce((a, b) =>
     haversineKm(a, bias) <= haversineKm(b, bias) ? a : b
   );

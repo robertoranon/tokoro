@@ -1008,6 +1008,38 @@ async function isBlocklisted(env: Env, pubkey: string): Promise<boolean> {
   return row !== null;
 }
 
+/**
+ * The id of an existing event of the same band on the same local date, wherever
+ * it is. A band plays one place a day, so two events with one `act_url` and
+ * one date are one show, even when their coordinates disagree (a city
+ * geocoded to two different points), which the proximity check cannot see.
+ *
+ * Two events that each name a different venue are not matched: a tour page
+ * that lists Rock im Park and Rock am Ring on one date is reporting two places,
+ * and only the person who reads the page can say which is right.
+ */
+export async function findSameActSameDay(
+  db: D1Database,
+  actUrl: string | undefined,
+  startTime: string,
+  venueName?: string | null
+): Promise<string | null> {
+  const normalized = (actUrl ?? '').trim().replace(/\/$/, '');
+  if (!normalized) return null;
+  const venue = (venueName ?? '').trim().toLowerCase();
+  const row = await db
+    .prepare(
+      `SELECT id FROM events
+       WHERE RTRIM(act_url, '/') = ? AND substr(start_time, 1, 10) = ?
+         AND (? = '' OR TRIM(COALESCE(venue_name, '')) = ''
+              OR LOWER(TRIM(venue_name)) = ?)
+       LIMIT 1`
+    )
+    .bind(normalized, startTime.slice(0, 10), venue, venue)
+    .first<{ id: string }>();
+  return row?.id ?? null;
+}
+
 async function handlePostEvent(request: Request, env: Env): Promise<Response> {
   const event: Event = await request.json();
 
@@ -1045,6 +1077,23 @@ async function handlePostEvent(request: Request, env: Env): Promise<Response> {
   const isValid = await verifyEventSignature(event);
   if (!isValid) {
     return jsonResponse({ error: 'Invalid signature' }, 401);
+  }
+
+  const sameShowId = await findSameActSameDay(
+    env.DB,
+    event.act_url,
+    event.start_time,
+    event.venue_name
+  );
+  if (sameShowId) {
+    return jsonResponse(
+      {
+        error: 'Duplicate event',
+        message: 'This band already has an event on that date',
+        existing_event_id: sameShowId,
+      },
+      409
+    );
   }
 
   // Generate geohashes

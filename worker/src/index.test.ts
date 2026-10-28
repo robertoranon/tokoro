@@ -17,6 +17,7 @@ import {
   validatePutRequest,
   validateAdoptBody,
   decideAdopt,
+  findSameActSameDay,
   BACKUP_TABLES,
 } from './index';
 import worker from './index';
@@ -1028,5 +1029,124 @@ describe('decideAdopt', () => {
     expect(
       decideAdopt('https://testband.example/live', 'https://testband.example')
     ).toBe('conflict');
+  });
+});
+
+describe('findSameActSameDay', () => {
+  const insert = (
+    DB: any,
+    id: string,
+    actUrl: string | null,
+    start: string,
+    venue: string | null = null
+  ) =>
+    DB.prepare(
+      `INSERT INTO events (id, pubkey, signature, title, lat, lng, geohash5, geohash6,
+         start_time, category, created_at, act_name, act_url, venue_name)
+       VALUES (?, 'pk', 'sig', 'Show', 46.44, 11.28, 'u0pyr', 'u0pyrx', ?,
+         'music', 'x', 'Band', ?, ?)`
+    )
+      .bind(id, start, actUrl, venue)
+      .run();
+
+  it("finds the band's show of that day wherever it is", async () => {
+    const DB = makeD1(ALL_MIGRATIONS);
+    await insert(DB, 'e1', 'https://band.example/en', '2027-06-03T00:00:00');
+    expect(
+      await findSameActSameDay(
+        DB,
+        'https://band.example/en',
+        '2027-06-03T00:00:00'
+      )
+    ).toBe('e1');
+  });
+
+  it('ignores the time of day and a trailing slash', async () => {
+    const DB = makeD1(ALL_MIGRATIONS);
+    await insert(DB, 'e1', 'https://band.example/en/', '2027-06-03T21:00:00');
+    expect(
+      await findSameActSameDay(
+        DB,
+        'https://band.example/en',
+        '2027-06-03T00:00:00'
+      )
+    ).toBe('e1');
+  });
+
+  it('does not match another day, another band or an event without a band', async () => {
+    const DB = makeD1(ALL_MIGRATIONS);
+    await insert(DB, 'day', 'https://band.example', '2027-06-04T00:00:00');
+    await insert(DB, 'other', 'https://other.example', '2027-06-03T00:00:00');
+    await insert(DB, 'none', null, '2027-06-03T00:00:00');
+    expect(
+      await findSameActSameDay(
+        DB,
+        'https://band.example',
+        '2027-06-03T20:00:00'
+      )
+    ).toBeNull();
+  });
+
+  it('matches nothing without an act url', async () => {
+    const DB = makeD1(ALL_MIGRATIONS);
+    await insert(DB, 'none', null, '2027-06-03T00:00:00');
+    expect(
+      await findSameActSameDay(DB, undefined, '2027-06-03T00:00:00')
+    ).toBeNull();
+    expect(await findSameActSameDay(DB, '', '2027-06-03T00:00:00')).toBeNull();
+  });
+
+  it('does not match when both name a venue and the venues differ', async () => {
+    const DB = makeD1(ALL_MIGRATIONS);
+    await insert(
+      DB,
+      'e1',
+      'https://band.example',
+      '2027-06-04T00:00:00',
+      'Rock im Park'
+    );
+    expect(
+      await findSameActSameDay(
+        DB,
+        'https://band.example',
+        '2027-06-04T00:00:00',
+        'Rock Am Ring'
+      )
+    ).toBeNull();
+  });
+
+  it('matches the same venue (case-insensitive) and a missing venue on either side', async () => {
+    const DB = makeD1(ALL_MIGRATIONS);
+    await insert(
+      DB,
+      'named',
+      'https://band.example',
+      '2027-06-04T00:00:00',
+      'Rock im Park'
+    );
+    expect(
+      await findSameActSameDay(
+        DB,
+        'https://band.example',
+        '2027-06-04T00:00:00',
+        ' rock IM park '
+      )
+    ).toBe('named');
+    expect(
+      await findSameActSameDay(
+        DB,
+        'https://band.example',
+        '2027-06-04T00:00:00'
+      )
+    ).toBe('named');
+    await insert(DB, 'blank', 'https://other.example', '2027-06-04T00:00:00');
+    expect(
+      await findSameActSameDay(
+        DB,
+        'https://other.example',
+        '2027-06-04T00:00:00',
+        'Anywhere'
+      )
+    ).toBe('blank');
   });
 });

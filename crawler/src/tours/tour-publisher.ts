@@ -49,6 +49,8 @@ const text = (v: string | null | undefined) => v ?? '';
  * 2. Otherwise the same venue name (normalized) on that date, even if the
  *    stored coordinates are far away: that is a show that was geocoded to the
  *    wrong place earlier, and the update corrects it instead of duplicating it.
+ * 3. With no venue name on the draft: the one stored show of that date that
+ *    has no venue name either (none if there are several).
  */
 export function matchShow(
   existing: ExistingShow[],
@@ -77,7 +79,16 @@ export function matchShow(
   }
 
   const venue = normalizeName(venueName ?? '');
-  if (venue === '') return undefined;
+  if (venue === '') {
+    // A show known only by its city: nothing but the date identifies it, and
+    // the geocoder may place a city at different points between runs. The
+    // band's one venue-less show of that day is it; with two, guessing would
+    // overwrite the wrong one.
+    const unnamed = sameDay.filter(
+      e => normalizeName(e.venue_name ?? '') === ''
+    );
+    return unnamed.length === 1 ? unnamed[0] : undefined;
+  }
   const sameVenue = sameDay.filter(
     e => normalizeName(e.venue_name ?? '') === venue
   );
