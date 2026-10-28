@@ -11,7 +11,7 @@ Return a JSON object {"shows": [ ... ]}. Each show has:
 - **title** (required): the show title as the page gives it (e.g. "Test Band live", or the event/tour name)
 - **performers** (required): array with the name of EVERY act on the bill, headliner first, exactly as written on the page. If the page names no act for a show, use the single act the page is about (a band's own page) or [].
 - **start_time** (required): "YYYY-MM-DDTHH:MM:SS" local time of the venue if the page gives a time (doors time is acceptable only if no show time is given); otherwise just the date "YYYY-MM-DD". Do NOT convert time zones.
-- **end_time**: only if the page states it, same format
+- **end_time**: only if the page states it, same format; also the festival's last day for a festival appearance with no known day (see RULES)
 - **venue_name**: the venue name only
 - **city**: the city or town of the venue
 - **region**: the state, province or county of the venue's city. Copy it EXACTLY as the page prints it ("TN", "TAS", "WA", "Bavaria"). If the page prints none for this show, infer it only under the INFERENCE rule below; otherwise omit it.
@@ -27,7 +27,7 @@ RULES:
 - INFERENCE: when the page prints no region or country for a show, infer them from the SURROUNDING shows, if and only if those make the place unambiguous. A run of US cities (Washington, Durham, Asheville, Atlanta) means "Durham" is Durham, North Carolina: give region "NC"; a leg of a tour in one country settles a bare city name the same way. Choose the place the tour routing actually points to, not the most famous namesake. If the surrounding shows do not settle it, omit the region and country. Never replace a region or country that the page prints.
 - Include only shows on or after today's date (given in the user message). Skip past shows.
 - Use the exact dates shown. If a date shows no year, assume the current year, or next year if the current-year date is more than a few months in the past. If the page URL or title contains a year, use it.
-- Several dates in the same city are separate shows. A multi-day festival appearance is one show per day the act plays if the page says so, otherwise one show on the first day.
+- Several dates in the same city are separate shows. A multi-day festival appearance is one show per day the act plays if the page says so. A festival appearance whose exact day the page does not give (only the festival's dates, e.g. "Rock im Park, 5-7 June") is ONE show: start_time is the festival's first day and end_time is its last day, both date-only ("YYYY-MM-DD"). If the page gives the band's own day, it is one show on that day with no end_time.
 - Skip cancelled shows, sold-out status does not matter (keep sold-out shows).
 - Do not invent shows, venues or dates. If the page lists no upcoming shows, return {"shows": []}.
 
@@ -51,6 +51,15 @@ Example output:
       "venue_name": "Kino Šiška",
       "city": "Ljubljana",
       "country": "Slovenia"
+    },
+    {
+      "title": "Test Band at Example Festival",
+      "performers": ["Test Band"],
+      "start_time": "2030-06-18",
+      "end_time": "2030-06-20",
+      "venue_name": "Example Festival",
+      "city": "Nuremberg",
+      "country": "Germany"
     }
   ]
 }`;

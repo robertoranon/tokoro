@@ -69,3 +69,14 @@ different venues). Specs and tests updated for all three.
   same date in different places when neither names a venue. A band cannot play
   two cities in a day, and the festival placeholders that legitimately share a
   date name different venues.
+
+## Task 2 verification (festival span in extraction)
+
+Prompt reworded (`shared/extractors/tour-prompt.ts`): a festival appearance with
+no known day is one show, `start_time` = festival first day, `end_time` = last
+day. Dry run (`npm run tours -- --bands <blink+pigeon> --debug`), first try:
+ESNS Showcase Festival 2027 (Pigeon) carries `end_time` (2027-01-13 to
+2027-01-16). Rock am Ring (2027-06-04) and Rock im Park (2027-06-06) from the
+Blink-182 page came out WITHOUT `end_time`; the tour page is JavaScript-rendered
+so it could not be checked whether it lists only the band's own day (then no
+`end_time` is correct). Not iterated further. Not verified for those two.

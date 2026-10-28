@@ -1728,6 +1728,21 @@ sources:
     );
   }
 
+  console.log('\n=== tour prompt: festival span ===\n');
+  {
+    const prompt = getTourShowsPrompt();
+    const rule =
+      prompt.split('\n').find(l => /festival appearance/i.test(l)) ?? '';
+    assert(
+      /last day/i.test(rule) && /end_time/.test(rule),
+      "tour prompt: a festival appearance with only the festival's dates keeps first day as start_time and last day as end_time"
+    );
+    assert(
+      !/otherwise one show on the first day/i.test(prompt),
+      'the old first-day-only wording is gone'
+    );
+  }
+
   console.log(
     '\n=== matchShow: same date and venue, different coordinates ===\n'
   );
