@@ -128,6 +128,14 @@ export interface TourSourceDeps {
    * it ambiguous places keep the geocoder's own ranking.
    */
   locate?: (queries: string[]) => Promise<GeoBias | undefined>;
+  /**
+   * Propose deleting a held stored show (one in an open conflict) that a
+   * band-mode source no longer lists. Optional: debug runs leave it out.
+   */
+  proposeDeletion?: (
+    eventId: string,
+    reason: string
+  ) => Promise<'proposed' | 'failed'>;
   /** This crawler's pubkey; a show held by another key is never updated. */
   ownPubkey?: string;
   /** YYYY-MM-DD; shows before it are skipped. */
@@ -170,6 +178,10 @@ export async function processTourSourcePage(
   const seenSameDay = new Map<string, ExistingShow[]>();
   // Ids (real, or stub ids for new shows) already POSTed/PUT in this run.
   const sentIds = new Set<string>();
+  // Stored shows this page still lists (matched by one of its drafts).
+  const matchedIds = new Set<string>();
+  // Drafts dropped as out of region before any lookup: still listed.
+  const earlyOutOfRegion: { draft: TourShowDraft; band: BandConfig }[] = [];
 
   // The page's centre, from the places of the upcoming shows that still need
   // geocoding, so a bare "Durham" among US cities resolves to Durham, NC.
@@ -206,6 +218,7 @@ export async function processTourSourcePage(
       !inRegion(draft.lat, draft.lng, region)
     ) {
       results.push({ title: draft.title, outcome: 'skipped_out_of_region' });
+      earlyOutOfRegion.push({ draft, band });
       continue;
     }
 
@@ -261,6 +274,7 @@ export async function processTourSourcePage(
           );
         }
       }
+      if (match) matchedIds.add(match.id);
       if (!normalized && match) {
         // LLM extraction varies between runs: a run that finds no usable
         // location must not fail a show whose location is already known.
@@ -369,5 +383,58 @@ export async function processTourSourcePage(
       });
     }
   }
+  await proposeUnlisted(
+    source,
+    bands[0],
+    results,
+    existingByBand,
+    matchedIds,
+    earlyOutOfRegion,
+    deps
+  );
   return results;
+}
+
+/**
+ * After a band-mode source page was processed cleanly (no failed show),
+ * propose deleting each held stored show of the band (upcoming, in an open
+ * conflict) that none of the page's drafts matched. Listing pages are partial
+ * by nature and never propose. A proposal error never fails the source.
+ */
+async function proposeUnlisted(
+  source: TourSource,
+  band: BandConfig | undefined,
+  results: ShowResult[],
+  existingByBand: Map<string, ExistingShow[]>,
+  matchedIds: Set<string>,
+  earlyOutOfRegion: { draft: TourShowDraft; band: BandConfig }[],
+  deps: TourSourceDeps
+): Promise<void> {
+  if (!deps.proposeDeletion || source.mode !== 'band' || !band) return;
+  if (results.some(r => r.outcome === 'failed')) return;
+  const existing = existingByBand.get(band.url);
+  if (!existing) return;
+  for (const { draft } of earlyOutOfRegion) {
+    const m = matchShow(
+      existing,
+      draft.start_time,
+      draft.lat,
+      draft.lng,
+      draft.venue_name
+    );
+    if (m) matchedIds.add(m.id);
+  }
+  const reason = `not listed on ${source.url}`;
+  for (const show of existing) {
+    if (show.held !== 1 || matchedIds.has(show.id)) continue;
+    // A past show is simply no longer on the page: nothing to propose.
+    if ((show.end_time ?? show.start_time).slice(0, 10) < deps.today) continue;
+    try {
+      await deps.proposeDeletion(show.id, reason);
+    } catch (error) {
+      console.error(
+        `  Proposal for event ${show.id} failed: ${error instanceof Error ? error.message : error}`
+      );
+    }
+  }
 }

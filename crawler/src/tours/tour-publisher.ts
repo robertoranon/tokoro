@@ -27,6 +27,8 @@ export interface ExistingShow {
   act_url?: string | null;
   created_at: string;
   pubkey?: string;
+  /** 1 when the event is held in an open conflict (hidden from listings). */
+  held?: number;
 }
 
 // GET /events is bounded by start_time (default window from now), so the
@@ -153,6 +155,12 @@ export type AdoptSigner = (
   actUrl: string
 ) => Promise<string>;
 
+/** Signs a deletion proposal for a held event (see proposal.ts). */
+export type ProposalSigner = (
+  eventId: string,
+  reason: string
+) => Promise<string>;
+
 export class TourPublisher {
   private failure: string | undefined;
 
@@ -160,7 +168,8 @@ export class TourPublisher {
     private apiUrl: string,
     private pubkey: string,
     private fetchFn: typeof fetch = fetch,
-    private signAdopt?: AdoptSigner
+    private signAdopt?: AdoptSigner,
+    private signPropose?: ProposalSigner
   ) {}
 
   /**
@@ -185,6 +194,9 @@ export class TourPublisher {
         from: LOOKUP_FROM,
         to: LOOKUP_TO,
         offset: String(offset),
+        // Held events (in an open conflict) are hidden from listings; the
+        // crawler must still see them to match and update them.
+        include_held: '1',
       });
       const res = await this.fetchFn(`${this.apiUrl}/events?${params}`);
       if (!res.ok) throw new Error(`Lookup failed (${res.status})`);
@@ -202,6 +214,47 @@ export class TourPublisher {
       offset += data.events.length;
     }
     return all;
+  }
+
+  /**
+   * Propose deleting a held event (one in an open conflict) that a source no
+   * longer lists. The curator decides; the crawler never deletes. One request,
+   * never throws: 200 (already proposed) and 201 are 'proposed'.
+   */
+  async proposeDeletion(
+    eventId: string,
+    reason: string
+  ): Promise<'proposed' | 'failed'> {
+    if (!this.signPropose) {
+      console.error(`Cannot propose deleting event ${eventId}: no signer`);
+      return 'failed';
+    }
+    try {
+      const signature = await this.signPropose(eventId, reason);
+      const res = await this.fetchFn(`${this.apiUrl}/conflicts/proposals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pubkey: this.pubkey,
+          event_id: eventId,
+          reason,
+          signature,
+        }),
+      });
+      if (res.status === 200 || res.status === 201) {
+        console.log(`✂ Proposed deleting event ${eventId}: ${reason}`);
+        return 'proposed';
+      }
+      console.error(
+        `Proposal to delete event ${eventId} refused (HTTP ${res.status})`
+      );
+      return 'failed';
+    } catch (error) {
+      console.error(
+        `Proposal to delete event ${eventId} failed (${error instanceof Error ? error.message : error})`
+      );
+      return 'failed';
+    }
   }
 
   /**

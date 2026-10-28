@@ -48,6 +48,7 @@ export function buildTourRunRecord(
       .filter(x => x.stale)
       .map(x => ({ source: r.url, title: x.title, ...x.stale! }))
   );
+  const proposed = results.reduce((n, r) => n + (r.proposed ?? 0), 0);
   const failedSources = results.filter(r => r.outcome === 'failed').length;
   const status =
     failedSources === 0
@@ -66,6 +67,7 @@ export function buildTourRunRecord(
     status,
     ...counters,
     ...(staleShows.length > 0 ? { stale: staleShows } : {}),
+    ...(proposed > 0 ? { proposed } : {}),
     entries: results.map(r => {
       const failed = r.shows.filter(x => x.outcome === 'failed');
       const failures = failed.slice(0, MAX_FAILURES).map(x => ({
@@ -230,6 +232,11 @@ async function main() {
     console.log(
       `\nTours complete: ${record.published} published, ${record.updated} updated, ${record.unchanged} unchanged, ${record.adopted} adopted, ${record.duplicate} duplicate, ${record.unmatched} unmatched, ${record.skipped_past} past, ${record.skipped_out_of_region} out of region, ${record.failed} failed`
     );
+    if (record.proposed) {
+      console.log(
+        `${record.proposed} deletion(s) proposed (held shows a source no longer lists)`
+      );
+    }
   }
 
   const failureLines = formatFailures(results);

@@ -1,5 +1,6 @@
 import * as ed from '@noble/ed25519';
 import { signAdoption, adoptMessage } from '../src/tours/adopt.js';
+import { signProposal, proposalMessage } from '../src/tours/proposal.js';
 import { getTourShowsPrompt } from '../../shared/extractors/tour-prompt.js';
 import { selectRetrySources } from '../src/tours/retry.js';
 import { parsePart, selectPart } from '../src/tours/part.js';
@@ -663,6 +664,10 @@ sources:
       q.get('from') === '1970-01-01T00:00:00' &&
         q.get('to') === '2999-12-31T23:59:59',
       'lookup uses an explicit wide range'
+    );
+    assert(
+      q.get('include_held') === '1',
+      'lookup asks for held (conflicting) shows too'
     );
 
     const ev = {
@@ -3583,6 +3588,400 @@ sources:
     assert(
       selectPart(sources, { index: 1, total: 1 }).length === sources.length,
       '1/1 selects everything'
+    );
+  }
+
+  console.log('\n=== proposals: signature message matches the worker ===\n');
+  {
+    // The worker's `proposalMessage` (worker/src/crypto.ts) hashes exactly
+    // `proposal:${eventId}\n${reason}`; both sides must stay identical, or
+    // every proposal is rejected as a bad signature.
+    const eventId =
+      'abababababababababababababababababababababababababababababababab';
+    const reason = 'not listed on https://testband.example/live';
+    const hex = (b: Uint8Array) =>
+      Array.from(b)
+        .map(x => x.toString(16).padStart(2, '0'))
+        .join('');
+    const expected = new Uint8Array(
+      await crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode(`proposal:${eventId}\n${reason}`)
+      )
+    );
+    const msg = await proposalMessage(eventId, reason);
+    assert(
+      hex(msg) ===
+        'd3b5bf26d323afeed7a082a550f5b5f7d2018f03ed7501500aef4cb708303156',
+      'proposalMessage is the pinned SHA-256 vector'
+    );
+    assert(
+      hex(msg) === hex(expected),
+      'proposalMessage follows the worker formula'
+    );
+    const priv =
+      '0101010101010101010101010101010101010101010101010101010101010101';
+    const sig = await signProposal(priv, eventId, reason);
+    const pub = await ed.getPublicKeyAsync(
+      Uint8Array.from(priv.match(/.{2}/g)!.map(h => parseInt(h, 16)))
+    );
+    assert(
+      await ed.verifyAsync(
+        Uint8Array.from(sig.match(/.{2}/g)!.map(h => parseInt(h, 16))),
+        msg,
+        pub
+      ),
+      'signProposal signs the proposal message'
+    );
+  }
+
+  console.log('\n=== TourPublisher.proposeDeletion ===\n');
+  {
+    type Call = { url: string; method: string; body?: any };
+    const calls: Call[] = [];
+    let status = 201;
+    let throwNet = false;
+    const fakeFetch = (async (url: string, init?: RequestInit) => {
+      calls.push({
+        url,
+        method: init?.method ?? 'GET',
+        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+      });
+      if (throwNet) throw new Error('offline');
+      return {
+        ok: status >= 200 && status < 300,
+        status,
+        json: async () => ({}),
+        text: async () => '{}',
+      } as Response;
+    }) as unknown as typeof fetch;
+    const signed: string[] = [];
+    const pub = new TourPublisher(
+      'http://api.test',
+      'PUBKEY',
+      fakeFetch,
+      undefined,
+      async (id, reason) => {
+        signed.push(`${id}|${reason}`);
+        return 'SIG';
+      }
+    );
+    assert(
+      (await pub.proposeDeletion('e1', 'not listed on https://x.example')) ===
+        'proposed',
+      '201 → proposed'
+    );
+    const c = calls.at(-1)!;
+    assert(
+      c.method === 'POST' && c.url === 'http://api.test/conflicts/proposals',
+      'POSTs /conflicts/proposals'
+    );
+    assert(
+      c.body.pubkey === 'PUBKEY' &&
+        c.body.event_id === 'e1' &&
+        c.body.reason === 'not listed on https://x.example' &&
+        c.body.signature === 'SIG',
+      'body has pubkey, event_id, reason, signature'
+    );
+    assert(
+      signed[0] === 'e1|not listed on https://x.example',
+      'signs the event id and reason'
+    );
+    status = 200;
+    assert(
+      (await pub.proposeDeletion('e1', 'r')) === 'proposed',
+      '200 (repeat) → proposed'
+    );
+
+    status = 409;
+    const errs: string[] = [];
+    const origErr = console.error;
+    const origLog = console.log;
+    console.error = (...a: unknown[]) => errs.push(a.join(' '));
+    console.log = (...a: unknown[]) => errs.push(a.join(' '));
+    const before = calls.length;
+    let r409: string;
+    try {
+      r409 = await pub.proposeDeletion('e1', 'r');
+    } finally {
+      console.error = origErr;
+      console.log = origLog;
+    }
+    assert(r409 === 'failed', '409 → failed');
+    assert(calls.length === before + 1, '409: one request, no retry');
+    assert(
+      errs.some(e => e.includes('409') && e.includes('e1')),
+      '409: a console message names the status and event'
+    );
+
+    throwNet = true;
+    let rNet: string = '';
+    let threw = false;
+    try {
+      rNet = await pub.proposeDeletion('e1', 'r');
+    } catch {
+      threw = true;
+    }
+    assert(!threw && rNet === 'failed', 'network error → failed, no throw');
+
+    const unsigned = new TourPublisher('http://api.test', 'PUBKEY', fakeFetch);
+    const n = calls.length;
+    assert(
+      (await unsigned.proposeDeletion('e1', 'r')) === 'failed' &&
+        calls.length === n,
+      'no proposal signer → failed, nothing sent'
+    );
+  }
+
+  console.log('\n=== processTourSourcePage: deletion proposals ===\n');
+  {
+    const cfg = parseCfg(`
+bands:
+  - name: Test Band
+    url: https://testband.example
+sources:
+  - { url: "https://testband.example/live", mode: band, band: Test Band }
+  - { url: "https://venue.example/programme", mode: listing }
+`);
+    const bandSource = cfg.sources[0];
+    const listingSource = cfg.sources[1];
+    const page: FetchedPage = {
+      url: 'https://testband.example/live',
+      title: 'P',
+      html: '',
+      text: 'x',
+    };
+    const draft = (over: Partial<TourShowDraft>): TourShowDraft => ({
+      title: 'Show',
+      performers: ['Test Band'],
+      start_time: '2030-11-12T21:00:00',
+      venue_name: 'Club X',
+      city: 'Udine',
+      lat: 46.06,
+      lng: 13.23,
+      ...over,
+    });
+    const stored = (
+      id: string,
+      day: string,
+      lat: number,
+      lng: number,
+      venue: string,
+      held?: number
+    ): ExistingShow => ({
+      id,
+      title: id,
+      venue_name: venue,
+      lat,
+      lng,
+      start_time: `${day}T21:00:00`,
+      category: 'music',
+      tags: [],
+      act_url: 'https://testband.example',
+      created_at: '2030-01-01T00:00:00',
+      ...(held !== undefined ? { held } : {}),
+    });
+    const heldMatched = stored('h1', '2030-11-12', 46.06, 13.23, 'Club X', 1);
+    const heldGone = stored('h2', '2030-11-20', 45.4, 12.3, 'Arena Y', 1);
+    const plainGone = stored('n1', '2030-11-21', 45.4, 12.3, 'Arena Z', 0);
+    const heldPast = stored('p1', '2030-01-05', 45.4, 12.3, 'Old Hall', 1);
+    const all = [heldMatched, heldGone, plainGone, heldPast];
+
+    const mkDeps = (
+      drafts: TourShowDraft[],
+      existing: ExistingShow[],
+      proposals: string[][] | undefined,
+      over: Partial<TourSourceDeps> = {}
+    ): TourSourceDeps => ({
+      extract: async () => drafts,
+      lookup: async () => existing,
+      normalize: async (e: ExtractedEvent, opts) =>
+        ({
+          pubkey: 'p',
+          signature: 's',
+          title: e.title,
+          lat: e.lat!,
+          lng: e.lng!,
+          start_time: String(e.start_time),
+          category: e.category,
+          created_at: opts?.createdAt ?? 'now',
+          act_name: e.act_name,
+          act_url: e.act_url,
+          tags: e.tags,
+          venue_name: e.venue_name,
+        }) as NormalizedEvent,
+      apply: async (_ev, match) => (match ? 'unchanged' : 'published'),
+      ...(proposals
+        ? {
+            proposeDeletion: async (id: string, reason: string) => {
+              proposals.push([id, reason]);
+              return 'proposed' as const;
+            },
+          }
+        : {}),
+      today: '2030-10-01',
+      ...over,
+    });
+
+    // A held show the page no longer lists → exactly one proposal; the held
+    // show that was matched, the non-held one and the past one → none.
+    let props: string[][] = [];
+    await processTourSourcePage(
+      page,
+      bandSource,
+      cfg,
+      mkDeps([draft({})], all, props)
+    );
+    assert(
+      props.length === 1 &&
+        props[0][0] === 'h2' &&
+        props[0][1] === 'not listed on https://testband.example/live',
+      'unlisted held show → one proposal with the source url as reason'
+    );
+
+    // Two drafts, one held show unmatched → still one call.
+    props = [];
+    await processTourSourcePage(
+      page,
+      bandSource,
+      cfg,
+      mkDeps(
+        [draft({}), draft({ start_time: '2030-11-13T21:00:00' })],
+        all,
+        props
+      )
+    );
+    assert(
+      props.length === 1 && props[0][0] === 'h2',
+      'two drafts, one unlisted held show → one call'
+    );
+
+    // Every held show matched → none.
+    props = [];
+    await processTourSourcePage(
+      page,
+      bandSource,
+      cfg,
+      mkDeps(
+        [
+          draft({}),
+          draft({
+            start_time: '2030-11-20T21:00:00',
+            venue_name: 'Arena Y',
+            lat: 45.4,
+            lng: 12.3,
+          }),
+        ],
+        all,
+        props
+      )
+    );
+    assert(props.length === 0, 'held shows all listed → no proposal');
+
+    // Only non-held stored shows unmatched → none.
+    props = [];
+    await processTourSourcePage(
+      page,
+      bandSource,
+      cfg,
+      mkDeps([draft({})], [heldMatched, plainGone], props)
+    );
+    assert(props.length === 0, 'unlisted non-held show → no proposal');
+
+    // Extraction failed → the source throws, nothing proposed.
+    props = [];
+    let threw = false;
+    try {
+      await processTourSourcePage(
+        page,
+        bandSource,
+        cfg,
+        mkDeps([draft({})], all, props, {
+          extract: async () => {
+            throw new Error('LLM down');
+          },
+        })
+      );
+    } catch {
+      threw = true;
+    }
+    assert(threw && props.length === 0, 'failed extraction → no proposal');
+
+    // A failed show in the source → nothing proposed for that source.
+    props = [];
+    const res = await processTourSourcePage(
+      page,
+      bandSource,
+      cfg,
+      mkDeps(
+        [draft({}), draft({ start_time: '2030-11-14T21:00:00' })],
+        all,
+        props,
+        {
+          apply: async (_ev, match) => (match ? 'unchanged' : 'failed'),
+        }
+      )
+    );
+    assert(
+      res.some(r => r.outcome === 'failed') && props.length === 0,
+      'a failed show → no proposal for the source'
+    );
+
+    // Listing-mode sources never propose.
+    props = [];
+    await processTourSourcePage(
+      { ...page, url: 'https://venue.example/programme' },
+      listingSource,
+      cfg,
+      mkDeps([draft({})], all, props)
+    );
+    assert(props.length === 0, 'listing mode → no proposal');
+
+    // Without a proposeDeletion dep (debug runs) nothing happens.
+    threw = false;
+    try {
+      await processTourSourcePage(
+        page,
+        bandSource,
+        cfg,
+        mkDeps([draft({})], all, undefined)
+      );
+    } catch {
+      threw = true;
+    }
+    assert(!threw, 'no proposeDeletion dep → no crash');
+
+    // A failing proposal never fails the source.
+    threw = false;
+    try {
+      await processTourSourcePage(
+        page,
+        bandSource,
+        cfg,
+        mkDeps([draft({})], all, undefined, {
+          proposeDeletion: async () => {
+            throw new Error('boom');
+          },
+        })
+      );
+    } catch {
+      threw = true;
+    }
+    assert(!threw, 'a throwing proposeDeletion does not fail the source');
+
+    const t = new Date('2030-10-01T00:00:00Z');
+    const rec = buildTourRunRecord(
+      [
+        { url: 'a', outcome: 'unchanged', shows: [], proposed: 2 },
+        { url: 'b', outcome: 'unchanged', shows: [] },
+      ],
+      t,
+      t
+    );
+    assert(rec.proposed === 2, 'run record counts proposed deletions');
+    assert(
+      !('proposed' in buildTourRunRecord([], t, t)),
+      'run record omits proposed when none'
     );
   }
 

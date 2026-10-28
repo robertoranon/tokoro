@@ -24,6 +24,7 @@ import {
 import { TourExtractor } from './extractors/tour-extractor.js';
 import { TourPublisher } from './tours/tour-publisher.js';
 import { signAdoption } from './tours/adopt.js';
+import { signProposal } from './tours/proposal.js';
 import { errorReason } from './tours/failure-report.js';
 import { medianBias } from '../../shared/utils/geocode.js';
 import {
@@ -185,6 +186,8 @@ export interface TourSourceResult {
   shows: ShowResult[];
   /** Why the whole source failed (fetch, block page, extraction...). */
   error?: string;
+  /** Held shows this source no longer lists, proposed for deletion. */
+  proposed?: number;
 }
 export type FetcherType = 'playwright' | 'jina';
 export type { BrowserEngine, PdfParserType };
@@ -268,7 +271,8 @@ export class EventCrawler {
       config.keypair.pubkey,
       fetch,
       (eventId, actName, actUrl) =>
-        signAdoption(config.keypair.privkey, eventId, actName, actUrl)
+        signAdoption(config.keypair.privkey, eventId, actName, actUrl),
+      (eventId, reason) => signProposal(config.keypair.privkey, eventId, reason)
     );
   }
 
@@ -665,11 +669,12 @@ export class EventCrawler {
         let shows: ShowResult[] = [];
         let outcome: SourceOutcome;
         let error: string | undefined;
+        const proposals = { count: 0 };
         try {
           const page = assertNotBlocked(
             await this.fetcherForUrl(source.url).fetchPage(source.url)
           );
-          shows = await this.processTourSource(page, source, config);
+          shows = await this.processTourSource(page, source, config, proposals);
           outcome = sourceOutcome(shows);
         } catch (err) {
           console.error(
@@ -685,6 +690,7 @@ export class EventCrawler {
           outcome,
           shows,
           ...(error !== undefined ? { error } : {}),
+          ...(proposals.count > 0 ? { proposed: proposals.count } : {}),
         });
       }
     } finally {
@@ -696,7 +702,8 @@ export class EventCrawler {
   private async processTourSource(
     page: FetchedPage,
     source: TourSource,
-    config: BandsConfig
+    config: BandsConfig,
+    proposals: { count: number }
   ): Promise<ShowResult[]> {
     const today =
       this.config.referenceDate || new Date().toISOString().slice(0, 10);
@@ -704,7 +711,8 @@ export class EventCrawler {
     if (this.config.debug) {
       // Debug: extract and attribute, print the finalized shows; never look
       // anything up or publish. `apply` returns 'published' only as an
-      // "extracted" marker, like the radar's debug run.
+      // "extracted" marker, like the radar's debug run. No proposeDeletion:
+      // a dry run never proposes deleting anything.
       return processTourSourcePage(page, source, config, {
         extract: p => this.tourExtractor.extract(p),
         lookup: async () => [],
@@ -740,6 +748,14 @@ export class EventCrawler {
       ownPubkey: this.config.keypair.pubkey,
       normalize: (event, options) => this.normalizer.normalize(event, options),
       apply: (event, match) => this.tourPublisher.apply(event, match),
+      proposeDeletion: async (eventId, reason) => {
+        const outcome = await this.tourPublisher.proposeDeletion(
+          eventId,
+          reason
+        );
+        if (outcome === 'proposed') proposals.count++;
+        return outcome;
+      },
       failureReason: () => this.tourPublisher.lastFailure,
       today,
     });
