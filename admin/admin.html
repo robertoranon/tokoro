@@ -1529,9 +1529,10 @@
         const byId = new Map(c.events.map(ev => [ev.id, ev]));
         for (const ev of c.events) {
           const row = el('div');
-          const title = ev.url ? el('a', ev.title) : el('strong', ev.title);
-          if (ev.url) {
-            title.href = ev.url;
+          const link = window.TokoroAdminConflicts.safeHttpUrl(ev.url);
+          const title = link ? el('a', ev.title) : el('strong', ev.title);
+          if (link) {
+            title.href = link;
             title.target = '_blank';
             title.rel = 'noopener noreferrer';
           }

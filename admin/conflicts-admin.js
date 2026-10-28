@@ -63,8 +63,19 @@ function createConflictsApi({ ed, fetchFn, workerUrl, privKeyHex }) {
   };
 }
 
+/** The url itself when it is a parseable http(s) URL, else null (never link javascript:/data:). */
+function safeHttpUrl(url) {
+  if (typeof url !== 'string') return null;
+  try {
+    const p = new URL(url).protocol;
+    return p === 'http:' || p === 'https:' ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 // Distinct top-level name: classic scripts share one global scope.
-const adminConflictsApi = { createConflictsApi };
+const adminConflictsApi = { createConflictsApi, safeHttpUrl };
 if (typeof module !== 'undefined') module.exports = adminConflictsApi;
 if (typeof window !== 'undefined')
   window.TokoroAdminConflicts = adminConflictsApi;

@@ -59,3 +59,12 @@ test('HTTP errors reject with the server error', async () => {
   await assert.rejects(api.list('open'), /forbidden/);
   await assert.rejects(api.resolve('c1', { action: 'keep_both' }), /forbidden/);
 });
+
+test('safeHttpUrl keeps http(s) urls and rejects everything else', () => {
+  const { safeHttpUrl } = C;
+  assert.equal(safeHttpUrl('http://a.example/x'), 'http://a.example/x');
+  assert.equal(safeHttpUrl('https://a.example/x'), 'https://a.example/x');
+  for (const bad of ['javascript:alert(1)', 'data:text/html,x', 'JAVASCRIPT:alert(1)', '//evil.example', '', null, undefined, 42, {}]) {
+    assert.equal(safeHttpUrl(bad), null, String(bad));
+  }
+});
