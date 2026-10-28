@@ -609,6 +609,8 @@ Before the proximity check above, a new event with an `act_url` and a non-empty 
 | `TELEGRAM_BOT_USERNAME` | Bot username without `@`, used to build the `t.me` link. When unset, `POST /member/telegram/link-code` answers `503`. | — |
 | `TELEGRAM_BOT_PUBKEY` | The bot's `BOT_PUBKEY` (hex); the only key accepted on `POST /telegram/*`. When unset those endpoints answer `503`. | — |
 | `PUBLIC_WEB_URL` | Base URL of the public web (e.g. `https://tokoro.example`), used for the "All shows" / "Festivals" links in digests. When unset the links line is left out. | — |
+| `ADMIN_TELEGRAM_CHAT_ID` | Telegram chat id of the admin (section 7.15.5). When unset (or `TELEGRAM_BOT_TOKEN` is unset) no admin message is sent. | — |
+| `ADMIN_PAGE_URL` | URL of the admin page, linked from conflict notices. When unset the link is left out. | — |
 
 **LLM duplicate detection:**
 
@@ -1417,6 +1419,13 @@ Runs from the `0 8 * * *` cron (section 8.3). Does nothing when `TELEGRAM_BOT_TO
 - Bands are in alphabetical order, shows within a band by start time. Show dates are `Ddd D Mon` (weekday, day, month), with the year when it is not the current year and the `HH:MM` time when it is not midnight. A show whose `end_time` is on a later day than its `start_time` (a festival appearance with an unknown exact day) is shown as a range with the same format as edition ranges instead of a single date. Edition ranges are `18 Jun 2027`, `18–21 Jun 2027`, `30 Jun – 2 Jul 2027` or `30 Dec 2026 – 2 Jan 2027`.
 - A message has at most 25 item lines (`MAX_DIGEST_LINES`) and about 3800 visible characters (`MAX_DIGEST_CHARS`; Telegram allows 4096). Items past either limit are counted in a `…and N more` line before the links.
 - The links line is omitted when `PUBLIC_WEB_URL` is not set; "All shows" appears only when the message has shows, "Festivals" only when it has editions.
+
+#### 7.15.5 Admin chat
+
+A separate chat identified by `ADMIN_TELEGRAM_CHAT_ID` (not a member; found via `getUpdates`, `message.chat.id`). Nothing is sent when it or `TELEGRAM_BOT_TOKEN` is unset.
+
+- **Conflict notice:** `notifyConflict` sends one message per newly created conflict, for any band: the band name (`act_name`; if null, the host of the first event URL, else "Unnamed band"), the day, one line per event with title and place (`venue_name`, else `address`), all HTML-escaped, a line telling the admin to resolve it in the admin page's Conflicts tab, and a link to `ADMIN_PAGE_URL` when set. Failures are logged, never thrown.
+- **Digest:** the digest job (7.15.4) adds the admin chat as a recipient with `radar_alerts` on and every `act_url` of the claimed shows as followed, so it receives all new shows and all new editions. It is sent first and counts toward the send budget, so it is never the one skipped. A `403` from the admin chat is only logged; no member's `telegram_chat_id` changes.
 
 ### 7.16 Conflicts: Crawler Proposals and Admin Resolution
 

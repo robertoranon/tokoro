@@ -36,6 +36,9 @@ export interface Edition {
   place: string | null;
 }
 
+/** Marker pubkey of the synthetic admin recipient (not a member). */
+const ADMIN_PUBKEY = 'admin';
+
 export const MAX_DIGEST_LINES = 25;
 /** Visible-text budget; Telegram rejects messages over 4096 characters. */
 export const MAX_DIGEST_CHARS = 3800;
@@ -263,7 +266,7 @@ export interface DigestOptions {
 
 type SendResult = 'ok' | 'blocked' | 'error';
 
-async function sendTelegram(
+export async function sendTelegram(
   fetchFn: typeof fetch,
   token: string,
   chatId: string,
@@ -378,7 +381,20 @@ export async function sendAlertDigests(
   const year = Number(today.slice(0, 4));
 
   let sent = 0;
-  const targets = (await loadRecipients(env))
+  const recipients = await loadRecipients(env);
+  const adminChat = env.ADMIN_TELEGRAM_CHAT_ID;
+  if (adminChat) {
+    // The admin chat gets every pending show and edition, and goes first so
+    // the send budget never skips it.
+    recipients.unshift({
+      pubkey: ADMIN_PUBKEY,
+      name: 'admin',
+      chat_id: adminChat,
+      radar: true,
+      bands: [...new Set(shows.map(e => e.act_url!))],
+    });
+  }
+  const targets = recipients
     .map(r => ({ r, d: digestFor(r, shows, editions) }))
     .filter(t => t.d);
   if (targets.length > MAX_SENDS_PER_RUN) {
@@ -400,7 +416,9 @@ export async function sendAlertDigests(
       sleep
     );
     if (result === 'ok') sent++;
-    else if (result === 'blocked') {
+    else if (result === 'blocked' && r.pubkey === ADMIN_PUBKEY) {
+      console.error('[alerts] the admin chat blocked the bot (403)');
+    } else if (result === 'blocked') {
       await env.DB.prepare(
         'UPDATE members SET telegram_chat_id = NULL WHERE pubkey = ?'
       )
@@ -423,11 +441,49 @@ export async function sendAlertDigests(
 }
 
 /**
- * Tell the admin that a band-day turned into a conflict (worker/SPECS.md
- * 5.5.1). A no-op for now; the admin notice fills it in later.
+ * Tell the admin chat that a band-day turned into a conflict (worker/SPECS.md
+ * 5.5.1 and 7.15.5). Sends nothing without ADMIN_TELEGRAM_CHAT_ID and
+ * TELEGRAM_BOT_TOKEN. Never throws.
  */
 export async function notifyConflict(
-  _env: Env,
-  _c: { actName: string | null; day: string; events: ConflictEventRow[] },
-  _opts?: { fetchFn?: typeof fetch }
-): Promise<void> {}
+  env: Env,
+  c: { actName: string | null; day: string; events: ConflictEventRow[] },
+  opts?: { fetchFn?: typeof fetch }
+): Promise<void> {
+  try {
+    if (!env.ADMIN_TELEGRAM_CHAT_ID || !env.TELEGRAM_BOT_TOKEN) return;
+    const host = (u: string | null) => {
+      try {
+        return u ? new URL(u).host : null;
+      } catch {
+        return null;
+      }
+    };
+    const band =
+      c.actName ||
+      host(c.events.find(e => e.url)?.url ?? null) ||
+      'Unnamed band';
+    const lines = c.events.map(e => {
+      const place = e.venue_name || e.address;
+      return `• ${esc(e.title)}${place ? ' · ' + esc(place) : ''}`;
+    });
+    const parts = [
+      `⚠️ <b>Conflict</b>: ${esc(band)} on ${esc(c.day)}`,
+      ...lines,
+      'Resolve it in the admin page, Conflicts tab.',
+    ];
+    const adminLink = link(env.ADMIN_PAGE_URL ?? null, 'Open admin page');
+    if (adminLink) parts.push(adminLink);
+    const result = await sendTelegram(
+      opts?.fetchFn ?? fetch,
+      env.TELEGRAM_BOT_TOKEN,
+      env.ADMIN_TELEGRAM_CHAT_ID,
+      parts.join('\n'),
+      ms => new Promise<void>(r => setTimeout(r, ms))
+    );
+    if (result !== 'ok')
+      console.error(`[alerts] conflict notice failed (${result})`);
+  } catch (err) {
+    console.error('[alerts] conflict notice failed:', err);
+  }
+}

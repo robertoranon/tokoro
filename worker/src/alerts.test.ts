@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   newEditions,
+  notifyConflict,
   sendAlertDigests,
   digestFor,
   formatDigest,
@@ -630,5 +631,192 @@ describe('sendAlertDigests', () => {
     expect(s.sent).toHaveLength(MAX_SENDS_PER_RUN);
     expect(warn).toHaveBeenCalledTimes(1);
     warn.mockRestore();
+  });
+  describe('admin chat', () => {
+    const A = 'https://alpha.example';
+    it('digest gives the admin chat every show and edition, even with no follows', async () => {
+      const s = await setup();
+      s.env.ADMIN_TELEGRAM_CHAT_ID = '999';
+      await s.addEvent('a1', { act_name: 'Alpha', act_url: A });
+      await s.addEvent('b1', {
+        act_name: 'Beta',
+        act_url: 'https://beta.example',
+      });
+      await s.addEvent('f1', {
+        festival_name: 'Fest',
+        festival_url: 'https://fest.example',
+        start: '2027-06-18T00:00:00',
+      });
+      const r = await sendAlertDigests(s.env, {
+        fetchFn: s.fetchFn as any,
+        today: TODAY,
+      });
+      expect(r.sent).toBe(1);
+      expect(s.sent).toHaveLength(1);
+      expect(s.sent[0].chat_id).toBe('999');
+      expect(s.sent[0].text).toContain('Alpha');
+      expect(s.sent[0].text).toContain('Beta');
+      expect(s.sent[0].text).toContain('Fest');
+    });
+
+    it('sends nothing to an admin when the var is unset', async () => {
+      const s = await setup();
+      await s.addEvent('a1', { act_name: 'Alpha', act_url: A });
+      await sendAlertDigests(s.env, {
+        fetchFn: s.fetchFn as any,
+        today: TODAY,
+      });
+      expect(s.sent).toHaveLength(0);
+    });
+
+    it('member digests are unchanged', async () => {
+      const s = await setup();
+      s.env.ADMIN_TELEGRAM_CHAT_ID = '999';
+      await s.addEvent('a1', { act_name: 'Alpha', act_url: A });
+      await s.addEvent('b1', {
+        act_name: 'Beta',
+        act_url: 'https://beta.example',
+      });
+      await s.addMember('anna', '1', 0, [A]);
+      await sendAlertDigests(s.env, {
+        fetchFn: s.fetchFn as any,
+        today: TODAY,
+      });
+      const anna = s.sent.find(m => m.chat_id === '1')!;
+      expect(anna.text).toContain('Alpha');
+      expect(anna.text).not.toContain('Beta');
+      expect(s.sent.find(m => m.chat_id === '999')!.text).toContain('Beta');
+    });
+
+    it('a 403 from the admin chat leaves member chats intact', async () => {
+      const s = await setup();
+      s.env.ADMIN_TELEGRAM_CHAT_ID = '999';
+      await s.addEvent('a1', { act_name: 'Alpha', act_url: A });
+      await s.addMember('anna', '1', 0, [A]);
+      await s.addMember('bea', '2', 0, [A]);
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const fetchFn = async (_u: string, init: any) => {
+        const b = JSON.parse(init.body);
+        s.sent.push({ chat_id: b.chat_id, text: b.text });
+        return new Response('{}', { status: b.chat_id === '999' ? 403 : 200 });
+      };
+      await sendAlertDigests(s.env, { fetchFn: fetchFn as any, today: TODAY });
+      err.mockRestore();
+      const rows = (
+        await s.DB.prepare(
+          'SELECT telegram_chat_id FROM members ORDER BY pubkey'
+        ).all<{ telegram_chat_id: string | null }>()
+      ).results!;
+      expect(rows.map(r => r.telegram_chat_id)).toEqual(['1', '2']);
+    });
+
+    it('is sent first when recipients exceed MAX_SENDS_PER_RUN', async () => {
+      const s = await setup();
+      s.env.ADMIN_TELEGRAM_CHAT_ID = '999';
+      await s.addEvent('a1', { act_name: 'Alpha', act_url: A });
+      for (let i = 0; i < MAX_SENDS_PER_RUN + 1; i++)
+        await s.addMember('m' + i, String(i), 0, [A]);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await sendAlertDigests(s.env, {
+        fetchFn: s.fetchFn as any,
+        today: TODAY,
+      });
+      warn.mockRestore();
+      expect(s.sent).toHaveLength(MAX_SENDS_PER_RUN);
+      expect(s.sent[0].chat_id).toBe('999');
+    });
+  });
+});
+
+describe('notifyConflict', () => {
+  const c = {
+    actName: 'Fish & Chips',
+    day: '2026-11-14',
+    events: [
+      {
+        id: 'e1',
+        title: 'Show <1>',
+        start_time: '2026-11-14T21:00:00',
+        venue_name: 'Club & Co',
+        address: null,
+        url: null,
+      },
+      {
+        id: 'e2',
+        title: 'Second',
+        start_time: '2026-11-14T20:00:00',
+        venue_name: null,
+        address: 'Main St 1',
+        url: null,
+      },
+    ],
+  };
+  const mk = (extra: Record<string, unknown> = {}) => {
+    const calls: { url: string; body: any }[] = [];
+    const fetchFn = async (url: string, init: any) => {
+      calls.push({ url, body: JSON.parse(init.body) });
+      return new Response('{}', { status: 200 });
+    };
+    return {
+      calls,
+      fetchFn,
+      env: { TELEGRAM_BOT_TOKEN: 'tok', ...extra } as any,
+    };
+  };
+
+  it('sends nothing when ADMIN_TELEGRAM_CHAT_ID is unset', async () => {
+    const m = mk();
+    await notifyConflict(m.env, c, { fetchFn: m.fetchFn as any });
+    expect(m.calls).toHaveLength(0);
+  });
+
+  it('sends nothing when the bot token is unset', async () => {
+    const m = mk({
+      ADMIN_TELEGRAM_CHAT_ID: '999',
+      TELEGRAM_BOT_TOKEN: undefined,
+    });
+    await notifyConflict(m.env, c, { fetchFn: m.fetchFn as any });
+    expect(m.calls).toHaveLength(0);
+  });
+
+  it('posts one escaped message naming band, day, titles and places', async () => {
+    const m = mk({
+      ADMIN_TELEGRAM_CHAT_ID: '999',
+      ADMIN_PAGE_URL: 'https://admin.example/',
+    });
+    await notifyConflict(m.env, c, { fetchFn: m.fetchFn as any });
+    expect(m.calls).toHaveLength(1);
+    expect(m.calls[0].url).toBe('https://api.telegram.org/bottok/sendMessage');
+    const { chat_id, text } = m.calls[0].body;
+    expect(chat_id).toBe('999');
+    expect(text).toContain('Fish &amp; Chips');
+    expect(text).toContain('2026-11-14');
+    expect(text).toContain('Show &lt;1&gt;');
+    expect(text).toContain('Club &amp; Co');
+    expect(text).toContain('Second');
+    expect(text).toContain('Main St 1');
+    expect(text).toContain('Conflicts');
+    expect(text).toContain('https://admin.example/');
+  });
+
+  it('omits the link without ADMIN_PAGE_URL and falls back without a band name', async () => {
+    const m = mk({ ADMIN_TELEGRAM_CHAT_ID: '999' });
+    await notifyConflict(
+      m.env,
+      { ...c, actName: null, events: c.events },
+      { fetchFn: m.fetchFn as any }
+    );
+    expect(m.calls[0].body.text).not.toContain('href');
+    expect(m.calls[0].body.text).toContain('Unnamed band');
+  });
+
+  it('never throws when the send fails', async () => {
+    const m = mk({ ADMIN_TELEGRAM_CHAT_ID: '999' });
+    const bad = async () => {
+      throw new Error('boom');
+    };
+    await expect(
+      notifyConflict(m.env, c, { fetchFn: bad as any })
+    ).resolves.toBeUndefined();
   });
 });

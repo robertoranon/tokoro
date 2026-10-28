@@ -36,6 +36,8 @@ export interface Env {
   TELEGRAM_BOT_USERNAME?: string; // bot username without @, for t.me link codes
   TELEGRAM_BOT_PUBKEY?: string; // the bot's BOT_PUBKEY; only key allowed on /telegram/*
   PUBLIC_WEB_URL?: string; // base URL of public-web, for links in digests
+  ADMIN_TELEGRAM_CHAT_ID?: string; // admin chat: conflict notices + every alert
+  ADMIN_PAGE_URL?: string; // admin page URL, linked from conflict notices
 }
 
 interface Event {

@@ -237,6 +237,15 @@ wrangler secret put TELEGRAM_BOT_PUBKEY     # the crawler-worker's BOT_PUBKEY (h
 wrangler secret put PUBLIC_WEB_URL          # e.g. https://tokoro-query.pages.dev, for the digest links
 ```
 
+Optional admin chat: set `ADMIN_TELEGRAM_CHAT_ID` to receive one message per new conflict (any band) and every digest alert (all bands and festival editions, not only followed ones). To find the chat id, send any message to the bot, then open `https://api.telegram.org/bot<TOKEN>/getUpdates` and read `message.chat.id` (negative for groups).
+
+```bash
+wrangler secret put ADMIN_TELEGRAM_CHAT_ID  # e.g. 123456789
+wrangler secret put ADMIN_PAGE_URL          # optional, linked from conflict notices
+```
+
+Unset, nothing is sent to an admin. A `403` from the admin chat is only logged (it is not a member).
+
 Until these are set, the digest job does nothing and the Telegram endpoints answer `503`. Wrangler cannot read secret values back, so keep the bot token and `BOT_PUBKEY` somewhere safe. The bot's `BOT_PUBKEY` is also the author key of every event the bot publishes.
 
 When piping values into `wrangler secret put` from zsh (the macOS default shell), use `read -r "VAR?prompt: "` instead of bash's `read -p`, and do not use `USERNAME` as a variable name: zsh reserves it for your login name.

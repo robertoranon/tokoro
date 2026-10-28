@@ -31,3 +31,8 @@ bucket_name = "tokoro-backups"
 # - TELEGRAM_BOT_USERNAME: bot username without @ (for t.me link codes)
 # - TELEGRAM_BOT_PUBKEY: the bot's BOT_PUBKEY; the only key accepted on /telegram/*
 # - PUBLIC_WEB_URL: public-web base URL, for the links at the end of a digest
+# - ADMIN_TELEGRAM_CHAT_ID: (optional) Telegram chat id of the admin. That chat
+#   gets one message per new conflict and every digest alert (all bands, all
+#   festival editions). Unset = nothing is sent. Find it: message the bot, open
+#   https://api.telegram.org/bot<TOKEN>/getUpdates and read message.chat.id
+# - ADMIN_PAGE_URL: (optional) URL of the admin page, linked from conflict notices
