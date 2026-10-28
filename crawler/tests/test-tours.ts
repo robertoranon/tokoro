@@ -1876,6 +1876,91 @@ sources:
     );
   }
 
+  console.log('\n=== matchShow: a draft inside a stored range ===\n');
+  {
+    const range: ExistingShow = {
+      id: 'range',
+      title: 'Southside Festival 2027',
+      lat: 47.9,
+      lng: 9.0,
+      start_time: '2027-06-18T00:00:00',
+      end_time: '2027-06-20T00:00:00',
+      category: 'music',
+      tags: [],
+      venue_name: 'Southside Festival 2027',
+      created_at: '2027-01-01T10:00:00',
+    };
+    const far = { lat: 10, lng: 10 };
+    const m = (start: string, venue?: string, e = range) =>
+      matchShow([e], start, far.lat, far.lng, venue);
+    const V = 'southside festival 2027';
+    assert(
+      m('2027-06-19T21:00:00', V)?.id === 'range',
+      'a draft dated inside a stored range at the same venue matches it'
+    );
+    assert(
+      m('2027-06-18T21:00:00', V)?.id === 'range' &&
+        m('2027-06-20T21:00:00', V)?.id === 'range',
+      "the range's first and last day both match"
+    );
+    assert(
+      m('2027-06-21T21:00:00', V) === undefined &&
+        m('2027-06-17T21:00:00', V) === undefined,
+      'a date outside the range does not match'
+    );
+    assert(
+      m('2027-06-19T21:00:00', 'Other Fest') === undefined,
+      'a different venue does not match'
+    );
+    assert(
+      m('2027-06-19T21:00:00') === undefined &&
+        m('2027-06-19T21:00:00', '') === undefined,
+      'no venue on the draft does not match a range'
+    );
+    assert(
+      m('2027-06-19T21:00:00', V, {
+        ...range,
+        end_time: '2027-06-18T23:00:00',
+      }) === undefined,
+      'a same-day end_time is not a range'
+    );
+
+    // The PUT carries the whole draft: a draft without end_time clears it.
+    const puts: any[] = [];
+    const putFetch = (async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') puts.push(JSON.parse(String(init.body)));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+        text: async () => '{}',
+      } as Response;
+    }) as unknown as typeof fetch;
+    const pubR = new TourPublisher('http://api.test', 'PUBKEY', putFetch);
+    const draft = {
+      pubkey: 'PUBKEY',
+      signature: 's',
+      title: 'Southside Festival 2027',
+      lat: far.lat,
+      lng: far.lng,
+      start_time: '2027-06-19T21:00:00',
+      category: 'music',
+      created_at: 'c',
+    } as NormalizedEvent;
+    assert(
+      differs(range, draft),
+      "differs() is true when the draft's start_time differs, so the update clears end_time"
+    );
+    assert(
+      (await pubR.apply(draft, range)) === 'updated' &&
+        puts.length === 1 &&
+        puts[0].start_time === '2027-06-19T21:00:00' &&
+        !('end_time' in puts[0]) &&
+        puts[0].end_time === undefined,
+      'the PUT body has no end_time, so the stored one is cleared'
+    );
+  }
+
   console.log(
     '\n=== a wrongly placed show is corrected, or reported when it leaves the region ===\n'
   );

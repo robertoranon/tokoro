@@ -51,6 +51,9 @@ const text = (v: string | null | undefined) => v ?? '';
  *    wrong place earlier, and the update corrects it instead of duplicating it.
  * 3. With no venue name on the draft: the one stored show of that date that
  *    has no venue name either (none if there are several).
+ * 4. By range: a draft inside a stored multi-day span (a festival kept as
+ *    first day to last day) of the same venue name, after its first day.
+ *    The update replaces the stored span with the draft's single day.
  */
 export function matchShow(
   existing: ExistingShow[],
@@ -92,7 +95,16 @@ export function matchShow(
   const sameVenue = sameDay.filter(
     e => normalizeName(e.venue_name ?? '') === venue
   );
-  if (sameVenue.length <= 1 || lat === undefined || lng === undefined) {
+  if (sameVenue.length === 0) {
+    return existing.find(
+      e =>
+        normalizeName(e.venue_name ?? '') === venue &&
+        e.end_time != null &&
+        e.start_time.slice(0, 10) < day &&
+        day <= e.end_time.slice(0, 10)
+    );
+  }
+  if (sameVenue.length === 1 || lat === undefined || lng === undefined) {
     return sameVenue[0];
   }
   return sameVenue.reduce((a, b) =>
