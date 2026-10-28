@@ -24,7 +24,7 @@ This specification is implementation-agnostic and provides sufficient detail to 
 
 ### 2.1 Database Tables
 
-The worker interacts with five SQLite tables: `events`, `blocklist`, and the three member tables (`members`, `member_bands`, `band_suggestions`), plus `telegram_link_codes` for the Telegram alerts (section 7.15).
+The worker interacts with five SQLite tables: `events`, `blocklist`, and the three member tables (`members`, `member_bands`, `band_suggestions`), plus `telegram_link_codes` for the Telegram alerts (section 7.15), and the three conflict tables (`conflicts`, `conflict_events`, `conflict_proposals`).
 
 #### Events Table
 
@@ -116,7 +116,34 @@ CREATE TABLE telegram_link_codes (
   pubkey      TEXT NOT NULL,          -- member who requested it
   expires_at  TEXT NOT NULL           -- ISO 8601 format, request time + 15 minutes
 );
+
+CREATE TABLE conflicts (                -- same band, same exact day, different places
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  act_url     TEXT,                     -- band site URL
+  day         TEXT,                     -- 'YYYY-MM-DD'
+  status      TEXT,                     -- 'open' | 'kept' | 'resolved'
+  created_at  TEXT,                     -- ISO 8601 format
+  resolved_at TEXT                      -- ISO 8601 format
+);
+
+CREATE TABLE conflict_events (
+  conflict_id INTEGER,
+  event_id    TEXT,
+  PRIMARY KEY (conflict_id, event_id)
+);
+
+CREATE TABLE conflict_proposals (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  conflict_id INTEGER,
+  event_id    TEXT,
+  action      TEXT,                     -- 'delete'
+  reason      TEXT,
+  created_at  TEXT,                     -- ISO 8601 format
+  UNIQUE (event_id, action)
+);
 ```
+
+Migration `0009_add_conflicts.sql` also adds `events.held INTEGER NOT NULL DEFAULT 0` (1 = hidden from public listings because the event is part of an open conflict). Two events of one band (same `act_url`) on the same exact day at different places conflict; events whose `end_time` is on a later day than `start_time` (ranges) never take part, and events within 0.005 degrees of each other in both axes are the same place (duplicates, not conflicts). `worker/src/conflicts.ts` holds the pure helpers `isRange` and `groupByPlace` (single-linkage clustering by that tolerance, input order kept, clusters ordered by first appearance).
 
 Because `alert_pending` defaults to 0, events that exist when the migration (`0008_add_telegram_alerts.sql`) is applied never trigger alerts: enabling the feature sends no backlog.
 
