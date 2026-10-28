@@ -25,7 +25,7 @@ The backend is a single TypeScript Cloudflare Worker that:
 - Executes geo-indexed SQL queries against D1 (SQLite)
 - Handles event expiration via scheduled cron triggers
 - Computes collaborative filtering recommendations
-- Sends a daily Telegram digest (08:00 UTC) of new shows of followed bands and new festival editions to linked members
+- Sends a daily Telegram digest (08:00 UTC) of new shows of followed bands and new festival editions to linked members. A separate admin Telegram chat (`ADMIN_TELEGRAM_CHAT_ID`; optional `ADMIN_PAGE_URL` is linked from the notice) gets a message for each new conflict (same band, two places, one day)
 
 API Endpoints:
 
@@ -74,7 +74,7 @@ API Endpoints:
 
 ### Data Model
 
-Data is stored in Cloudflare D1 (SQLite). The main table is `events` (below); `blocklist` and the member tables (`members`, `member_bands`, `band_suggestions`) are described in `worker/SPECS.md` section 2.1.
+Data is stored in Cloudflare D1 (SQLite). The main table is `events` (below); `blocklist`, the member tables (`members`, `member_bands`, `band_suggestions`) and the conflict tables (`conflicts`, `conflict_events`, `conflict_proposals`) are described in `worker/SPECS.md` section 2.1.
 
 **Timestamp Format Convention:**
 
@@ -107,7 +107,8 @@ CREATE TABLE events (
   act_name      TEXT,                 -- optional band name (unsigned metadata; used for grouping)
   act_url       TEXT,                 -- optional band canonical site URL (unsigned metadata; used for grouping/filtering)
   created_at  TEXT NOT NULL,          -- ISO 8601 format
-  updated_at  TEXT                    -- ISO 8601 format, updated on edit
+  updated_at  TEXT,                   -- ISO 8601 format, updated on edit
+  held        INTEGER NOT NULL DEFAULT 0 -- unsigned metadata: 1 = hidden from public listings while part of an open conflict
 );
 
 CREATE INDEX idx_geohash6_time ON events (geohash6, start_time);

@@ -17,13 +17,13 @@ different venues). Specs and tests updated for all three.
   - TOTO, Cork: stored 2027-06-16, should be 06-17
     (event `1eca6f95ca8a41ab7acb65d28f84bb0dd42d2468d883afdea6ea8d4d121bcd84`;
     source https://totoofficial.com/events/)
-- [ ] **2. How to treat an announced date that is a range.** Festival appearances
+- [~] **2. How to treat an announced date that is a range.** _Implemented in branch `feat/tours-ranges-conflicts`, pending deploy and manual data cleanup._ Festival appearances
       (Interrupters at Southside / Hurricane, Blink-182 at Rock im Park / Rock am
       Ring, Pigeon at ESNS) have no exact date yet; we store the range start.
       Decide: how to represent it, how it interacts with the same-band/same-date
       rules (`matchShow` rule 3, worker `findSameActSameDay`), and when the real
       date arrives (update in place, not a new event).
-- [ ] **3. Duplicates and wrong entries in the data.** Needs the user's decision
+- [~] **3. Duplicates and wrong entries in the data.** _Conflict detection and the admin Conflicts tab are implemented in branch `feat/tours-ranges-conflicts`, pending deploy and manual data cleanup (deletions by hand)._ Needs the user's decision
       on which of each pair to keep; deleting is done by the user (wrangler is not
       authorized for the remote DB).
   - Probable duplicates: Cat Power Paris (10-31 and 11-09), Fontaines D.C. Paris
@@ -41,6 +41,15 @@ different venues). Specs and tests updated for all three.
       worker same-band/same-date check has the same race.
 - [ ] **5. Before deploying:** run the main crawler suite (`npm test`), then
       deploy the crawler fix before the next tours run, then the worker.
+
+## Deploy checklist (branch `feat/tours-ranges-conflicts`)
+
+1. Apply migration `0009_add_conflicts.sql` to the remote DB.
+2. Set `ADMIN_TELEGRAM_CHAT_ID` (and optionally `ADMIN_PAGE_URL`) on the worker.
+3. Deploy the worker.
+4. Deploy the crawler before the next tours run.
+5. Run the tours job once and open the Conflicts tab.
+6. Delete by hand the known bad events: Putan Club La Pompe `68637010...`, TOTO Cork `1eca6f95...`, and the duplicates chosen in task 3. Then confirm the next run republishes them with the right dates and no conflict remains.
 
 ## Notes
 

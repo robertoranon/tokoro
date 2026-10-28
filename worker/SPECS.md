@@ -24,7 +24,7 @@ This specification is implementation-agnostic and provides sufficient detail to 
 
 ### 2.1 Database Tables
 
-The worker interacts with five SQLite tables: `events`, `blocklist`, and the three member tables (`members`, `member_bands`, `band_suggestions`), plus `telegram_link_codes` for the Telegram alerts (section 7.15), and the three conflict tables (`conflicts`, `conflict_events`, `conflict_proposals`).
+The worker interacts with nine SQLite tables: `events`, `blocklist`, the three member tables (`members`, `member_bands`, `band_suggestions`), `telegram_link_codes` for the Telegram alerts (section 7.15), and the three conflict tables (`conflicts`, `conflict_events`, `conflict_proposals`).
 
 #### Events Table
 
@@ -263,7 +263,7 @@ The reference implementation pins this format with a fixed cross-package test ve
 
 ### 3.6 Member and Admin Request Signatures
 
-The member endpoints (`/member/*`) and the admin member/suggestion endpoints (`/admin/members*`, `/admin/suggestions*`, `/admin/band-followers`) authenticate with headers instead of body fields. Reads are signed too, because member data is private.
+The member endpoints (`/member/*`) and the admin endpoints (`/admin/members*`, `/admin/suggestions*`, `/admin/band-followers`, `/admin/conflicts*`) authenticate with headers instead of body fields. Reads are signed too, because member data is private.
 
 **Headers:**
 

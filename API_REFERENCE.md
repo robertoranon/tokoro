@@ -108,13 +108,13 @@ The Crawler Worker requires an `Authorization: Bearer <api-key>` header.
 
 ## Authentication
 
-All write operations (`POST`, `PUT`, `DELETE`) require a valid Ed25519 signature in the request body (the member and admin member/suggestion endpoints use headers instead, see below). The Worker verifies every write against the declared public key; unsigned or invalidly-signed requests are rejected.
+All write operations (`POST`, `PUT`, `DELETE`) require a valid Ed25519 signature in the request body (the member and admin endpoints use headers instead, see below). The Worker verifies every write against the declared public key; unsigned or invalidly-signed requests are rejected.
 
 Optionally, set `ALLOWED_PUBKEYS` on the API Worker (comma-separated hex pubkeys) to restrict publishing to known curators — if absent, any valid signature is accepted.
 
 ### Member and admin request signatures
 
-The member and admin member/suggestion endpoints carry their signature in headers, and reads are signed too:
+The member and admin endpoints carry their signature in headers, and reads are signed too:
 
 | Header        | Value                                    |
 | ------------- | ---------------------------------------- |
