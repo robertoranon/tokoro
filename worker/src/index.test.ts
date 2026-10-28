@@ -26,13 +26,14 @@ import { makeKey, toHex, type TestKey } from '../test-support/sign';
 import * as ed from '@noble/ed25519';
 import { notifyConflict } from './alerts';
 
-import { reevaluateConflicts } from './conflicts';
+import { reevaluateConflicts, purgeConflictLinks } from './conflicts';
 
 vi.mock('./conflicts', async importOriginal => {
   const actual = await importOriginal<typeof import('./conflicts')>();
   return {
     ...actual,
     reevaluateConflicts: vi.fn(actual.reevaluateConflicts),
+    purgeConflictLinks: vi.fn(actual.purgeConflictLinks),
   };
 });
 
@@ -41,7 +42,7 @@ vi.mock('./alerts', async importOriginal => ({
   notifyConflict: vi.fn(async () => {}),
 }));
 
-import { verifyActSignature, actMessage } from './crypto';
+import { verifyActSignature, actMessage, proposalMessage } from './crypto';
 import { isDuplicate } from '../../shared/llm/duplicate-check';
 import { encode as geohashEncode, neighbors } from './geohash';
 import type { LLMProvider } from '../../shared/types/llm';
@@ -870,6 +871,20 @@ const ACT_VECTOR = {
     'eb42a79e717ed8cf6a9657d1f8b426ee770dc35a6705a77f648b1b27f908d139f7481f05e916b75fc5a6c7ecf4e38ff4c1daa70dff51ce70cd19b923e9b64303',
 };
 
+describe('proposalMessage', () => {
+  it('is the pinned SHA-256 vector shared with the crawler', async () => {
+    // crawler/tests/test-tours.ts pins the same digest: both sides hash
+    // exactly `proposal:${eventId}\n${reason}`.
+    const msg = await proposalMessage(
+      'ab'.repeat(32),
+      'not listed on https://testband.example/live'
+    );
+    expect(toHex(msg)).toBe(
+      'd3b5bf26d323afeed7a082a550f5b5f7d2018f03ed7501500aef4cb708303156'
+    );
+  });
+});
+
 describe('verifyActSignature', () => {
   const v = ACT_VECTOR;
 
@@ -1517,6 +1532,29 @@ describe('conflicts on event writes', () => {
     }
   });
 
+  it('DELETE answers 200 when purging the conflict links fails', async () => {
+    const DB = makeD1();
+    const key = await makeKey();
+    const { c } = await postBoth(DB, key);
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(purgeConflictLinks).mockRejectedValueOnce(new Error('d1 down'));
+    try {
+      const sig = await ed.signAsync(hexBytes(c), key.priv);
+      const res = await call(DB, 'DELETE', `/events/${c}`, {
+        pubkey: key.pubkey,
+        signature: toHex(sig),
+      });
+      expect(res.status).toBe(200);
+      const row = await DB.prepare('SELECT id FROM events WHERE id = ?')
+        .bind(c)
+        .first();
+      expect(row).toBeNull();
+      expect(errSpy).toHaveBeenCalled();
+    } finally {
+      errSpy.mockRestore();
+    }
+  });
+
   it('PUT still reevaluates the new band-day when the old one fails', async () => {
     const DB = makeD1();
     const key = await makeKey();
@@ -1632,6 +1670,29 @@ describe('conflicts on event writes', () => {
       ).held;
     expect(await heldOf('live')).toBe(0); // its conflict closed
     expect(await heldOf('live3')).toBe(1); // still in an open conflict
+  });
+});
+
+describe('GET /stats ignores held events', () => {
+  it('counts and picks the last event among non-held events only', async () => {
+    const DB = makeD1(ALL_MIGRATIONS);
+    const ins = (id: string, held: number, created: string) =>
+      DB.prepare(
+        `INSERT INTO events (id, pubkey, signature, title, lat, lng, geohash5, geohash6,
+           start_time, category, created_at, held)
+         VALUES (?, 'pk', 'sig', ?, 45, 13, 'u0000', 'u00000',
+           '2999-01-01T20:00:00', 'music', ?, ?)`
+      )
+        .bind(id, 'Show ' + id, created, held)
+        .run();
+    await ins('shown', 0, '2026-01-01T00:00:00');
+    await ins('held', 1, '2026-02-01T00:00:00');
+    const res = await worker.fetch(new Request('https://w.test/stats'), {
+      DB,
+    } as any);
+    const body: any = await res.json();
+    expect(body.total_events).toBe(1);
+    expect(body.last_event.title).toBe('Show shown');
   });
 });
 

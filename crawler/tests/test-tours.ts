@@ -3925,6 +3925,38 @@ sources:
     );
     assert(props.length === 0, 'unlisted non-held show → no proposal');
 
+    // A held range that started before today and ends today or later is still
+    // listed, but its draft is skipped_past (start date), so it never matches:
+    // the same start-date criterion keeps it from being proposed.
+    props = [];
+    const heldRange: ExistingShow = {
+      ...stored('r1', '2030-09-28', 47.9, 9.0, 'Fest Grounds', 1),
+      end_time: '2030-10-02T23:00:00',
+    };
+    await processTourSourcePage(
+      page,
+      bandSource,
+      cfg,
+      mkDeps(
+        [
+          draft({}),
+          draft({
+            start_time: '2030-09-28T21:00:00',
+            end_time: '2030-10-02T23:00:00',
+            venue_name: 'Fest Grounds',
+            lat: 47.9,
+            lng: 9.0,
+          }),
+        ],
+        [heldMatched, heldRange],
+        props
+      )
+    );
+    assert(
+      props.length === 0,
+      'held range started in the past, still listed → no proposal'
+    );
+
     // Extraction failed → the source throws, nothing proposed.
     props = [];
     let threw = false;

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as ed from '@noble/ed25519';
 import { routeAdminConflictRequest } from './admin-conflicts';
 import worker from './index';
-import { reevaluateConflicts } from './conflicts';
+import { reevaluateConflicts, purgeConflictLinks } from './conflicts';
 import { proposalMessage } from './crypto';
 import { notifyConflict } from './alerts';
 import { makeD1, ALL_MIGRATIONS } from '../test-support/d1';
@@ -23,6 +23,7 @@ vi.mock('./conflicts', async importOriginal => {
   return {
     ...actual,
     reevaluateConflicts: vi.fn(actual.reevaluateConflicts),
+    purgeConflictLinks: vi.fn(actual.purgeConflictLinks),
   };
 });
 
@@ -265,6 +266,34 @@ describe('GET /admin/conflicts', () => {
         created_at: expect.any(String),
       },
     ]);
+  });
+
+  it('a corrupt tags value on one event does not break the list', async () => {
+    await addEvent('dublin', 53.35, -6.26, { tags: '{not json' });
+    await addEvent('cork', 51.9, -8.47);
+    await reevaluateConflicts(env, BAND, DAY);
+    const res = await list();
+    expect(res.status).toBe(200);
+    const body: any = await res.json();
+    const byId = Object.fromEntries(
+      body.conflicts[0].events.map((e: any) => [e.id, e])
+    );
+    expect(byId.dublin.tags).toEqual([]);
+    expect(byId.cork.tags).toEqual(['rock']);
+  });
+
+  it('DELETE via resolve answers 200 when purging the conflict links fails', async () => {
+    const id = await openConflict();
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(purgeConflictLinks).mockRejectedValueOnce(new Error('d1 down'));
+    try {
+      const res = await resolve(id, { action: 'delete', event_id: 'cork' });
+      expect(res.status).toBe(200);
+      expect(await row('cork')).toBeNull();
+      expect(err).toHaveBeenCalled();
+    } finally {
+      err.mockRestore();
+    }
   });
 
   it('filters by status', async () => {

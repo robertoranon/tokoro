@@ -49,6 +49,17 @@ export async function routeAdminConflictRequest(
   return null;
 }
 
+/** Stored tags as an array; a corrupt value gives [] instead of a 500. */
+function parseTags(raw: unknown): unknown[] {
+  if (typeof raw !== 'string' || raw === '') return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
 async function listConflicts(request: Request, env: Env): Promise<Response> {
   const a = await authAdmin(request, env, 'admin-read', readPayload(request));
   if (a !== true) return a;
@@ -77,7 +88,7 @@ async function listConflicts(request: Request, env: Env): Promise<Response> {
     ).results.map(
       (e): Record<string, unknown> => ({
         ...e,
-        tags: e.tags ? JSON.parse(e.tags as string) : [],
+        tags: parseTags(e.tags),
       })
     );
     const proposals = (
@@ -243,7 +254,12 @@ async function resolveConflict(
   }
   // As DELETE /events/:id: delete, purge the conflict links, re-check the band-day
   await env.DB.prepare('DELETE FROM events WHERE id = ?').bind(eventId).run();
-  await purgeConflictLinks(env, eventId);
+  // The delete has committed: a failure from here on is logged, never a 500.
+  try {
+    await purgeConflictLinks(env, eventId);
+  } catch (err) {
+    console.error(`purgeConflictLinks failed for ${eventId}:`, err);
+  }
   await reevaluateAfterWrite(env, [
     { actUrl: event.act_url, startTime: event.start_time },
   ]);

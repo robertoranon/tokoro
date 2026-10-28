@@ -739,10 +739,10 @@ export default {
 
 async function handleGetStats(env: Env): Promise<Response> {
   const countResult = await env.DB.prepare(
-    'SELECT COUNT(*) as total FROM events'
+    'SELECT COUNT(*) as total FROM events WHERE held = 0'
   ).first<{ total: number }>();
   const lastResult = await env.DB.prepare(
-    'SELECT title, venue_name, lat, lng, url FROM events ORDER BY created_at DESC LIMIT 1'
+    'SELECT title, venue_name, lat, lng, url FROM events WHERE held = 0 ORDER BY created_at DESC LIMIT 1'
   ).first<{
     title: string;
     venue_name: string | null;
@@ -1509,7 +1509,12 @@ async function handleDeleteEvent(
 
   // Delete the event, then its conflict links, then re-check its band-day
   await env.DB.prepare('DELETE FROM events WHERE id = ?').bind(eventId).run();
-  await purgeConflictLinks(env, eventId);
+  // The delete has committed: a failure from here on is logged, never a 500.
+  try {
+    await purgeConflictLinks(env, eventId);
+  } catch (err) {
+    console.error(`purgeConflictLinks failed for ${eventId}:`, err);
+  }
   await reevaluateAfterWrite(env, [
     { actUrl: event.act_url, startTime: event.start_time },
   ]);

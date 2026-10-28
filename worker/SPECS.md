@@ -592,7 +592,7 @@ Then apply `are_events_similar()` to each result.
 
 Before the proximity check above, a new event with an `act_url` and a non-empty `venue_name` is compared with the existing events of that band: if any event has the same `act_url` (compared without a trailing `/`), the same local date (the first 10 characters of `start_time`) and the same venue name (compared trimmed and case-insensitively), the new event is rejected with the same 409 response (`message`: "This band already has an event on that date", `existing_event_id`: that event). Distance and time of day are ignored: the proximity check cannot see a duplicate whose coordinates disagree (the same venue geocoded to two points). Every other same-band, same-day pair (different venue names, or a venue name missing on either side) is accepted and becomes a conflict (below), because a band plays one place a day and only a person can decide which listing is right. The crawler treats this 409 like any other: it attaches the band to the existing event if it has none, and otherwise leaves it alone. Events without an `act_url` are not affected.
 
-**Conflict detection on writes.** After every successful write the worker runs the reconcile of section 2.1 (`reevaluateConflicts`) for each affected (`act_url`, day) pair, skipping pairs without an `act_url`: `POST /events` the new event's pair; `PUT /events/:id` both the stored pair (read before the update) and the new one; `POST /events/:id/act` the attached band with the event's day; `DELETE /events/:id` and the `delete` / `apply_proposal` actions of `POST /admin/conflicts/:id/resolve` (section 7.16.3) the stored pair, after deleting the event and calling `purgeConflictLinks` (in that order). The reference implementation shares this step as `reevaluateAfterWrite` (`conflict-writes.ts`). When the reconcile returns `created`, the worker calls `notifyConflict(env, created)` (`alerts.ts`; currently a no-op); a failure there is logged and never fails the write. A failure of the reconcile itself is also logged (with the `act_url` and day) and never fails the write: the client gets the normal success status, the remaining pairs are still reconciled, and the conflict state of that band-day is corrected by the next write that touches it.
+**Conflict detection on writes.** After every successful write the worker runs the reconcile of section 2.1 (`reevaluateConflicts`) for each affected (`act_url`, day) pair, skipping pairs without an `act_url`: `POST /events` the new event's pair; `PUT /events/:id` both the stored pair (read before the update) and the new one; `POST /events/:id/act` the attached band with the event's day; `DELETE /events/:id` and the `delete` / `apply_proposal` actions of `POST /admin/conflicts/:id/resolve` (section 7.16.3) the stored pair, after deleting the event and calling `purgeConflictLinks` (in that order; the delete has committed, so a `purgeConflictLinks` failure is logged and never fails the request). The reference implementation shares this step as `reevaluateAfterWrite` (`conflict-writes.ts`). When the reconcile returns `created`, the worker calls `notifyConflict(env, created)` (`alerts.ts`; currently a no-op); a failure there is logged and never fails the write. A failure of the reconcile itself is also logged (with the `act_url` and day) and never fails the write: the client gets the normal success status, the remaining pairs are still reconciled, and the conflict state of that band-day is corrected by the next write that touches it.
 
 ### 5.6 Environment Variables and Secrets
 
@@ -717,11 +717,11 @@ GET /stats
 ```json
 {
   "total_events": 1234,
-  "last_event_at": "2026-04-15T20:00:00"
+  "last_event": { "title": "...", "venue_name": "...", "lat": 46.06, "lng": 13.23, "url": "..." }
 }
 ```
 
-Returns the total event count and the `created_at` timestamp of the most recently added event.
+Returns the count of events and the most recently added one (by `created_at`; `null` when there is none). Both ignore held events (`held = 1`, section 2.1), so a show hidden by an open conflict is never shown here.
 
 ### 7.4 GET /events (Query Events)
 
@@ -1462,7 +1462,7 @@ Conflicts (section 2.1) hide the events of a band that appear at two places on o
 } ] }
 ```
 
-`events` are the full rows of the linked events that still exist, held ones included, with `tags` parsed (ordered by `start_time`, then id); `act_name` is the first non-empty one among them (`null` if none). `proposals` are those recorded for the conflict.
+`events` are the full rows of the linked events that still exist, held ones included, with `tags` parsed (a value that is not a JSON array gives `[]`, never an error) (ordered by `start_time`, then id); `act_name` is the first non-empty one among them (`null` if none). `proposals` are those recorded for the conflict.
 
 #### 7.16.3 POST /admin/conflicts/:id/resolve (Resolve a Conflict)
 

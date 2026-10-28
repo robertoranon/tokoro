@@ -427,8 +427,9 @@ async function proposeUnlisted(
   const reason = `not listed on ${source.url}`;
   for (const show of existing) {
     if (show.held !== 1 || matchedIds.has(show.id)) continue;
-    // A past show is simply no longer on the page: nothing to propose.
-    if ((show.end_time ?? show.start_time).slice(0, 10) < deps.today) continue;
+    // A show that started before today is skipped_past as a draft (start
+    // date, as isPastShow), so it can never be matched: nothing to propose.
+    if (isPastShow(show.start_time, deps.today)) continue;
     try {
       await deps.proposeDeletion(show.id, reason);
     } catch (error) {
