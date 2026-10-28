@@ -31,7 +31,7 @@ API Endpoints:
 
 **Events**
 
-- `GET /events?lat=&lng=&radius=&from=&to=&category=&tags=&festival_url=&act_url=` - Query events (max 100 results; `festival_url` filters to a specific festival; `has_festival=1` returns only festival entries; `act_url` filters to a specific band; `has_act=1` returns only band shows, `0` excludes them)
+- `GET /events?lat=&lng=&radius=&from=&to=&category=&tags=&festival_url=&act_url=` - Query events (max 100 results; `festival_url` filters to a specific festival; `has_festival=1` returns only festival entries; `act_url` filters to a specific band; `has_act=1` returns only band shows, `0` excludes them; held events of open conflicts are hidden unless `include_held=1`)
 - `POST /events` - Publish signed event
 - `PUT /events/:id` - Edit own event (new signature required)
 - `DELETE /events/:id` - Delete own event (signature required)

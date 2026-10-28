@@ -1634,3 +1634,58 @@ describe('conflicts on event writes', () => {
     expect(await heldOf('live3')).toBe(1); // still in an open conflict
   });
 });
+
+describe('GET /events hides held events', () => {
+  const BAND = 'https://band.example';
+  async function seed() {
+    const DB = makeD1(ALL_MIGRATIONS);
+    const ins = (id: string, held: number) =>
+      DB.prepare(
+        `INSERT INTO events (id, pubkey, signature, title, lat, lng, geohash5, geohash6,
+           start_time, category, created_at, act_url, held)
+         VALUES (?, 'pk', 'sig', 'Show', 45, 13, ?, ?, '2999-01-01T20:00:00',
+           'music', 'x', ?, ?)`
+      )
+        .bind(
+          id,
+          geohashEncode(45, 13, 5),
+          geohashEncode(45, 13, 6),
+          BAND,
+          held
+        )
+        .run();
+    await ins('shown', 0);
+    await ins('held', 1);
+    return DB;
+  }
+  const ids = async (DB: D1Database, qs: string) => {
+    const res = await worker.fetch(new Request(`https://w.test/events?${qs}`), {
+      DB,
+    } as any);
+    const body: any = await res.json();
+    return ((body.events ?? body) as { id: string }[]).map(e => e.id).sort();
+  };
+  const paths: [string, string][] = [
+    ['browse', 'from=2999-01-01T00:00:00&to=2999-12-31T00:00:00'],
+    [
+      'geo',
+      'lat=45&lng=13&radius=50&from=2999-01-01T00:00:00&to=2999-12-31T00:00:00',
+    ],
+    ['pubkey', 'pubkey=pk&from=2999-01-01T00:00:00&to=2999-12-31T00:00:00'],
+  ];
+
+  for (const [name, qs] of paths) {
+    it(`${name} path omits a held event unless include_held=1`, async () => {
+      const DB = await seed();
+      expect(await ids(DB, qs)).toEqual(['shown']);
+      expect(await ids(DB, qs + '&include_held=1')).toEqual(['held', 'shown']);
+      expect(await ids(DB, qs + '&include_held=true')).toEqual(['shown']);
+      const act = `&act_url=${encodeURIComponent(BAND)}`;
+      expect(await ids(DB, qs + act)).toEqual(['shown']);
+      expect(await ids(DB, qs + act + '&include_held=1')).toEqual([
+        'held',
+        'shown',
+      ]);
+    });
+  }
+});

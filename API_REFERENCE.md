@@ -6,7 +6,7 @@
 
 | Method   | Endpoint                                                            | Description                                 |
 | -------- | ------------------------------------------------------------------- | ------------------------------------------- |
-| `GET`    | `/events?lat=&lng=&radius=&from=&to=&category=&tags=&festival_url=&has_festival=1&act_url=&has_act=1` | Query events (max 100; all params optional; `has_festival=1` returns only festival entries; `has_act=1` returns only band shows, `has_act=0` excludes them) |
+| `GET`    | `/events?lat=&lng=&radius=&from=&to=&category=&tags=&festival_url=&has_festival=1&act_url=&has_act=1` | Query events (max 100; all params optional; `has_festival=1` returns only festival entries; `has_act=1` returns only band shows, `has_act=0` excludes them; `include_held=1` also returns events held by an open conflict) |
 | `GET`    | `/events?…&format=ical`                                             | Same query, returned as an iCal (.ics) feed |
 | `POST`   | `/events`                                                           | Publish a signed event                      |
 | `PUT`    | `/events/:id`                                                       | Edit own event (re-signed; `created_at` immutable; no dedup) |

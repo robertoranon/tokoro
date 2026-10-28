@@ -351,7 +351,7 @@ export async function sendAlertDigests(
 
   // Claim the flags first: events flagged while sending stay pending for tomorrow.
   await env.DB.prepare(
-    'UPDATE events SET alert_pending = 2 WHERE alert_pending = 1'
+    'UPDATE events SET alert_pending = 2 WHERE alert_pending = 1 AND held = 0'
   ).run();
   const pending =
     (
@@ -368,7 +368,7 @@ export async function sendAlertDigests(
       (
         await env.DB.prepare(
           `SELECT DISTINCT festival_url FROM events
-           WHERE alert_pending = 0 AND festival_url IS NOT NULL AND festival_url != ''`
+           WHERE alert_pending = 0 AND held = 0 AND festival_url IS NOT NULL AND festival_url != ''`
         ).all<{ festival_url: string }>()
       ).results || []
     ).map(r => bandKey(r.festival_url))

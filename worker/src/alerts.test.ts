@@ -11,6 +11,7 @@ import {
   type AlertEvent,
   type Recipient,
 } from './alerts';
+import { reevaluateConflicts } from './conflicts';
 import { makeD1 } from '../test-support/d1';
 
 const ev = (o: Partial<AlertEvent>): AlertEvent => ({
@@ -309,18 +310,20 @@ describe('sendAlertDigests', () => {
     const addEvent = (id: string, o: Record<string, unknown>) =>
       DB.prepare(
         `INSERT INTO events (id, pubkey, signature, title, lat, lng, geohash5, geohash6,
-           start_time, category, created_at, act_name, act_url, festival_name, festival_url, alert_pending)
-         VALUES (?, 'pk', 'sig', ?, 45, 13, 'u0000', 'u00000', ?, 'music', 'x', ?, ?, ?, ?, ?)`
+           start_time, category, created_at, act_name, act_url, festival_name, festival_url, alert_pending, held)
+         VALUES (?, 'pk', 'sig', ?, ?, 13, 'u0000', 'u00000', ?, 'music', 'x', ?, ?, ?, ?, ?, ?)`
       )
         .bind(
           id,
           o.title ?? id,
+          o.lat ?? 45,
           o.start ?? '2026-11-14T21:00:00',
           o.act_name ?? null,
           o.act_url ?? null,
           o.festival_name ?? null,
           o.festival_url ?? null,
-          o.pending ?? 1
+          o.pending ?? 1,
+          o.held ?? 0
         )
         .run();
     const addMember = async (
@@ -417,6 +420,57 @@ describe('sendAlertDigests', () => {
     await s.addMember('bea', '2', 1, []);
     await sendAlertDigests(s.env, { fetchFn: s.fetchFn as any, today: TODAY });
     expect(s.sent).toEqual([]);
+  });
+
+  it('does not send, claim or clear a held event; sends it once released', async () => {
+    const s = await setup();
+    const band = 'https://alpha.example';
+    await s.addEvent('h1', {
+      act_name: 'Alpha',
+      act_url: band,
+      lat: 45,
+    });
+    await s.addEvent('h2', {
+      act_name: 'Alpha',
+      act_url: band,
+      lat: 50,
+    });
+    await reevaluateConflicts(s.env, band, '2026-11-14'); // holds both
+    await s.DB.prepare(
+      "UPDATE events SET alert_pending = 1 WHERE id = 'h1'"
+    ).run();
+    await s.addMember('anna', '1', 0, [band]);
+    await sendAlertDigests(s.env, { fetchFn: s.fetchFn as any, today: TODAY });
+    expect(s.sent).toEqual([]);
+    const row = (await s.DB.prepare(
+      "SELECT alert_pending AS p FROM events WHERE id = 'h1'"
+    ).first()) as any;
+    expect(row.p).toBe(1);
+
+    await s.DB.prepare("DELETE FROM events WHERE id = 'h2'").run();
+    await reevaluateConflicts(s.env, band, '2026-11-14');
+    await sendAlertDigests(s.env, { fetchFn: s.fetchFn as any, today: TODAY });
+    expect(s.sent).toHaveLength(1);
+    expect(s.sent[0].text).toContain('Alpha');
+  });
+
+  it('a held festival show does not make its festival known', async () => {
+    const s = await setup();
+    await s.addEvent('fh', {
+      festival_url: 'https://fest.example',
+      act_url: 'https://alpha.example',
+      pending: 0,
+      held: 1,
+    });
+    await s.addEvent('f1', {
+      festival_name: 'Fest',
+      festival_url: 'https://fest.example',
+      start: '2026-11-15T00:00:00',
+    });
+    await s.addMember('bea', '2', 1, []);
+    await sendAlertDigests(s.env, { fetchFn: s.fetchFn as any, today: TODAY });
+    expect(s.sent).toHaveLength(1);
+    expect(s.sent[0].text).toContain('Fest');
   });
 
   it('clears the chat id when the member blocked the bot (403)', async () => {

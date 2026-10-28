@@ -780,6 +780,9 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
   );
   const actFilter = buildActUrlFilter(url.searchParams.get('act_url') || '');
   const hasActFilter = buildHasActFilter(url.searchParams.get('has_act') || '');
+  // Held events (open conflicts) are hidden unless include_held=1 (literal).
+  const heldFilter =
+    url.searchParams.get('include_held') === '1' ? '' : ' AND held = 0';
   const pubkeyFilter = url.searchParams.get('pubkey') || '';
   const q = url.searchParams.get('q') || '';
   const textFilter = buildTextFilter(q);
@@ -790,7 +793,7 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
   if (!hasGeo && !pubkeyFilter) {
     const offset = parseInt(url.searchParams.get('offset') || '0', 10) || 0;
 
-    let allQuery = 'SELECT * FROM events WHERE 1=1';
+    let allQuery = 'SELECT * FROM events WHERE 1=1' + heldFilter;
     const allParams: any[] = [];
 
     if (fromParam) {
@@ -849,6 +852,7 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
 			WHERE pubkey = ?
 			AND start_time >= ?
 			AND start_time <= ?
+			${heldFilter}
 		`;
     const pubkeyParams: any[] = [pubkeyFilter, from, to];
 
@@ -927,6 +931,7 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
 			  (end_time IS NOT NULL AND end_time >= ?)
 			  OR (end_time IS NULL AND start_time >= ?)
 			)
+			${heldFilter}
 		`;
     params.push(...hashes, to, from, from);
   } else if (precision === 6) {
@@ -939,6 +944,7 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
 			  (end_time IS NOT NULL AND end_time >= ?)
 			  OR (end_time IS NULL AND start_time >= ?)
 			)
+			${heldFilter}
 		`;
     params.push(...hashes, to, from, from);
   } else {
@@ -953,6 +959,7 @@ async function handleGetEvents(request: Request, env: Env): Promise<Response> {
 			  (end_time IS NOT NULL AND end_time >= ?)
 			  OR (end_time IS NULL AND start_time >= ?)
 			)
+			${heldFilter}
 		`;
     params.push(...hashes.map(h => h + '%'), to, from, from);
   }
