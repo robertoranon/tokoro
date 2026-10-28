@@ -1067,7 +1067,8 @@ export async function findSameActSameDay(
 /**
  * Re-check the conflict state of each (act_url, day) pair touched by a write
  * and notify on a newly created conflict. A notification failure is logged and
- * never fails the write. Pairs without an act_url are skipped.
+ * never fails the write; neither does a reevaluation failure (logged, and the
+ * other pairs still run). Pairs without an act_url are skipped.
  */
 async function reevaluateAfterWrite(
   env: Env,
@@ -1080,7 +1081,18 @@ async function reevaluateAfterWrite(
     const key = `${p.actUrl.replace(/\/+$/, '')}|${day}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    const { created } = await reevaluateConflicts(env, p.actUrl, day);
+    // The write has already committed: a failure here is logged, never a 500.
+    // The next write touching this band-day corrects its conflict state.
+    let created;
+    try {
+      ({ created } = await reevaluateConflicts(env, p.actUrl, day));
+    } catch (err) {
+      console.error(
+        `reevaluateConflicts failed for ${p.actUrl} on ${day}:`,
+        err
+      );
+      continue;
+    }
     if (created) {
       try {
         await notifyConflict(env, created);

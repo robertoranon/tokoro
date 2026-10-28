@@ -26,6 +26,16 @@ import { makeKey, toHex, type TestKey } from '../test-support/sign';
 import * as ed from '@noble/ed25519';
 import { notifyConflict } from './alerts';
 
+import { reevaluateConflicts } from './conflicts';
+
+vi.mock('./conflicts', async importOriginal => {
+  const actual = await importOriginal<typeof import('./conflicts')>();
+  return {
+    ...actual,
+    reevaluateConflicts: vi.fn(actual.reevaluateConflicts),
+  };
+});
+
 vi.mock('./alerts', async importOriginal => ({
   ...(await importOriginal<typeof import('./alerts')>()),
   notifyConflict: vi.fn(async () => {}),
@@ -1462,6 +1472,83 @@ describe('conflicts on event writes', () => {
     expect(await held(DB, d)).toBe(1);
     expect(await held(DB, c)).toBe(1);
     expect(notifyConflict).toHaveBeenCalledTimes(1);
+  });
+
+  it('POST answers 201 and keeps the event when reevaluation fails', async () => {
+    const DB = makeD1();
+    const key = await makeKey();
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(reevaluateConflicts).mockRejectedValueOnce(new Error('d1 down'));
+    try {
+      const r = await call(DB, 'POST', '/events', await signed(key, dublin));
+      expect(r.status).toBe(201);
+      const id = ((await r.json()) as any).id;
+      const row = await DB.prepare('SELECT id FROM events WHERE id = ?')
+        .bind(id)
+        .first();
+      expect(row).not.toBeNull();
+      expect(errSpy).toHaveBeenCalled();
+      expect(String(errSpy.mock.calls[0].join(' '))).toContain(BAND);
+    } finally {
+      errSpy.mockRestore();
+    }
+  });
+
+  it('DELETE answers 200 and removes the event when reevaluation fails', async () => {
+    const DB = makeD1();
+    const key = await makeKey();
+    const { c } = await postBoth(DB, key);
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(reevaluateConflicts).mockRejectedValueOnce(new Error('d1 down'));
+    try {
+      const sig = await ed.signAsync(hexBytes(c), key.priv);
+      const res = await call(DB, 'DELETE', `/events/${c}`, {
+        pubkey: key.pubkey,
+        signature: toHex(sig),
+      });
+      expect(res.status).toBe(200);
+      const row = await DB.prepare('SELECT id FROM events WHERE id = ?')
+        .bind(c)
+        .first();
+      expect(row).toBeNull();
+      expect(errSpy).toHaveBeenCalled();
+    } finally {
+      errSpy.mockRestore();
+    }
+  });
+
+  it('PUT still reevaluates the new band-day when the old one fails', async () => {
+    const DB = makeD1();
+    const key = await makeKey();
+    const { c } = await postBoth(DB, key); // Dublin + Cork on the 18th
+    await call(
+      DB,
+      'POST',
+      '/events',
+      await signed(key, {
+        title: 'Band live in Galway',
+        lat: 53.27,
+        lng: -9.05,
+        start_time: '2030-06-19T20:00:00',
+      })
+    );
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(reevaluateConflicts).mockRejectedValueOnce(new Error('d1 down'));
+    try {
+      const res = await call(
+        DB,
+        'PUT',
+        `/events/${c}`,
+        await signed(key, { ...cork, start_time: '2030-06-19T20:00:00' })
+      );
+      expect(res.status).toBe(200);
+      expect(errSpy).toHaveBeenCalled();
+      const day19 = (await conflictsOf(DB)).filter(x => x.day === '2030-06-19');
+      expect(day19).toHaveLength(1);
+      expect(day19[0].status).toBe('open');
+    } finally {
+      errSpy.mockRestore();
+    }
   });
 
   it('the expiry cron removes orphan links and resolves conflicts left with one event', async () => {
