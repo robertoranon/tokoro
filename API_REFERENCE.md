@@ -12,6 +12,7 @@
 | `PUT`    | `/events/:id`                                                       | Edit own event (re-signed; `created_at` immutable; no dedup) |
 | `DELETE` | `/events/:id`                                                       | Delete an event (signature required)        |
 | `POST`   | `/events/:id/act`                                                   | Attach act_name/act_url to an existing event that has none (signed, allowlisted key) |
+| `POST`   | `/conflicts/proposals`                                              | Propose deleting a held event of an open conflict `{pubkey, event_id, reason, signature}` (signed over `SHA-256("proposal:" + event_id + "\n" + reason)`, allowlisted key) → `201`; repeat → `200`; `409` if the event is not held in an open conflict |
 
 ### Stars
 
@@ -64,7 +65,16 @@ Signed by `ADMIN_PUBKEY` (`503` when it is not configured).
 | `POST`   | `/admin/suggestions/link`                  | Link suggestions to a tracked band `{ids, act_url}` and follow it for each suggester → `{updated}` |
 | `GET`    | `/admin/band-followers`                    | `[{act_url, followers}]`, most followed first (counts only; active members only) |
 
-Bodies, status codes and error messages: [`worker/SPECS.md`](worker/SPECS.md) sections 7.11-7.14.
+### Admin (conflicts)
+
+Signed by `ADMIN_PUBKEY` (`503` when it is not configured). A conflict is one band at two places on the same day; its events are hidden until resolved.
+
+| Method | Endpoint                          | Description |
+| ------ | --------------------------------- | ----------- |
+| `GET`  | `/admin/conflicts?status=`        | `{conflicts: [{id, act_url, act_name, day, status, created_at, resolved_at, events, proposals}]}`; `status` = `open` (default), `kept` or `resolved`; `events` are full rows, held ones included |
+| `POST` | `/admin/conflicts/:id/resolve`    | `{action: "keep_both"}` (status `kept`, events shown again), `{action: "delete", event_id}` or `{action: "apply_proposal", proposal_id}` (delete the event, then re-check the band-day); `404` unknown conflict/proposal, `400` conflict not open or event not in it |
+
+Bodies, status codes and error messages: [`worker/SPECS.md`](worker/SPECS.md) sections 7.11-7.14 and 7.16.
 
 ### iCal feeds
 
@@ -120,16 +130,17 @@ The signed message is `SHA-256("<domain>:<payload>:<timestamp>")`. The timestamp
 | `band-follow`             | `POST /member/bands/:act_url_b64`                               | normalized band URL                     |
 | `band-unfollow`           | `DELETE /member/bands/:act_url_b64`                             | normalized band URL                     |
 | `band-suggest`            | `POST /member/suggestions`                                      | raw JSON body                           |
-| `admin-read`              | `GET /admin/members`, `/admin/suggestions`, `/admin/band-followers` | request path with its query string as sent (e.g. `/admin/suggestions?detail=1`) |
+| `admin-read`              | `GET /admin/members`, `/admin/suggestions`, `/admin/band-followers`, `/admin/conflicts` | request path with its query string as sent (e.g. `/admin/suggestions?detail=1`) |
 | `admin-member`            | `POST /admin/members`                                           | raw JSON body                           |
 | `admin-member-revoke`     | `POST /admin/members/:pubkey/revoke`                            | target pubkey (lower-case)              |
 | `admin-member-delete`     | `DELETE /admin/members/:pubkey`                                 | target pubkey (lower-case)              |
 | `admin-suggestion-reject` | `POST /admin/suggestions/reject`                                | raw JSON body                           |
 | `admin-suggestion-link`   | `POST /admin/suggestions/link`                                  | raw JSON body                           |
+| `admin-conflict-resolve`  | `POST /admin/conflicts/:id/resolve`                             | raw JSON body                           |
 
 A normalized band URL is scheme + host[:port] + path, lower-case scheme and host, without query, fragment or trailing slash (http/https only), at most 500 characters (a suggestion `url` or link `act_url` that is longer after normalization → `400`). CORS allows the three headers.
 
-Endpoints with a JSON body (`POST /member/suggestions`, `POST /admin/members`, `POST /admin/suggestions/reject`, `POST /admin/suggestions/link`) accept at most 8 KB and check the cheap things before reading it: a `Content-Length` above 8 KB → `413 {"error": "Payload too large"}` (before any auth check); for the admin endpoints, `503` when the admin is not configured; malformed headers or a timestamp outside the window → `401`; a body that turns out larger than 8 KB → `413`; then the signature (`401`) and the member/admin check (`403`).
+Endpoints with a JSON body (`POST /member/suggestions`, `POST /admin/members`, `POST /admin/suggestions/reject`, `POST /admin/suggestions/link`, `POST /admin/conflicts/:id/resolve`) accept at most 8 KB and check the cheap things before reading it: a `Content-Length` above 8 KB → `413 {"error": "Payload too large"}` (before any auth check); for the admin endpoints, `503` when the admin is not configured; malformed headers or a timestamp outside the window → `401`; a body that turns out larger than 8 KB → `413`; then the signature (`401`) and the member/admin check (`403`).
 
 ---
 

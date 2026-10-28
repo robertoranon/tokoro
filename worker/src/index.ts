@@ -16,8 +16,13 @@ import { CORS_HEADERS, jsonResponse } from './http';
 import { routeMemberRequest } from './members';
 import { routeTelegramRequest } from './telegram-link';
 import { routeAdminMemberRequest } from './admin-members';
-import { sendAlertDigests, notifyConflict } from './alerts';
-import { reevaluateConflicts, purgeConflictLinks } from './conflicts';
+import {
+  routeAdminConflictRequest,
+  handlePostProposal,
+} from './admin-conflicts';
+import { sendAlertDigests } from './alerts';
+import { purgeConflictLinks } from './conflicts';
+import { reevaluateAfterWrite } from './conflict-writes';
 
 export interface Env {
   DB: D1Database;
@@ -612,6 +617,17 @@ export default {
                 'Edit an own event (requires re-signed Ed25519 signature; created_at is immutable)',
               body: 'Same shape as POST /events',
             },
+            'POST /conflicts/proposals': {
+              description:
+                'Propose deleting a held event of an open conflict (signed by an allowlisted key)',
+              body: {
+                pubkey: 'Ed25519 public key (hex)',
+                event_id: 'Held event ID',
+                reason: 'Why (1-200 characters)',
+                signature:
+                  'Signature of SHA-256("proposal:" + event_id + "\\n" + reason) (hex)',
+              },
+            },
             'POST /events/:id/act': {
               description:
                 'Attach act_name/act_url to an existing event that has none (signed by an allowlisted key)',
@@ -664,6 +680,11 @@ export default {
         return await handlePostEvent(request, env);
       }
 
+      // Route: POST /conflicts/proposals
+      if (request.method === 'POST' && path === '/conflicts/proposals') {
+        return await handlePostProposal(request, env);
+      }
+
       // Route: POST /events/:id/act
       const adoptMatch = path.match(/^\/events\/([^/]+)\/act$/);
       if (request.method === 'POST' && adoptMatch) {
@@ -698,11 +719,12 @@ export default {
         return await handleDeleteBlocklist(request, env, targetPubkey);
       }
 
-      // Routes: Telegram linking, /member/* and the admin member/suggestion endpoints
+      // Routes: Telegram linking, /member/*, the admin member/suggestion and conflict endpoints
       const memberResponse =
         (await routeTelegramRequest(request, env, path)) ??
         (await routeMemberRequest(request, env, path)) ??
-        (await routeAdminMemberRequest(request, env, path));
+        (await routeAdminMemberRequest(request, env, path)) ??
+        (await routeAdminConflictRequest(request, env, path));
       if (memberResponse) return memberResponse;
 
       return jsonResponse({ error: 'Not found' }, 404);
@@ -1069,45 +1091,6 @@ export async function findSameActSameDay(
     .bind(normalized, startTime.slice(0, 10), venue)
     .first<{ id: string }>();
   return row?.id ?? null;
-}
-
-/**
- * Re-check the conflict state of each (act_url, day) pair touched by a write
- * and notify on a newly created conflict. A notification failure is logged and
- * never fails the write; neither does a reevaluation failure (logged, and the
- * other pairs still run). Pairs without an act_url are skipped.
- */
-async function reevaluateAfterWrite(
-  env: Env,
-  pairs: { actUrl: string | null | undefined; startTime: string | null }[]
-): Promise<void> {
-  const seen = new Set<string>();
-  for (const p of pairs) {
-    if (!p.actUrl || !p.startTime) continue;
-    const day = p.startTime.slice(0, 10);
-    const key = `${p.actUrl.replace(/\/+$/, '')}|${day}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    // The write has already committed: a failure here is logged, never a 500.
-    // The next write touching this band-day corrects its conflict state.
-    let created;
-    try {
-      ({ created } = await reevaluateConflicts(env, p.actUrl, day));
-    } catch (err) {
-      console.error(
-        `reevaluateConflicts failed for ${p.actUrl} on ${day}:`,
-        err
-      );
-      continue;
-    }
-    if (created) {
-      try {
-        await notifyConflict(env, created);
-      } catch (err) {
-        console.error('notifyConflict failed:', err);
-      }
-    }
-  }
 }
 
 async function handlePostEvent(request: Request, env: Env): Promise<Response> {

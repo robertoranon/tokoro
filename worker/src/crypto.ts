@@ -147,3 +147,31 @@ export async function verifyActSignature(
     return false;
   }
 }
+
+/** SHA-256 of `proposal:${eventId}\n${reason}`: what a conflict proposal signs. */
+export async function proposalMessage(
+  eventId: string,
+  reason: string
+): Promise<Uint8Array> {
+  const bytes = new TextEncoder().encode(`proposal:${eventId}\n${reason}`);
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+}
+
+export async function verifyProposalSignature(
+  eventId: string,
+  reason: string,
+  signature: string,
+  pubkey: string
+): Promise<boolean> {
+  try {
+    const message = await proposalMessage(eventId, reason);
+    return await ed25519.verifyAsync(
+      hexToBytes(signature),
+      message,
+      hexToBytes(pubkey)
+    );
+  } catch (error) {
+    console.error('Proposal signature verification error:', error);
+    return false;
+  }
+}

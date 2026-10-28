@@ -307,18 +307,25 @@ The member endpoints (`/member/*`) and the admin member/suggestion endpoints (`/
 | `telegram-link` | `POST /telegram/link` | the raw JSON request body |
 | `telegram-settings` | `POST /telegram/settings` | the raw JSON request body |
 | `telegram-unlink` | `POST /telegram/unlink` | the raw JSON request body |
-| `admin-read` | `GET /admin/members`, `GET /admin/suggestions`, `GET /admin/band-followers` | the request path with its query string exactly as sent (URL pathname + search, e.g. `/admin/suggestions?detail=1`; without a query, just the path such as `/admin/suggestions`). A signature for one query is refused (`401`) for any other, so a captured read cannot be replayed with `?detail=1` added |
+| `admin-read` | `GET /admin/members`, `GET /admin/suggestions`, `GET /admin/band-followers`, `GET /admin/conflicts` | the request path with its query string exactly as sent (URL pathname + search, e.g. `/admin/suggestions?detail=1`; without a query, just the path such as `/admin/suggestions`). A signature for one query is refused (`401`) for any other, so a captured read cannot be replayed with `?detail=1` added |
 | `admin-member` | `POST /admin/members` | the raw JSON request body |
 | `admin-member-revoke` | `POST /admin/members/:pubkey/revoke` | the target pubkey from the path, lower-cased |
 | `admin-member-delete` | `DELETE /admin/members/:pubkey` | the target pubkey from the path, lower-cased |
 | `admin-suggestion-reject` | `POST /admin/suggestions/reject` | the raw JSON request body |
 | `admin-suggestion-link` | `POST /admin/suggestions/link` | the raw JSON request body |
+| `admin-conflict-resolve` | `POST /admin/conflicts/:id/resolve` | the raw JSON request body |
 
 **Normalization rules** (shared by the worker and the public-web client `member.js`; both MUST behave identically):
 
 - `normalizeActUrl(raw)`: trim; parse as a URL; only `http:` and `https:` are accepted (anything else, unparsable input or a non-string → invalid). Result is `scheme + "//" + host[:port] + path`, with the query, the fragment and all trailing slashes removed. Scheme and host are lower-cased and a default port is dropped (standard URL parsing). Example: `HTTPS://Band.Example/Tour/?x=1#top` → `https://band.example/Tour`; `https://band.example/` → `https://band.example`.
 - `normalizeName(raw)`: Unicode NFD, remove combining marks, lower-case, then remove every character that is not a letter or a digit. Example: `Sigur Rós!` → `sigurros`.
 - `act_url_b64` in paths is base64url (alphabet `A-Z a-z 0-9 - _`, no padding) of the UTF-8 URL; anything outside the alphabet or not valid UTF-8 is invalid.
+
+### 3.7 Conflict Proposal Signature (POST /conflicts/proposals)
+
+**Signed Message:** `SHA-256("proposal:" + event_id + "\n" + reason)` (UTF-8, `\n` is a single line feed)
+
+The prefix `"proposal:"` is a domain separator, as `"act:"` is in section 3.5: a proposal signature cannot be replayed as an event, delete, blocklist or act signature. `event_id` and `reason` are taken from the body exactly as sent. Verification is `ed25519.verify(signature_bytes, message_bytes, pubkey_bytes)`; any decoding error counts as a failed verification.
 
 ---
 
@@ -584,7 +591,7 @@ Then apply `are_events_similar()` to each result.
 
 Before the proximity check above, a new event with an `act_url` and a non-empty `venue_name` is compared with the existing events of that band: if any event has the same `act_url` (compared without a trailing `/`), the same local date (the first 10 characters of `start_time`) and the same venue name (compared trimmed and case-insensitively), the new event is rejected with the same 409 response (`message`: "This band already has an event on that date", `existing_event_id`: that event). Distance and time of day are ignored: the proximity check cannot see a duplicate whose coordinates disagree (the same venue geocoded to two points). Every other same-band, same-day pair (different venue names, or a venue name missing on either side) is accepted and becomes a conflict (below), because a band plays one place a day and only a person can decide which listing is right. The crawler treats this 409 like any other: it attaches the band to the existing event if it has none, and otherwise leaves it alone. Events without an `act_url` are not affected.
 
-**Conflict detection on writes.** After every successful write the worker runs the reconcile of section 2.1 (`reevaluateConflicts`) for each affected (`act_url`, day) pair, skipping pairs without an `act_url`: `POST /events` the new event's pair; `PUT /events/:id` both the stored pair (read before the update) and the new one; `POST /events/:id/act` the attached band with the event's day; `DELETE /events/:id` the stored pair, after deleting the event and calling `purgeConflictLinks` (in that order). When the reconcile returns `created`, the worker calls `notifyConflict(env, created)` (`alerts.ts`; currently a no-op); a failure there is logged and never fails the write. A failure of the reconcile itself is also logged (with the `act_url` and day) and never fails the write: the client gets the normal success status, the remaining pairs are still reconciled, and the conflict state of that band-day is corrected by the next write that touches it.
+**Conflict detection on writes.** After every successful write the worker runs the reconcile of section 2.1 (`reevaluateConflicts`) for each affected (`act_url`, day) pair, skipping pairs without an `act_url`: `POST /events` the new event's pair; `PUT /events/:id` both the stored pair (read before the update) and the new one; `POST /events/:id/act` the attached band with the event's day; `DELETE /events/:id` and the `delete` / `apply_proposal` actions of `POST /admin/conflicts/:id/resolve` (section 7.16.3) the stored pair, after deleting the event and calling `purgeConflictLinks` (in that order). The reference implementation shares this step as `reevaluateAfterWrite` (`conflict-writes.ts`). When the reconcile returns `created`, the worker calls `notifyConflict(env, created)` (`alerts.ts`; currently a no-op); a failure there is logged and never fails the write. A failure of the reconcile itself is also logged (with the `act_url` and day) and never fails the write: the client gets the normal success status, the remaining pairs are still reconciled, and the conflict state of that band-day is corrected by the next write that touches it.
 
 ### 5.6 Environment Variables and Secrets
 
@@ -1410,6 +1417,52 @@ Runs from the `0 8 * * *` cron (section 8.3). Does nothing when `TELEGRAM_BOT_TO
 - Bands are in alphabetical order, shows within a band by start time. Show dates are `Ddd D Mon` (weekday, day, month), with the year when it is not the current year and the `HH:MM` time when it is not midnight. A show whose `end_time` is on a later day than its `start_time` (a festival appearance with an unknown exact day) is shown as a range with the same format as edition ranges instead of a single date. Edition ranges are `18 Jun 2027`, `18–21 Jun 2027`, `30 Jun – 2 Jul 2027` or `30 Dec 2026 – 2 Jan 2027`.
 - A message has at most 25 item lines (`MAX_DIGEST_LINES`) and about 3800 visible characters (`MAX_DIGEST_CHARS`; Telegram allows 4096). Items past either limit are counted in a `…and N more` line before the links.
 - The links line is omitted when `PUBLIC_WEB_URL` is not set; "All shows" appears only when the message has shows, "Festivals" only when it has editions.
+
+### 7.16 Conflicts: Crawler Proposals and Admin Resolution
+
+Conflicts (section 2.1) hide the events of a band that appear at two places on one day until a person decides. The crawler can propose which listing is wrong; the admin lists the conflicts and resolves them. The admin endpoints are not listed in `GET /`.
+
+#### 7.16.1 POST /conflicts/proposals (Propose Deleting a Held Event)
+
+**Request:** `{ "pubkey": "<64 hex>", "event_id": "<id>", "reason": "<text>", "signature": "<128 hex>" }`, signature as in section 3.7. Public CORS like the other event endpoints.
+
+**Check order:**
+
+1. Body: JSON object (`400 Invalid JSON` / `Invalid body`); `pubkey` 64 hex and `signature` 128 hex (`400 Missing or malformed pubkey or signature`); `event_id` a non-empty string of at most 128 characters; `reason` a string of 1-200 characters, not blank (`400`)
+2. `pubkey` in the `blocklist` → `403 {"error": "Forbidden"}`
+3. `pubkey` not in `ALLOWED_PUBKEYS` (trimmed, case-insensitive) → `403 {"error": "Forbidden", "message": "Public key not in allowlist"}`. Unlike publishing, an unset allowlist accepts no proposals.
+4. Signature → `401 {"error": "Invalid signature"}`
+5. The event must exist, have `held = 1` and be linked to an `open` conflict, otherwise `409 {"error": "Event is not in an open conflict"}`
+
+**Effect:** records a `delete` proposal (`conflict_proposals`, `action = 'delete'`) for the event in its open conflict. `UNIQUE (event_id, action)` makes it idempotent: the first call answers `201`, a repeat answers `200` with the existing proposal (its `reason` and `created_at` unchanged; if it was recorded under an earlier conflict of the same event, its `conflict_id` moves to the open one). Response body: `{ id, conflict_id, event_id, action, reason, created_at }`. Deleting the event removes its proposals (`purgeConflictLinks`).
+
+#### 7.16.2 GET /admin/conflicts (List Conflicts)
+
+**Request:** `GET /admin/conflicts?status=<open|kept|resolved>` (default `open`; any other value → `400 Invalid status`), signed with domain `admin-read` over the path and query string as sent (section 3.6).
+
+**Response (200 OK):** conflicts of that status ordered by day, then id:
+
+```json
+{ "conflicts": [ {
+  "id": 1, "act_url": "https://band.example", "act_name": "The Band",
+  "day": "2030-06-18", "status": "open",
+  "created_at": "2026-10-28T10:00:00", "resolved_at": null,
+  "events": [ { "id": "...", "title": "...", "held": 1, "tags": ["rock"], "...": "every events column" } ],
+  "proposals": [ { "id": 3, "event_id": "...", "action": "delete", "reason": "...", "created_at": "..." } ]
+} ] }
+```
+
+`events` are the full rows of the linked events that still exist, held ones included, with `tags` parsed (ordered by `start_time`, then id); `act_name` is the first non-empty one among them (`null` if none). `proposals` are those recorded for the conflict.
+
+#### 7.16.3 POST /admin/conflicts/:id/resolve (Resolve a Conflict)
+
+**Request:** signed with domain `admin-conflict-resolve` over the raw body (section 3.6; the body limits and check order of that section apply). Body, one of:
+
+- `{ "action": "keep_both" }`: both listings are right. The conflict becomes `kept` (`resolved_at` = now) and its events are released as in the reconcile (`held = 0`; those that were held and start after the current UTC date get `alert_pending = 1`; an event linked to another open conflict stays held). A later reconcile of the same event set leaves a kept conflict alone. Response `{ "ok": true }`.
+- `{ "action": "delete", "event_id": "<id>" }`: delete that event (the admin needs no ownership), then as `DELETE /events/:id`: `purgeConflictLinks`, then the reconcile of the event's band-day (which resolves the conflict and releases the survivor when one place remains) and `notifyConflict` if it creates one; a failure of either is logged and never fails the request. Response `{ "ok": true, "deleted": "<id>" }`.
+- `{ "action": "apply_proposal", "proposal_id": <integer> }`: as `delete`, for the proposal's event.
+
+**Errors:** `404 {"error": "Conflict not found"}` for an unknown or non-numeric `:id`; `404 {"error": "Proposal not found"}`; `400` for invalid JSON, an unknown `action`, a missing `event_id` / non-integer `proposal_id`, a conflict that is not `open` (`Conflict is not open`), or an event that is not linked to this conflict (`Event is not part of this conflict`, also for a proposal of another conflict); `401` / `403` / `503` as the other admin endpoints.
 
 ---
 

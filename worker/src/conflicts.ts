@@ -89,7 +89,7 @@ export async function purgeConflictLinks(
 interface Row extends ConflictEvent, ConflictEventRow {}
 
 /** Release events (held = 0); future ones that were held get alert_pending = 1. */
-function releaseStatements(
+export function releaseStatements(
   env: Pick<Env, 'DB'>,
   ids: string[],
   conflictId: number

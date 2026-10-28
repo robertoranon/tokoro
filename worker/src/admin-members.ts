@@ -14,7 +14,7 @@ const MAX_REASON = 200;
 const MAX_IDS = 200;
 
 /** Ok when the request is signed by ADMIN_PUBKEY; otherwise the error Response. */
-async function authAdmin(
+export async function authAdmin(
   request: Request,
   env: Env,
   domain: string,
@@ -36,7 +36,7 @@ async function authAdmin(
  * as requested (e.g. `/admin/suggestions?detail=1`), so a captured signature
  * cannot be replayed with a different query.
  */
-function readPayload(request: Request): string {
+export function readPayload(request: Request): string {
   const url = new URL(request.url);
   return url.pathname + url.search;
 }
@@ -45,7 +45,7 @@ function readPayload(request: Request): string {
  * The body of a signed admin request: 503 when the admin is not configured,
  * then the checks of readSignedBody (413 / 401 / 413) before reading it.
  */
-async function readAdminBody(
+export async function readAdminBody(
   request: Request,
   env: Env
 ): Promise<string | Response> {
@@ -55,7 +55,7 @@ async function readAdminBody(
   return readSignedBody(request);
 }
 
-function parseJson(raw: string): any | null {
+export function parseJson(raw: string): any | null {
   try {
     const v = JSON.parse(raw);
     return v && typeof v === 'object' && !Array.isArray(v) ? v : null;

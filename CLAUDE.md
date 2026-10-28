@@ -36,6 +36,7 @@ API Endpoints:
 - `PUT /events/:id` - Edit own event (new signature required)
 - `DELETE /events/:id` - Delete own event (signature required)
 - `POST /events/:id/act` - Attach a band (`act_name`, `act_url`) to an existing event that has none (signed by an allowlisted key)
+- `POST /conflicts/proposals` - Propose deleting a held event of an open conflict (same band, two places, one day; signed by an allowlisted key)
 
 **Stars** (Event Interactions)
 
@@ -68,6 +69,8 @@ API Endpoints:
 - `GET /admin/suggestions?status=&detail=1` - Suggestions grouped by band name (admin)
 - `POST /admin/suggestions/reject|link` - Reject, or link to a tracked band (admin)
 - `GET /admin/band-followers` - Follower count per band (admin)
+- `GET /admin/conflicts?status=` - Conflicts with their events (held included) and proposals (admin)
+- `POST /admin/conflicts/:id/resolve` - `keep_both`, `delete` an event, or `apply_proposal` (admin)
 
 ### Data Model
 
