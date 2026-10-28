@@ -103,3 +103,6 @@ crawler/bands.yaml
 crawler/scout-sources.yaml
 crawler/candidates.yaml
 crawler/scout-state.json
+
+# Production database exports from scripts/backup-local.sh (contain member keys)
+backup-*.sql
