@@ -1964,6 +1964,43 @@ sources:
         puts[0].end_time === undefined,
       'the PUT body has no end_time, so the stored one is cleared'
     );
+
+    // A single-day draft on the range's FIRST day (same start_time) still
+    // clears the range.
+    // Same coordinates as the stored range so only the end_time can differ.
+    const here = { ...draft, lat: range.lat, lng: range.lng };
+    const firstDay = { ...here, start_time: range.start_time };
+    assert(
+      differs(range, firstDay),
+      "a single-day draft on the range's first day differs (clears the range)"
+    );
+    puts.length = 0;
+    assert(
+      (await pubR.apply(firstDay, range)) === 'updated' &&
+        puts.length === 1 &&
+        puts[0].start_time === range.start_time &&
+        !('end_time' in puts[0]),
+      'the first-day PUT body has no end_time, so the range is cleared'
+    );
+    assert(
+      differs(range, { ...here, start_time: '2027-06-19T00:00:00' }),
+      'a single-day draft on a middle day still differs'
+    );
+    assert(
+      !differs(range, { ...firstDay, end_time: range.end_time }),
+      'a draft that is the same range does not differ'
+    );
+    assert(
+      !differs(
+        {
+          ...range,
+          start_time: '2027-06-18T21:00:00',
+          end_time: '2027-06-18T23:00:00',
+        },
+        { ...here, start_time: '2027-06-18T21:00:00' }
+      ),
+      'a same-day stored end_time is still never erased by a draft without one'
+    );
   }
 
   console.log(

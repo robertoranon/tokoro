@@ -119,18 +119,23 @@ export function matchShow(
 
 /**
  * True only for changes that matter: start/end time, a real move (coordinates),
- * or filling a previously empty description or url. A known end_time is never
- * erased by a run that did not find one. When a PUT happens the whole event is
- * sent, so all fields are refreshed.
+ * or filling a previously empty description or url. A known same-day end_time
+ * is never erased by a run that did not find one, but a stored range (end on a
+ * later day than the start) is cleared by a single-day draft (no end_time).
+ * When a PUT happens the whole event is sent, so all fields are refreshed.
  */
 export function differs(
   existing: ExistingShow,
   next: NormalizedEvent
 ): boolean {
+  const storedEnd = text(existing.end_time);
+  const isRange =
+    storedEnd !== '' &&
+    storedEnd.slice(0, 10) > existing.start_time.slice(0, 10);
   return (
     existing.start_time !== next.start_time ||
-    (text(next.end_time) !== '' &&
-      text(existing.end_time) !== text(next.end_time)) ||
+    (text(next.end_time) !== '' && storedEnd !== text(next.end_time)) ||
+    (text(next.end_time) === '' && isRange) ||
     Math.abs(existing.lat - next.lat) > COORD_TOLERANCE ||
     Math.abs(existing.lng - next.lng) > COORD_TOLERANCE ||
     (text(existing.description) === '' && text(next.description) !== '') ||
