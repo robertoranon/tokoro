@@ -147,6 +147,29 @@ describe('digestFor', () => {
 });
 
 describe('formatDigest', () => {
+  it('a range show in the digest uses fmtDayRange', () => {
+    const text = formatDigest(
+      [
+        ev({
+          act_name: 'A',
+          act_url: 'https://a.example',
+          start_time: '2027-06-18T00:00:00',
+          end_time: '2027-06-20T00:00:00',
+        }),
+        ev({
+          act_name: 'B',
+          act_url: 'https://b.example',
+          start_time: '2027-06-18T00:00:00',
+          end_time: '2027-06-18T23:00:00',
+        }),
+      ],
+      [],
+      { year: 2027 }
+    );
+    expect(text).toContain('18–20 Jun 2027');
+    expect(text).toContain('Fri 18 Jun');
+    expect(text).not.toContain('Fri 18 Jun –');
+  });
   it('escapes dates and edition ranges', () => {
     const text = formatDigest(
       [

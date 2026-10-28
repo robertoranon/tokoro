@@ -238,6 +238,26 @@ const ev = over => ({
 
 // ── formatting ───────────────────────────────────────────────────────────────
 {
+  const r = e => toShow(ev({ start_time: '2030-06-18T00:00:00', ...e }));
+  assert.equal(r({ end_time: '2030-06-20T00:00:00' }).end, '2030-06-20');
+  assert.equal(r({ end_time: '2030-06-18T23:00:00' }).end, '');
+  assert.equal(r({ end_time: '2030-06-17T00:00:00' }).end, '');
+  assert.equal(r({ end_time: null }).end, '');
+  assert.equal(r({}).end, '');
+  assert.equal(fmtShowDate('2030-06-18', '', TODAY, '2030-06-20'), '18–20 Jun');
+  assert.equal(fmtShowDate('2030-06-30', '', TODAY, '2030-07-02'), '30 Jun – 2 Jul');
+  assert.equal(fmtShowDate('2031-06-18', '', TODAY, '2031-06-20'), '18–20 Jun 2031');
+  assert.equal(
+    fmtShowDate('2030-12-30', '', TODAY, '2031-01-02'),
+    '30 Dec 2030 – 2 Jan 2031'
+  );
+  assert.equal(fmtShowDate('2030-11-12', '', TODAY, ''), 'Tue 12 Nov');
+  assert.equal(fmtShowDate('2030-11-12', '', TODAY, '2030-11-12'), 'Tue 12 Nov');
+  assert.equal(fmtShowDate('2030-11-12', '', TODAY, '2030-11-10'), 'Tue 12 Nov');
+  console.log('✅ show date ranges: 18–20 Jun, 30 Jun – 2 Jul; bad end ignored');
+}
+
+{
   assert.equal(fmtShowDate('2030-11-12', '', TODAY), 'Tue 12 Nov');
   assert.equal(fmtShowDate('2030-11-12', '21:00', TODAY), 'Tue 12 Nov, 21:00');
   assert.equal(fmtShowDate('2031-01-02', '', TODAY), 'Thu 2 Jan 2031');

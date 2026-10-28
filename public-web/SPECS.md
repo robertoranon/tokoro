@@ -284,6 +284,7 @@ A band-first browse page for the shows published by the crawler's `npm run tours
 **FR-8.3: Band cards**
 
 - MUST render one collapsed `<details>` card per band; the summary shows the band name, the number of upcoming shows and "Next: Tue 12 Nov, 21:00" (year added only if not the current one; time omitted when the start is midnight)
+- MUST show a show whose `end_time` falls on a later day than its `start_time` (a festival appearance with an unknown exact day) as a day range without weekday or time, using the wording of the digest: "18–20 Jun" (same month), "30 Jun – 2 Jul" (month change), year added only if not the current one ("30 Dec 2030 – 2 Jan 2031" across years). An `end_time` on the same or an earlier day is ignored; the show object carries `end` (`YYYY-MM-DD`, empty when not a range)
 - MUST show in the body every show (weekday, date, time when not midnight, venue and address joined with " · ", a "Show page" link when the event has a URL, and the distance when an area origin is set) and a "Band website" link; the API has no city field, so the address stands in for it
 - MUST keep open cards open when filters change or the list re-renders
 

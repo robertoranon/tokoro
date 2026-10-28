@@ -194,7 +194,11 @@ export function formatDigest(
         const place = clip(
           [e.venue_name, e.address].filter(Boolean).join(', ')
         );
-        const date = esc(fmtAlertDate(e.start_time, opts.year));
+        const date = esc(
+          e.end_time && e.end_time.slice(0, 10) > e.start_time.slice(0, 10)
+            ? fmtDayRange(e.start_time, e.end_time)
+            : fmtAlertDate(e.start_time, opts.year)
+        );
         const a = link(e.url, 'page');
         const cost =
           2 +

@@ -89,6 +89,11 @@ function toShow(e) {
     title: e.title || '',
     url: e.url || null,
     start: e.start_time.slice(0, 10),
+    // Last day of a festival appearance whose exact day is unknown; '' for a single day.
+    end:
+      e.end_time && e.end_time.slice(0, 10) > e.start_time.slice(0, 10)
+        ? e.end_time.slice(0, 10)
+        : '',
     time,
     venue: e.venue_name || '',
     address: e.address || '',
@@ -269,8 +274,32 @@ function fmtNewBadge(count) {
 }
 
 /** "Tue 12 Nov", "Tue 12 Nov, 21:00"; a year is added when it is not the current one. */
-function fmtShowDate(start, time, todayYmd) {
+function fmtShowDate(start, time, todayYmd, end) {
   const [y, m, d] = start.split('-').map(Number);
+  if (end && end > start) {
+    // Range wording mirrors the worker's fmtDayRange (18–20 Jun, 30 Jun – 2 Jul).
+    const [y2, m2, d2] = end.split('-').map(Number);
+    const ys = y !== Number(todayYmd.slice(0, 4)) ? ' ' + y : '';
+    if (y === y2 && m === m2)
+      return d + '–' + d2 + ' ' + MONTH_ABBR[m - 1] + ys;
+    if (y === y2)
+      return (
+        d + ' ' + MONTH_ABBR[m - 1] + ' – ' + d2 + ' ' + MONTH_ABBR[m2 - 1] + ys
+      );
+    return (
+      d +
+      ' ' +
+      MONTH_ABBR[m - 1] +
+      ' ' +
+      y +
+      ' – ' +
+      d2 +
+      ' ' +
+      MONTH_ABBR[m2 - 1] +
+      ' ' +
+      y2
+    );
+  }
   const weekday = WEEKDAY_ABBR[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
   const thisYear = Number(todayYmd.slice(0, 4));
   const year = y !== thisYear ? ' ' + y : '';
@@ -286,7 +315,10 @@ function fmtShowDate(start, time, todayYmd) {
 }
 
 function fmtNext(band, todayYmd) {
-  return 'Next: ' + fmtShowDate(band.next.start, band.next.time, todayYmd);
+  return (
+    'Next: ' +
+    fmtShowDate(band.next.start, band.next.time, todayYmd, band.next.end)
+  );
 }
 
 /** One map pin per distinct location: [{ lat, lng, items }] in first-seen order. */

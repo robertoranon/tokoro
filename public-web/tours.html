@@ -721,7 +721,7 @@
           return (
             '<li class="band-show">' +
             '<div class="band-show__date">' +
-            escHtml(T.fmtShowDate(s.start, s.time, today)) +
+            escHtml(T.fmtShowDate(s.start, s.time, today, s.end)) +
             (T.isNewShow(s, Date.now())
               ? '<span class="band-show__new">new</span>'
               : '') +
@@ -924,7 +924,7 @@
                   '<div class="pin-popup__item"><strong>' +
                   escHtml(s.bandName) +
                   '</strong><div>' +
-                  escHtml(T.fmtShowDate(s.start, s.time, today)) +
+                  escHtml(T.fmtShowDate(s.start, s.time, today, s.end)) +
                   '</div><div>' +
                   escHtml([s.venue, s.address].filter(Boolean).join(' · ')) +
                   '</div></div>'

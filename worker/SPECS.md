@@ -1373,7 +1373,7 @@ Runs from the `0 8 * * *` cron (section 8.3). Does nothing when `TELEGRAM_BOT_TO
 <a href="PUBLIC_WEB_URL/tours.html">All shows</a> · <a href="PUBLIC_WEB_URL/festivals.html">Festivals</a>
 ```
 
-- Bands are in alphabetical order, shows within a band by start time. Show dates are `Ddd D Mon` (weekday, day, month), with the year when it is not the current year and the `HH:MM` time when it is not midnight. Edition ranges are `18 Jun 2027`, `18–21 Jun 2027`, `30 Jun – 2 Jul 2027` or `30 Dec 2026 – 2 Jan 2027`.
+- Bands are in alphabetical order, shows within a band by start time. Show dates are `Ddd D Mon` (weekday, day, month), with the year when it is not the current year and the `HH:MM` time when it is not midnight. A show whose `end_time` is on a later day than its `start_time` (a festival appearance with an unknown exact day) is shown as a range with the same format as edition ranges instead of a single date. Edition ranges are `18 Jun 2027`, `18–21 Jun 2027`, `30 Jun – 2 Jul 2027` or `30 Dec 2026 – 2 Jan 2027`.
 - A message has at most 25 item lines (`MAX_DIGEST_LINES`) and about 3800 visible characters (`MAX_DIGEST_CHARS`; Telegram allows 4096). Items past either limit are counted in a `…and N more` line before the links.
 - The links line is omitted when `PUBLIC_WEB_URL` is not set; "All shows" appears only when the message has shows, "Festivals" only when it has editions.
 
