@@ -16,7 +16,8 @@ import { CORS_HEADERS, jsonResponse } from './http';
 import { routeMemberRequest } from './members';
 import { routeTelegramRequest } from './telegram-link';
 import { routeAdminMemberRequest } from './admin-members';
-import { sendAlertDigests } from './alerts';
+import { sendAlertDigests, notifyConflict } from './alerts';
+import { reevaluateConflicts, purgeConflictLinks } from './conflicts';
 
 export interface Env {
   DB: D1Database;
@@ -481,6 +482,32 @@ export default {
     )
       .bind(cutoffStr, cutoffStr)
       .run();
+
+    // 1b. Drop conflict links of expired events; close conflicts left with < 2
+    await env.DB.batch([
+      env.DB.prepare(
+        'DELETE FROM conflict_events WHERE event_id NOT IN (SELECT id FROM events)'
+      ),
+      env.DB.prepare(
+        'DELETE FROM conflict_proposals WHERE event_id NOT IN (SELECT id FROM events)'
+      ),
+      env.DB.prepare(
+        `UPDATE conflicts SET status = 'resolved', resolved_at = ?
+         WHERE status IN ('open', 'kept')
+           AND (SELECT COUNT(*) FROM conflict_events ce
+                WHERE ce.conflict_id = conflicts.id) < 2`
+      ).bind(formatLocalDateTime(new Date())),
+      // release events no open conflict holds any more (as reevaluateConflicts does)
+      env.DB.prepare(
+        `UPDATE events SET
+           alert_pending = CASE WHEN substr(start_time,1,10) > ?
+                                THEN 1 ELSE alert_pending END,
+           held = 0
+         WHERE held = 1 AND NOT EXISTS (
+           SELECT 1 FROM conflict_events ce JOIN conflicts c ON c.id = ce.conflict_id
+           WHERE ce.event_id = events.id AND c.status = 'open')`
+      ).bind(new Date().toISOString().slice(0, 10)),
+    ]);
 
     // 2. Backup to R2 (if binding is configured)
     if (env.BACKUP_BUCKET) {
@@ -1009,14 +1036,11 @@ async function isBlocklisted(env: Env, pubkey: string): Promise<boolean> {
 }
 
 /**
- * The id of an existing event of the same band on the same local date, wherever
- * it is. A band plays one place a day, so two events with one `act_url` and
- * one date are one show, even when their coordinates disagree (a city
- * geocoded to two different points), which the proximity check cannot see.
- *
- * Two events that each name a different venue are not matched: a tour page
- * that lists Rock im Park and Rock am Ring on one date is reporting two places,
- * and only the person who reads the page can say which is right.
+ * The id of an existing event of the same band on the same local date that
+ * names the same venue (trimmed, case-insensitive): a true duplicate, wherever
+ * its coordinates landed. Any other same-band, same-day pair (different
+ * venues, or a venue missing on either side) is accepted and handled as a
+ * conflict by reevaluateConflicts.
  */
 export async function findSameActSameDay(
   db: D1Database,
@@ -1027,17 +1051,44 @@ export async function findSameActSameDay(
   const normalized = (actUrl ?? '').trim().replace(/\/$/, '');
   if (!normalized) return null;
   const venue = (venueName ?? '').trim().toLowerCase();
+  if (!venue) return null;
   const row = await db
     .prepare(
       `SELECT id FROM events
        WHERE RTRIM(act_url, '/') = ? AND substr(start_time, 1, 10) = ?
-         AND (? = '' OR TRIM(COALESCE(venue_name, '')) = ''
-              OR LOWER(TRIM(venue_name)) = ?)
+         AND LOWER(TRIM(venue_name)) = ?
        LIMIT 1`
     )
-    .bind(normalized, startTime.slice(0, 10), venue, venue)
+    .bind(normalized, startTime.slice(0, 10), venue)
     .first<{ id: string }>();
   return row?.id ?? null;
+}
+
+/**
+ * Re-check the conflict state of each (act_url, day) pair touched by a write
+ * and notify on a newly created conflict. A notification failure is logged and
+ * never fails the write. Pairs without an act_url are skipped.
+ */
+async function reevaluateAfterWrite(
+  env: Env,
+  pairs: { actUrl: string | null | undefined; startTime: string | null }[]
+): Promise<void> {
+  const seen = new Set<string>();
+  for (const p of pairs) {
+    if (!p.actUrl || !p.startTime) continue;
+    const day = p.startTime.slice(0, 10);
+    const key = `${p.actUrl.replace(/\/+$/, '')}|${day}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const { created } = await reevaluateConflicts(env, p.actUrl, day);
+    if (created) {
+      try {
+        await notifyConflict(env, created);
+      } catch (err) {
+        console.error('notifyConflict failed:', err);
+      }
+    }
+  }
 }
 
 async function handlePostEvent(request: Request, env: Env): Promise<Response> {
@@ -1233,6 +1284,10 @@ async function handlePostEvent(request: Request, env: Env): Promise<Response> {
     )
     .run();
 
+  await reevaluateAfterWrite(env, [
+    { actUrl: event.act_url, startTime: event.start_time },
+  ]);
+
   return jsonResponse(
     { id: eventId, message: 'Event created successfully' },
     201
@@ -1247,10 +1302,15 @@ async function handlePutEvent(
   const event: Event = await request.json();
 
   const existing = await env.DB.prepare(
-    'SELECT pubkey, created_at FROM events WHERE id = ?'
+    'SELECT pubkey, created_at, act_url, start_time FROM events WHERE id = ?'
   )
     .bind(eventId)
-    .first<{ pubkey: string; created_at: string }>();
+    .first<{
+      pubkey: string;
+      created_at: string;
+      act_url: string | null;
+      start_time: string;
+    }>();
 
   if (!existing) {
     return jsonResponse({ error: 'Event not found' }, 404);
@@ -1322,6 +1382,12 @@ async function handlePutEvent(
     )
     .run();
 
+  // both the band-day the event left and the one it moved to
+  await reevaluateAfterWrite(env, [
+    { actUrl: existing.act_url, startTime: existing.start_time },
+    { actUrl: event.act_url, startTime: event.start_time },
+  ]);
+
   return jsonResponse({ id: eventId, message: 'Event updated successfully' });
 }
 
@@ -1371,10 +1437,10 @@ async function handleAdoptAct(
   }
 
   const existing = await env.DB.prepare(
-    'SELECT act_url FROM events WHERE id = ?'
+    'SELECT act_url, start_time FROM events WHERE id = ?'
   )
     .bind(eventId)
-    .first<{ act_url: string | null }>();
+    .first<{ act_url: string | null; start_time: string }>();
   if (!existing) return jsonResponse({ error: 'Event not found' }, 404);
 
   const decision = decideAdopt(existing.act_url, v.actUrl);
@@ -1390,6 +1456,9 @@ async function handleAdoptAct(
   )
     .bind(v.actName, v.actUrl, eventId)
     .run();
+  await reevaluateAfterWrite(env, [
+    { actUrl: v.actUrl, startTime: existing.start_time },
+  ]);
   return jsonResponse({ id: eventId, adopted: true });
 }
 
@@ -1419,9 +1488,11 @@ async function handleDeleteEvent(
   }
 
   // Check if event exists and belongs to this pubkey
-  const event = await env.DB.prepare('SELECT pubkey FROM events WHERE id = ?')
+  const event = await env.DB.prepare(
+    'SELECT pubkey, act_url, start_time FROM events WHERE id = ?'
+  )
     .bind(eventId)
-    .first();
+    .first<{ pubkey: string; act_url: string | null; start_time: string }>();
 
   if (!event) {
     return jsonResponse({ error: 'Event not found' }, 404);
@@ -1432,8 +1503,12 @@ async function handleDeleteEvent(
     return jsonResponse({ error: 'Unauthorized' }, 403);
   }
 
-  // Delete the event
+  // Delete the event, then its conflict links, then re-check its band-day
   await env.DB.prepare('DELETE FROM events WHERE id = ?').bind(eventId).run();
+  await purgeConflictLinks(env, eventId);
+  await reevaluateAfterWrite(env, [
+    { actUrl: event.act_url, startTime: event.start_time },
+  ]);
 
   return jsonResponse({ message: 'Event deleted successfully' });
 }

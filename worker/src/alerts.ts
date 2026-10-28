@@ -3,6 +3,7 @@
 // worker/SPECS.md (Telegram alerts).
 
 import type { Env } from './index';
+import type { ConflictEventRow } from './conflicts';
 import { nowIso } from './members';
 
 export interface AlertEvent {
@@ -420,3 +421,13 @@ export async function sendAlertDigests(
     .run();
   return { sent, cleared };
 }
+
+/**
+ * Tell the admin that a band-day turned into a conflict (worker/SPECS.md
+ * 5.5.1). A no-op for now; the admin notice fills it in later.
+ */
+export async function notifyConflict(
+  _env: Env,
+  _c: { actName: string | null; day: string; events: ConflictEventRow[] },
+  _opts?: { fetchFn?: typeof fetch }
+): Promise<void> {}

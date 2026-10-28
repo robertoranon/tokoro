@@ -582,7 +582,9 @@ Then apply `are_events_similar()` to each result.
 
 ### 5.5.1 Same Band, Same Date
 
-Before the proximity check above, a new event with an `act_url` is compared with the existing events of that band: if any event has the same `act_url` (compared without a trailing `/`) and the same local date (the first 10 characters of `start_time`), the new event is rejected with the same 409 response (`message`: "This band already has an event on that date", `existing_event_id`: that event). Distance and time of day are ignored, but two events that each name a venue and name different ones (compared trimmed and case-insensitively) are not matched: a tour page listing Rock im Park and Rock am Ring on one date reports two places, and a person must decide which is right. A band plays one place a day, and the proximity check cannot see a duplicate whose coordinates disagree (the same city geocoded to two points 5 to 40 km apart). The crawler treats this 409 like any other: it attaches the band to the existing event if it has none, and otherwise leaves it alone. Events without an `act_url` are not affected.
+Before the proximity check above, a new event with an `act_url` and a non-empty `venue_name` is compared with the existing events of that band: if any event has the same `act_url` (compared without a trailing `/`), the same local date (the first 10 characters of `start_time`) and the same venue name (compared trimmed and case-insensitively), the new event is rejected with the same 409 response (`message`: "This band already has an event on that date", `existing_event_id`: that event). Distance and time of day are ignored: the proximity check cannot see a duplicate whose coordinates disagree (the same venue geocoded to two points). Every other same-band, same-day pair (different venue names, or a venue name missing on either side) is accepted and becomes a conflict (below), because a band plays one place a day and only a person can decide which listing is right. The crawler treats this 409 like any other: it attaches the band to the existing event if it has none, and otherwise leaves it alone. Events without an `act_url` are not affected.
+
+**Conflict detection on writes.** After every successful write the worker runs the reconcile of section 2.1 (`reevaluateConflicts`) for each affected (`act_url`, day) pair, skipping pairs without an `act_url`: `POST /events` the new event's pair; `PUT /events/:id` both the stored pair (read before the update) and the new one; `POST /events/:id/act` the attached band with the event's day; `DELETE /events/:id` the stored pair, after deleting the event and calling `purgeConflictLinks` (in that order). When the reconcile returns `created`, the worker calls `notifyConflict(env, created)` (`alerts.ts`; currently a no-op); a failure there is logged and never fails the write.
 
 ### 5.6 Environment Variables and Secrets
 
@@ -1431,6 +1433,8 @@ WHERE (end_time IS NOT NULL AND end_time < ?)
 Where both `?` bind to the cutoff ISO 8601 string (e.g. `"2026-04-08T02:00:00"`).
 
 The 2-day grace period ensures events that have just ended remain visible briefly after their conclusion.
+
+After the delete, one batch cleans the conflict tables (section 2.1): it deletes `conflict_events` and `conflict_proposals` rows whose `event_id` no longer exists in `events`, marks `resolved` (with `resolved_at` = now) every `open` or `kept` conflict left with fewer than two linked events, and releases (`held = 0`) every held event that no `open` conflict links any more, setting `alert_pending = 1` on those starting after the current UTC date.
 
 ### 8.2 Daily Database Backup
 

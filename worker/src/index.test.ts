@@ -22,6 +22,14 @@ import {
 } from './index';
 import worker from './index';
 import { makeD1, ALL_MIGRATIONS } from '../test-support/d1';
+import { makeKey, toHex, type TestKey } from '../test-support/sign';
+import * as ed from '@noble/ed25519';
+import { notifyConflict } from './alerts';
+
+vi.mock('./alerts', async importOriginal => ({
+  ...(await importOriginal<typeof import('./alerts')>()),
+  notifyConflict: vi.fn(async () => {}),
+}));
 
 import { verifyActSignature, actMessage } from './crypto';
 import { isDuplicate } from '../../shared/llm/duplicate-check';
@@ -1051,24 +1059,38 @@ describe('findSameActSameDay', () => {
 
   it("finds the band's show of that day wherever it is", async () => {
     const DB = makeD1(ALL_MIGRATIONS);
-    await insert(DB, 'e1', 'https://band.example/en', '2027-06-03T00:00:00');
+    await insert(
+      DB,
+      'e1',
+      'https://band.example/en',
+      '2027-06-03T00:00:00',
+      'Vicar Street'
+    );
     expect(
       await findSameActSameDay(
         DB,
         'https://band.example/en',
-        '2027-06-03T00:00:00'
+        '2027-06-03T00:00:00',
+        'Vicar Street'
       )
     ).toBe('e1');
   });
 
   it('ignores the time of day and a trailing slash', async () => {
     const DB = makeD1(ALL_MIGRATIONS);
-    await insert(DB, 'e1', 'https://band.example/en/', '2027-06-03T21:00:00');
+    await insert(
+      DB,
+      'e1',
+      'https://band.example/en/',
+      '2027-06-03T21:00:00',
+      'Vicar Street'
+    );
     expect(
       await findSameActSameDay(
         DB,
         'https://band.example/en',
-        '2027-06-03T00:00:00'
+        '2027-06-03T00:00:00',
+        'Vicar Street'
       )
     ).toBe('e1');
   });
@@ -1115,7 +1137,7 @@ describe('findSameActSameDay', () => {
     ).toBeNull();
   });
 
-  it('matches the same venue (case-insensitive) and a missing venue on either side', async () => {
+  it('matches the same named venue (trimmed, case-insensitive)', async () => {
     const DB = makeD1(ALL_MIGRATIONS);
     await insert(
       DB,
@@ -1132,13 +1154,24 @@ describe('findSameActSameDay', () => {
         ' rock IM park '
       )
     ).toBe('named');
+  });
+
+  it('does not match when either side lacks a venue (that is a conflict)', async () => {
+    const DB = makeD1(ALL_MIGRATIONS);
+    await insert(
+      DB,
+      'named',
+      'https://band.example',
+      '2027-06-04T00:00:00',
+      'Rock im Park'
+    );
     expect(
       await findSameActSameDay(
         DB,
         'https://band.example',
         '2027-06-04T00:00:00'
       )
-    ).toBe('named');
+    ).toBeNull();
     await insert(DB, 'blank', 'https://other.example', '2027-06-04T00:00:00');
     expect(
       await findSameActSameDay(
@@ -1147,6 +1180,370 @@ describe('findSameActSameDay', () => {
         '2027-06-04T00:00:00',
         'Anywhere'
       )
-    ).toBe('blank');
+    ).toBeNull();
+    expect(
+      await findSameActSameDay(
+        DB,
+        'https://other.example',
+        '2027-06-04T00:00:00'
+      )
+    ).toBeNull();
+  });
+});
+
+describe('conflicts on event writes', () => {
+  const BAND = 'https://band.example';
+  const CREATED = '2026-10-28T00:00:00';
+
+  async function sha256Hex(s: string): Promise<string> {
+    const buf = await crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(s)
+    );
+    return toHex(new Uint8Array(buf));
+  }
+  const hexBytes = (h: string) =>
+    new Uint8Array(h.match(/.{2}/g)!.map(x => parseInt(x, 16)));
+
+  /** An event signed exactly as verifyEventSignature expects. */
+  async function signed(key: TestKey, f: Record<string, any>) {
+    const e: Record<string, any> = {
+      pubkey: key.pubkey,
+      category: 'music',
+      created_at: CREATED,
+      act_name: 'Band',
+      act_url: BAND,
+      ...f,
+    };
+    const data = {
+      pubkey: e.pubkey,
+      title: e.title,
+      description: e.description || '',
+      url: e.url || '',
+      venue_name: e.venue_name || '',
+      address: e.address || '',
+      lat: e.lat,
+      lng: e.lng,
+      start_time: e.start_time,
+      end_time: e.end_time,
+      category: e.category,
+      tags: e.tags || [],
+      created_at: e.created_at,
+    };
+    const msg = hexBytes(await sha256Hex(JSON.stringify(data)));
+    e.signature = toHex(await ed.signAsync(msg, key.priv));
+    return e;
+  }
+
+  const call = (DB: D1Database, method: string, path: string, body: unknown) =>
+    worker.fetch(
+      new Request(`https://w.test${path}`, {
+        method,
+        body: JSON.stringify(body),
+      }),
+      { DB } as any
+    );
+
+  const dublin = {
+    title: 'Band live in Dublin',
+    lat: 53.35,
+    lng: -6.26,
+    start_time: '2030-06-18T20:00:00',
+  };
+  const cork = {
+    title: 'Band live in Cork',
+    lat: 51.9,
+    lng: -8.47,
+    start_time: '2030-06-18T20:00:00',
+  };
+
+  const held = async (DB: D1Database, id: string) =>
+    (
+      (await DB.prepare('SELECT held FROM events WHERE id = ?')
+        .bind(id)
+        .first()) as any
+    ).held;
+  const conflictsOf = async (DB: D1Database) =>
+    (
+      await DB.prepare(
+        'SELECT id, status, act_url, day FROM conflicts ORDER BY id'
+      ).all()
+    ).results as any[];
+
+  async function postBoth(DB: D1Database, key: TestKey) {
+    const r1 = await call(DB, 'POST', '/events', await signed(key, dublin));
+    const r2 = await call(DB, 'POST', '/events', await signed(key, cork));
+    expect(r1.status).toBe(201);
+    expect(r2.status).toBe(201);
+    return {
+      d: ((await r1.json()) as any).id as string,
+      c: ((await r2.json()) as any).id as string,
+    };
+  }
+
+  it('POST of two venue-less same-day shows at two places holds both and notifies once', async () => {
+    vi.mocked(notifyConflict).mockClear();
+    const DB = makeD1();
+    const key = await makeKey();
+    const { d, c } = await postBoth(DB, key);
+    expect(await held(DB, d)).toBe(1);
+    expect(await held(DB, c)).toBe(1);
+    const cs = await conflictsOf(DB);
+    expect(cs).toHaveLength(1);
+    expect(cs[0]).toMatchObject({
+      status: 'open',
+      act_url: BAND,
+      day: '2030-06-18',
+    });
+    expect(notifyConflict).toHaveBeenCalledTimes(1);
+    const arg = vi.mocked(notifyConflict).mock.calls[0][1];
+    expect(arg.day).toBe('2030-06-18');
+    expect(arg.actName).toBe('Band');
+    expect(arg.events.map(e => e.id).sort()).toEqual([d, c].sort());
+
+    // a third show at a third place joins the open conflict, no new notice
+    const r3 = await call(
+      DB,
+      'POST',
+      '/events',
+      await signed(key, {
+        title: 'Band live in Galway',
+        lat: 53.27,
+        lng: -9.05,
+        start_time: '2030-06-18T21:00:00',
+      })
+    );
+    expect(r3.status).toBe(201);
+    expect(notifyConflict).toHaveBeenCalledTimes(1);
+    expect(await conflictsOf(DB)).toHaveLength(1);
+  });
+
+  it('a notification failure does not fail the write', async () => {
+    vi.mocked(notifyConflict).mockClear();
+    vi.mocked(notifyConflict).mockRejectedValueOnce(new Error('boom'));
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const DB = makeD1();
+      await postBoth(DB, await makeKey());
+      expect(notifyConflict).toHaveBeenCalledTimes(1);
+    } finally {
+      errSpy.mockRestore();
+    }
+  });
+
+  it('POST of the same band, day and named venue is still a 409', async () => {
+    const DB = makeD1();
+    const key = await makeKey();
+    const r1 = await call(
+      DB,
+      'POST',
+      '/events',
+      await signed(key, { ...dublin, venue_name: 'Vicar Street' })
+    );
+    expect(r1.status).toBe(201);
+    const r2 = await call(
+      DB,
+      'POST',
+      '/events',
+      await signed(key, { ...cork, venue_name: ' vicar street ' })
+    );
+    expect(r2.status).toBe(409);
+    expect(await conflictsOf(DB)).toHaveLength(0);
+  });
+
+  it('POST of an event without a band creates no conflict', async () => {
+    const DB = makeD1();
+    const key = await makeKey();
+    const r = await call(
+      DB,
+      'POST',
+      '/events',
+      await signed(key, { ...dublin, act_url: undefined, act_name: undefined })
+    );
+    expect(r.status).toBe(201);
+    expect(await conflictsOf(DB)).toHaveLength(0);
+  });
+
+  it('PUT moving Cork to the next day resolves the conflict and releases both', async () => {
+    const DB = makeD1();
+    const key = await makeKey();
+    const { d, c } = await postBoth(DB, key);
+    const res = await call(
+      DB,
+      'PUT',
+      `/events/${c}`,
+      await signed(key, { ...cork, start_time: '2030-06-19T20:00:00' })
+    );
+    expect(res.status).toBe(200);
+    expect((await conflictsOf(DB))[0].status).toBe('resolved');
+    expect(await held(DB, d)).toBe(0);
+    expect(await held(DB, c)).toBe(0);
+  });
+
+  it('PUT moving a show onto a busy day creates a conflict there', async () => {
+    vi.mocked(notifyConflict).mockClear();
+    const DB = makeD1();
+    const key = await makeKey();
+    await call(DB, 'POST', '/events', await signed(key, dublin));
+    const r = await call(
+      DB,
+      'POST',
+      '/events',
+      await signed(key, { ...cork, start_time: '2030-06-19T20:00:00' })
+    );
+    const c = ((await r.json()) as any).id;
+    expect(await conflictsOf(DB)).toHaveLength(0);
+    const res = await call(DB, 'PUT', `/events/${c}`, await signed(key, cork));
+    expect(res.status).toBe(200);
+    const cs = await conflictsOf(DB);
+    expect(cs).toHaveLength(1);
+    expect(cs[0]).toMatchObject({ status: 'open', day: '2030-06-18' });
+    expect(notifyConflict).toHaveBeenCalledTimes(1);
+  });
+
+  it("DELETE Cork releases Dublin and purges Cork's links", async () => {
+    const DB = makeD1();
+    const key = await makeKey();
+    const { d, c } = await postBoth(DB, key);
+    const cid = (await conflictsOf(DB))[0].id;
+    await DB.prepare(
+      `INSERT INTO conflict_proposals (conflict_id, event_id, action, reason, created_at)
+       VALUES (?, ?, 'delete', 'wrong city', 'x')`
+    )
+      .bind(cid, c)
+      .run();
+    const sig = await ed.signAsync(hexBytes(c), key.priv);
+    const res = await call(DB, 'DELETE', `/events/${c}`, {
+      pubkey: key.pubkey,
+      signature: toHex(sig),
+    });
+    expect(res.status).toBe(200);
+    expect(await held(DB, d)).toBe(0);
+    expect((await conflictsOf(DB))[0].status).toBe('resolved');
+    const links = (await DB.prepare(
+      'SELECT COUNT(*) AS n FROM conflict_events WHERE event_id = ?'
+    )
+      .bind(c)
+      .first()) as any;
+    const props = (await DB.prepare(
+      'SELECT COUNT(*) AS n FROM conflict_proposals WHERE event_id = ?'
+    )
+      .bind(c)
+      .first()) as any;
+    expect(links.n).toBe(0);
+    expect(props.n).toBe(0);
+  });
+
+  it('attaching a band that creates a clash opens a conflict', async () => {
+    vi.mocked(notifyConflict).mockClear();
+    const DB = makeD1();
+    const key = await makeKey();
+    const r1 = await call(DB, 'POST', '/events', await signed(key, dublin));
+    const d = ((await r1.json()) as any).id;
+    const r2 = await call(
+      DB,
+      'POST',
+      '/events',
+      await signed(key, { ...cork, act_url: undefined, act_name: undefined })
+    );
+    const c = ((await r2.json()) as any).id;
+    expect(await conflictsOf(DB)).toHaveLength(0);
+    const sig = await ed.signAsync(await actMessage(c, 'Band', BAND), key.priv);
+    const res = await call(DB, 'POST', `/events/${c}/act`, {
+      pubkey: key.pubkey,
+      signature: toHex(sig),
+      act_name: 'Band',
+      act_url: BAND,
+    });
+    expect(res.status).toBe(200);
+    const cs = await conflictsOf(DB);
+    expect(cs).toHaveLength(1);
+    expect(cs[0].status).toBe('open');
+    expect(await held(DB, d)).toBe(1);
+    expect(await held(DB, c)).toBe(1);
+    expect(notifyConflict).toHaveBeenCalledTimes(1);
+  });
+
+  it('the expiry cron removes orphan links and resolves conflicts left with one event', async () => {
+    const DB = makeD1();
+    const ins = (id: string, start: string) =>
+      DB.prepare(
+        `INSERT INTO events (id, pubkey, signature, title, lat, lng, geohash5, geohash6,
+           start_time, category, created_at, act_url, held)
+         VALUES (?, 'pk', 'sig', 'Show', 45, 13, 'u0000', 'u00000', ?, 'music', 'x', ?, 1)`
+      )
+        .bind(id, start, BAND)
+        .run();
+    await ins('old', '2000-01-01T20:00:00'); // expires
+    await ins('live', '2999-01-01T20:00:00');
+    await ins('live2', '2999-01-01T20:00:00');
+    await ins('live3', '2999-01-01T20:00:00');
+    const conf = (status: string) =>
+      DB.prepare(
+        `INSERT INTO conflicts (act_url, day, status, created_at) VALUES (?, ?, ?, 'x')`
+      )
+        .bind(BAND, '2000-01-01', status)
+        .run();
+    const c1 = Number((await conf('open')).meta.last_row_id); // old + live -> 1 left
+    const c2 = Number((await conf('kept')).meta.last_row_id); // old + live2 -> 1 left
+    const link = (cid: number, eid: string) =>
+      DB.prepare(
+        'INSERT INTO conflict_events (conflict_id, event_id) VALUES (?, ?)'
+      )
+        .bind(cid, eid)
+        .run();
+    await link(c1, 'old');
+    await link(c1, 'live');
+    await link(c2, 'old');
+    await link(c2, 'live2');
+    // a separate conflict that still has two events stays open
+    const c3 = Number(
+      (
+        await DB.prepare(
+          `INSERT INTO conflicts (act_url, day, status, created_at) VALUES (?, '2999-01-01', 'open', 'x')`
+        )
+          .bind(BAND)
+          .run()
+      ).meta.last_row_id
+    );
+    await link(c3, 'live2');
+    await link(c3, 'live3');
+    await DB.prepare(
+      `INSERT INTO conflict_proposals (conflict_id, event_id, action, reason, created_at)
+       VALUES (?, 'old', 'delete', 'r', 'x')`
+    )
+      .bind(c1)
+      .run();
+
+    await worker.scheduled({ cron: '0 2 * * *' } as any, { DB } as any);
+
+    const left = (
+      await DB.prepare(
+        'SELECT event_id FROM conflict_events ORDER BY conflict_id, event_id'
+      ).all()
+    ).results.map((r: any) => r.event_id);
+    expect(left).toEqual(['live', 'live2', 'live2', 'live3']);
+    const props = (await DB.prepare(
+      'SELECT COUNT(*) AS n FROM conflict_proposals'
+    ).first()) as any;
+    expect(props.n).toBe(0);
+    const st = (
+      await DB.prepare(
+        'SELECT id, status, resolved_at FROM conflicts ORDER BY id'
+      ).all()
+    ).results as any[];
+    expect(st[0].status).toBe('resolved');
+    expect(st[0].resolved_at).toBeTruthy();
+    expect(st[1].status).toBe('resolved');
+    expect(st[2].status).toBe('open');
+    expect(st[2].resolved_at).toBeNull();
+    const heldOf = async (id: string) =>
+      (
+        (await DB.prepare('SELECT held FROM events WHERE id = ?')
+          .bind(id)
+          .first()) as any
+      ).held;
+    expect(await heldOf('live')).toBe(0); // its conflict closed
+    expect(await heldOf('live3')).toBe(1); // still in an open conflict
   });
 });
