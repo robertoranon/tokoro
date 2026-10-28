@@ -33,3 +33,4 @@ CREATE TABLE conflict_proposals (
 CREATE INDEX idx_conflicts_act_day ON conflicts (act_url, day);
 CREATE INDEX idx_conflict_events_event ON conflict_events (event_id);
 CREATE INDEX idx_events_act_start ON events (act_url, start_time);
+CREATE UNIQUE INDEX idx_conflicts_open ON conflicts (act_url, day) WHERE status = 'open';

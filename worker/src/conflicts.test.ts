@@ -248,6 +248,93 @@ describe('reevaluateConflicts', () => {
     expect((await held(db, 'c')).held).toBe(1);
   });
 
+  it('concurrent reevaluations create exactly one open conflict', async () => {
+    const db = makeD1(ALL_MIGRATIONS);
+    const env = { DB: db } as any;
+    await add(db, 'a', 53.35, -6.26);
+    await add(db, 'b', 51.9, -8.47);
+    const rs = await Promise.all([
+      reevaluateConflicts(env, BAND, DAY),
+      reevaluateConflicts(env, BAND, DAY),
+    ]);
+    expect(rs.filter(r => r.created).length).toBe(1);
+    const cs = await conflicts(db);
+    expect(cs.filter(c => c.status === 'open')).toHaveLength(1);
+    const links = (await db.prepare('SELECT * FROM conflict_events').all())
+      .results;
+    expect(links).toHaveLength(2);
+  });
+
+  it('the unique index rejects a second open conflict', async () => {
+    const db = makeD1(ALL_MIGRATIONS);
+    const ins = () =>
+      db
+        .prepare(
+          "INSERT OR IGNORE INTO conflicts (act_url, day, status, created_at) VALUES (?, ?, 'open', 'x')"
+        )
+        .bind(BAND, DAY)
+        .run();
+    expect((await ins()).meta.changes).toBe(1);
+    expect((await ins()).meta.changes).toBe(0);
+  });
+
+  it('a moved event stays held and unalerted whichever day is reevaluated first', async () => {
+    for (const order of [
+      ['D2', 'D1'],
+      ['D1', 'D2'],
+    ]) {
+      const db = makeD1(ALL_MIGRATIONS);
+      const env = { DB: db } as any;
+      const D1 = '2999-06-18',
+        D2 = '2999-06-19';
+      await add(db, 'a', 53.35, -6.26, { start: `${D1}T20:00:00` });
+      await add(db, 'b', 51.9, -8.47, { start: `${D1}T20:00:00` });
+      await add(db, 'c', 48.1, 11.5, { start: `${D2}T20:00:00` });
+      await reevaluateConflicts(env, BAND, D1);
+      await db
+        .prepare("UPDATE events SET start_time = ? WHERE id = 'b'")
+        .bind(`${D2}T20:00:00`)
+        .run();
+      for (const o of order)
+        await reevaluateConflicts(env, BAND, o === 'D1' ? D1 : D2);
+      const b = await held(db, 'b');
+      expect([order.join(), b.held, b.alert_pending]).toEqual([
+        order.join(),
+        1,
+        0,
+      ]);
+      expect((await held(db, 'c')).held).toBe(1);
+      expect((await held(db, 'a')).held).toBe(0);
+    }
+  });
+
+  it('releases an event that drops out of a still-open conflict', async () => {
+    const db = makeD1(ALL_MIGRATIONS);
+    const env = { DB: db } as any;
+    const day = '2999-06-18';
+    const st = { start: `${day}T20:00:00` };
+    await add(db, 'a', 53.35, -6.26, st);
+    await add(db, 'b', 51.9, -8.47, st);
+    await add(db, 'c', 48.1, 11.5, st);
+    await reevaluateConflicts(env, BAND, day);
+    await db.prepare("DELETE FROM events WHERE id='c'").run();
+    await db
+      .prepare(
+        "UPDATE events SET start_time='2999-07-01T20:00:00' WHERE id='b'"
+      )
+      .run();
+    await add(db, 'd', 41.9, 12.5, st);
+    await reevaluateConflicts(env, BAND, day);
+    expect((await held(db, 'a')).held).toBe(1);
+    expect((await held(db, 'd')).held).toBe(1);
+    const b = await held(db, 'b');
+    expect([b.held, b.alert_pending]).toEqual([0, 1]);
+    const links = (
+      await db.prepare('SELECT event_id FROM conflict_events').all()
+    ).results as any[];
+    expect(links.map(l => l.event_id).sort()).toEqual(['a', 'd']);
+  });
+
   it('purgeConflictLinks removes an event from links and proposals', async () => {
     const db = makeD1(ALL_MIGRATIONS);
     const env = { DB: db } as any;

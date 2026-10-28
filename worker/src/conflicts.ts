@@ -89,7 +89,11 @@ export async function purgeConflictLinks(
 interface Row extends ConflictEvent, ConflictEventRow {}
 
 /** Release events (held = 0); future ones that were held get alert_pending = 1. */
-function releaseStatements(env: Pick<Env, 'DB'>, ids: string[]) {
+function releaseStatements(
+  env: Pick<Env, 'DB'>,
+  ids: string[],
+  conflictId: number
+) {
   const today = new Date().toISOString().slice(0, 10);
   return ids.map(id =>
     env.DB.prepare(
@@ -97,8 +101,11 @@ function releaseStatements(env: Pick<Env, 'DB'>, ids: string[]) {
          alert_pending = CASE WHEN held = 1 AND substr(start_time,1,10) > ?
                               THEN 1 ELSE alert_pending END,
          held = 0
-       WHERE id = ?`
-    ).bind(today, id)
+       WHERE id = ?
+         AND NOT EXISTS (
+           SELECT 1 FROM conflict_events ce JOIN conflicts c ON c.id = ce.conflict_id
+           WHERE ce.event_id = events.id AND c.status = 'open' AND c.id <> ?)`
+    ).bind(today, id, conflictId)
   );
 }
 
@@ -160,7 +167,9 @@ export async function reevaluateConflicts(
 
   const holdStmts = () =>
     ids.map(id =>
-      env.DB.prepare('UPDATE events SET held = 1 WHERE id = ?').bind(id)
+      env.DB.prepare(
+        'UPDATE events SET held = 1, alert_pending = 0 WHERE id = ?'
+      ).bind(id)
     );
 
   if (conflicted) {
@@ -173,11 +182,11 @@ export async function reevaluateConflicts(
         ).bind(open.id),
         ...ids.map(id =>
           env.DB.prepare(
-            'INSERT INTO conflict_events (conflict_id, event_id) VALUES (?, ?)'
+            'INSERT OR IGNORE INTO conflict_events (conflict_id, event_id) VALUES (?, ?)'
           ).bind(open.id, id)
         ),
         ...holdStmts(),
-        ...releaseStatements(env, removed),
+        ...releaseStatements(env, removed, open.id),
       ]);
       return { created: null };
     }
@@ -188,31 +197,30 @@ export async function reevaluateConflicts(
       }
     }
     const actName = events.find(e => e.act_name)?.act_name ?? null;
-    await env.DB.batch([
+    const res = await env.DB.batch([
       ...kept.map(k =>
         env.DB.prepare(
           "UPDATE conflicts SET status = 'resolved', resolved_at = ? WHERE id = ?"
         ).bind(now, k.id)
       ),
       env.DB.prepare(
-        "INSERT INTO conflicts (act_url, day, status, created_at) VALUES (?, ?, 'open', ?)"
+        "INSERT OR IGNORE INTO conflicts (act_url, day, status, created_at) VALUES (?, ?, 'open', ?)"
       ).bind(act, day, now),
       ...ids.map(id =>
         env.DB.prepare(
-          `INSERT INTO conflict_events (conflict_id, event_id)
+          `INSERT OR IGNORE INTO conflict_events (conflict_id, event_id)
            SELECT id, ? FROM conflicts WHERE act_url = ? AND day = ? AND status = 'open'`
         ).bind(id, act, day)
       ),
       ...holdStmts(),
     ]);
-    const created = await env.DB.prepare(
-      "SELECT id FROM conflicts WHERE act_url = ? AND day = ? AND status = 'open'"
-    )
-      .bind(act, day)
-      .first<{ id: number }>();
+    // The unique open-conflict index makes a lost race a no-op insert.
+    const ins = res[kept.length];
+    if (ins.meta.changes !== 1) return { created: null };
+    const createdId = Number(ins.meta.last_row_id);
     return {
       created: {
-        id: created!.id,
+        id: createdId,
         actName,
         day,
         events: events.map(e => ({
@@ -235,7 +243,7 @@ export async function reevaluateConflicts(
       env.DB.prepare(
         "UPDATE conflicts SET status = 'resolved', resolved_at = ? WHERE id = ?"
       ).bind(now, open.id),
-      ...releaseStatements(env, old)
+      ...releaseStatements(env, old, open.id)
     );
   }
   for (const k of kept) {
