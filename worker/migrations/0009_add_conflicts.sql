@@ -29,3 +29,7 @@ CREATE TABLE conflict_proposals (
   created_at  TEXT,
   UNIQUE (event_id, action)
 );
+
+CREATE INDEX idx_conflicts_act_day ON conflicts (act_url, day);
+CREATE INDEX idx_conflict_events_event ON conflict_events (event_id);
+CREATE INDEX idx_events_act_start ON events (act_url, start_time);

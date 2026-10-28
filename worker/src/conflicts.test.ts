@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { makeD1, ALL_MIGRATIONS } from '../test-support/d1';
-import { isRange, groupByPlace, ConflictEvent } from './conflicts';
+import {
+  isRange,
+  groupByPlace,
+  ConflictEvent,
+  reevaluateConflicts,
+  purgeConflictLinks,
+} from './conflicts';
 
 const ev = (id: string, lat: number, lng: number): ConflictEvent => ({
   id,
@@ -93,5 +99,172 @@ describe('conflict schema', () => {
         .first();
       expect(r, t).toBeTruthy();
     }
+  });
+});
+
+describe('reevaluateConflicts', () => {
+  const DAY = '2027-06-18';
+  const BAND = 'https://band.example';
+  let n = 0;
+  async function add(
+    db: any,
+    id: string,
+    lat: number,
+    lng: number,
+    o: { act?: string | null; start?: string; end?: string | null } = {}
+  ) {
+    await db
+      .prepare(
+        `INSERT INTO events (id,pubkey,signature,title,lat,lng,geohash5,geohash6,start_time,end_time,category,created_at,act_url)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+      )
+      .bind(
+        id,
+        'p',
+        's',
+        'T' + id,
+        lat,
+        lng,
+        'g5',
+        'g6',
+        o.start ?? `${DAY}T20:00:00`,
+        o.end ?? null,
+        'music',
+        '2026-01-01T00:00:00',
+        o.act === undefined ? BAND : o.act
+      )
+      .run();
+    n++;
+  }
+  const held = async (db: any, id: string) =>
+    (await db
+      .prepare('SELECT held, alert_pending FROM events WHERE id=?')
+      .bind(id)
+      .first()) as any;
+  const conflicts = async (db: any) =>
+    (await db.prepare('SELECT * FROM conflicts ORDER BY id').all())
+      .results as any[];
+
+  it('creates a conflict for Dublin/Cork and holds both; idempotent', async () => {
+    const db = makeD1(ALL_MIGRATIONS);
+    await add(db, 'a', 53.35, -6.26);
+    await add(db, 'b', 51.9, -8.47);
+    const r = await reevaluateConflicts({ DB: db } as any, BAND + '/', DAY);
+    expect(r.created?.events.map(e => e.id).sort()).toEqual(['a', 'b']);
+    expect((await held(db, 'a')).held).toBe(1);
+    expect((await held(db, 'b')).held).toBe(1);
+    const r2 = await reevaluateConflicts({ DB: db } as any, BAND, DAY);
+    expect(r2.created).toBeNull();
+    expect(await conflicts(db)).toHaveLength(1);
+  });
+
+  it('resolves when one event is deleted and releases the survivor', async () => {
+    const db = makeD1(ALL_MIGRATIONS);
+    await add(db, 'a', 53.35, -6.26, { start: '2999-06-18T20:00:00' });
+    await add(db, 'b', 51.9, -8.47, { start: '2999-06-18T20:00:00' });
+    const env = { DB: db } as any;
+    await reevaluateConflicts(env, BAND, '2999-06-18');
+    await db.prepare("DELETE FROM events WHERE id='b'").run();
+    const r = await reevaluateConflicts(env, BAND, '2999-06-18');
+    expect(r.created).toBeNull();
+    const cs = await conflicts(db);
+    expect(cs[0].status).toBe('resolved');
+    expect(cs[0].resolved_at).toBeTruthy();
+    const a = await held(db, 'a');
+    expect(a.held).toBe(0);
+    expect(a.alert_pending).toBe(1);
+  });
+
+  it('does not set alert_pending for past events on release', async () => {
+    const db = makeD1(ALL_MIGRATIONS);
+    await add(db, 'a', 53.35, -6.26, { start: '2020-06-18T20:00:00' });
+    await add(db, 'b', 51.9, -8.47, { start: '2020-06-18T20:00:00' });
+    const env = { DB: db } as any;
+    await reevaluateConflicts(env, BAND, '2020-06-18');
+    await db.prepare("DELETE FROM events WHERE id='b'").run();
+    await reevaluateConflicts(env, BAND, '2020-06-18');
+    const a = await held(db, 'a');
+    expect(a.held).toBe(0);
+    expect(a.alert_pending).toBe(0);
+  });
+
+  it('ignores same-place events, ranges and events without act_url', async () => {
+    const db = makeD1(ALL_MIGRATIONS);
+    const env = { DB: db } as any;
+    await add(db, 'a', 53.35, -6.26);
+    await add(db, 'b', 53.351, -6.261);
+    expect((await reevaluateConflicts(env, BAND, DAY)).created).toBeNull();
+    await add(db, 'r', 51.9, -8.47, { end: '2027-06-20T02:00:00' });
+    expect((await reevaluateConflicts(env, BAND, DAY)).created).toBeNull();
+    await add(db, 'n', 48.1, 11.5, { act: null });
+    expect((await reevaluateConflicts(env, BAND, DAY)).created).toBeNull();
+    expect(await conflicts(db)).toHaveLength(0);
+    expect((await held(db, 'a')).held).toBe(0);
+  });
+
+  it('leaves a kept conflict with the same event set alone', async () => {
+    const db = makeD1(ALL_MIGRATIONS);
+    const env = { DB: db } as any;
+    await add(db, 'a', 53.35, -6.26);
+    await add(db, 'b', 51.9, -8.47);
+    await reevaluateConflicts(env, BAND, DAY);
+    await db.prepare("UPDATE conflicts SET status='kept'").run();
+    await db.prepare('UPDATE events SET held=0').run();
+    const r = await reevaluateConflicts(env, BAND, DAY);
+    expect(r.created).toBeNull();
+    expect(await conflicts(db)).toHaveLength(1);
+    expect((await held(db, 'a')).held).toBe(0);
+  });
+
+  it('opens a new conflict when a kept set changes', async () => {
+    const db = makeD1(ALL_MIGRATIONS);
+    const env = { DB: db } as any;
+    await add(db, 'a', 53.35, -6.26);
+    await add(db, 'b', 51.9, -8.47);
+    await reevaluateConflicts(env, BAND, DAY);
+    await db.prepare("UPDATE conflicts SET status='kept'").run();
+    await db.prepare('UPDATE events SET held=0').run();
+    await add(db, 'c', 48.1, 11.5);
+    const r = await reevaluateConflicts(env, BAND, DAY);
+    expect(r.created?.events).toHaveLength(3);
+    const cs = await conflicts(db);
+    expect(cs.map(c => c.status)).toEqual(['resolved', 'open']);
+    expect((await held(db, 'c')).held).toBe(1);
+  });
+
+  it('updates an open conflict when a third event appears', async () => {
+    const db = makeD1(ALL_MIGRATIONS);
+    const env = { DB: db } as any;
+    await add(db, 'a', 53.35, -6.26);
+    await add(db, 'b', 51.9, -8.47);
+    await reevaluateConflicts(env, BAND, DAY);
+    await add(db, 'c', 48.1, 11.5);
+    const r = await reevaluateConflicts(env, BAND, DAY);
+    expect(r.created).toBeNull();
+    expect(await conflicts(db)).toHaveLength(1);
+    const links = (await db.prepare('SELECT * FROM conflict_events').all())
+      .results;
+    expect(links).toHaveLength(3);
+    expect((await held(db, 'c')).held).toBe(1);
+  });
+
+  it('purgeConflictLinks removes an event from links and proposals', async () => {
+    const db = makeD1(ALL_MIGRATIONS);
+    const env = { DB: db } as any;
+    await add(db, 'a', 53.35, -6.26);
+    await add(db, 'b', 51.9, -8.47);
+    await reevaluateConflicts(env, BAND, DAY);
+    await db
+      .prepare(
+        "INSERT INTO conflict_proposals (conflict_id,event_id,action,reason,created_at) VALUES (1,'a','delete','r','x')"
+      )
+      .run();
+    await purgeConflictLinks(env, 'a');
+    const l = (await db.prepare('SELECT event_id FROM conflict_events').all())
+      .results as any[];
+    expect(l.map(x => x.event_id)).toEqual(['b']);
+    expect(
+      (await db.prepare('SELECT * FROM conflict_proposals').all()).results
+    ).toHaveLength(0);
   });
 });
