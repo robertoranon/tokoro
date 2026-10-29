@@ -337,6 +337,24 @@ const BERLIN = [52.52, 13.405];
     'band:https://b.example',
   ]);
 }
+{
+  // hops area: equal labels collapse, a missing label is left out
+  const followedBands = bandsOf(['A', 'B']);
+  const hops = { mode: 'hops', radiusKm: 100 };
+  const same = [
+    show('a1', 'A', D(1), ...UDINE, { address: 'Udine' }),
+    show('b1', 'B', D(2), 46.07, 13.24, { address: 'Udine' }),
+  ];
+  assert.equal(compute({ shows: same, followedBands }, hops)[0].area, 'Udine');
+  const blank = [
+    show('a1', 'A', D(1), ...UDINE, { address: '', venue: '' }),
+    show('b1', 'B', D(2), 46.07, 13.24, { address: 'Gorizia' }),
+  ];
+  assert.equal(
+    compute({ shows: blank, followedBands }, hops)[0].area,
+    'Gorizia'
+  );
+}
 console.log('✅ radius modes');
 
 // one place per day, distinct bands, span, min padding
@@ -570,14 +588,20 @@ console.log('✅ planner validity + determinism');
     followedBands: bands,
     followedFestivals: fests,
   };
-  for (const mode of ['base', 'hops']) {
+  for (const s of [
+    { mode: 'base' },
+    { mode: 'hops' },
+    { mode: 'base', radiusKm: 1000, maxDays: 60 },
+    { mode: 'hops', radiusKm: 1000, maxDays: 60 },
+  ]) {
+    const label = JSON.stringify(s);
     const t0 = performance.now();
-    const trips = compute(args, { mode });
+    const trips = compute(args, s);
     const ms = performance.now() - t0;
     assert.ok(trips.length > 0);
-    assert.ok(ms < 2000, `${mode} took ${ms.toFixed(0)} ms`);
+    assert.ok(ms < 2000, `${label} took ${ms.toFixed(0)} ms`);
     console.log(
-      `   ${mode}: ${ms.toFixed(0)} ms, ${trips.length} trips, best ${trips[0].score}`
+      `   ${label}: ${ms.toFixed(0)} ms, ${trips.length} trips, best ${trips[0].score}`
     );
   }
 }

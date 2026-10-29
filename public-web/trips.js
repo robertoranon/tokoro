@@ -347,73 +347,170 @@ function lowerBound(stops, ymd) {
   return lo;
 }
 
-function baseCandidates(stops, settings) {
-  // many centres pick the same stops: keep one per stop set (lowest travelKm)
-  const out = new Map();
-  const len = new Map(stops.map(s => [s, dayNum(s.end) - dayNum(s.start)]));
-  const centres = new Map();
-  for (const s of stops) {
-    const k = s.lat.toFixed(3) + ',' + s.lng.toFixed(3);
-    if (!centres.has(k)) centres.set(k, s);
+/** Max-heap of non-negative integers (packed greedy priorities). */
+function heapPush(h, v) {
+  let i = h.length;
+  h.push(v);
+  while (i > 0) {
+    const p = (i - 1) >> 1;
+    if (h[p] >= v) break;
+    h[i] = h[p];
+    i = p;
   }
-  for (const cs of centres.values()) {
+  h[i] = v;
+}
+
+function heapPop(h) {
+  const top = h[0];
+  const v = h.pop();
+  if (h.length) {
+    let i = 0;
+    for (;;) {
+      let c = 2 * i + 1;
+      if (c >= h.length) break;
+      if (c + 1 < h.length && h[c + 1] > h[c]) c++;
+      if (h[c] <= v) break;
+      h[i] = h[c];
+      i = c;
+    }
+    h[i] = v;
+  }
+  return top;
+}
+
+/** `stops` must be in stop order: index order is then date order. */
+function baseCandidates(stops, settings) {
+  const n = stops.length;
+  const d0 = stops.map(s => dayNum(s.start));
+  const d1 = stops.map(s => dayNum(s.end));
+  const keyIds = new Map();
+  const keys = stops.map(s =>
+    s.keys.map(k => {
+      if (!keyIds.has(k)) keyIds.set(k, keyIds.size);
+      return keyIds.get(k);
+    })
+  );
+  // greedy tie order: fewer days, earlier start, id
+  const byRank = stops
+    .map((_, i) => i)
+    .sort(
+      (a, b) =>
+        d1[a] - d0[a] - (d1[b] - d0[b]) ||
+        cmpStr(stops[a].start, stops[b].start) ||
+        cmpStr(stops[a].id, stops[b].id)
+    );
+  const rank = new Int32Array(n);
+  byRank.forEach((i, r) => (rank[i] = r));
+  const seen = new Uint8Array(keyIds.size);
+  const taken = new Uint8Array(settings.maxDays);
+
+  /*
+   * Greedy pick in a window (stop indices, days from `firstNum`): most new
+   * keys, no shared day. New-key counts only shrink, so a max-heap with lazy
+   * re-evaluation picks exactly what a full scan per step would.
+   */
+  function greedy(window, firstNum) {
+    const heap = [];
+    for (const i of window)
+      heapPush(heap, keys[i].length * n + (n - 1 - rank[i]));
+    const chosen = [];
+    while (heap.length) {
+      const v = heapPop(heap);
+      const r = v % n;
+      const i = byRank[n - 1 - r];
+      let free = true;
+      for (let d = d0[i]; free && d <= d1[i]; d++) free = !taken[d - firstNum];
+      if (!free) continue;
+      let fresh = 0;
+      for (const k of keys[i]) if (!seen[k]) fresh++;
+      if (fresh === 0) continue;
+      if (fresh < (v - r) / n) {
+        heapPush(heap, fresh * n + r);
+        continue;
+      }
+      chosen.push(i);
+      for (let d = d0[i]; d <= d1[i]; d++) taken[d - firstNum] = 1;
+      for (const k of keys[i]) seen[k] = 1;
+    }
+    taken.fill(0);
+    for (const i of chosen) for (const k of keys[i]) seen[k] = 0;
+    if (chosen.length === 0) return null;
+    chosen.sort((a, b) => a - b);
+    const picked = chosen.map(i => stops[i]);
+    const keySet = new Set(picked.flatMap(s => s.keys));
+    if (keySet.size < MIN_SCORE) return null;
+    let lastDay = picked[0].end;
+    for (const s of picked) if (s.end > lastDay) lastDay = s.end;
+    return { chosen, picked, keySet, lastDay, ids: idsOf(picked) };
+  }
+
+  // many centres see the same window: memoise the greedy by window content
+  const memo = new Map();
+  // and pick the same stops: keep one candidate per stop set (lowest travelKm)
+  const out = new Map();
+  const dist = new Float64Array(n);
+  const centres = new Map();
+  stops.forEach((s, i) => {
+    const k = s.lat.toFixed(3) + ',' + s.lng.toFixed(3);
+    if (!centres.has(k)) centres.set(k, i);
+  });
+  for (const ci of centres.values()) {
+    const cs = stops[ci];
     const centre = { lat: cs.lat, lng: cs.lng };
-    const dist = new Map();
     const near = [];
-    for (const s of stops) {
-      const km = haversineKm(centre, s);
+    for (let i = 0; i < n; i++) {
+      const km = haversineKm(centre, stops[i]);
       if (km <= settings.radiusKm) {
-        near.push(s);
-        dist.set(s, km);
+        near.push(i);
+        dist[i] = km;
       }
     }
-    const starts = [...new Set(near.map(s => s.start))];
-    for (const first of starts) {
-      const last = addDays(first, settings.maxDays - 1);
+    for (let j = 0; j < near.length; j++) {
+      const firstNum = d0[near[j]];
+      if (j > 0 && d0[near[j - 1]] === firstNum) continue; // distinct starts
+      const lastNum = firstNum + settings.maxDays - 1;
       const window = [];
-      // `near` keeps the stop order (by start), so the window is a slice
-      for (
-        let i = lowerBound(near, first);
-        i < near.length && near[i].start <= last;
-        i++
-      ) {
-        if (near[i].end <= last) window.push(near[i]);
+      let h1 = 0;
+      let h2 = 0;
+      for (let k = j; k < near.length && d0[near[k]] <= lastNum; k++) {
+        const i = near[k];
+        if (d1[i] > lastNum) continue;
+        window.push(i);
+        h1 = (Math.imul(h1, 31) + i + 1) | 0;
+        h2 = (Math.imul(h2 ^ i, 0x5bd1e995) + 0x6b43a9b5) | 0;
       }
-      const chosen = [];
-      const seen = new Set();
-      for (;;) {
-        let best = null;
-        let bestNew = 0;
-        for (const s of window) {
-          if (chosen.some(c => s.start <= c.end && c.start <= s.end)) continue;
-          let fresh = 0;
-          for (const k of s.keys) if (!seen.has(k)) fresh++;
-          if (fresh === 0) continue;
-          if (
-            !best ||
-            fresh > bestNew ||
-            (fresh === bestNew &&
-              (len.get(s) - len.get(best) ||
-                cmpStr(s.start, best.start) ||
-                cmpStr(s.id, best.id)) < 0)
-          ) {
-            best = s;
-            bestNew = fresh;
-          }
-        }
-        if (!best) break;
-        chosen.push(best);
-        for (const k of best.keys) seen.add(k);
+      // two 32-bit hashes plus length; collisions are verified below
+      const key = h1 + ':' + h2 + ':' + window.length;
+      let entry = memo.get(key);
+      if (!entry || !sameWindow(entry.window, window)) {
+        entry = { window, res: greedy(window, firstNum) };
+        memo.set(key, entry);
       }
-      if (seen.size < MIN_SCORE) continue;
-      const km = Math.max(...chosen.map(s => dist.get(s)));
-      const c = candidate(chosen, km, centre, cs);
-      const id = idsOf(c.stops);
-      const prev = out.get(id);
-      if (!prev || km < prev.travelKm) out.set(id, c);
+      const res = entry.res;
+      if (!res) continue;
+      let km = 0;
+      for (const i of res.chosen) if (dist[i] > km) km = dist[i];
+      const prev = out.get(res.ids);
+      if (prev && km >= prev.travelKm) continue;
+      out.set(res.ids, {
+        stops: res.picked,
+        keys: res.keySet,
+        score: res.keySet.size,
+        firstDay: res.picked[0].start,
+        lastDay: res.lastDay,
+        travelKm: km,
+        centre,
+        centreStop: cs,
+      });
     }
   }
   return [...out.values()];
+}
+
+function sameWindow(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }
 
 function compareStates(a, b) {
@@ -463,11 +560,14 @@ function toTrip(c, settings) {
   const padded = addDays(c.firstDay, settings.minDays - 1);
   const first = c.stops[0];
   const last = c.stops[c.stops.length - 1];
+  const from = placeLabel(first);
+  const to = placeLabel(last);
+  // hops: one label when they match or one is missing
   const area = c.centre
     ? 'around ' + placeLabel(c.centreStop)
-    : c.stops.length === 1
-      ? placeLabel(first)
-      : placeLabel(first) + ' → ' + placeLabel(last);
+    : !from || !to || from === to
+      ? from || to
+      : from + ' → ' + to;
   return {
     start: c.firstDay,
     end: c.lastDay > padded ? c.lastDay : padded,
