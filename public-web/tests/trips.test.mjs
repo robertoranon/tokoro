@@ -16,6 +16,11 @@ const {
   validSettings,
   buildStops,
   placeLabel,
+  MIN_SCORE,
+  planTrips,
+  compareTrips,
+  computeTrips,
+  fmtScore,
 } = createRequire(import.meta.url)('../trips.js');
 
 const TODAY = '2030-10-01';
@@ -271,3 +276,315 @@ console.log('✅ region');
   assert.deepEqual(rev, fwd);
 }
 console.log('✅ determinism');
+
+// ---- planner ----
+const compute = (o, s) =>
+  computeTrips({
+    shows: [],
+    festivals: [],
+    followedBands: [],
+    followedFestivals: [],
+    todayYmd: TODAY,
+    settings: s || {},
+    ...o,
+  });
+const bandsOf = names => names.map(n => `https://${n.toLowerCase()}.example`);
+const keysOf = trip => [...new Set(trip.stops.flatMap(s => s.keys))].sort();
+const sharesDay = (a, b) => a.start <= b.end && b.start <= a.end;
+const UDINE = [46.06, 13.23];
+const BERLIN = [52.52, 13.405];
+
+// radius modes
+{
+  const shows = [
+    show('a1', 'A', D(1), 46, 13),
+    show('b1', 'B', D(2), 46, 14),
+    show('c1', 'C', D(3), 46, 15),
+    show('d1', 'D', D(4), 46, 16),
+  ];
+  const args = { shows, followedBands: bandsOf(['A', 'B', 'C', 'D']) };
+  const hops = compute(args, { mode: 'hops', radiusKm: 100 });
+  assert.equal(hops.length, 1);
+  assert.equal(hops[0].score, 4);
+  assert.equal(hops[0].bands, 4);
+  assert.equal(hops[0].festivals, 0);
+  assert.equal(hops[0].centre, null);
+  assert.equal(hops[0].area, 'Addr a1 → Addr d1');
+  assert.deepEqual(
+    hops[0].stops.map(s => s.start),
+    [D(1), D(2), D(3), D(4)]
+  );
+  assert.ok(
+    Math.abs(hops[0].travelKm - 3 * haversineKm(shows[0], shows[1])) < 1
+  );
+  const base = compute(args, { mode: 'base', radiusKm: 100 });
+  assert.equal(base[0].score, 3);
+  assert.ok(base[0].centre && Number.isFinite(base[0].centre.lat));
+  assert.ok(base[0].area.startsWith('around '));
+}
+{
+  const shows = [
+    show('a1', 'A', D(1), ...UDINE),
+    show('b1', 'B', D(3), 46.06, 13.62), // ~30 km
+    show('c1', 'C', D(2), ...BERLIN),
+  ];
+  const trips = compute(
+    { shows, followedBands: bandsOf(['A', 'B', 'C']) },
+    { mode: 'base', radiusKm: 100 }
+  );
+  assert.deepEqual(keysOf(trips[0]), [
+    'band:https://a.example',
+    'band:https://b.example',
+  ]);
+}
+console.log('✅ radius modes');
+
+// one place per day, distinct bands, span, min padding
+{
+  const shows = [
+    show('a1', 'A', D(1), 46, 13),
+    show('b1', 'B', D(1), 46, 13.65), // ~50 km
+    show('c1', 'C', D(2), 46, 13.3),
+  ];
+  for (const mode of ['base', 'hops']) {
+    const trips = compute(
+      { shows, followedBands: bandsOf(['A', 'B', 'C']) },
+      { mode, radiusKm: 250 }
+    );
+    for (const t of trips) {
+      for (let i = 0; i < t.stops.length; i++)
+        for (let j = i + 1; j < t.stops.length; j++)
+          assert.ok(!sharesDay(t.stops[i], t.stops[j]));
+    }
+    assert.equal(trips[0].score, 2);
+  }
+}
+{
+  const shows = [
+    show('a1', 'A', D(1), 46, 13),
+    show('a2', 'A', D(2), 46, 13.1),
+    show('b1', 'B', D(3), 46, 13.2),
+  ];
+  const trips = compute({ shows, followedBands: bandsOf(['A', 'B']) });
+  assert.equal(trips[0].score, 2);
+  assert.equal(trips[0].bands, 2);
+}
+{
+  const shows = [show('a1', 'A', D(1), 46, 13), show('b1', 'B', D(25), 46, 13)];
+  const args = { shows, followedBands: bandsOf(['A', 'B']) };
+  assert.deepEqual(compute(args, { maxDays: 21 }), []);
+  assert.deepEqual(compute(args, { maxDays: 21, mode: 'hops' }), []);
+}
+{
+  const shows = [show('a1', 'A', D(1), 46, 13), show('b1', 'B', D(3), 46, 13)];
+  const [t] = compute(
+    { shows, followedBands: bandsOf(['A', 'B']) },
+    { minDays: 14 }
+  );
+  assert.equal(t.start, D(1));
+  assert.equal(t.firstDay, D(1));
+  assert.equal(t.end, addDays(D(1), 13));
+  assert.equal(t.lastDay, D(3));
+}
+console.log('✅ planner rules');
+
+// empty
+{
+  const shows = [
+    show('a1', 'A', D(1), 46, 13),
+    show('b1', 'B', D(2), ...BERLIN),
+  ];
+  const args = { shows, followedBands: bandsOf(['A', 'B']) };
+  assert.deepEqual(compute(args, { radiusKm: 100 }), []);
+  assert.deepEqual(compute(args, { radiusKm: 100, mode: 'hops' }), []);
+  assert.deepEqual(planTrips([], validSettings({})), []);
+  assert.deepEqual(planTrips([], validSettings({ mode: 'hops' })), []);
+}
+console.log('✅ planner empty');
+
+// festival on top
+{
+  const args = {
+    festivals: [fest('f1', 'Fest', D(5), D(7), 50, 8)],
+    shows: [show('a1', 'Alpha', D(6), 50.018, 8)],
+    followedBands: [ALPHA],
+    followedFestivals: [FEST],
+  };
+  for (const mode of ['base', 'hops']) {
+    const trips = compute(args, { mode });
+    assert.equal(trips.length, 1);
+    assert.equal(trips[0].score, 2);
+    assert.equal(trips[0].bands, 1);
+    assert.equal(trips[0].festivals, 1);
+    assert.deepEqual(compute(args, { mode, source: 'festivals' }), []);
+  }
+}
+console.log('✅ festival on top');
+
+// compareTrips
+{
+  const mk = (score, firstDay, lastDay, travelKm, ids = ['x']) => ({
+    score,
+    firstDay,
+    lastDay,
+    travelKm,
+    stops: ids.map(id => ({ id })),
+  });
+  const span3 = mk(3, D(10), D(12), 50);
+  const span5 = mk(3, D(1), D(5), 10);
+  assert.ok(compareTrips(span3, span5) < 0);
+  assert.ok(compareTrips(mk(4, D(1), D(9), 0), span3) < 0);
+  assert.ok(compareTrips(mk(3, D(1), D(3), 50), span3) < 0);
+  assert.ok(compareTrips(mk(3, D(10), D(12), 20), span3) < 0);
+  assert.ok(
+    compareTrips(
+      mk(3, D(10), D(12), 50, ['a']),
+      mk(3, D(10), D(12), 50, ['b'])
+    ) < 0
+  );
+  assert.equal(compareTrips(span3, mk(3, D(10), D(12), 50)), 0);
+}
+console.log('✅ compareTrips');
+
+// de-duplication
+{
+  const GORIZIA = [45.94, 13.62];
+  const shows = [
+    show('a1', 'A', D(1), ...UDINE),
+    show('a2', 'A', D(2), ...GORIZIA),
+    show('b1', 'B', D(3), ...UDINE),
+    show('b2', 'B', D(4), ...GORIZIA),
+    show('c1', 'C', D(100), ...BERLIN),
+    show('d1', 'D', D(101), ...BERLIN),
+  ];
+  for (const mode of ['base', 'hops']) {
+    const trips = compute(
+      { shows, followedBands: bandsOf(['A', 'B', 'C', 'D']) },
+      { mode }
+    );
+    assert.equal(trips.length, 2);
+    assert.deepEqual(keysOf(trips[0]), [
+      'band:https://a.example',
+      'band:https://b.example',
+    ]);
+    assert.deepEqual(keysOf(trips[1]), [
+      'band:https://c.example',
+      'band:https://d.example',
+    ]);
+  }
+}
+console.log('✅ de-duplication');
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// validity + determinism (seeded)
+{
+  const rnd = mulberry32(42);
+  const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+  // 600 km box: ~5.4 deg lat x ~8 deg lng at 48N
+  const shows = Array.from({ length: 40 }, (_, i) =>
+    show(
+      's' + i,
+      names[Math.floor(rnd() * names.length)],
+      D(Math.floor(rnd() * 60)),
+      45 + rnd() * 5.4,
+      8 + rnd() * 8
+    )
+  );
+  const args = { shows, followedBands: bandsOf(names) };
+  for (const mode of ['base', 'hops']) {
+    const s = validSettings({ mode, radiusKm: 100, maxDays: 10, minDays: 3 });
+    const trips = compute(args, s);
+    assert.ok(trips.length > 0);
+    for (const t of trips) {
+      for (let i = 0; i < t.stops.length; i++)
+        for (let j = i + 1; j < t.stops.length; j++)
+          assert.ok(!sharesDay(t.stops[i], t.stops[j]));
+      assert.ok(daysBetween(t.firstDay, t.lastDay) + 1 <= s.maxDays);
+      if (mode === 'hops') {
+        for (let i = 1; i < t.stops.length; i++)
+          assert.ok(haversineKm(t.stops[i - 1], t.stops[i]) <= s.radiusKm);
+      } else {
+        for (const st of t.stops)
+          assert.ok(haversineKm(t.centre, st) <= s.radiusKm);
+      }
+      const keys = keysOf(t);
+      assert.equal(t.score, keys.length);
+      assert.equal(t.bands + t.festivals, t.score);
+      assert.ok(t.score >= MIN_SCORE);
+    }
+    for (let i = 1; i < trips.length; i++)
+      assert.ok(compareTrips(trips[i - 1], trips[i]) <= 0);
+    assert.deepEqual(compute(args, s), trips);
+  }
+}
+console.log('✅ planner validity + determinism');
+
+// performance
+{
+  const rnd = mulberry32(7);
+  const shows = [];
+  const bands = [];
+  for (let b = 0; b < 50; b++) {
+    bands.push(`https://band${b}.example`);
+    for (let i = 0; i < 20; i++)
+      shows.push(
+        show(
+          `b${b}s${i}`,
+          'Band' + b,
+          D(Math.floor(rnd() * 548)),
+          36 + rnd() * 24,
+          -9 + rnd() * 34
+        )
+      );
+  }
+  const festivals = [];
+  const fests = [];
+  for (let f = 0; f < 20; f++) {
+    const start = Math.floor(rnd() * 548);
+    const len = 2 + Math.floor(rnd() * 4);
+    festivals.push(
+      fest(
+        'f' + f,
+        'Fest' + f,
+        D(start),
+        D(start + len - 1),
+        36 + rnd() * 24,
+        -9 + rnd() * 34
+      )
+    );
+    fests.push(`https://fest${f}.example`);
+  }
+  const args = {
+    shows,
+    festivals,
+    followedBands: bands,
+    followedFestivals: fests,
+  };
+  for (const mode of ['base', 'hops']) {
+    const t0 = performance.now();
+    const trips = compute(args, { mode });
+    const ms = performance.now() - t0;
+    assert.ok(trips.length > 0);
+    assert.ok(ms < 2000, `${mode} took ${ms.toFixed(0)} ms`);
+    console.log(
+      `   ${mode}: ${ms.toFixed(0)} ms, ${trips.length} trips, best ${trips[0].score}`
+    );
+  }
+}
+console.log('✅ planner performance');
+
+// fmtScore
+assert.equal(fmtScore({ bands: 7, festivals: 1 }), '7 bands · 1 festival');
+assert.equal(fmtScore({ bands: 1, festivals: 0 }), '1 band');
+assert.equal(fmtScore({ bands: 0, festivals: 2 }), '2 festivals');
+console.log('✅ fmtScore');

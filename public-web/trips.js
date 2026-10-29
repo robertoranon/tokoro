@@ -264,6 +264,281 @@ function placeLabel(stop) {
   return (stop.fest && stop.fest.name) || stop.address || stop.venue || '';
 }
 
+/*
+ * Part 2: the planner. A trip is a set of stops, no two sharing a day, within
+ * maxDays and the radius rule of the mode. Several stops may carry the same
+ * keys (alternatives); the score is always the number of distinct keys.
+ */
+
+const dayNums = new Map();
+/** Day number of a "YYYY-MM-DD" string (cached: hot while ranking). */
+function dayNum(ymd) {
+  let n = dayNums.get(ymd);
+  if (n === undefined) {
+    const [y, m, d] = ymd.split('-').map(Number);
+    n = Math.round(Date.UTC(y, m - 1, d) / DAY_MS);
+    dayNums.set(ymd, n);
+  }
+  return n;
+}
+
+function cmpStr(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function idsOf(stops) {
+  return stops.map(s => s.id).join('|');
+}
+
+/** Sort key of a trip; compareKeys orders these as compareTrips orders trips. */
+function rankKey(t) {
+  return {
+    t,
+    score: t.score,
+    span: dayNum(t.lastDay) - dayNum(t.firstDay),
+    firstDay: t.firstDay,
+    travelKm: t.travelKm,
+    ids: idsOf(t.stops),
+  };
+}
+
+function compareKeys(a, b) {
+  return (
+    b.score - a.score ||
+    a.span - b.span ||
+    cmpStr(a.firstDay, b.firstDay) ||
+    a.travelKm - b.travelKm ||
+    cmpStr(a.ids, b.ids)
+  );
+}
+
+/** Ranking: score desc, span asc, firstDay asc, travelKm asc, stop ids. */
+function compareTrips(a, b) {
+  return compareKeys(rankKey(a), rankKey(b));
+}
+
+/** Raw candidate from chosen stops (any order); full Trip built on accept. */
+function candidate(chosen, travelKm, centre, centreStop) {
+  const stops = [...chosen].sort(stopOrder);
+  const keys = new Set(stops.flatMap(s => s.keys));
+  let lastDay = stops[0].end;
+  for (const s of stops) if (s.end > lastDay) lastDay = s.end;
+  return {
+    stops,
+    keys,
+    score: keys.size,
+    firstDay: stops[0].start,
+    lastDay,
+    travelKm,
+    centre,
+    centreStop,
+  };
+}
+
+/** First index in `stops` (sorted by start) with start >= ymd. */
+function lowerBound(stops, ymd) {
+  let lo = 0;
+  let hi = stops.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (stops[mid].start < ymd) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+function baseCandidates(stops, settings) {
+  // many centres pick the same stops: keep one per stop set (lowest travelKm)
+  const out = new Map();
+  const len = new Map(stops.map(s => [s, dayNum(s.end) - dayNum(s.start)]));
+  const centres = new Map();
+  for (const s of stops) {
+    const k = s.lat.toFixed(3) + ',' + s.lng.toFixed(3);
+    if (!centres.has(k)) centres.set(k, s);
+  }
+  for (const cs of centres.values()) {
+    const centre = { lat: cs.lat, lng: cs.lng };
+    const dist = new Map();
+    const near = [];
+    for (const s of stops) {
+      const km = haversineKm(centre, s);
+      if (km <= settings.radiusKm) {
+        near.push(s);
+        dist.set(s, km);
+      }
+    }
+    const starts = [...new Set(near.map(s => s.start))];
+    for (const first of starts) {
+      const last = addDays(first, settings.maxDays - 1);
+      const window = [];
+      // `near` keeps the stop order (by start), so the window is a slice
+      for (
+        let i = lowerBound(near, first);
+        i < near.length && near[i].start <= last;
+        i++
+      ) {
+        if (near[i].end <= last) window.push(near[i]);
+      }
+      const chosen = [];
+      const seen = new Set();
+      for (;;) {
+        let best = null;
+        let bestNew = 0;
+        for (const s of window) {
+          if (chosen.some(c => s.start <= c.end && c.start <= s.end)) continue;
+          let fresh = 0;
+          for (const k of s.keys) if (!seen.has(k)) fresh++;
+          if (fresh === 0) continue;
+          if (
+            !best ||
+            fresh > bestNew ||
+            (fresh === bestNew &&
+              (len.get(s) - len.get(best) ||
+                cmpStr(s.start, best.start) ||
+                cmpStr(s.id, best.id)) < 0)
+          ) {
+            best = s;
+            bestNew = fresh;
+          }
+        }
+        if (!best) break;
+        chosen.push(best);
+        for (const k of best.keys) seen.add(k);
+      }
+      if (seen.size < MIN_SCORE) continue;
+      const km = Math.max(...chosen.map(s => dist.get(s)));
+      const c = candidate(chosen, km, centre, cs);
+      const id = idsOf(c.stops);
+      const prev = out.get(id);
+      if (!prev || km < prev.travelKm) out.set(id, c);
+    }
+  }
+  return [...out.values()];
+}
+
+function compareStates(a, b) {
+  return b.seen.size - a.seen.size || a.km - b.km || cmpStr(a.ids, b.ids);
+}
+
+function hopsCandidates(stops, settings) {
+  const out = [];
+  const push = st => {
+    if (st.seen.size >= MIN_SCORE) out.push(candidate(st.stops, st.km, null));
+  };
+  for (const s0 of stops) {
+    const last = addDays(s0.start, settings.maxDays - 1);
+    let beam = [{ stops: [s0], seen: new Set(s0.keys), km: 0, ids: s0.id }];
+    push(beam[0]);
+    while (beam.length) {
+      const next = [];
+      for (const st of beam) {
+        const tail = st.stops[st.stops.length - 1];
+        for (
+          let i = lowerBound(stops, addDays(tail.end, 1));
+          i < stops.length && stops[i].start <= last;
+          i++
+        ) {
+          const t = stops[i];
+          if (t.end > last || !t.keys.some(k => !st.seen.has(k))) continue;
+          const hop = haversineKm(tail, t);
+          if (hop > settings.radiusKm) continue;
+          next.push({
+            stops: [...st.stops, t],
+            seen: new Set([...st.seen, ...t.keys]),
+            km: st.km + hop,
+            ids: st.ids + '|' + t.id,
+          });
+        }
+      }
+      beam = next.sort(compareStates).slice(0, BEAM_WIDTH);
+      beam.forEach(push);
+    }
+  }
+  return out;
+}
+
+function toTrip(c, settings) {
+  const bands = [...c.keys].filter(k => k.startsWith('band:')).length;
+  const festivals = [...c.keys].filter(k => k.startsWith('fest:')).length;
+  const padded = addDays(c.firstDay, settings.minDays - 1);
+  const first = c.stops[0];
+  const last = c.stops[c.stops.length - 1];
+  const area = c.centre
+    ? 'around ' + placeLabel(c.centreStop)
+    : c.stops.length === 1
+      ? placeLabel(first)
+      : placeLabel(first) + ' → ' + placeLabel(last);
+  return {
+    start: c.firstDay,
+    end: c.lastDay > padded ? c.lastDay : padded,
+    firstDay: c.firstDay,
+    lastDay: c.lastDay,
+    stops: c.stops,
+    bands,
+    festivals,
+    score: bands + festivals,
+    travelKm: c.travelKm,
+    centre: c.centre,
+    area,
+  };
+}
+
+/** Ranked, de-duplicated trips (at most MAX_TRIPS). `settings` from validSettings. */
+function planTrips(stops, settings) {
+  const sorted = [...(stops || [])].sort(stopOrder);
+  const cands =
+    settings.mode === 'hops'
+      ? hopsCandidates(sorted, settings)
+      : baseCandidates(sorted, settings);
+  const ranked = cands.map(rankKey).sort(compareKeys);
+  const accepted = [];
+  for (const { t: c } of ranked) {
+    if (accepted.length >= MAX_TRIPS) break;
+    const dup = accepted.some(a => {
+      if (c.firstDay > a.lastDay || a.firstDay > c.lastDay) return false;
+      let shared = 0;
+      for (const k of c.keys) if (a.keys.has(k)) shared++;
+      return shared > c.keys.size / 2;
+    });
+    if (!dup) accepted.push(c);
+  }
+  return accepted.map(c => toTrip(c, settings));
+}
+
+function computeTrips({
+  shows,
+  festivals,
+  followedBands,
+  followedFestivals,
+  todayYmd,
+  settings,
+}) {
+  const s = validSettings(settings);
+  return planTrips(
+    buildStops({
+      shows,
+      festivals,
+      followedBands,
+      followedFestivals,
+      todayYmd,
+      settings: s,
+    }),
+    s
+  );
+}
+
+/** "7 bands · 1 festival", "1 band", "2 festivals" (zero parts omitted). */
+function fmtScore(trip) {
+  const parts = [];
+  if (trip.bands)
+    parts.push(trip.bands + (trip.bands === 1 ? ' band' : ' bands'));
+  if (trip.festivals)
+    parts.push(
+      trip.festivals + (trip.festivals === 1 ? ' festival' : ' festivals')
+    );
+  return parts.join(' · ');
+}
+
 const api = {
   RADII_KM,
   DEFAULT_RADIUS_KM,
@@ -284,6 +559,10 @@ const api = {
   validSettings,
   buildStops,
   placeLabel,
+  compareTrips,
+  planTrips,
+  computeTrips,
+  fmtScore,
 };
 
 // Node.js / browser / Web Worker compatibility
