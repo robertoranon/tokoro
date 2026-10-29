@@ -350,7 +350,7 @@ Each command calls the API worker (service binding `API_WORKER`, else `API_WORKE
 
 | Command | Worker call | Reply |
 |---|---|---|
-| `/start <code>` | `POST /telegram/link {code, chat_id}` | 200: "Connected, {name}. You'll get a daily message when your {n} band(s) announce new shows." + radar state line ("Festival radar alerts are off — send /radar on to enable." or "...are on (/radar off to stop them).") + "/stop to disconnect." (name HTML-escaped). 404 or 410: "This link has expired. Open Telegram alerts again from the tours page." 403: "This personal link is no longer active." Other: generic error |
+| `/start <code>` | `POST /telegram/link {code, chat_id}` | 200: "Connected, {name}. You'll get a daily message when your {n} band(s) announce new shows." (with followed festivals, `festivals` in the response, missing = 0: "...your {n} bands announce new shows or your {m} festival(s) announce a new edition."; no bands: "...when your {m} festival(s) announce(s) a new edition.") + radar state line ("Festival radar alerts are off — send /radar on to enable." or "...are on (/radar off to stop them).") + "/stop to disconnect." (name HTML-escaped). 404 or 410: "This link has expired. Open Telegram alerts again from the tours page." 403: "This personal link is no longer active." Other: generic error |
 | `/radar on` / `/radar off` | `POST /telegram/settings {chat_id, radar_alerts}` | "Festival radar alerts are on." / "...are off."; 404: "This chat isn't connected. Open Telegram alerts from your tours page link."; `/radar` with any other argument: "Send /radar on or /radar off." |
 | `/stop` | `POST /telegram/unlink {chat_id}` | "Disconnected. You won't receive alerts."; 404: the "isn't connected" reply |
 

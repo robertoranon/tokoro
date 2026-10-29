@@ -79,6 +79,39 @@ describe('handleAlertCommand', () => {
     expect(calls[1].body.code).toBe('abcDEF');
   });
 
+  it.each([
+    [
+      3,
+      2,
+      "Connected, Anna. You'll get a daily message when your 3 bands announce new shows or your 2 festivals announce a new edition.",
+    ],
+    [
+      0,
+      1,
+      "Connected, Anna. You'll get a daily message when your 1 festival announces a new edition.",
+    ],
+    [
+      3,
+      0,
+      "Connected, Anna. You'll get a daily message when your 3 bands announce new shows.",
+    ],
+    [
+      0,
+      0,
+      "Connected, Anna. You'll get a daily message when your 0 bands announce new shows.",
+    ],
+  ])(
+    '/start connect message with %i bands, %i festivals',
+    async (bands, festivals, first) => {
+      answer = {
+        status: 200,
+        body: { name: 'Anna', bands, festivals, radar_alerts: false },
+      };
+      await handleAlertCommand(dm('/start abc'), env, reply);
+      expect(replies[0].split('\n')[0]).toBe(first);
+    }
+  );
+
   it('/start with an expired or unknown code explains what to do', async () => {
     answer = { status: 410, body: { error: 'Code expired' } };
     await handleAlertCommand(dm('/start abc'), env, reply);

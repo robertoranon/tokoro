@@ -36,10 +36,22 @@ const MSG = {
 const escapeHtml = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-function connected(name: string, bands: number, radar: boolean): string {
-  const n = `${bands} band${bands === 1 ? '' : 's'}`;
+function connected(
+  name: string,
+  bands: number,
+  radar: boolean,
+  festivals = 0
+): string {
+  const b = `${bands} band${bands === 1 ? '' : 's'}`;
+  const f = `${festivals} festival${festivals === 1 ? '' : 's'}`;
+  let what: string;
+  if (festivals > 0 && bands > 0)
+    what = `your ${b} announce new shows or your ${f} announce a new edition`;
+  else if (festivals > 0)
+    what = `your ${f} ${festivals === 1 ? 'announces' : 'announce'} a new edition`;
+  else what = `your ${b} announce new shows`;
   return [
-    `Connected, ${escapeHtml(name)}. You'll get a daily message when your ${n} announce new shows.`,
+    `Connected, ${escapeHtml(name)}. You'll get a daily message when ${what}.`,
     radar
       ? 'Festival radar alerts are on (/radar off to stop them).'
       : 'Festival radar alerts are off — send /radar on to enable.',
@@ -118,7 +130,8 @@ export async function handleAlertCommand(
           connected(
             data.name,
             Number(data.bands) || 0,
-            data.radar_alerts === true
+            data.radar_alerts === true,
+            Number(data.festivals) || 0
           )
         );
       } else if (status === 404 || status === 410) await reply(MSG.expired);
