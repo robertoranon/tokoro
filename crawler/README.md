@@ -242,6 +242,7 @@ Legitimate parallel events (different stages or acts running at the same time) a
 - **Updates**: an existing entry is only re-published (`PUT`) when something that matters to the radar changed: dates, category, a move of more than ~500 m, or a previously empty description now filled. Wording differences between runs are ignored, since LLM output varies
 - **Safety**: an existing entry is only ever updated if it looks like a radar entry (tagged `festival` and with the radar date shape: start `T00:00:00`, end `T23:59:59`), so program events from Festival Mode under the same `festival_url` are never overwritten
 - **Scheduling**: `0 10 * * 1  cd /path/to/tokoro/crawler && /absolute/path/to/npm run radar >> logs/radar.log 2>&1` (cron's PATH usually lacks npm: find it with `which npm`; `logs/` is gitignored)
+- **Publish the tracked list**: `npm run export-festivals -- --out tracked-festivals.json` writes the public list of active festivals (name and homepage only; `--festivals <path>` for another file) and warns about urls that contain a year (keep urls the same from one edition to the next); `scripts/deploy-public-web.sh` does it for you
 - **Tests**: `npm run test:radar` (offline); `npm run smoke:radar` (needs `wrangler dev`)
 
 #### Scout: finding new festivals for the watchlist
@@ -459,7 +460,8 @@ src/
 ├── scout.ts, scout-promote.ts   # npm run scout, scout-promote
 ├── tours.ts       # npm run tours
 ├── bands-scout.ts # npm run bands-scout
-└── export-tracked-bands.ts  # npm run export-bands
+├── export-tracked-bands.ts  # npm run export-bands
+└── export-tracked-festivals.ts  # npm run export-festivals
 ```
 
 ## Configuration

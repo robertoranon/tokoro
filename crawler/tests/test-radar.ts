@@ -45,6 +45,12 @@ import {
   type RunRecord,
 } from '../src/utils/run-log.js';
 import { tallyOutcomes } from '../src/radar.js';
+import { parseFestivalsConfig } from '../src/radar/festivals-config.js';
+import {
+  buildTrackedFestivals,
+  yearInUrlWarnings,
+} from '../src/radar/tracked-festivals.js';
+import { parseExportArgs as parseFestivalExportArgs } from '../src/export-tracked-festivals.js';
 
 let passed = 0;
 let failed = 0;
@@ -2215,6 +2221,83 @@ console.log('\n=== other_places (additional festival places) ===\n');
       !('other_places' in e2e),
     'end to end: description gets the sentence, address/venue_name untouched'
   );
+}
+
+// --- tracked festivals export ---
+{
+  console.log('\n=== tracked festivals export ===\n');
+  const cfg = parseFestivalsConfig(`
+festivals:
+  - { url: "https://zed.example/", name: Zed Fest, notes: "private note", fetcher: jina, added: 2026-01-01 }
+  - { url: "https://Alpha.example/Main/", name: alpha fest }
+  - { url: "https://paused.example", name: Paused Fest, status: paused }
+  - { url: "https://www.noname.example" }
+  - { url: "https://zzz.example/a", name: Zed Fest }
+`);
+  const out = buildTrackedFestivals(cfg, '2030-10-07');
+  assert(out.generated === '2030-10-07', 'carries the generation date');
+  assert(
+    !out.festivals.some(f => f.url === 'https://paused.example'),
+    'paused entries are left out'
+  );
+  assert(
+    out.festivals.map(f => f.name).join('|') ===
+      'alpha fest|www.noname.example|Zed Fest|Zed Fest',
+    'sorted by name case-insensitively; name falls back to the hostname'
+  );
+  assert(
+    out.festivals[0].url === 'https://alpha.example/Main',
+    'urls are normalized'
+  );
+  assert(
+    Object.keys(out.festivals[0]).sort().join() === 'name,url' &&
+      !/private note|notes|added|fetcher|jina/.test(JSON.stringify(out)),
+    'only name and url are exported'
+  );
+  const dup = buildTrackedFestivals(
+    {
+      festivals: [
+        { url: 'https://d.example', name: 'D', status: 'active' },
+        { url: 'https://d.example/', name: 'D2', status: 'active' },
+      ],
+    },
+    '2030-10-07'
+  );
+  assert(dup.festivals.length === 1, 'duplicate urls appear once');
+
+  const warn = yearInUrlWarnings(
+    parseFestivalsConfig(`
+festivals:
+  - { url: "https://x.example/jazz-river-2026/", name: Jazz River }
+  - { url: "https://fest.example" }
+  - { url: "https://old.example/2019", status: paused }
+`)
+  );
+  assert(
+    warn.length === 1 && warn[0].includes('https://x.example/jazz-river-2026'),
+    'one warning per active entry with a year in the url, naming it'
+  );
+
+  const a = parseFestivalExportArgs(['node', 'x', '--out', 'o.json']);
+  assert(a.out === 'o.json' && a.festivals === 'festivals.yaml', 'defaults');
+  assert(
+    parseFestivalExportArgs([
+      'node',
+      'x',
+      '--festivals',
+      'f.yaml',
+      '--out',
+      'o',
+    ]).festivals === 'f.yaml',
+    '--festivals flag'
+  );
+  let threw = false;
+  try {
+    parseFestivalExportArgs(['node', 'x']);
+  } catch {
+    threw = true;
+  }
+  assert(threw, '--out is required');
 }
 
 // --- add new test sections above this line ---

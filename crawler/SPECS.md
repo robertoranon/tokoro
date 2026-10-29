@@ -634,6 +634,18 @@ Writes the public list of the bands the tours runner follows, for the tours page
 
 **Members.** The tours page also uses this file to decide whether a member's suggestion has been added (matched by site url, else by normalized name; `public-web/SPECS.md` FR-8.9). A band added to `bands.yaml` therefore shows as *Added* to the members who suggested it only after the next deploy regenerates `tracked-bands.json`. Aliases are not exported, so a suggestion that matches only an alias needs the admin's "Link selected to an existing band".
 
+### 4.13 Tracked Festivals Export (`npm run export-festivals`)
+
+Writes the public list of the festivals on the radar, for the festivals page of the public web (`public-web/SPECS.md`) and for members who follow festivals.
+
+**Usage:** `npm run export-festivals -- --out <file> [--festivals <path>]`. `--out` is required; `--festivals` defaults to `festivals.yaml`. `scripts/deploy-public-web.sh` runs it and ships the result as `tracked-festivals.json` (skipped, with a notice, when `crawler/festivals.yaml` does not exist; if the export fails the deploy warns and leaves the file out).
+
+**Output:** `{ "generated": "YYYY-MM-DD", "festivals": [{ "name", "url" }] }` (2-space indented, trailing newline). Only active entries are listed, sorted by name (case- and accent-insensitive); `url` is the normalized `festival_url` and `name` falls back to the url's hostname. Duplicate urls appear once. Notes, `added`, fetcher, browser and model never leave the file. The output directory is created if missing and the file is written atomically.
+
+**Curator rule: urls must not depend on the edition.** Members follow a festival by its url, so an entry's `url` must stay the same from one edition to the next (no year or `/2026/` in it). The export prints a warning (`console.warn`, not an error) for each active entry whose url matches `(19|20)\d\d`; paused entries are not checked.
+
+**Errors (exit 1):** unknown option, missing `--out`, `--festivals` without a path, `festivals.yaml` not found or invalid (4.8); nothing is written. On success it prints `Exported N tracked festival(s) to <file>`.
+
 ---
 
 ## 5. HTML Fetching

@@ -67,6 +67,18 @@ else
   echo "No crawler/bands.yaml: skipping tracked-bands.json (the tours page will list only bands that have shows)."
 fi
 
+# Public list of tracked festivals for the festivals page (names and homepage urls only).
+FESTIVALS_FILE="${REPO_ROOT}/crawler/festivals.yaml"
+if [[ -f "$FESTIVALS_FILE" ]]; then
+  echo "Exporting tracked festivals..."
+  if ! (cd "${REPO_ROOT}/crawler" && npx tsx src/export-tracked-festivals.ts --festivals "$FESTIVALS_FILE" --out "${DEPLOY_DIR}/tracked-festivals.json"); then
+    echo "Warning: could not export tracked festivals; the festivals page will list only festivals that have entries." >&2
+    rm -f "${DEPLOY_DIR}/tracked-festivals.json"
+  fi
+else
+  echo "No crawler/festivals.yaml: skipping tracked-festivals.json (the festivals page will list only festivals that have entries)."
+fi
+
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "[dry-run] Would deploy public-web to Cloudflare Pages (project: tokoro-query)"
   echo "[dry-run] Skipping deploy."

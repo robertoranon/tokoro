@@ -7,6 +7,10 @@
 #   npm run radar -- --debug
 # Use a different file:
 #   npm run radar -- --festivals /path/to/other.yaml
+#
+# Rule: a url must not depend on the edition (no year, no /2026/). Members follow
+# a festival by its url, so it has to stay the same from one edition to the next.
+# Exporting warns about active urls that contain a year.
 
 defaults:
   fetcher: playwright # optional; per-festival override allowed (playwright | jina)

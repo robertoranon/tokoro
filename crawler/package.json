@@ -29,6 +29,7 @@
     "radar": "tsx src/radar.ts",
     "tours": "tsx src/tours.ts",
     "export-bands": "tsx src/export-tracked-bands.ts",
+    "export-festivals": "tsx src/export-tracked-festivals.ts",
     "scout": "tsx src/scout.ts",
     "scout-promote": "tsx src/scout-promote.ts",
     "bands-scout": "tsx src/bands-scout.ts",
