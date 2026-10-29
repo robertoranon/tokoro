@@ -17,7 +17,7 @@ import {
   placeQuery,
   type TourShowDraft,
 } from './tour-shows.js';
-import type { GeoBias } from '../../../shared/utils/geocode.js';
+import { haversineKm, type GeoBias } from '../../../shared/utils/geocode.js';
 import {
   matchShow,
   type ExistingShow,
@@ -44,6 +44,13 @@ export interface ShowResult {
   /** Why the show failed (set whenever `outcome` is 'failed'). */
   reason?: string;
 }
+
+/**
+ * How far from the page's centre a venue-only show may be geocoded. Such a
+ * show has only a venue name to go on, and Nominatim answers with any place of
+ * that name ("The Truth" is a pub in London, not the Nashville venue).
+ */
+export const MAX_VENUE_ONLY_KM = 1500;
 
 /** Why normalize found no location for a show (it returned null). */
 function noLocationReason(entry: ExtractedEvent): string {
@@ -274,6 +281,24 @@ export async function processTourSourcePage(
           );
         }
       }
+      // A venue name alone can resolve to a namesake on another continent
+      // that still passes the region check: distrust it when the rest of the
+      // page points elsewhere. A matched show then keeps its stored place.
+      let farReason: string | undefined;
+      if (
+        normalized &&
+        geoBias &&
+        entry.lat === undefined &&
+        !entry.address &&
+        haversineKm(normalized, geoBias) > MAX_VENUE_ONLY_KM
+      ) {
+        farReason = truncate(
+          `"${entry.venue_name}" has no city on the page and geocoded far from the rest of the page (${normalized.lat}, ${normalized.lng})`,
+          MAX_REASON
+        );
+        console.log(`  ⚠ ${farReason}`);
+        normalized = null;
+      }
       if (match) matchedIds.add(match.id);
       if (!normalized && match) {
         // LLM extraction varies between runs: a run that finds no usable
@@ -290,7 +315,7 @@ export async function processTourSourcePage(
         results.push({
           title: draft.title,
           outcome: 'failed',
-          reason: noLocationReason(entry),
+          reason: farReason ?? noLocationReason(entry),
         });
         continue;
       }

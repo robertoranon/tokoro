@@ -2596,6 +2596,8 @@ sources:
       text: 'x',
     };
     const sentBias: (GeoBias | undefined)[] = [];
+    // Where the stubbed geocoder puts a show that has no coordinates.
+    let stubGeocode = { lat: 36, lng: -78.9 };
     let queries: string[] = [];
     let applied = 0;
     const mk = (
@@ -2611,8 +2613,8 @@ sources:
           pubkey: 'me',
           signature: 's',
           title: e.title,
-          lat: e.lat ?? 36,
-          lng: e.lng ?? -78.9,
+          lat: e.lat ?? stubGeocode.lat,
+          lng: e.lng ?? stubGeocode.lng,
           start_time: String(e.start_time),
           category: e.category,
           created_at: opts?.createdAt ?? 'now',
@@ -2713,6 +2715,59 @@ sources:
       called === 1,
       'locate is still called once (with an empty list when every show has coordinates)'
     );
+
+    // A venue-only show (no address, city, region or country) geocoded far from
+    // the rest of the page is a namesake ("The Truth" pub in London for a
+    // Nashville venue): it fails instead of being published
+    const usBias = async () => ({ lat: 36, lng: -86 });
+    const venueOnly = (over: Partial<TourShowDraft> = {}) =>
+      show({ city: undefined, venue_name: 'The Truth', ...over });
+    stubGeocode = { lat: 51.61, lng: -0.11 };
+    applied = 0;
+    const far = await processTourSourcePage(
+      pg,
+      cfgW.sources[0],
+      cfgW,
+      mk([venueOnly()], [], usBias)
+    );
+    assert(
+      far[0].outcome === 'failed' &&
+        /far from the rest of the page/.test(far[0].reason ?? '') &&
+        applied === 0,
+      'a venue-only show geocoded far from the page bias fails and is not sent'
+    );
+    const withCity = await processTourSourcePage(
+      pg,
+      cfgW.sources[0],
+      cfgW,
+      mk([show({ city: 'Nashville' })], [], usBias)
+    );
+    assert(
+      withCity[0].outcome === 'published',
+      'a show with a city is trusted whatever the bias says'
+    );
+    const noBias = await processTourSourcePage(
+      pg,
+      cfgW.sources[0],
+      cfgW,
+      mk([venueOnly()])
+    );
+    assert(
+      noBias[0].outcome === 'published',
+      'without a bias a venue-only show is not second-guessed'
+    );
+    stubGeocode = { lat: 36.2, lng: -86.8 };
+    const near = await processTourSourcePage(
+      pg,
+      cfgW.sources[0],
+      cfgW,
+      mk([venueOnly()], [], usBias)
+    );
+    assert(
+      near[0].outcome === 'published',
+      'a venue-only show geocoded near the page bias is published'
+    );
+    stubGeocode = { lat: 36, lng: -78.9 };
 
     // a show held by another key is left alone
     applied = 0;

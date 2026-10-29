@@ -113,7 +113,7 @@ export async function geocodeCandidates(
   return candidates;
 }
 
-function haversineKm(a: GeoBias, b: GeoBias): number {
+export function haversineKm(a: GeoBias, b: GeoBias): number {
   const R = 6371;
   const rad = (x: number) => (x * Math.PI) / 180;
   const dLat = rad(b.lat - a.lat);
