@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Usage: ./scripts/restore-from-backup.sh <backup-file.json>
 # Restores events, the member tables (members, member_bands,
-# band_suggestions) and the blocklist from a JSON backup file (produced by the
+# band_suggestions, member_festivals, festival_suggestions) and the blocklist from a JSON backup file (produced by the
 # Worker R2 backup) into the remote (production) D1 database using wrangler d1 execute. Older
 # backups restore just the tables they contain (e.g. only events, or no
 # blocklist).
@@ -34,7 +34,7 @@ node - "$BACKUP_FILE" "$SQL_FILE" <<'EOF'
 const fs = require('fs');
 const [,, inputFile, outputFile] = process.argv;
 const { tables } = JSON.parse(fs.readFileSync(inputFile, 'utf8'));
-const TABLES = ['events', 'members', 'member_bands', 'band_suggestions', 'blocklist'];
+const TABLES = ['events', 'members', 'member_bands', 'band_suggestions', 'member_festivals', 'festival_suggestions', 'blocklist'];
 
 const stmts = [];
 for (const table of TABLES) {
