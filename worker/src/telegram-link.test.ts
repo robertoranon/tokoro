@@ -90,12 +90,19 @@ describe('POST /telegram/link', () => {
     )
       .bind(anna.pubkey)
       .run();
+    for (const u of ['https://f1.example', 'https://f2.example'])
+      await env.DB.prepare(
+        'INSERT INTO member_festivals (pubkey, festival_url, created_at) VALUES (?, ?, ?)'
+      )
+        .bind(anna.pubkey, u, 'x')
+        .run();
     const { code } = (await (await linkCode(anna)).json()) as any;
     const res = await link(code, '12345');
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       name: 'Anna',
       bands: 1,
+      festivals: 2,
       radar_alerts: false,
     });
     expect(await memberRow(anna)).toEqual({

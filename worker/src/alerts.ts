@@ -26,6 +26,7 @@ export interface Recipient {
   chat_id: string;
   radar: boolean;
   bands: string[]; // followed act_url values
+  festivals: string[]; // followed festival urls
 }
 
 export interface Edition {
@@ -151,18 +152,25 @@ export function digestFor(
   r: Recipient,
   shows: AlertEvent[],
   editions: Edition[]
-): { shows: AlertEvent[]; editions: Edition[] } | null {
-  const followed = new Set(r.bands.map(bandKey));
-  const mine = shows.filter(e => e.act_url && followed.has(bandKey(e.act_url)));
-  const eds = r.radar ? editions : [];
-  return mine.length || eds.length ? { shows: mine, editions: eds } : null;
+): { shows: AlertEvent[]; followed: Edition[]; editions: Edition[] } | null {
+  const bandSet = new Set(r.bands.map(bandKey));
+  const mine = shows.filter(e => e.act_url && bandSet.has(bandKey(e.act_url)));
+  const festSet = new Set(r.festivals.map(bandKey));
+  const followed = editions.filter(e => festSet.has(bandKey(e.festival_url)));
+  const eds = r.radar
+    ? editions.filter(e => !festSet.has(bandKey(e.festival_url)))
+    : [];
+  return mine.length || followed.length || eds.length
+    ? { shows: mine, followed, editions: eds }
+    : null;
 }
 
 /** The Telegram HTML message for one member. */
 export function formatDigest(
   shows: AlertEvent[],
   editions: Edition[],
-  opts: { year: number; publicWebUrl?: string }
+  opts: { year: number; publicWebUrl?: string },
+  followed: Edition[] = []
 ): string {
   let used = 0;
   let chars = 0;
@@ -221,9 +229,10 @@ export function formatDigest(
     if (lines.length > 1) blocks.push(lines.join('\n'));
   }
 
-  if (editions.length) {
-    const lines = ['🎪 <b>New festival editions</b>'];
-    for (const ed of editions) {
+  const editionBlock = (heading: string, list: Edition[]) => {
+    if (!list.length) return;
+    const lines = [heading];
+    for (const ed of list) {
       const name = clip(ed.name);
       const range = esc(fmtDayRange(ed.start, ed.end));
       const place = ed.place ? clip(ed.place) : '';
@@ -242,7 +251,9 @@ export function formatDigest(
       lines.push('• ' + bits.join(' · '));
     }
     if (lines.length > 1) blocks.push(lines.join('\n'));
-  }
+  };
+  editionBlock('🎪 <b>Festivals you follow</b>', followed);
+  editionBlock('🎪 <b>New festival editions</b>', editions);
 
   if (omitted) blocks.push(`…and ${omitted} more`);
 
@@ -251,7 +262,7 @@ export function formatDigest(
     const links: string[] = [];
     if (shows.length)
       links.push(`<a href="${esc(base)}/tours.html">All shows</a>`);
-    if (editions.length)
+    if (editions.length || followed.length)
       links.push(`<a href="${esc(base)}/festivals.html">Festivals</a>`);
     blocks.push(links.join(' · '));
   }
@@ -332,12 +343,27 @@ async function loadRecipients(env: Env): Promise<Recipient[]> {
     l.push(f.act_url);
     byMember.set(f.pubkey, l);
   }
+  const festFollows =
+    (
+      await env.DB.prepare(
+        `SELECT f.pubkey, f.festival_url FROM member_festivals f
+         JOIN members m ON m.pubkey = f.pubkey
+         WHERE m.telegram_chat_id IS NOT NULL AND m.revoked_at IS NULL`
+      ).all<{ pubkey: string; festival_url: string }>()
+    ).results || [];
+  const festByMember = new Map<string, string[]>();
+  for (const f of festFollows) {
+    const l = festByMember.get(f.pubkey) || [];
+    l.push(f.festival_url);
+    festByMember.set(f.pubkey, l);
+  }
   return members.map(m => ({
     pubkey: m.pubkey,
     name: m.name,
     chat_id: m.telegram_chat_id,
     radar: m.radar_alerts === 1,
     bands: byMember.get(m.pubkey) || [],
+    festivals: festByMember.get(m.pubkey) || [],
   }));
 }
 
@@ -392,6 +418,7 @@ export async function sendAlertDigests(
       chat_id: adminChat,
       radar: true,
       bands: [...new Set(shows.map(e => e.act_url!))],
+      festivals: [],
     });
   }
   const targets = recipients
@@ -404,10 +431,12 @@ export async function sendAlertDigests(
   }
   for (const { r, d: dg } of targets.slice(0, MAX_SENDS_PER_RUN)) {
     const d = dg!;
-    const text = formatDigest(d.shows, d.editions, {
-      year,
-      publicWebUrl: env.PUBLIC_WEB_URL,
-    });
+    const text = formatDigest(
+      d.shows,
+      d.editions,
+      { year, publicWebUrl: env.PUBLIC_WEB_URL },
+      d.followed
+    );
     const result = await sendTelegram(
       fetchFn,
       env.TELEGRAM_BOT_TOKEN,

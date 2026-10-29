@@ -140,9 +140,15 @@ async function linkChat(
   )
     .bind(row.pubkey)
     .first<{ n: number }>();
+  const festivals = await env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM member_festivals WHERE pubkey = ?'
+  )
+    .bind(row.pubkey)
+    .first<{ n: number }>();
   return jsonResponse({
     name: member.name,
     bands: bands?.n ?? 0,
+    festivals: festivals?.n ?? 0,
     radar_alerts: member.radar_alerts === 1,
   });
 }

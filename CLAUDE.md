@@ -25,7 +25,7 @@ The backend is a single TypeScript Cloudflare Worker that:
 - Executes geo-indexed SQL queries against D1 (SQLite)
 - Handles event expiration via scheduled cron triggers
 - Computes collaborative filtering recommendations
-- Sends a daily Telegram digest (08:00 UTC) of new shows of followed bands and new festival editions to linked members. A separate admin Telegram chat (`ADMIN_TELEGRAM_CHAT_ID`; optional `ADMIN_PAGE_URL` is linked from the notice) gets a message for each new conflict (same band, two places, one day)
+- Sends a daily Telegram digest (08:00 UTC) of new shows of followed bands, new editions of followed festivals and (with radar alerts on) all new festival editions to linked members. A separate admin Telegram chat (`ADMIN_TELEGRAM_CHAT_ID`; optional `ADMIN_PAGE_URL` is linked from the notice) gets a message for each new conflict (same band, two places, one day)
 
 API Endpoints:
 

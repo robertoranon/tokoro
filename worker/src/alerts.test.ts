@@ -36,6 +36,7 @@ const anna: Recipient = {
   chat_id: '1',
   radar: false,
   bands: ['https://alpha.example/'],
+  festivals: [],
 };
 
 describe('fmtAlertDate / fmtDayRange', () => {
@@ -145,6 +146,80 @@ describe('digestFor', () => {
   });
   it('null when there is nothing for the member', () => {
     expect(digestFor({ ...anna, bands: [] }, shows, editions)).toBeNull();
+  });
+  const edA = {
+    festival_url: 'https://fest.example/x/',
+    name: 'A',
+    start: '2027-06-18T00:00:00',
+    end: '2027-06-18T00:00:00',
+    place: null,
+  };
+  const edB = {
+    festival_url: 'https://other.example/',
+    name: 'B',
+    start: '2027-07-01T00:00:00',
+    end: '2027-07-01T00:00:00',
+    place: null,
+  };
+  const fan = { ...anna, bands: [], festivals: ['https://Fest.example/X'] };
+  it('digestFor puts followed editions in followed, matching case-insensitively', () => {
+    expect(digestFor(fan, [], [edA])!.followed).toEqual([edA]);
+  });
+  it('digestFor does not repeat a followed edition under editions when radar is on', () => {
+    const d = digestFor({ ...fan, radar: true }, [], [edA, edB])!;
+    expect(d.followed).toEqual([edA]);
+    expect(d.editions).toEqual([edB]);
+  });
+  it('digestFor sends a festivals-only member their followed editions with radar off', () => {
+    const d = digestFor(fan, [], [edA, edB])!;
+    expect(d).not.toBeNull();
+    expect(d.editions).toEqual([]);
+    expect(d.followed).toEqual([edA]);
+  });
+});
+
+describe('formatDigest followed festivals', () => {
+  const ed = (name: string) => ({
+    festival_url: 'https://f.example/' + name,
+    name,
+    start: '2027-06-18T00:00:00',
+    end: '2027-06-20T00:00:00',
+    place: 'Berlin',
+  });
+  it('formatDigest orders sections', () => {
+    const text = formatDigest(
+      [
+        ev({
+          id: 's',
+          act_url: 'https://a.example',
+          act_name: 'Alpha',
+          start_time: '2026-11-14T21:00:00',
+        }),
+      ],
+      [ed('New')],
+      { year: 2026, publicWebUrl: 'https://tokoro.example' },
+      [ed('Mine')]
+    );
+    const a = text.indexOf('🎸 <b>New shows</b>');
+    const b = text.indexOf('🎪 <b>Festivals you follow</b>');
+    const c = text.indexOf('🎪 <b>New festival editions</b>');
+    expect(a).toBeGreaterThanOrEqual(0);
+    expect(a).toBeLessThan(b);
+    expect(b).toBeLessThan(c);
+    expect(text).toContain(
+      '• <b>Mine</b> · 18–20 Jun 2027 · Berlin · <a href="https://f.example/Mine">site</a>'
+    );
+  });
+  it('adds the Festivals link when only followed is non-empty', () => {
+    const text = formatDigest(
+      [],
+      [],
+      { year: 2026, publicWebUrl: 'https://tokoro.example' },
+      [ed('Mine')]
+    );
+    expect(text).toContain(
+      '<a href="https://tokoro.example/festivals.html">Festivals</a>'
+    );
   });
 });
 

@@ -1411,7 +1411,7 @@ Same as 7.14 over `member_festivals`: active members only, most followed first, 
 
 ### 7.15 Telegram Alerts
 
-Tours members can connect one private Telegram chat and receive a daily digest of new shows by the bands they follow and, if they opt in, of newly announced festival editions. The API worker detects new items and sends the digests from its cron; the crawler-worker bot only handles linking and settings commands (`crawler-worker/SPECS.md` 3.6).
+Tours members can connect one private Telegram chat and receive a daily digest of new shows by the bands they follow, new editions of the festivals they follow and, if they opt in, of all newly announced festival editions. The API worker detects new items and sends the digests from its cron; the crawler-worker bot only handles linking and settings commands (`crawler-worker/SPECS.md` 3.6).
 
 #### 7.15.1 POST /member/telegram/link-code
 
@@ -1433,7 +1433,7 @@ Signed by the bot as described in section 3.6 (domains `telegram-link`, `telegra
 
 | Endpoint | Body | Behaviour | Success (200) |
 |---|---|---|---|
-| `POST /telegram/link` | `{code, chat_id}` | Redeems a link code (below) | `{name, bands, radar_alerts}` (`bands` = number of followed bands) |
+| `POST /telegram/link` | `{code, chat_id}` | Redeems a link code (below) | `{name, bands, festivals, radar_alerts}` (`bands` / `festivals` = number of followed bands / festivals) |
 | `POST /telegram/settings` | `{chat_id, radar_alerts}` (boolean required, else `400 {"error": "radar_alerts must be true or false"}`) | Sets `radar_alerts` of the member linked to the chat | `{radar_alerts}` |
 | `POST /telegram/unlink` | `{chat_id}` | Sets `telegram_chat_id` to null for the chat | `{unlinked: true}` |
 
@@ -1460,8 +1460,8 @@ Runs from the `0 8 * * *` cron (section 8.3). Does nothing when `TELEGRAM_BOT_TO
 1. **Claim:** `UPDATE events SET alert_pending = 2 WHERE alert_pending = 1 AND held = 0` (held events stay at 1, are neither sent nor cleared, and go out in the digest after their conflict is resolved), then select the claimed events with `start_time >= today`. Events published while the job runs stay at 1 and go into the next digest.
 2. **New shows:** claimed events with an `act_url`.
 3. **New editions:** claimed events with a `festival_url`, grouped by `festival_url` (compared lower-case, trailing slashes ignored). A group is a new edition when **no** non-held (`held = 0`) event with that `festival_url` has `alert_pending = 0`, whatever its date. This relies on the daily expiry (section 8.1) deleting events 2 days after they end: a processed entry still in the database means the edition is running or upcoming, so it is not announced again; a festival seen for the first time, or whose next edition appears after the last one expired, is announced. An edition is shown with its name (the first non-empty `festival_name` of the group, else the earliest entry's title), the date range from the earliest start to the latest end (or start) of the group, the earliest entry's `venue_name` (else `address`), and a link to `festival_url`.
-4. **Recipients:** members with `telegram_chat_id` not null and `revoked_at` null, with their `member_bands`. A show matches when its `act_url` equals a followed URL after lower-casing and dropping trailing slashes (the rule `tours.html` uses).
-5. **Per recipient:** their shows (followed bands only) plus all new editions if `radar_alerts = 1`. A recipient with nothing is skipped; otherwise one message is sent with `POST https://api.telegram.org/bot<TOKEN>/sendMessage` (`chat_id`, `text`, `parse_mode: "HTML"`, `disable_web_page_preview: true`). At most one message per member per day.
+4. **Recipients:** members with `telegram_chat_id` not null and `revoked_at` null, with their `member_bands` and `member_festivals`. A show matches when its `act_url` equals a followed URL after lower-casing and dropping trailing slashes (the rule `tours.html` uses).
+5. **Per recipient:** their shows (followed bands only); the new editions whose `festival_url` they follow (same lower-case, no-trailing-slash comparison), listed as "followed" even with `radar_alerts = 0`; and, if `radar_alerts = 1`, all other new editions (a followed edition is never repeated there). A recipient with none of the three is skipped, so a member who only follows festivals still gets a digest; otherwise one message is sent with `POST https://api.telegram.org/bot<TOKEN>/sendMessage` (`chat_id`, `text`, `parse_mode: "HTML"`, `disable_web_page_preview: true`). At most one message per member per day.
 6. **Send errors:** `403` from Telegram (bot blocked) sets that member's `telegram_chat_id` to null. `429` waits `min(parameters.retry_after, 5)` seconds (1 if absent) and retries once. Any other error (including a network failure) is logged and the member is skipped; their items are not re-sent.
 7. **Send budget:** at most 45 messages per run (`MAX_SENDS_PER_RUN`, to stay under the Workers free plan's 50 subrequests). If more recipients have something to send, a warning is logged and the extra members are skipped that day (they miss those items).
 8. **Finish:** `UPDATE events SET alert_pending = 0 WHERE alert_pending = 2` (this also clears claimed past events and claimed events nobody follows), then `telegram_link_codes` rows with `expires_at` earlier than now are deleted. Flags are cleared once after all sends: if a run crashes midway, members already messaged get the same items again on the next run.
@@ -1476,6 +1476,9 @@ Runs from the `0 8 * * *` cron (section 8.3). Does nothing when `TELEGRAM_BOT_TO
 <b>Other Band</b>
 • ...
 
+🎪 <b>Festivals you follow</b>
+• <b>Festival Name</b> · 18–21 Jun 2027 · Place · <a href="url">site</a>
+
 🎪 <b>New festival editions</b>
 • <b>Festival Name</b> · 18–21 Jun 2027 · Place · <a href="url">site</a>
 
@@ -1486,7 +1489,7 @@ Runs from the `0 8 * * *` cron (section 8.3). Does nothing when `TELEGRAM_BOT_TO
 
 - Bands are in alphabetical order, shows within a band by start time. Show dates are `Ddd D Mon` (weekday, day, month), with the year when it is not the current year and the `HH:MM` time when it is not midnight. A show whose `end_time` is on a later day than its `start_time` (a festival appearance with an unknown exact day) is shown as a range with the same format as edition ranges instead of a single date. Edition ranges are `18 Jun 2027`, `18–21 Jun 2027`, `30 Jun – 2 Jul 2027` or `30 Dec 2026 – 2 Jan 2027`.
 - A message has at most 25 item lines (`MAX_DIGEST_LINES`) and about 3800 visible characters (`MAX_DIGEST_CHARS`; Telegram allows 4096). Items past either limit are counted in a `…and N more` line before the links.
-- The links line is omitted when `PUBLIC_WEB_URL` is not set; "All shows" appears only when the message has shows, "Festivals" only when it has editions.
+- The links line is omitted when `PUBLIC_WEB_URL` is not set; "All shows" appears only when the message has shows, "Festivals" only when it has followed or other editions. Sections appear in the order New shows, Festivals you follow, New festival editions; the followed section uses the same line format and shares the line and character budget.
 
 #### 7.15.5 Admin chat
 
