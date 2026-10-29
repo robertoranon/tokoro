@@ -1429,10 +1429,17 @@
           if (suggestionKind === k) return;
           suggestionKind = k;
           applySuggestionKind();
+          // Drop the other kind's rows now: their ids belong to another table.
+          suggestionGroups = [];
+          document.getElementById('s-body').replaceChildren();
+          document.getElementById('s-followers').replaceChildren();
           refreshSuggestions();
         });
       let suggestionGroups = [];
+      // Only the latest refresh may touch the page (responses can arrive out of order).
+      let refreshSeq = 0;
       async function refreshSuggestions(keepStatus = false) {
+        const mine = ++refreshSeq;
         try {
           const api = adminApi();
           const detail =
@@ -1440,9 +1447,11 @@
               .getElementById('s-who-btn')
               .getAttribute('aria-pressed') === 'true';
           const festivals = suggestionKind === 'festivals';
-          suggestionGroups = await (festivals
+          const groups = await (festivals
             ? api.listFestivalSuggestions({ detail })
             : api.listSuggestions({ detail }));
+          if (mine !== refreshSeq) return;
+          suggestionGroups = groups;
           const body = document.getElementById('s-body');
           body.replaceChildren();
           suggestionGroups.forEach((g, i) => {
@@ -1461,11 +1470,13 @@
             );
             body.append(tr);
           });
+          const followers = await (festivals
+            ? api.festivalFollowers()
+            : api.followers());
+          if (mine !== refreshSeq) return;
           const list = document.getElementById('s-followers');
           list.replaceChildren();
-          for (const f of await (festivals
-            ? api.festivalFollowers()
-            : api.followers())) {
+          for (const f of followers) {
             const li = document.createElement('li');
             li.textContent =
               (festivals ? f.festival_url : f.act_url) + ' — ' + f.followers;
@@ -1474,10 +1485,10 @@
           if (!keepStatus)
             say(
               's-status',
-              suggestionGroups.length ? '' : 'No pending suggestions.'
+              suggestionGroups.length ? '' : KIND_TEXT[suggestionKind].empty
             );
         } catch (e) {
-          say('s-status', e.message, 'error');
+          if (mine === refreshSeq) say('s-status', e.message, 'error');
         }
       }
       // The worker accepts at most 200 ids per request: send them in chunks.
