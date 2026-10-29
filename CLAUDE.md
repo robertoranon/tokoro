@@ -59,9 +59,11 @@ API Endpoints:
 
 **Members (tours)** (signed with headers `X-Pubkey`/`X-Signature`/`X-Timestamp`, see `worker/SPECS.md` 3.6; member keys cannot publish)
 
-- `GET /member/me` - Member's name, followed bands and own suggestions
+- `GET /member/me` - Member's name, followed bands and festivals, and own suggestions
 - `POST|DELETE /member/bands/:act_url_b64` - Follow / unfollow a band (base64url site URL)
 - `POST /member/suggestions` - Suggest a band (`name`, optional `url`)
+- `POST|DELETE /member/festivals/:festival_url_b64` - Follow / unfollow a festival (base64url site URL)
+- `POST /member/festival-suggestions` - Suggest a festival (`name`, optional `url`)
 - `POST /member/telegram/link-code` - One-time code + `t.me` link to connect the member's Telegram chat
 - `POST /telegram/link|settings|unlink` - Called by the bot (signed with the bot key): redeem a code, toggle radar alerts, disconnect
 - `GET|POST /admin/members` - List / create members (admin)

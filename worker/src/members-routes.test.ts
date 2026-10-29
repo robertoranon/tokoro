@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import worker from './index';
+import worker, { BACKUP_TABLES } from './index';
 import { encodeB64Url } from './band-keys';
 import { makeD1 } from '../test-support/d1';
 import { makeKey, authHeaders, type TestKey } from '../test-support/sign';
@@ -201,5 +201,16 @@ describe('existing behaviour is unchanged', () => {
   it('still returns 404 for unknown routes', async () => {
     const res = await worker.fetch(new Request('https://w.test/nope'), env);
     expect(res.status).toBe(404);
+  });
+});
+
+describe('backup', () => {
+  it('BACKUP_TABLES includes member_festivals and festival_suggestions', () => {
+    const t: readonly string[] = BACKUP_TABLES;
+    expect(t).toContain('member_festivals');
+    expect(t).toContain('festival_suggestions');
+    expect(t.indexOf('festival_suggestions')).toBeGreaterThan(
+      t.indexOf('band_suggestions')
+    );
   });
 });

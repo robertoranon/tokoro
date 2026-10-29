@@ -14,6 +14,38 @@ export function nowIso(): string {
   return new Date().toISOString().slice(0, 19);
 }
 
+/** What differs between following/suggesting a band and a festival. */
+export interface MemberKindConfig {
+  followTable: string;
+  suggestionTable: string;
+  /** Column holding the normalized url (follow table and suggestions link). */
+  urlColumn: string;
+  followDomain: string;
+  unfollowDomain: string;
+  suggestDomain: string;
+  invalidUrlMessage: string;
+}
+
+export const BAND_KIND: MemberKindConfig = {
+  followTable: 'member_bands',
+  suggestionTable: 'band_suggestions',
+  urlColumn: 'act_url',
+  followDomain: 'band-follow',
+  unfollowDomain: 'band-unfollow',
+  suggestDomain: 'band-suggest',
+  invalidUrlMessage: 'Invalid band url',
+};
+
+export const FESTIVAL_KIND: MemberKindConfig = {
+  followTable: 'member_festivals',
+  suggestionTable: 'festival_suggestions',
+  urlColumn: 'festival_url',
+  followDomain: 'festival-follow',
+  unfollowDomain: 'festival-unfollow',
+  suggestDomain: 'festival-suggest',
+  invalidUrlMessage: 'Invalid festival url',
+};
+
 interface ActiveMember {
   pubkey: string;
   name: string;
@@ -53,10 +85,17 @@ export async function routeMemberRequest(
   }
   const band = path.match(/^\/member\/bands\/([^/]+)$/);
   if (band && (request.method === 'POST' || request.method === 'DELETE')) {
-    return handleMemberBand(request, env, band[1]);
+    return handleMemberFollow(request, env, band[1], BAND_KIND);
+  }
+  const festival = path.match(/^\/member\/festivals\/([^/]+)$/);
+  if (festival && (request.method === 'POST' || request.method === 'DELETE')) {
+    return handleMemberFollow(request, env, festival[1], FESTIVAL_KIND);
   }
   if (request.method === 'POST' && path === '/member/suggestions') {
-    return handleMemberSuggest(request, env);
+    return handleMemberSuggest(request, env, BAND_KIND);
+  }
+  if (request.method === 'POST' && path === '/member/festival-suggestions') {
+    return handleMemberSuggest(request, env, FESTIVAL_KIND);
   }
   return null;
 }
@@ -75,6 +114,17 @@ async function handleMemberMe(request: Request, env: Env): Promise<Response> {
   )
     .bind(m.pubkey)
     .all();
+  const festivals = await env.DB.prepare(
+    'SELECT festival_url FROM member_festivals WHERE pubkey = ? ORDER BY created_at, festival_url'
+  )
+    .bind(m.pubkey)
+    .all<{ festival_url: string }>();
+  const festivalSuggestions = await env.DB.prepare(
+    `SELECT id, name, url, status, festival_url, reject_reason, created_at
+     FROM festival_suggestions WHERE pubkey = ? ORDER BY id DESC`
+  )
+    .bind(m.pubkey)
+    .all();
   const tg = await env.DB.prepare(
     'SELECT telegram_chat_id, radar_alerts FROM members WHERE pubkey = ?'
   )
@@ -88,50 +138,54 @@ async function handleMemberMe(request: Request, env: Env): Promise<Response> {
       linked: !!tg?.telegram_chat_id,
       radar_alerts: tg?.radar_alerts === 1,
     },
+    festivals: (festivals.results || []).map(r => r.festival_url),
+    festival_suggestions: festivalSuggestions.results || [],
   });
 }
 
-async function handleMemberBand(
+async function handleMemberFollow(
   request: Request,
   env: Env,
-  encoded: string
+  encoded: string,
+  kind: MemberKindConfig
 ): Promise<Response> {
   const decoded = decodeB64Url(encoded);
   const actUrl = decoded === null ? null : normalizeActUrl(decoded);
-  if (!actUrl) return jsonResponse({ error: 'Invalid band url' }, 400);
+  if (!actUrl) return jsonResponse({ error: kind.invalidUrlMessage }, 400);
 
   const follow = request.method === 'POST';
   const m = await authMember(
     request,
     env,
-    follow ? 'band-follow' : 'band-unfollow',
+    follow ? kind.followDomain : kind.unfollowDomain,
     actUrl
   );
   if (m instanceof Response) return m;
 
   if (follow) {
     await env.DB.prepare(
-      'INSERT OR IGNORE INTO member_bands (pubkey, act_url, created_at) VALUES (?, ?, ?)'
+      `INSERT OR IGNORE INTO ${kind.followTable} (pubkey, ${kind.urlColumn}, created_at) VALUES (?, ?, ?)`
     )
       .bind(m.pubkey, actUrl, nowIso())
       .run();
   } else {
     await env.DB.prepare(
-      'DELETE FROM member_bands WHERE pubkey = ? AND act_url = ?'
+      `DELETE FROM ${kind.followTable} WHERE pubkey = ? AND ${kind.urlColumn} = ?`
     )
       .bind(m.pubkey, actUrl)
       .run();
   }
-  return jsonResponse({ act_url: actUrl });
+  return jsonResponse({ [kind.urlColumn]: actUrl });
 }
 
 async function handleMemberSuggest(
   request: Request,
-  env: Env
+  env: Env,
+  kind: MemberKindConfig
 ): Promise<Response> {
   const raw = await readSignedBody(request);
   if (raw instanceof Response) return raw;
-  const m = await authMember(request, env, 'band-suggest', raw);
+  const m = await authMember(request, env, kind.suggestDomain, raw);
   if (m instanceof Response) return m;
 
   let body: any;
@@ -171,7 +225,7 @@ async function handleMemberSuggest(
 
   const key = normalizeName(name);
   const pending = await env.DB.prepare(
-    "SELECT id, name FROM band_suggestions WHERE pubkey = ? AND status = 'pending'"
+    `SELECT id, name FROM ${kind.suggestionTable} WHERE pubkey = ? AND status = 'pending'`
   )
     .bind(m.pubkey)
     .all<{ id: number; name: string }>();
@@ -181,7 +235,7 @@ async function handleMemberSuggest(
   if (existing) return jsonResponse({ id: existing.id, duplicate: true }, 200);
 
   const res = await env.DB.prepare(
-    `INSERT INTO band_suggestions (pubkey, name, url, status, created_at)
+    `INSERT INTO ${kind.suggestionTable} (pubkey, name, url, status, created_at)
      VALUES (?, ?, ?, 'pending', ?)`
   )
     .bind(m.pubkey, name, url, nowIso())

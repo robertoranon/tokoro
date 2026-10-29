@@ -451,6 +451,8 @@ export const BACKUP_TABLES = [
   'members',
   'member_bands',
   'band_suggestions',
+  'member_festivals',
+  'festival_suggestions',
   'blocklist',
 ] as const;
 
@@ -643,10 +645,20 @@ export default {
             },
             'GET /member/me': {
               description:
-                'The calling member: name, followed bands, own suggestions (signed with X-Pubkey/X-Signature/X-Timestamp)',
+                'The calling member: name, followed bands and festivals, own suggestions (signed with X-Pubkey/X-Signature/X-Timestamp)',
             },
             'POST|DELETE /member/bands/:act_url_b64': {
               description: 'Follow or unfollow a band (signed)',
+            },
+            'POST|DELETE /member/festivals/:festival_url_b64': {
+              description: 'Follow or unfollow a festival (signed)',
+            },
+            'POST /member/festival-suggestions': {
+              description: 'Suggest a festival to the admin (signed)',
+              body: {
+                name: 'Festival name (required)',
+                url: 'Festival site (optional)',
+              },
             },
             'POST /member/suggestions': {
               description: 'Suggest a band to the admin (signed)',

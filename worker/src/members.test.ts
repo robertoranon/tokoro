@@ -67,6 +67,8 @@ describe('GET /member/me', () => {
       bands: [],
       suggestions: [],
       telegram: { linked: false, radar_alerts: false },
+      festivals: [],
+      festival_suggestions: [],
     });
   });
 
@@ -312,5 +314,107 @@ describe('hardening', () => {
       'SELECT COUNT(*) AS n FROM band_suggestions'
     ).first();
     expect(n).toEqual({ n: 0 });
+  });
+});
+
+describe('member festivals', () => {
+  const festPath = (url: string) => '/member/festivals/' + encodeB64Url(url);
+  const sendFest = (key: TestKey, obj: unknown) => {
+    const body = typeof obj === 'string' ? obj : JSON.stringify(obj);
+    return call(
+      key,
+      'POST',
+      '/member/festival-suggestions',
+      'festival-suggest',
+      body,
+      body
+    );
+  };
+  const count = async (table: string) =>
+    (
+      (await env.DB.prepare(
+        `SELECT COUNT(*) AS n FROM ${table}`
+      ).first()) as any
+    ).n;
+
+  it('festival follow is idempotent and unfollow removes it', async () => {
+    const input = 'HTTPS://Fest.example/Path/?x=1';
+    const norm = 'https://fest.example/Path';
+    const p = festPath(input);
+    const r1 = await call(anna, 'POST', p, 'festival-follow', norm);
+    expect(r1.status).toBe(200);
+    expect(await r1.json()).toEqual({ festival_url: norm });
+    await call(anna, 'POST', p, 'festival-follow', norm);
+    expect(await count('member_festivals')).toBe(1);
+    expect(((await (await me(anna)).json()) as any).festivals).toEqual([norm]);
+    const d = await call(anna, 'DELETE', p, 'festival-unfollow', norm);
+    expect(d.status).toBe(200);
+    expect(await count('member_festivals')).toBe(0);
+  });
+
+  it('festival follow rejects a non-http url before auth', async () => {
+    const r = (await routeMemberRequest(
+      new Request('https://w.test' + festPath('ftp://x'), { method: 'POST' }),
+      env,
+      festPath('ftp://x')
+    ))!;
+    expect(r.status).toBe(400);
+    expect(await r.json()).toEqual({ error: 'Invalid festival url' });
+  });
+
+  it('festival follow signed with band-follow is refused', async () => {
+    const norm = 'https://fest.example/Path';
+    const r = await call(anna, 'POST', festPath(norm), 'band-follow', norm);
+    expect(r.status).toBe(401);
+  });
+
+  it('festival suggestion validates and dedupes pending names', async () => {
+    const empty = await sendFest(anna, { name: '' });
+    expect(empty.status).toBe(400);
+    expect(await empty.json()).toEqual({
+      error: 'name is required (1-120 characters)',
+    });
+    const badUrl = await sendFest(anna, { name: 'Fest', url: 'nope' });
+    expect(badUrl.status).toBe(400);
+    expect(await badUrl.json()).toEqual({
+      error: 'url must be an http(s) URL (max 500 characters)',
+    });
+    const ok = await sendFest(anna, { name: 'Fest' });
+    expect(ok.status).toBe(201);
+    const { id } = (await ok.json()) as any;
+    const dup = await sendFest(anna, { name: 'fest!' });
+    expect(dup.status).toBe(200);
+    expect(await dup.json()).toEqual({ id, duplicate: true });
+    expect(await count('festival_suggestions')).toBe(1);
+    expect(await count('band_suggestions')).toBe(0);
+  });
+
+  it('/member/me returns festivals and festival_suggestions', async () => {
+    const a = 'https://a.example';
+    const b = 'https://b.example';
+    await call(anna, 'POST', festPath(a), 'festival-follow', a);
+    await call(anna, 'POST', festPath(b), 'festival-follow', b);
+    const s1: any = await (await sendFest(anna, { name: 'One' })).json();
+    const s2: any = await (await sendFest(anna, { name: 'Two' })).json();
+    const body: any = await (await me(anna)).json();
+    expect(body.festivals).toEqual([a, b]);
+    expect(body.festival_suggestions.map((x: any) => x.id)).toEqual([
+      s2.id,
+      s1.id,
+    ]);
+    expect(Object.keys(body.festival_suggestions[0]).sort()).toEqual(
+      [
+        'id',
+        'name',
+        'url',
+        'status',
+        'festival_url',
+        'reject_reason',
+        'created_at',
+      ].sort()
+    );
+    expect(body.bands).toEqual([]);
+    expect(body.suggestions).toEqual([]);
+    expect(body.telegram).toEqual({ linked: false, radar_alerts: false });
   });
 });

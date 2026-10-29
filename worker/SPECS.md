@@ -24,7 +24,7 @@ This specification is implementation-agnostic and provides sufficient detail to 
 
 ### 2.1 Database Tables
 
-The worker interacts with nine SQLite tables: `events`, `blocklist`, the three member tables (`members`, `member_bands`, `band_suggestions`), `telegram_link_codes` for the Telegram alerts (section 7.15), and the three conflict tables (`conflicts`, `conflict_events`, `conflict_proposals`).
+The worker interacts with eleven SQLite tables: `events`, `blocklist`, the five member tables (`members`, `member_bands`, `band_suggestions`, `member_festivals`, `festival_suggestions`), `telegram_link_codes` for the Telegram alerts (section 7.15), and the three conflict tables (`conflicts`, `conflict_events`, `conflict_proposals`).
 
 #### Events Table
 
@@ -78,7 +78,7 @@ Blocked pubkeys are checked on write paths. Any request whose `pubkey` appears i
 
 #### Member Tables
 
-Members (admin-issued keys for the tours page) are stored in `members`, `member_bands` and `band_suggestions`; member keys are never part of `ALLOWED_PUBKEYS` and cannot publish.
+Members (admin-issued keys for the tours page) are stored in `members`, `member_bands`, `band_suggestions`, `member_festivals` and `festival_suggestions`; member keys are never part of `ALLOWED_PUBKEYS` and cannot publish.
 
 ```sql
 CREATE TABLE members (
@@ -110,6 +110,26 @@ CREATE TABLE band_suggestions (
   created_at    TEXT NOT NULL         -- ISO 8601 format
 );
 CREATE INDEX idx_suggestions_status ON band_suggestions (status, created_at);
+
+CREATE TABLE member_festivals (
+  pubkey       TEXT NOT NULL,         -- member public key
+  festival_url TEXT NOT NULL,         -- normalized festival site URL (section 3.6)
+  created_at   TEXT NOT NULL,         -- ISO 8601 format
+  PRIMARY KEY (pubkey, festival_url)
+);
+CREATE INDEX idx_member_festivals_url ON member_festivals (festival_url);
+
+CREATE TABLE festival_suggestions (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  pubkey        TEXT NOT NULL,        -- suggesting member
+  name          TEXT NOT NULL,        -- festival name, trimmed, 1-120 chars
+  url           TEXT,                 -- optional festival site, normalized (section 3.6)
+  status        TEXT NOT NULL,        -- 'pending' | 'rejected' | 'linked'
+  festival_url  TEXT,                 -- set when status = 'linked'
+  reject_reason TEXT,                 -- optional, max 200 chars
+  created_at    TEXT NOT NULL         -- ISO 8601 format
+);
+CREATE INDEX idx_festival_suggestions_status ON festival_suggestions (status, created_at);
 
 CREATE TABLE telegram_link_codes (
   code        TEXT PRIMARY KEY,       -- 22 chars base64url, 128 random bits
@@ -286,7 +306,7 @@ The member endpoints (`/member/*`) and the admin endpoints (`/admin/members*`, `
 
    - Telegram bot endpoints (`POST /telegram/*`): if `TELEGRAM_BOT_PUBKEY` is not configured → `503 {"error": "Telegram not configured"}` (checked **before** steps 1-3); the pubkey must equal it (case-insensitive), else `403 {"error": "Unauthorized"}`.
 
-**Endpoints with a body** (`POST /member/suggestions`, `POST /admin/members`, `POST /admin/suggestions/reject`, `POST /admin/suggestions/link`, `POST /telegram/*`) are signed over the raw body, so the body must be read before step 3. To avoid buffering bodies for unauthenticated requests, the order of checks is:
+**Endpoints with a body** (`POST /member/suggestions`, `POST /member/festival-suggestions`, `POST /admin/members`, `POST /admin/suggestions/reject`, `POST /admin/suggestions/link`, `POST /telegram/*`) are signed over the raw body, so the body must be read before step 3. To avoid buffering bodies for unauthenticated requests, the order of checks is:
 
 1. `Content-Length` header present and greater than 8192 bytes → `413 {"error": "Payload too large"}` (before any other check).
 2. Admin endpoints only: `ADMIN_PUBKEY` not configured → `503`.
@@ -303,6 +323,9 @@ The member endpoints (`/member/*`) and the admin endpoints (`/admin/members*`, `
 | `band-follow` | `POST /member/bands/:act_url_b64` | the normalized `act_url` (decoded from the path, then `normalizeActUrl`) |
 | `band-unfollow` | `DELETE /member/bands/:act_url_b64` | the normalized `act_url` |
 | `band-suggest` | `POST /member/suggestions` | the raw JSON request body, byte for byte |
+| `festival-follow` | `POST /member/festivals/:festival_url_b64` | the normalized `festival_url` (decoded from the path, then `normalizeActUrl`) |
+| `festival-unfollow` | `DELETE /member/festivals/:festival_url_b64` | the normalized `festival_url` |
+| `festival-suggest` | `POST /member/festival-suggestions` | the raw JSON request body, byte for byte |
 | `telegram-link-code` | `POST /member/telegram/link-code` | the literal string `/member/telegram/link-code` |
 | `telegram-link` | `POST /telegram/link` | the raw JSON request body |
 | `telegram-settings` | `POST /telegram/settings` | the raw JSON request body |
@@ -703,7 +726,7 @@ OPTIONS requests return `200 OK` with CORS headers and empty body.
 GET /
 ```
 
-**Response (200 OK):** A JSON object listing the available endpoints and their parameters. The listing includes the member endpoints (`GET /member/me`, `POST|DELETE /member/bands/:act_url_b64`, `POST /member/suggestions`); the admin endpoints are not listed.
+**Response (200 OK):** A JSON object listing the available endpoints and their parameters. The listing includes the member endpoints (`GET /member/me`, `POST|DELETE /member/bands/:act_url_b64`, `POST /member/suggestions`, `POST|DELETE /member/festivals/:festival_url_b64`, `POST /member/festival-suggestions`); the admin endpoints are not listed.
 
 ### 7.3 GET /stats
 
@@ -1132,13 +1155,27 @@ Members are people the admin has given a personal key (section 7.12) so they can
       "created_at": "2026-10-13T10:00:00"
     }
   ],
-  "telegram": { "linked": true, "radar_alerts": false }
+  "telegram": { "linked": true, "radar_alerts": false },
+  "festivals": ["https://fest.example/edition"],
+  "festival_suggestions": [
+    {
+      "id": 3,
+      "name": "Some Festival",
+      "url": "https://somefest.example",
+      "status": "pending",
+      "festival_url": null,
+      "reject_reason": null,
+      "created_at": "2026-10-29T10:00:00"
+    }
+  ]
 }
 ```
 
 - `telegram`: `linked` is true when the member has a connected Telegram chat; `radar_alerts` is the opt-in for festival editions (section 7.15).
 - `bands`: the member's followed normalized band URLs, oldest follow first (ties by URL).
 - `suggestions`: all of the member's suggestions in any status, newest first (`id` descending).
+- `festivals`: the member's followed normalized festival URLs, oldest follow first (ties by URL).
+- `festival_suggestions`: all of the member's festival suggestions in any status, newest first (`id` descending); same fields as `suggestions` with `festival_url` in place of `act_url`.
 
 **Error Responses:** `401` (section 3.6), `403 {"error": "Forbidden", "message": "Not an active member"}`.
 
@@ -1188,6 +1225,14 @@ POST /member/suggestions
 ```
 
 **Error Responses:** `400`, `401`, `403`, `413`.
+
+#### 7.11.4 POST /member/festivals/:festival_url_b64 (Follow) and DELETE /member/festivals/:festival_url_b64 (Unfollow)
+
+Identical to section 7.11.2 with these differences: the table is `member_festivals` (column `festival_url`), the signature domains are `festival-follow` (POST) and `festival-unfollow` (DELETE) over the normalized URL, the invalid-URL error is `400 {"error": "Invalid festival url"}` (checked before authentication), and the response is `{ "festival_url": "<normalized url>" }`. A band-follow signature does not authenticate a festival request (`401`).
+
+#### 7.11.5 POST /member/festival-suggestions (Suggest a Festival)
+
+Identical to section 7.11.3 with these differences: the domain is `festival-suggest` over the raw body, rows go to `festival_suggestions` (separate from `band_suggestions`, so duplicate detection only considers the member's pending festival suggestions), and the response is `201 {"id": n}` or `200 {"id": n, "duplicate": true}`. Validation errors and limits are the band ones (`name is required (1-120 characters)`, `url must be an http(s) URL (max 500 characters)`). The implementation shares one handler per operation between bands and festivals, parameterised by a per-kind config (`BAND_KIND`, `FESTIVAL_KIND` in `members.ts`: tables, url column, domains, invalid-url message).
 
 ### 7.12 Admin Member Endpoints
 
@@ -1516,14 +1561,14 @@ After the delete, one batch cleans the conflict tables (section 2.1): it deletes
 
 **Schedule:** Daily at 02:00 UTC
 
-**Purpose:** Snapshot the `events` table, the member tables (`members`, `member_bands`, `band_suggestions`) and the `blocklist` to Cloudflare R2 for disaster recovery (the blocklist is included so a restore does not silently unblock banned keys). The member tables hold private data (member names, followed bands, suggestions); they go into the same bucket as the events, which MUST NOT be publicly readable. No private key is ever stored: the server only knows public keys.
+**Purpose:** Snapshot the `events` table, the member tables (`members`, `member_bands`, `band_suggestions`, `member_festivals`, `festival_suggestions`) and the `blocklist` to Cloudflare R2 for disaster recovery (the blocklist is included so a restore does not silently unblock banned keys). The member tables hold private data (member names, followed bands, suggestions); they go into the same bucket as the events, which MUST NOT be publicly readable. No private key is ever stored: the server only knows public keys.
 
 **Binding requirement:** An R2 bucket must be bound as `BACKUP_BUCKET` in `wrangler.toml`. If the binding is absent at runtime, the backup step is silently skipped (no error is thrown).
 
 **Algorithm:**
 
-1. Query all rows from each of the tables `events`, `members`, `member_bands`, `band_suggestions` and `blocklist`.
-2. Serialise the result as a JSON object `{ timestamp, tables: { events, members, member_bands, band_suggestions, blocklist } }` (each value is the array of rows of that table, `[]` when empty) and write it to R2 under the key `backups/backup-YYYY-MM-DD.json`, where the date is the current UTC date. All five tables share one object per day, so the retention below applies to them together. Backups written before the member tables existed contain only `tables.events`, and backups written before the blocklist was added lack `tables.blocklist`; consumers (e.g. `scripts/restore-from-backup.sh`) MUST treat a missing table as empty.
+1. Query all rows from each of the tables `events`, `members`, `member_bands`, `band_suggestions`, `member_festivals`, `festival_suggestions` and `blocklist`.
+2. Serialise the result as a JSON object `{ timestamp, tables: { events, members, member_bands, band_suggestions, member_festivals, festival_suggestions, blocklist } }` (each value is the array of rows of that table, `[]` when empty) and write it to R2 under the key `backups/backup-YYYY-MM-DD.json`, where the date is the current UTC date. All seven tables share one object per day, so the retention below applies to them together. Backups written before the member tables existed contain only `tables.events`, backups written before the blocklist was added lack `tables.blocklist`, and backups written before festival following lack `tables.member_festivals` and `tables.festival_suggestions`; consumers (e.g. `scripts/restore-from-backup.sh`) MUST treat a missing table as empty.
 3. List all objects under the `backups/` prefix in the bucket.
 4. Sort the listed keys in ascending chronological order (oldest first).
 5. Delete the oldest keys beyond the 7 most recent (time-based retention).
@@ -1740,7 +1785,7 @@ The reference implementation covers these in `worker/src/band-keys.test.ts`, `me
 
 **Signed requests (`member-auth`):** a fresh, correctly signed request is accepted (also with an upper-case `X-Pubkey`); a signature for another domain, another payload or another key is rejected; a timestamp outside ±300 s is rejected with `server_time`; missing or malformed headers are rejected.
 
-**Member endpoints (`members`):** `/member/me` returns name, bands and suggestions of an active member; `403` for unknown and revoked keys; `401` without valid auth; follow stores the normalized URL and is idempotent; unfollow is idempotent; `400` for a path that is not base64url or not an http(s) URL; each member has their own list; a suggestion is created pending and listed in `/member/me`; a duplicate pending name from the same member returns the existing id; two members may suggest the same name; invalid input → `400`.
+**Member endpoints (`members`):** `/member/me` returns name, bands and suggestions of an active member; `403` for unknown and revoked keys; `401` without valid auth; follow stores the normalized URL and is idempotent; unfollow is idempotent; `400` for a path that is not base64url or not an http(s) URL; each member has their own list; a suggestion is created pending and listed in `/member/me`; a duplicate pending name from the same member returns the existing id; two members may suggest the same name; invalid input → `400`. Festivals: follow/unfollow idempotent, the url is normalized, a non-http url is `400 Invalid festival url` before auth, a band-follow signature is refused (`401`); festival suggestions validate like band ones, dedupe pending names and land in `festival_suggestions`; `/member/me` returns `festivals` and `festival_suggestions`; `BACKUP_TABLES` includes both new tables.
 
 **Admin endpoints (`admin-members`):** `503` without `ADMIN_PUBKEY`; `403` for a valid signature from another key; `401` for a bad signature; create, list, revoke and delete a member; a revoke signature cannot be used to delete; `409` for an existing pubkey, `400` for bad input, `404` for an unknown member; delete cascades to follows and suggestions; grouping by normalized name, counting distinct members, ordering by demand, member names only with `detail=1`; reject with a reason; link marks `linked`, stores the normalized `act_url` and follows it for the suggester; reject/link bodies are validated; follower counts are ordered and contain no names.
 
@@ -1783,6 +1828,8 @@ The reference implementation covers these in `worker/src/band-keys.test.ts`, `me
 - [x] GET /member/me
 - [x] POST|DELETE /member/bands/:act_url_b64
 - [x] POST /member/suggestions
+- [x] POST|DELETE /member/festivals/:festival_url_b64
+- [x] POST /member/festival-suggestions
 - [x] GET|POST /admin/members, POST /admin/members/:pubkey/revoke, DELETE /admin/members/:pubkey
 - [x] GET /admin/suggestions, POST /admin/suggestions/reject, POST /admin/suggestions/link
 - [x] GET /admin/band-followers
@@ -1793,7 +1840,7 @@ The reference implementation covers these in `worker/src/band-keys.test.ts`, `me
 - [x] Geospatial queries (precision 2-6)
 - [x] Blocklist check on write paths (POST /events, DELETE /events/:id)
 - [x] Blocklist CRUD (GET, insert, delete)
-- [x] Member tables (`members`, `member_bands`, `band_suggestions`), delete cascade done explicitly
+- [x] Member tables (`members`, `member_bands`, `band_suggestions`, `member_festivals`, `festival_suggestions`), delete cascade done explicitly
 
 ### 11.4 Validation & Error Handling
 - [ ] Required field validation
