@@ -11,6 +11,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const F = require('../festivals.js');
+const M = require('../member.js');
 
 let chromium;
 try {
@@ -64,7 +65,7 @@ const EVENTS = [
   radar('run', 'Running Fest', -5, 3, { lat: 45.7, lng: 13.7 }),
   radar('cc', 'Tagged Concert', 4, 4, { start_time: ymd(4) + 'T21:00:00', end_time: ymd(4) + 'T23:00:00' }), // tagged concert → hidden
   radar('thr', 'Berlin Stage Days', 41, 44, { category: 'theater', lat: 52.52, lng: 13.4, updated_at: utcAgo(1) }), // → updated pill
-  radar('mus', 'Soon Sound', 10, 12, { lat: 46.5, lng: 11.3, created_at: utcAgo(2) }), // → new pill
+  radar('mus', 'Soon Sound', 10, 12, { lat: 46.5, lng: 11.3, created_at: utcAgo(2), festival_url: 'https://mus.example/Soon/' }), // → new pill
   radar('ny', 'Far Future Fest', 400, 402, { lat: 48.2, lng: 16.37 }),
   radar('xss', 'Safe <b>Name</b>', 20, 21, { description: '<img src=x onerror="window.__xss=1">', category: 'other', lat: 41.9, lng: 12.5 }),
 ];
@@ -79,14 +80,80 @@ const EXPECTED_TITLES = [
 ];
 
 // ── one local server: static page files + fake paged API ──────────────────────
-const state = { requests: [], failApi: false };
+const TRACKED_DEFAULT = JSON.stringify({
+  generated: '2030-01-02',
+  festivals: [
+    { name: 'Quiet Valley', url: 'https://quiet.example' }, // not on the radar
+    { name: 'Aurora Art Weekend', url: 'https://art.example/' }, // on the radar (trailing slash)
+  ],
+});
+// file rows: Aurora, Quiet Valley; radar rows not in the file: 5 more
+const TRACKED_COUNT = 7;
+const state = {
+  requests: [],
+  failApi: false,
+  events: null, // null → EVENTS
+  tracked: TRACKED_DEFAULT, // undefined → 404
+  memberRequests: [], // "METHOD /path" of every /member/* request
+  memberMe: null, // null → 403
+  staticRequests: [], // every static file request
+  festivalDelayMs: 0, // artificial delay on /member/festivals/*
+};
 let base = '';
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8' };
 const PAGE_SIZE = 2;
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1');
+  if (url.pathname.startsWith('/member/')) {
+    state.memberRequests.push(req.method + ' ' + url.pathname);
+    let raw = '';
+    for await (const chunk of req) raw += chunk;
+    if (url.pathname === '/member/me') {
+      if (!state.memberMe) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end('{"error":"Forbidden"}');
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(state.memberMe));
+      }
+      return;
+    }
+    if (url.pathname.startsWith('/member/festivals/') && state.festivalDelayMs)
+      await new Promise(r => setTimeout(r, state.festivalDelayMs));
+    if (url.pathname === '/member/telegram/link-code') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ code: 'abc', bot_url: 'https://t.me/tokoro_bot?start=abc' }));
+      return;
+    }
+    if (url.pathname === '/member/festival-suggestions') {
+      const b = JSON.parse(raw);
+      state.memberMe.festival_suggestions.unshift({
+        id: 100 + state.memberMe.festival_suggestions.length,
+        name: b.name,
+        url: b.url || null,
+        status: 'pending',
+        festival_url: null,
+        reject_reason: null,
+        created_at: '2030-01-01T00:00:00',
+      });
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end('{}');
+    return;
+  }
+  if (url.pathname === '/tracked-festivals.json') {
+    if (state.tracked === undefined) {
+      res.writeHead(404);
+      res.end('not found');
+    } else {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(state.tracked);
+    }
+    return;
+  }
   if (url.pathname === '/events') {
+    const EVENTS_NOW = state.events || EVENTS;
     state.requests.push({
       has_festival: url.searchParams.get('has_festival'),
       from: url.searchParams.get('from'),
@@ -99,13 +166,14 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     const offset = Number(url.searchParams.get('offset') || 0);
-    const slice = EVENTS.slice(offset, offset + PAGE_SIZE);
+    const slice = EVENTS_NOW.slice(offset, offset + PAGE_SIZE);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ events: slice, offset, count: slice.length, has_more: offset + PAGE_SIZE < EVENTS.length }));
+    res.end(JSON.stringify({ events: slice, offset, count: slice.length, has_more: offset + PAGE_SIZE < EVENTS_NOW.length }));
     return;
   }
+  state.staticRequests.push(url.pathname);
   const name = url.pathname.replace(/^\//, '');
-  if (!['festivals.html', 'shared.js', 'festivals.js'].includes(name)) {
+  if (!['festivals.html', 'shared.js', 'festivals.js', 'member.js'].includes(name)) {
     res.writeHead(404);
     res.end('not found');
     return;
@@ -254,7 +322,187 @@ try {
     await context.close();
   }
 
-  // ── 6. optional: the Leaflet map (needs internet) ────────────────────────────
+
+  // ── 6. visitors: the Tracked festivals pane, and nothing member-related ──────
+  {
+    state.memberRequests.length = 0;
+    state.staticRequests.length = 0;
+    const { page, context, errors } = await newPage(browser, {});
+    await page.goto(base + '/festivals.html');
+    await page.waitForSelector('.fest-card');
+    await page.waitForSelector('#trackedPane:not([hidden])');
+    check('visitor: Tracked festivals pane with its count', (await page.textContent('#trackedPane > summary')).trim() === `Tracked festivals (${TRACKED_COUNT})`, await page.textContent('#trackedPane > summary'));
+    check('visitor: tracked rows have no heart', (await page.locator('#trackedList li').count()) === TRACKED_COUNT && (await page.locator('#trackedList .follow-btn').count()) === 0);
+    const rowText = await page.textContent('#trackedList');
+    check('visitor: tracked rows say "on the radar" / "no dates yet"', /Quiet Valley[^]*no dates yet/.test(rowText) && /Aurora Art Weekend[^]*on the radar/.test(rowText), rowText);
+    check('visitor: rows link to the festival site', (await page.locator('#trackedList a[href^="https://quiet.example"][rel~="noopener"]').count()) === 1);
+    check('visitor: "List updated" note', (await page.textContent('#trackedPane')).includes('List updated 2030-01-02'));
+    check('visitor: no hearts on cards', (await page.locator('#festList .follow-btn').count()) === 0);
+    check('visitor: no member bar, no suggest pane, no Telegram button', (await page.isHidden('#memberBar')) && (await page.isHidden('#suggestPane')) && (await page.isHidden('#telegramBtn')));
+    check('visitor: member.js is not downloaded', !state.staticRequests.includes('/member.js'), state.staticRequests);
+    check('visitor: no /member requests', state.memberRequests.length === 0, state.memberRequests);
+    check('visitor: no page errors', errors.length === 0, errors);
+    await context.close();
+  }
+
+  // ── 7. tracked-festivals.json missing → radar festivals; none at all → hidden ─
+  {
+    state.tracked = undefined;
+    const { page, context } = await newPage(browser, {});
+    await page.goto(base + '/festivals.html');
+    await page.waitForSelector('.fest-card');
+    await page.waitForSelector('#trackedPane:not([hidden])');
+    check('missing tracked file: pane lists the radar festivals', (await page.locator('#trackedList li').count()) === 6 && (await page.textContent('#trackedPane > summary')).includes('(6)'), await page.textContent('#trackedList'));
+    await context.close();
+
+    state.events = [];
+    const empty = await newPage(browser, {});
+    await empty.page.goto(base + '/festivals.html');
+    await empty.page.waitForSelector('.empty-state');
+    await empty.page.waitForTimeout(200);
+    check('missing tracked file and no radar festivals: pane hidden', await empty.page.isHidden('#trackedPane'));
+    await empty.context.close();
+    state.events = null;
+    state.tracked = TRACKED_DEFAULT;
+  }
+
+  // ── 8. members ───────────────────────────────────────────────────────────────
+  {
+    const seed = Buffer.from(Array.from({ length: 32 }, (_, i) => i + 1)).toString('base64url');
+    const b64 = u => Buffer.from(M.normalizeActUrl(u)).toString('base64url');
+    state.memberMe = {
+      name: 'Anna',
+      bands: [],
+      suggestions: [],
+      festivals: ['https://mus.example/soon'], // the radar entry is https://mus.example/Soon/
+      festival_suggestions: [
+        { id: 1, name: 'quiet valley', url: null, status: 'pending', festival_url: null, reject_reason: null, created_at: 'x' },
+        { id: 2, name: 'Megafest', url: null, status: 'rejected', festival_url: null, reject_reason: 'Too big', created_at: 'x' },
+      ],
+    };
+    state.memberRequests.length = 0;
+    state.staticRequests.length = 0;
+    const { page, context, errors } = await newPage(browser, {});
+    await page.goto(base + '/festivals.html#k=' + seed);
+    await page.waitForSelector('.fest-card');
+    await page.waitForSelector('#memberBar:not([hidden])');
+    check('member: a link loads member.js', state.staticRequests.includes('/member.js'), state.staticRequests);
+    check('member: link fragment removed from the address bar', !page.url().includes('#k='), page.url());
+    check('member: greeting names the member', (await page.textContent('#memberHello')).includes('Anna'));
+    check('member: hearts on every card', (await page.locator('#festList .follow-btn').count()) === 6);
+    await page.waitForSelector('#trackedList .follow-btn', { state: 'attached' });
+    check('member: hearts on every tracked row', (await page.locator('#trackedList .follow-btn').count()) === (await page.locator('#trackedList li').count()));
+    check(
+      'member: a followed festival matches across case and trailing slash',
+      (await page.getAttribute('#festList .follow-btn[data-follow="https://mus.example/Soon/"]', 'aria-pressed')) === 'true' &&
+        (await page.getAttribute('#festList .follow-btn[data-follow="https://run.example"]', 'aria-pressed')) === 'false'
+    );
+    check('member: heart label', (await page.getAttribute('#festList .follow-btn[data-follow="https://run.example"]', 'aria-label')) === 'Follow this festival');
+
+    // auto-follow of the pending suggestion matching a tracked festival
+    const quietFollow = 'POST /member/festivals/' + b64('https://quiet.example');
+    for (let i = 0; i < 50 && !state.memberRequests.includes(quietFollow); i++) await new Promise(r => setTimeout(r, 100));
+    check('member: matched suggestion is followed automatically, once', state.memberRequests.filter(r => r === quietFollow).length === 1, state.memberRequests);
+    check('member: auto-follow remembered on this device', JSON.parse(await page.evaluate(() => localStorage.getItem('tokoro_member_festival_autofollowed'))).includes(1));
+    const sugg = await page.textContent('#suggestList');
+    check('member: matched suggestion shows Added, rejected one its reason', sugg.includes('Added') && sugg.includes('Not added — Too big'), sugg);
+    await page.waitForFunction(() => document.querySelector('#trackedList [data-follow="https://quiet.example"]')?.getAttribute('aria-pressed') === 'true');
+    check('member: auto-followed tracked row shows a filled heart', true);
+
+    // ♡ in All festivals: request sent, nothing re-rendered
+    state.memberRequests.length = 0;
+    await page.evaluate(() => {
+      window.__runCard = document.querySelector('#festList [data-follow="https://run.example"]').closest('.fest-card');
+    });
+    await page.click('#festList [data-follow="https://run.example"]');
+    await page.waitForFunction(() => {
+      const b = document.querySelector('#festList [data-follow="https://run.example"]');
+      return b.getAttribute('aria-pressed') === 'true' && !b.hasAttribute('aria-disabled');
+    });
+    check('member: ♡ sends POST /member/festivals/<b64>', state.memberRequests.includes('POST /member/festivals/' + b64('https://run.example')), state.memberRequests);
+    check('member: ♡ in All festivals re-renders nothing', await page.evaluate(() => window.__runCard === document.querySelector('#festList [data-follow="https://run.example"]').closest('.fest-card')));
+
+    // in-flight guard: a second click while the request is pending is ignored
+    state.memberRequests.length = 0;
+    state.festivalDelayMs = 400;
+    const busy = await page.evaluate(() => {
+      const sel = '#festList [data-follow="https://art.example"]';
+      document.querySelector(sel).click();
+      document.querySelector(sel).click();
+      const b = document.querySelector(sel);
+      return { aria: b.getAttribute('aria-disabled'), disabled: b.hasAttribute('disabled') };
+    });
+    check('member: an in-flight heart is aria-disabled, not disabled', busy.aria === 'true' && !busy.disabled, busy);
+    await page.waitForSelector('#festList [data-follow="https://art.example"]:not([aria-disabled])');
+    state.festivalDelayMs = 0;
+    check('member: rapid double click sends one request', state.memberRequests.filter(r => r.startsWith('POST /member/festivals/')).length === 1, state.memberRequests);
+    await page.click('#festList [data-follow="https://art.example"]'); // unfollow again
+    await page.waitForFunction(() => document.querySelector('#festList [data-follow="https://art.example"]:not([aria-disabled])')?.getAttribute('aria-pressed') === 'false');
+
+    await page.click('#myFestivalsBtn');
+    check('member: My festivals keeps only followed festivals', JSON.stringify(await titles(page)) === JSON.stringify(['Running Fest 2026', 'Soon Sound 2026']), await titles(page));
+    check('member: My festivals choice is remembered', (await page.evaluate(() => localStorage.getItem('tokoro_member_festival_view'))) === 'mine');
+    await page.click('#allFestivalsBtn');
+    check('member: All festivals shows everyone again', (await titles(page)).length === 6);
+
+    // suggest
+    await page.click('#suggestPane > summary');
+    await page.fill('#suggestName', 'Brand New Fest');
+    await page.click('#suggestForm button[type=submit]');
+    await page.waitForFunction(() => document.getElementById('suggestList').textContent.includes('Brand New Fest'));
+    check('member: suggestion sent with a thank-you', (await page.textContent('#suggestMsg')).includes('Thanks! We will take a look.') && state.memberRequests.includes('POST /member/festival-suggestions'), await page.textContent('#suggestMsg'));
+    check('member: new suggestion is Waiting', /Brand New Fest\s*Waiting/.test(await page.textContent('#suggestList')), await page.textContent('#suggestList'));
+    check('member: Telegram button shown', await page.isVisible('#telegramBtn'));
+    check('member: no page errors', errors.length === 0, errors);
+    await context.close();
+
+    // stored seed only (e.g. activated on Tours), Telegram button
+    state.memberMe = { name: 'Anna', bands: [], suggestions: [], festivals: [], festival_suggestions: [] };
+    state.memberRequests.length = 0;
+    {
+      const p = await newPage(browser, {});
+      await p.context.route('https://t.me/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: 'telegram' }));
+      await p.page.addInitScript(s => localStorage.setItem('tokoro_member', s), seed);
+      await p.page.goto(base + '/festivals.html');
+      await p.page.waitForSelector('.fest-card');
+      await p.page.waitForSelector('#memberBar:not([hidden])', { timeout: 5000 }).catch(() => {});
+      check('stored seed: member bar without a link', await p.page.isVisible('#memberBar'));
+      await p.page.click('#myFestivalsBtn');
+      check(
+        'My festivals with nothing followed: empty state',
+        (await p.page.textContent('#festList')).includes('You are not following any festival yet. Switch to All festivals and tap ♡ on a festival.'),
+        await p.page.textContent('#festList')
+      );
+      await p.page.click('#telegramBtn');
+      await p.page.waitForURL('https://t.me/**');
+      check('telegram: click requests a link code', state.memberRequests.includes('POST /member/telegram/link-code'), state.memberRequests);
+      await p.context.close();
+    }
+
+    // followed festival without a radar entry
+    state.memberMe = { name: 'Anna', bands: [], suggestions: [], festivals: ['https://gone.example'], festival_suggestions: [] };
+    {
+      const p = await newPage(browser, {});
+      await p.page.addInitScript(s => {
+        localStorage.setItem('tokoro_member', s);
+        localStorage.setItem('tokoro_member_festival_view', 'mine');
+      }, seed);
+      await p.page.goto(base + '/festivals.html');
+      await p.page.waitForSelector('#memberBar:not([hidden])');
+      await p.page.waitForSelector('#trackedList [data-follow="https://gone.example"]', { state: 'attached' });
+      check(
+        'My festivals, followed festival off the radar: empty state',
+        (await p.page.textContent('#festList')).includes('None of your festivals has dates on the radar right now. They are listed under Tracked festivals.'),
+        await p.page.textContent('#festList')
+      );
+      const row = p.page.locator('#trackedList li', { has: p.page.locator('[data-follow="https://gone.example"]') });
+      check('followed-only festival: tracked row labelled with the hostname, filled heart', (await row.textContent()).includes('gone.example') && (await row.locator('.follow-btn').getAttribute('aria-pressed')) === 'true', await row.textContent());
+      await p.context.close();
+    }
+    state.memberMe = null;
+  }
+
+  // ── 9. optional: the Leaflet map (needs internet) ────────────────────────────
   if (process.env.FESTIVALS_SMOKE_MAP === '1') {
     const { page, context } = await newPage(browser, { allowExternal: true });
     await page.goto(base + '/festivals.html');

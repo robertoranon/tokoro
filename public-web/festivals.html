@@ -367,6 +367,113 @@
         padding: 6px 14px;
         cursor: pointer;
       }
+
+      /* ── Tracked festivals and suggest panes ────────────────────────── */
+      .tracked-pane {
+        margin: 0 0 18px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+      }
+      .tracked-pane > summary {
+        cursor: pointer;
+        padding: 12px 16px;
+        font-weight: 700;
+      }
+      .tracked-list {
+        list-style: none;
+        margin: 0;
+        padding: 0 16px 12px;
+        columns: 2 260px;
+        column-gap: 24px;
+      }
+      .tracked-festival {
+        break-inside: avoid;
+        padding: 4px 0;
+        font-size: 14px;
+      }
+      /* Members only: room on the right of each row for a smaller, fixed
+         follow button (nothing moves on a tap). */
+      .has-follow > .tracked-festival {
+        position: relative;
+        min-height: 32px;
+        padding: 6px 40px 6px 0;
+      }
+      .has-follow > .tracked-festival .follow-btn {
+        top: 0;
+        right: 0;
+        width: 32px;
+        height: 32px;
+      }
+      .tracked-festival__state {
+        margin-left: 8px;
+        font-size: 12px;
+        color: var(--text-2);
+      }
+      .tracked-note {
+        padding: 0 16px 12px;
+        font-size: 12px;
+        color: var(--text-2);
+      }
+
+      /* ── Members ────────────────────────────────────────────────────── */
+      .member-bar__hello {
+        font-weight: 600;
+        margin-right: 8px;
+      }
+      .fest-card {
+        position: relative; /* anchors the member's follow button */
+      }
+      /* Members only: room on the right for the follow button. */
+      #festList.has-follow .fest-card__body {
+        padding-right: 56px;
+      }
+      /* Fixed box, out of the flow, with an SVG icon: following or not, in
+         flight or not, the button never changes size or moves the text. */
+      .follow-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 40px;
+        height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        padding: 0;
+        margin: 0;
+        cursor: pointer;
+      }
+      .follow-btn svg {
+        display: block;
+        width: 20px;
+        height: 20px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+      }
+      .follow-btn[aria-pressed='true'] {
+        color: #c0392b;
+      }
+      .follow-btn[aria-pressed='true'] svg {
+        fill: currentColor;
+      }
+      .follow-btn[aria-disabled='true'] {
+        opacity: 0.5;
+        cursor: progress;
+      }
+      .suggest-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 0;
+        padding: 0 16px 12px;
+      }
+      .suggest-form input {
+        flex: 1 1 180px;
+      }
     </style>
     <link rel="stylesheet" href="theme.css" />
   </head>
@@ -424,6 +531,28 @@
             Near me
           </button>
         </div>
+        <div class="filter-row member-bar" id="memberBar" hidden>
+          <span class="member-bar__hello" id="memberHello"></span>
+          <button
+            id="allFestivalsBtn"
+            class="toggle"
+            type="button"
+            aria-pressed="true"
+          >
+            All festivals
+          </button>
+          <button
+            id="myFestivalsBtn"
+            class="toggle"
+            type="button"
+            aria-pressed="false"
+          >
+            My festivals
+          </button>
+          <button id="telegramBtn" class="toggle" type="button">
+            🔔 Telegram alerts
+          </button>
+        </div>
         <p
           id="statusLine"
           class="status-line"
@@ -436,7 +565,49 @@
           role="status"
           aria-live="polite"
         ></p>
+        <p
+          id="memberNote"
+          class="notice-line"
+          role="status"
+          aria-live="polite"
+          hidden
+        ></p>
       </section>
+
+      <details class="tracked-pane" id="trackedPane" hidden>
+        <summary id="trackedSummary">Tracked festivals</summary>
+        <ul class="tracked-list" id="trackedList"></ul>
+        <p class="tracked-note" id="trackedNote"></p>
+      </details>
+
+      <details class="tracked-pane" id="suggestPane" hidden>
+        <summary>Suggest a festival</summary>
+        <form id="suggestForm" class="filter-row suggest-form">
+          <input
+            id="suggestName"
+            type="text"
+            maxlength="120"
+            placeholder="Festival name"
+            aria-label="Festival name"
+            required
+          />
+          <input
+            id="suggestUrl"
+            type="url"
+            maxlength="500"
+            placeholder="Website (optional)"
+            aria-label="Festival website (optional)"
+          />
+          <button type="submit" class="toggle">Suggest</button>
+        </form>
+        <p
+          id="suggestMsg"
+          class="tracked-note"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <ul id="suggestList" class="tracked-list"></ul>
+      </details>
 
       <section class="map-panel" id="mapPanel" aria-label="Map of festivals">
         <div id="map"></div>
@@ -459,6 +630,31 @@
         const API_URL = '__TOKORO_WORKER_URL__';
         const F = window.TokoroFestivals;
         const today = formatLocalDateTime(new Date()).slice(0, 10);
+        // member.js is loaded on demand (loadMemberScript), so visitors never
+        // download it. M stays null for visitors; it is only used once
+        // member.ok is true or inside initMember after the load.
+        let M = null;
+        const MEMBER_SEED_KEY = 'tokoro_member'; // same key as member.js
+        const storage = (() => {
+          try {
+            return window.localStorage;
+          } catch (err) {
+            return null; // private mode: member features stay off
+          }
+        })();
+        // Member state. `ok` is true only after the server accepted the link.
+        const member = {
+          ok: false,
+          api: null,
+          name: '',
+          followed: new Set(), // festivalKey of every followed url
+          followedUrls: [], // the followed urls as /member/me sent them
+          suggestions: [],
+          mine: false, // show only followed festivals
+          syncing: false,
+          inFlight: new Set(), // festivalKeys with a follow/unfollow request pending
+        };
+        let trackedDone = false; // load() has finished its tracked-festivals attempt
 
         const state = {
           all: [],
@@ -469,6 +665,7 @@
           nearOn: false,
           nearPending: false,
           ready: false,
+          tracked: null, // { generated, festivals } from tracked-festivals.json, or null
         };
         let nearReq = 0;
         let lastFitKey = null;
@@ -481,6 +678,63 @@
         }
         function setNotice(text) {
           el('noticeLine').textContent = text || '';
+        }
+        // The member note is hidden while empty, so visitors get no blank line.
+        function setMemberNote(text) {
+          el('memberNote').textContent = text || '';
+          el('memberNote').hidden = !text;
+        }
+
+        // ── Follow buttons (members only) ───────────────────────────────
+        function isFollowed(url) {
+          const key = F.festivalKey(url);
+          return !!key && member.followed.has(key);
+        }
+        // The follow button's attributes, shared by the first render and the
+        // in-place updates so they cannot diverge. null = attribute absent.
+        function followBtnAttrs(url) {
+          const on = isFollowed(url);
+          const busy = member.inFlight.has(F.festivalKey(url));
+          return {
+            'aria-pressed': String(on),
+            'aria-label': on
+              ? 'Stop following this festival'
+              : 'Follow this festival',
+            title: on ? 'Following' : 'Follow this festival',
+            'aria-disabled': busy ? 'true' : null,
+          };
+        }
+        // Outline heart; CSS fills it when aria-pressed is true.
+        const FOLLOW_ICON =
+          '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+          '<path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>' +
+          '</svg>';
+
+        function followBtnHtml(url) {
+          if (!member.ok || !safeUrl(url)) return '';
+          const attrs = followBtnAttrs(url);
+          let html =
+            '<button type="button" class="follow-btn" data-follow="' +
+            escHtml(url) +
+            '"';
+          for (const [name, value] of Object.entries(attrs)) {
+            if (value !== null)
+              html += ' ' + name + '="' + escHtml(value) + '"';
+          }
+          return html + '>' + FOLLOW_ICON + '</button>';
+        }
+
+        // Update every follow button (cards, tracked pane) in place: no list
+        // rebuild, so nothing on the page moves.
+        function syncFollowButtons() {
+          if (!member.ok) return;
+          for (const btn of document.querySelectorAll('[data-follow]')) {
+            const attrs = followBtnAttrs(btn.getAttribute('data-follow'));
+            for (const [name, value] of Object.entries(attrs)) {
+              if (value === null) btn.removeAttribute(name);
+              else btn.setAttribute(name, value);
+            }
+          }
         }
 
         // ── Month chips ─────────────────────────────────────────────────
@@ -534,6 +788,7 @@
             '<div class="fest-card__stripe fest-card__stripe--' +
             catClass +
             '"></div>' +
+            followBtnHtml(f.festivalUrl) +
             '<div class="fest-card__body">' +
             '<div class="fest-card__top">' +
             '<span class="fest-card__date">' +
@@ -579,6 +834,8 @@
             category: state.category,
             keyword: state.keyword,
           });
+          if (member.ok && member.mine)
+            list = F.filterMine(list, member.followed);
           if (state.nearOn && state.origin)
             list = F.withDistance(list, state.origin);
           return list;
@@ -602,9 +859,21 @@
             state.nearOn && state.origin ? F.byDistance : F.byStartThenName;
           const groups = F.groupFestivals(list, today, cmp);
 
+          el('festList').classList.toggle('has-follow', member.ok);
+          const mine = member.ok && member.mine;
           if (!state.all.length) {
             el('festList').innerHTML =
               '<p class="empty-state">Nothing on the radar yet.</p>';
+          } else if (!list.length && mine && member.followed.size === 0) {
+            el('festList').innerHTML =
+              '<p class="empty-state">You are not following any festival yet. Switch to All festivals and tap ♡ on a festival.</p>';
+          } else if (
+            !list.length &&
+            mine &&
+            !F.filterMine(state.all, member.followed).length
+          ) {
+            el('festList').innerHTML =
+              '<p class="empty-state">None of your festivals has dates on the radar right now. They are listed under Tracked festivals.</p>';
           } else if (!list.length) {
             el('festList').innerHTML =
               '<p class="empty-state">' +
@@ -636,6 +905,7 @@
           );
           syncChips();
           renderPins(list);
+          syncFollowButtons(); // the tracked pane's hearts
         }
 
         // ── Map (optional: the list works without Leaflet) ─────────────
@@ -819,6 +1089,67 @@
           );
         });
 
+        // ── Tracked festivals: which festivals the radar follows ────────
+        async function fetchTracked() {
+          try {
+            const res = await fetch('./tracked-festivals.json', {
+              cache: 'no-store',
+            });
+            if (!res.ok) return null;
+            return F.parseTrackedFestivals(await res.json());
+          } catch (err) {
+            return null; // missing or invalid: the pane falls back to the radar
+          }
+        }
+        function renderTracked() {
+          const rows = F.trackedRows(
+            state.tracked,
+            state.all,
+            member.ok ? member.followedUrls : []
+          );
+          const pane = el('trackedPane');
+          if (!rows.length) {
+            pane.hidden = true;
+            return;
+          }
+          pane.hidden = false;
+          el('trackedSummary').textContent =
+            'Tracked festivals (' + rows.length + ')';
+          // Members get a heart on every row (festivals without dates included).
+          el('trackedList').classList.toggle('has-follow', member.ok);
+          el('trackedList').innerHTML = rows
+            .map(r => {
+              const url = safeUrl(r.url);
+              const label = state.ready
+                ? r.onRadar
+                  ? 'on the radar'
+                  : 'no dates yet'
+                : '';
+              return (
+                '<li class="tracked-festival">' +
+                (url
+                  ? '<a href="' +
+                    escHtml(url) +
+                    '" target="_blank" rel="noopener noreferrer">' +
+                    escHtml(r.name) +
+                    ' ↗</a>'
+                  : escHtml(r.name)) +
+                (label
+                  ? '<span class="tracked-festival__state">' +
+                    escHtml(label) +
+                    '</span>'
+                  : '') +
+                (url ? followBtnHtml(r.url) : '') +
+                '</li>'
+              );
+            })
+            .join('');
+          el('trackedNote').textContent =
+            state.tracked && state.tracked.generated
+              ? 'List updated ' + state.tracked.generated
+              : '';
+        }
+
         // ── Load ────────────────────────────────────────────────────────
         async function load() {
           state.ready = false;
@@ -830,6 +1161,7 @@
               '<p class="error-state">The API address is not configured (the deploy step replaces the placeholder).</p>';
             return;
           }
+          const trackedPromise = fetchTracked();
           setStatus('Loading the radar…');
           try {
             const { events, truncated } = await F.loadRadarEvents(
@@ -839,12 +1171,20 @@
             );
             state.all = F.toFestivals(events, today);
             state.ready = true;
+            state.tracked = await trackedPromise;
+            renderTracked();
             render();
+            trackedDone = true;
+            syncMember();
             if (truncated)
               setNotice(
                 'Showing the first results only — the radar is larger than one page load.'
               );
           } catch (err) {
+            state.tracked = await trackedPromise;
+            renderTracked();
+            trackedDone = true;
+            syncMember();
             setStatus('');
             el('festList').innerHTML =
               '<p class="error-state">Could not load the radar right now. ' +
@@ -853,8 +1193,285 @@
           }
         }
 
+        // ── Members: ♡ buttons, My festivals, suggestions ──────────────
+        function renderSuggestions(views) {
+          el('suggestList').innerHTML = views
+            .map(v => {
+              const label =
+                v.state === 'added'
+                  ? 'Added'
+                  : v.state === 'rejected'
+                    ? 'Not added' + (v.reason ? ' — ' + v.reason : '')
+                    : 'Waiting';
+              return (
+                '<li class="tracked-festival">' +
+                escHtml(v.name) +
+                '<span class="tracked-festival__state">' +
+                escHtml(label) +
+                '</span></li>'
+              );
+            })
+            .join('');
+        }
+
+        // "Added" matches the tracked file and the festivals on the radar.
+        function currentViews() {
+          const known = (state.tracked ? state.tracked.festivals : []).concat(
+            state.all.map(f => ({ name: f.name, url: f.festivalUrl }))
+          );
+          return M.describeSuggestions(member.suggestions, known);
+        }
+
+        function addFollowed(url) {
+          const key = F.festivalKey(url);
+          member.followed.add(key);
+          if (!member.followedUrls.some(u => F.festivalKey(u) === key))
+            member.followedUrls.push(url);
+        }
+        // Returns the removed urls, so a failed unfollow can put them back.
+        function removeFollowed(url) {
+          const key = F.festivalKey(url);
+          member.followed.delete(key);
+          const removed = member.followedUrls.filter(
+            u => F.festivalKey(u) === key
+          );
+          member.followedUrls = member.followedUrls.filter(
+            u => F.festivalKey(u) !== key
+          );
+          return removed;
+        }
+
+        // Follow the festivals that match this member's pending suggestions,
+        // once per device (so an unfollow sticks).
+        async function syncMember() {
+          if (!member.ok || !trackedDone || member.syncing) return;
+          member.syncing = true;
+          try {
+            const done = M.loadAutoFollowed(
+              storage,
+              M.FESTIVAL_AUTO_FOLLOWED_KEY
+            );
+            const views = currentViews();
+            let changed = false;
+            for (const v of views) {
+              if (!v.autoFollowUrl || done.has(v.id)) continue;
+              const key = F.festivalKey(v.autoFollowUrl);
+              if (key && !member.followed.has(key)) {
+                addFollowed(v.autoFollowUrl);
+                const res = await member.api
+                  .followFestival(v.autoFollowUrl)
+                  .catch(() => null);
+                if (!res || !res.ok) {
+                  removeFollowed(v.autoFollowUrl);
+                  continue; // try again next visit
+                }
+                changed = true;
+              }
+              done.add(v.id);
+            }
+            M.saveAutoFollowed(storage, done, M.FESTIVAL_AUTO_FOLLOWED_KEY);
+            renderSuggestions(views);
+            if (changed) renderTracked();
+            render();
+          } finally {
+            member.syncing = false;
+          }
+        }
+
+        function syncViewButtons() {
+          el('allFestivalsBtn').setAttribute(
+            'aria-pressed',
+            String(!member.mine)
+          );
+          el('myFestivalsBtn').setAttribute(
+            'aria-pressed',
+            String(member.mine)
+          );
+        }
+        function setMine(value) {
+          if (!member.ok) return;
+          member.mine = value;
+          try {
+            storage.setItem(M.FESTIVAL_VIEW_KEY, value ? 'mine' : 'all');
+          } catch (err) {}
+          syncViewButtons();
+          render();
+        }
+        el('allFestivalsBtn').addEventListener('click', () => setMine(false));
+        el('myFestivalsBtn').addEventListener('click', () => setMine(true));
+
+        function syncTelegramButton(telegram) {
+          el('telegramBtn').textContent =
+            telegram && telegram.linked
+              ? '🔔 Telegram alerts: on'
+              : '🔔 Telegram alerts';
+        }
+        el('telegramBtn').addEventListener('click', async () => {
+          if (!member.ok) return;
+          const btn = el('telegramBtn');
+          btn.disabled = true;
+          let res;
+          try {
+            res = await member.api.telegramLinkCode();
+          } catch (err) {
+            res = null; // offline
+          }
+          btn.disabled = false;
+          const url = res && res.ok && res.data && res.data.bot_url;
+          if (typeof url !== 'string' || !/^https:\/\/t\.me\//.test(url)) {
+            setMemberNote('Could not start Telegram alerts. Please try again.');
+            return;
+          }
+          window.location.assign(url);
+        });
+
+        async function toggleFollow(url) {
+          if (!member.ok) return;
+          const key = F.festivalKey(url);
+          // One request per festival at a time: clicks while one is pending are ignored.
+          if (!key || member.inFlight.has(key)) return;
+          const was = member.followed.has(key);
+          let removed = [];
+          if (was) removed = removeFollowed(url);
+          else addFollowed(url);
+          member.inFlight.add(key);
+          refreshFollowView();
+          // Unfollow the url the server holds (it may differ in case).
+          const res = await (
+            was
+              ? member.api.unfollowFestival(removed[0] || url)
+              : member.api.followFestival(url)
+          ).catch(() => null);
+          member.inFlight.delete(key);
+          if (!res || !res.ok) {
+            if (was) {
+              member.followed.add(key);
+              member.followedUrls.push(...removed);
+            } else {
+              removeFollowed(url);
+            }
+            setMemberNote('Could not save that change. Please try again.');
+          }
+          refreshFollowView();
+        }
+        // All festivals: a follow toggle only changes the buttons, so update
+        // them in place. My festivals: a card appears or disappears, so
+        // re-render, but keep the reader where they were.
+        function refreshFollowView() {
+          if (!member.mine) {
+            syncFollowButtons();
+            return;
+          }
+          const y = window.scrollY;
+          render();
+          window.scrollTo(0, y);
+        }
+        function onFollowClick(e) {
+          const btn = e.target.closest('[data-follow]');
+          if (!btn) return;
+          e.preventDefault();
+          e.stopPropagation();
+          toggleFollow(btn.getAttribute('data-follow'));
+        }
+        el('festList').addEventListener('click', onFollowClick);
+        el('trackedList').addEventListener('click', onFollowClick);
+
+        el('suggestForm').addEventListener('submit', async e => {
+          e.preventDefault();
+          if (!member.ok) return;
+          const name = el('suggestName').value.trim();
+          const url = el('suggestUrl').value.trim();
+          if (!name) return;
+          const msg = el('suggestMsg');
+          msg.textContent = 'Sending…';
+          const res = await member.api
+            .suggestFestival(name, url)
+            .catch(() => null);
+          if (!res || !res.ok) {
+            msg.textContent =
+              res && res.status === 400
+                ? 'That does not look right. Check the name and the website.'
+                : 'Could not send that. Please try again.';
+            return;
+          }
+          el('suggestName').value = '';
+          el('suggestUrl').value = '';
+          msg.textContent = 'Thanks! We will take a look.';
+          const again = await member.api.me().catch(() => null);
+          if (again && again.ok)
+            member.suggestions = again.data.festival_suggestions || [];
+          renderSuggestions(currentViews());
+          await syncMember(); // a suggestion matching a known festival is followed now
+        });
+
+        // Only a personal link or a stored seed makes the page fetch member.js.
+        function loadMemberScript() {
+          if (window.TokoroMember) return Promise.resolve(window.TokoroMember);
+          return new Promise(resolve => {
+            const script = document.createElement('script');
+            script.src = './member.js';
+            script.onload = () => resolve(window.TokoroMember || null);
+            script.onerror = () => resolve(null);
+            document.head.appendChild(script);
+          });
+        }
+
+        async function initMember() {
+          if (!storage) return; // private mode: visitor view
+          const hash = window.location.hash;
+          if (/^#k=[A-Za-z0-9_-]+$/.test(hash)) {
+            // Never leave the link in the address bar or the history, even
+            // if member.js then fails to load.
+            history.replaceState(
+              null,
+              '',
+              window.location.pathname + window.location.search
+            );
+          }
+          let hasStored = false;
+          try {
+            hasStored = !!storage.getItem(MEMBER_SEED_KEY);
+          } catch (err) {}
+          if (!hash.startsWith('#k=') && !hasStored) return; // a visitor
+          M = await loadMemberScript();
+          if (!M) return; // no member.js: visitor view
+          const res = await M.activateMember({
+            hash,
+            storage,
+            fetchFn: window.fetch.bind(window),
+            apiBase: API_URL,
+          });
+          if (!res.ok) {
+            if (res.note) setMemberNote(res.note);
+            return; // visitor view this time
+          }
+          member.api = res.api;
+          member.ok = true;
+          member.name = res.data.name || '';
+          member.followedUrls = (res.data.festivals || []).filter(
+            u => typeof u === 'string' && F.festivalKey(u)
+          );
+          member.followed = new Set(member.followedUrls.map(F.festivalKey));
+          member.suggestions = res.data.festival_suggestions || [];
+          try {
+            member.mine = storage.getItem(M.FESTIVAL_VIEW_KEY) === 'mine';
+          } catch (err) {}
+          el('memberHello').textContent = member.name
+            ? 'Hi, ' + member.name
+            : 'Hi';
+          el('memberBar').hidden = false;
+          syncTelegramButton(res.data.telegram);
+          el('suggestPane').hidden = false;
+          syncViewButtons();
+          renderSuggestions(currentViews());
+          if (trackedDone) renderTracked(); // add the hearts (else load() will)
+          render();
+          await syncMember();
+        }
+
         renderChips();
         load();
+        initMember();
       })();
     </script>
     <!-- build: __BUILD_VERSION__ -->
