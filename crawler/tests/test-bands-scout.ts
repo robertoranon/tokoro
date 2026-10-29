@@ -171,14 +171,14 @@ sources:
         'band and source present after re-parse'
       );
       assert(
-        cfg.bands[1].name === 'New Band' && cfg.bands[1].added === '2030-10-07',
-        'name and added date written'
+        cfg.bands[0].name === 'New Band' && cfg.bands[0].added === '2030-10-07',
+        'name and added date written (sorted before Test Band)'
       );
-      assert(cfg.bands[1].notes === 'bands-scout: test', 'note written');
+      assert(cfg.bands[0].notes === 'bands-scout: test', 'note written');
       assert(
-        cfg.sources[1].mode === 'band' &&
-          cfg.sources[1].url === 'https://newband.example/live',
-        'band-mode source written'
+        cfg.sources[0].mode === 'band' &&
+          cfg.sources[0].url === 'https://newband.example/live',
+        'band-mode source written (sorted before Test Band)'
       );
       for (const c of [
         '# header comment',
@@ -190,14 +190,16 @@ sources:
       }
       const iNew = r.text.indexOf('New Band');
       assert(
-        iNew > r.text.indexOf('# a curator note') &&
-          iNew < r.text.indexOf('# The pages to read'),
-        'new band lands at the end of the bands block, before the next section comment'
+        iNew > r.text.indexOf('# The registry') &&
+          iNew < r.text.indexOf('- name: Test Band') &&
+          r.text.indexOf('# a curator note') <
+            r.text.indexOf('# The pages to read'),
+        'new band sorted inside the bands block, before the next section comment'
       );
       assert(
-        r.text.indexOf('newband.example/live') >
+        r.text.indexOf('newband.example/live') <
           r.text.indexOf('band: Test Band'),
-        'new source lands at the end of sources'
+        'new source sorted inside sources'
       );
       assert(
         r.text.endsWith('\n') && !r.text.endsWith('\n\n'),
@@ -338,10 +340,97 @@ sources:
         '2030-10-07'
       );
       const cfg = parseBandsConfig(r.text);
+      const sigur = cfg.bands.find(b => b.name.startsWith('Sigur'));
       assert(
-        cfg.bands[1].name === 'Sigur "Rós": the #1 band' &&
-          cfg.bands[1].notes === 'a: b # c',
+        sigur?.name === 'Sigur "Rós": the #1 band' &&
+          sigur.notes === 'a: b # c',
         'quotes, colons and # are escaped'
+      );
+    }
+
+    // both lists are sorted alphabetically, entries keep their comments
+    {
+      const messy = `defaults:
+  fetcher: playwright
+
+bands:
+  # registry header comment
+  - name: Zeta
+    url: https://zeta.example
+
+  # Moved here from the old list
+  - name: alpha
+    url: https://alpha.example
+    # inner note
+    status: paused
+
+  - name: The Cure
+    url: https://thecure.example
+
+# Column-0 comment before sources
+sources:
+  - url: https://venue.example/agenda
+    mode: listing
+
+  - url: https://zeta.example/live
+    mode: band
+    band: Zeta
+
+  - url: https://alpha.example/tour
+    mode: band
+    band: alpha
+`;
+      const r = appendBands(
+        messy,
+        [
+          nb({
+            name: 'Mogwai',
+            url: 'https://mogwai.example',
+            tourUrl: 'https://mogwai.example/live',
+          }),
+        ],
+        '2030-10-07'
+      );
+      const cfg = parseBandsConfig(r.text);
+      assert(
+        cfg.bands.map(b => b.name).join() === 'alpha,Mogwai,The Cure,Zeta',
+        'bands sorted by name, case-insensitive'
+      );
+      assert(
+        cfg.sources.map(s => s.url).join() ===
+          'https://alpha.example/tour,https://mogwai.example/live,https://zeta.example/live,https://venue.example/agenda',
+        'band sources by band name, then listing sources'
+      );
+      assert(
+        cfg.bands[0].status === 'paused',
+        'item fields move with the item'
+      );
+      assert(
+        r.text.indexOf('# Moved here from the old list') <
+          r.text.indexOf('- name: alpha') &&
+          r.text.indexOf('# Moved here from the old list') >
+            r.text.indexOf('# registry header comment'),
+        'comment above an item moves with it'
+      );
+      assert(
+        r.text.indexOf('# inner note') > r.text.indexOf('- name: alpha') &&
+          r.text.indexOf('# inner note') < r.text.indexOf('- name: "Mogwai"'),
+        'comment inside an item stays inside it'
+      );
+      assert(
+        r.text.indexOf('# registry header comment') < r.text.indexOf('- name:'),
+        'comment above the first item stays at the top of the section'
+      );
+      assert(
+        r.text.indexOf('# Column-0 comment before sources') >
+          r.text.indexOf('- name: Zeta') &&
+          r.text.indexOf('# Column-0 comment before sources') <
+            r.text.indexOf('sources:'),
+        'column-0 comment before the next key stays put'
+      );
+      assert(
+        r.text.includes('url: https://thecure.example\n\n  - name: Zeta'),
+        'items stay separated by a blank line'
       );
     }
 

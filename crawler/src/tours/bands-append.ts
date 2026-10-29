@@ -1,3 +1,4 @@
+import yaml from 'js-yaml';
 import {
   normalizeActUrl,
   parseBandsConfig,
@@ -85,9 +86,102 @@ function addToSection(
   lines.splice(sectionEnd(lines, at), 0, ...flat);
 }
 
+const byText = (a: string, b: string) =>
+  a.localeCompare(b, 'en', { sensitivity: 'base', numeric: true });
+
+const indentOf = (line: string) => line.length - line.trimStart().length;
+
+/**
+ * Sort the items of a top-level block list alphabetically, as TEXT. An item
+ * takes along the blank lines and comments just above it (up to its own
+ * indentation); lines before the first item stay at the top. Each item is
+ * parsed on its own to get its sort key; if any cannot be, nothing is sorted.
+ */
+function sortSection(
+  lines: string[],
+  key: 'bands' | 'sources',
+  compare: (a: Record<string, unknown>, b: Record<string, unknown>) => number
+): void {
+  const at = lines.findIndex(l => l.startsWith(`${key}:`));
+  if (at === -1) return;
+  const end = sectionEnd(lines, at);
+  const first = lines.findIndex(
+    (l, i) => i > at && i < end && /^\s*- /.test(l)
+  );
+  if (first === -1) return;
+  const indent = indentOf(lines[first]);
+  const isItem = (l: string) =>
+    indentOf(l) === indent && l.trimStart().startsWith('- ');
+  const isLead = (l: string) =>
+    l.trim() === '' || (l.trimStart().startsWith('#') && indentOf(l) <= indent);
+
+  const items: {
+    lead: string[];
+    body: string[];
+    value: Record<string, unknown>;
+  }[] = [];
+  let pendingLead: string[] = [];
+  let i = first;
+  while (i < end) {
+    let next = i + 1;
+    while (next < end && !isItem(lines[next])) next++;
+    // Blank lines and shallow comments right above the next item belong to it.
+    let bodyEnd = next;
+    if (next < end) {
+      while (bodyEnd > i + 1 && isLead(lines[bodyEnd - 1])) bodyEnd--;
+    }
+    const body = lines.slice(i, bodyEnd);
+    const lead = pendingLead;
+    pendingLead = lines.slice(bodyEnd, next);
+    let value: unknown;
+    try {
+      value = yaml.load(
+        body.map(l => l.slice(Math.min(indent, indentOf(l)))).join('\n')
+      );
+    } catch {
+      return;
+    }
+    if (
+      !Array.isArray(value) ||
+      value.length !== 1 ||
+      typeof value[0] !== 'object' ||
+      value[0] === null
+    ) {
+      return;
+    }
+    items.push({ lead, body, value: value[0] as Record<string, unknown> });
+    i = next;
+  }
+
+  const blankBetween = items.some(it => it.lead.some(l => l.trim() === ''));
+  const sorted = [...items].sort((a, b) => compare(a.value, b.value));
+  const out = sorted.flatMap((it, n) => {
+    const comments = it.lead.filter(l => l.trim() !== '');
+    return [...(n > 0 && blankBetween ? [''] : []), ...comments, ...it.body];
+  });
+  lines.splice(first, end - first, ...out);
+}
+
+const str = (v: unknown) => (typeof v === 'string' ? v : '');
+
+/** Bands by name; band sources by band (then url), then listing sources by url. */
+function sortBandsYaml(lines: string[]): void {
+  sortSection(lines, 'bands', (a, b) => byText(str(a.name), str(b.name)));
+  sortSection(lines, 'sources', (a, b) => {
+    const la = a.mode === 'band' ? 0 : 1;
+    const lb = b.mode === 'band' ? 0 : 1;
+    return (
+      la - lb ||
+      byText(str(a.band), str(b.band)) ||
+      byText(str(a.url), str(b.url))
+    );
+  });
+}
+
 /**
  * Insert new bands (and their tour-page sources) into bands.yaml as TEXT, so
- * comments and ordering survive, skipping duplicates, then prove the result
+ * comments survive, skipping duplicates; sort both lists alphabetically
+ * (sortBandsYaml); then prove the result
  * still parses and contains everything that was added. Throws if inserting is
  * not safe (nothing is returned in that case).
  */
@@ -158,6 +252,7 @@ export function appendBands(
   const lines = text.replace(/\s+$/, '').split('\n');
   if (sourceBlocks.length > 0) addToSection(lines, 'sources', sourceBlocks);
   addToSection(lines, 'bands', bandBlocks);
+  sortBandsYaml(lines);
   const out = lines.join('\n').replace(/\s+$/, '') + '\n';
 
   const parsed = parseBandsConfig(out); // throws on invalid result
