@@ -534,13 +534,14 @@ See [`crawler/README.md`](crawler/README.md) for the full options reference.
 
 ---
 
-## 10. Members and My bands (tours page)
+## 10. Members: My bands and My festivals
 
-The band-tours page (`tours.html`) is public. On top of that, you can give a few people a **personal link**. Someone who has opened their link (a **member**) can:
+The band-tours page (`tours.html`) and the festival radar (`festivals.html`) are public. On top of that, you can give a few people a **personal link**. Someone who has opened their link (a **member**) can:
 
-- follow bands with the ♡ button (♥ means "following"),
-- switch the page between **All bands** and **My bands**,
-- suggest new bands for you to add.
+- follow bands and festivals with the ♡ button (♥ means "following"),
+- switch the tours page between **All bands** and **My bands**, and the festival radar between **All festivals** and **My festivals**,
+- suggest new bands and festivals for you to add,
+- connect Telegram to get a daily message when a followed band announces new shows or a followed festival announces a new edition.
 
 Members cannot publish or change events. You manage everything from the admin page (`admin/admin.html`).
 
@@ -568,6 +569,12 @@ Treat the link like a house key: anyone who has it can use it as that member (fo
   - **Added** — the band is now on the tours page (and it is followed for them automatically);
   - **Not added** — you rejected it (with your reason, if you gave one).
 
+On the festival radar (`festivals.html`) the same member works without opening the link again: a device that opened it on the tours page is recognised there too (the link also works when opened on `festivals.html`).
+
+- **Follow festivals:** tap ♡ on a festival card, or on any festival in the **Tracked festivals** list. That list shows every festival on your watchlist, also the ones with no dates right now ("no dates yet"), so a member can follow a festival before its next edition is announced. **My festivals** shows only the followed festivals that have dates on the radar.
+- **Suggest a festival:** open **Suggest a festival**, type the name and, if they know it, the website. The statuses are the same as for bands; a festival counts as **Added** once it is in the Tracked festivals list or on the radar.
+- **Telegram alerts:** the **🔔 Telegram alerts** button is on both pages. The daily message lists new editions of followed festivals under "Festivals you follow". With `/radar on` in Telegram they also get every other newly announced festival.
+
 If the page says "This personal link is no longer active", the member was revoked or deleted.
 
 ### Review suggestions
@@ -588,16 +595,23 @@ Tick one or more bands, then:
 - **Reject selected:** type an optional reason (members see it) and confirm.
 - **Link selected to an existing band:** use this when the band is already tracked under another name or website (the page cannot match it on its own), or to clear suggestions you have already added. Paste the band's website as written in `bands.yaml` (its `url`). The members who suggested it follow the band right away and see **Added**.
 
+**Festival suggestions:** switch the Suggestions tab from **Bands** to **Festivals**. Reject and link work the same way (link with the festival's `url` from `festivals.yaml`), and **Most followed festivals** shows the follower counts. To add festivals:
+
+1. Tick them and press **Copy for festivals.yaml**. It copies ready-made entries (`url`, `name`, `added`); an entry whose website nobody gave starts with `# TODO url`.
+2. Paste them under `festivals:` in `crawler/festivals.yaml`, fill in any missing `url`, and check each entry.
+3. Use an address that stays the same from one edition to the next, without the year (for example `https://example.org/festival/`, not `…/festival-2026/`): members follow a festival by its address, so a new address next year would lose them. The deploy prints a warning for addresses that contain a year.
+4. Redeploy the public web (`./scripts/deploy-public-web.sh`). This refreshes the Tracked festivals list; members then see **Added**, and the festival is followed for them.
+
 ### Revoke or delete a member
 
 In the **Members** tab:
 
 - **Revoke** stops the link from working. The member's list and suggestions are kept, but nobody can use them. There is no "undo": to let the person back in, create a new member.
-- **Delete** removes the member together with their list and their suggestions.
+- **Delete** removes the member together with their followed bands and festivals and their suggestions.
 
 ### A member lost their link
 
-A lost link cannot be recovered or shown again (the server never stores it). Create a new member for the same person, send the new link, and delete the old member. Their old list is lost, so they need to follow their bands again. A device on which they already opened the old link keeps working until you delete or revoke the old member.
+A lost link cannot be recovered or shown again (the server never stores it). Create a new member for the same person, send the new link, and delete the old member. Their old list is lost, so they need to follow their bands and festivals again. A device on which they already opened the old link keeps working until you delete or revoke the old member.
 
 ---
 

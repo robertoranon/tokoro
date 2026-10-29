@@ -61,7 +61,7 @@ Events are queryable through a simple API. Point it at a location, a radius, and
 | [**Public Web**](public-web/)             | Example event browser — query by location, date, category; embeds the bookmarklet; festival radar and band-tours pages |
 | [**Admin Panel**](admin/)                 | Static HTML moderation UI — browse and delete events with admin key auth; manages tours members and reviews their band suggestions |
 
-**Members and My bands.** The band-tours page (`tours.html`) is public. In addition, the admin can give a small group of people a personal link (created in the Admin Panel's Members tab). Opening it once lets that person follow bands (♡), switch the page to "My bands", and suggest new bands. The admin reviews suggestions in the Suggestions tab and adds the good ones with `bands-scout` (see [HOW-TO-USE](HOW-TO-USE.md#10-members-and-my-bands-tours-page)). Members cannot publish events.
+**Members: My bands and My festivals.** The band-tours page (`tours.html`) and the festival radar (`festivals.html`) are public. In addition, the admin can give a small group of people a personal link (created in the Admin Panel's Members tab). Opening it once lets that person follow bands and festivals (♡), switch the pages to "My bands" / "My festivals", suggest new bands and festivals, and get Telegram alerts for them. The admin reviews suggestions in the Suggestions tab, adds bands with `bands-scout` and festivals by pasting entries into `festivals.yaml` (see [HOW-TO-USE](HOW-TO-USE.md#10-members-my-bands-and-my-festivals)). Members cannot publish events.
 
 ---
 

@@ -8,7 +8,7 @@ A simple web interface for querying events from the Tokoro API.
 - Filter by category and time range
 - Geocoding support via OpenStreetMap Nominatim API
 - Mobile-responsive design
-- `festivals.html`: Festival radar. Browse under-the-radar festivals by month on a map; independent of the event pages
+- `festivals.html`: Festival radar. Browse under-the-radar festivals by month on a map, plus a public Tracked festivals pane (list generated from `crawler/festivals.yaml` at deploy time, also festivals with no dates yet); independent of the event pages. Members (same personal link and stored seed as `tours.html`) can follow festivals (♡/♥ on cards and tracked rows), switch to "My festivals", suggest festivals and connect Telegram alerts; visitors see none of this and never download `member.js`. See `SPECS.md` FR-7.6/FR-7.7
 - `tours.html`: Band tours. Upcoming shows of the followed bands, band by band, with filters, a NEW badge for shows first published in the last 7 days (and a "New only" filter), saved queries via "Copy link", an optional map, and a tracked-bands pane (list generated from `crawler/bands.yaml` at deploy time); independent of the other pages. Band shows are excluded from the other pages (`has_act=0`)
 - `tours.html` members: people who received a personal link from the admin (`tours.html#k=…`, created on the admin page's Members tab) can follow bands (♡/♥, on the band cards and on every row of the Tracked bands pane), switch to "My bands", and suggest bands for the admin to review. Visitors see none of this. The member logic is in `member.js`, which ships with the page but is loaded only for a personal link or a stored member seed (visitors never download it); see `SPECS.md` FR-8.9
 
