@@ -762,6 +762,7 @@ try {
     check('visitor: member.js is not downloaded', !state.staticRequests.includes('/member.js'), state.staticRequests);
     check('visitor: no page errors', errors.length === 0, errors);
     check('visitor: no member bar', await page.isHidden('#memberBar'));
+    check('visitor: Plan a trip link is hidden and trips.* is not requested', (await page.isHidden('#tripsLink')) && !state.staticRequests.some(r => r.includes('trips.')), state.staticRequests);
     check('visitor: no suggest pane', await page.isHidden('#suggestPane'));
     check('visitor: no follow buttons', (await page.locator('.follow-btn').count()) === 0);
     check('visitor: no /member requests', state.memberRequests.length === 0, state.memberRequests);
@@ -803,6 +804,7 @@ try {
     await page.waitForSelector('.band-card');
     await page.waitForSelector('#memberBar:not([hidden])');
     check('member: a link loads member.js', state.staticRequests.includes('/member.js'), state.staticRequests);
+    check('member: Plan a trip link is visible and points to trips.html', (await page.isVisible('#tripsLink')) && ((await page.getAttribute('#tripsLink', 'href')) || '').endsWith('trips.html'));
     check('member: greeting names the member', (await page.textContent('#memberHello')).includes('Anna'));
     check('member: link fragment removed from the address bar', !page.url().includes('#k='), page.url());
     check(

@@ -14,6 +14,7 @@ const PAGES = [
   'map.html',
   'festivals.html',
   'tours.html',
+  'trips.html',
   'publish.html',
   'privacy-policy.html',
 ];
