@@ -235,6 +235,9 @@ export interface SuggestionRow {
   member_name: string | null;
 }
 
+/** Shown as the suggester of rows added from the admin Telegram chat. */
+export const ADMIN_CHAT_LABEL = 'Admin (Telegram)';
+
 /** Group suggestions by normalized band name, most requested first. */
 export function groupSuggestions(rows: SuggestionRow[], detail: boolean) {
   const groups = new Map<
@@ -310,9 +313,13 @@ async function listSuggestions(
   )
     .bind(status)
     .all<SuggestionRow>();
-  return jsonResponse(
-    groupSuggestions(res.results || [], params.get('detail') === '1')
+  const bot = env.TELEGRAM_BOT_PUBKEY?.toLowerCase();
+  const rows = (res.results || []).map(r =>
+    r.member_name == null && bot && r.pubkey === bot
+      ? { ...r, member_name: ADMIN_CHAT_LABEL }
+      : r
   );
+  return jsonResponse(groupSuggestions(rows, params.get('detail') === '1'));
 }
 
 async function rejectSuggestions(
@@ -392,7 +399,8 @@ async function linkSuggestions(
     writes.push(
       env.DB.prepare(
         `INSERT OR IGNORE INTO ${kind.followTable} (pubkey, ${kind.urlColumn}, created_at)
-         SELECT DISTINCT pubkey, ?, ? FROM ${kind.suggestionTable} WHERE id IN (${inList})`
+         SELECT DISTINCT pubkey, ?, ? FROM ${kind.suggestionTable}
+         WHERE id IN (${inList}) AND pubkey IN (SELECT pubkey FROM members)`
       ).bind(actUrl, now, ...chunk),
       env.DB.prepare(
         `UPDATE ${kind.suggestionTable} SET status = 'linked', ${kind.urlColumn} = ?

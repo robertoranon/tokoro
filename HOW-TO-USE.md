@@ -577,6 +577,15 @@ On the festival radar (`festivals.html`) the same member works without opening t
 
 If the page says "This personal link is no longer active", the member was revoked or deleted.
 
+### Add bands and festivals from Telegram
+
+In the admin Telegram chat (the one set as `ADMIN_TELEGRAM_CHAT_ID`), send:
+
+- `/band Karate | https://karate.example` to add a band to Tours;
+- `/festival Tiny Fest | https://tinyfest.example` to add a festival to Festivals.
+
+The site is optional (`/band Karate`). The bot answers with a confirmation, and the band or festival appears in the admin page's **Suggestions** tab, suggested by **Admin (Telegram)**. From there it is added like any suggestion (below). It needs `TELEGRAM_WEBHOOK_SECRET` on the bot and `ADMIN_TELEGRAM_CHAT_ID` and `TELEGRAM_BOT_PUBKEY` on the API worker.
+
 ### Review suggestions
 
 Open the **Suggestions** tab. It lists the waiting suggestions grouped by band (spellings that differ only in capitals, accents or punctuation are grouped), most requested first. **Show who asked** adds the members' names. Below, **Most followed bands** shows how many members follow each band.

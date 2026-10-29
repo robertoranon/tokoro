@@ -66,6 +66,7 @@ API Endpoints:
 - `POST /member/festival-suggestions` - Suggest a festival (`name`, optional `url`)
 - `POST /member/telegram/link-code` - One-time code + `t.me` link to connect the member's Telegram chat
 - `POST /telegram/link|settings|unlink` - Called by the bot (signed with the bot key): redeem a code, toggle radar alerts, disconnect
+- `POST /telegram/admin-suggest` - Called by the bot for `/band` and `/festival` in the admin chat: adds a pending band or festival suggestion (only from `ADMIN_TELEGRAM_CHAT_ID`)
 - `GET|POST /admin/members` - List / create members (admin)
 - `POST /admin/members/:pubkey/revoke`, `DELETE /admin/members/:pubkey` - Revoke / delete a member (admin)
 - `GET /admin/suggestions?status=&detail=1` - Suggestions grouped by band name (admin)

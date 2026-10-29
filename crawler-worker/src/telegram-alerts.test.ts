@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as ed from '@noble/ed25519';
 import { bytesToHex, hexToBytes } from './bot-shared'; // also configures sha512Async
-import { handleAlertCommand } from './telegram-alerts';
+import {
+  handleAlertCommand,
+  handleAdminCommand,
+  parseNameAndUrl,
+} from './telegram-alerts';
 
 let calls: { path: string; headers: Headers; body: any }[];
 let answer: { status: number; body: any };
@@ -159,5 +163,95 @@ describe('handleAlertCommand', () => {
     answer = { status: 500, body: {} };
     await handleAlertCommand(dm('/radar on'), env, reply);
     expect(replies[0]).toContain('went wrong');
+  });
+});
+
+describe('parseNameAndUrl', () => {
+  it('accepts "Name | url", "Name url" and a bare name', () => {
+    expect(parseNameAndUrl('Karate | https://karate.example/')).toEqual({
+      name: 'Karate',
+      url: 'https://karate.example/',
+    });
+    expect(parseNameAndUrl('  The   Ex https://theex.nl')).toEqual({
+      name: 'The Ex',
+      url: 'https://theex.nl',
+    });
+    expect(parseNameAndUrl('Tiny Fest')).toEqual({ name: 'Tiny Fest' });
+    expect(parseNameAndUrl('https://x.example')).toEqual({
+      name: '',
+      url: 'https://x.example',
+    });
+  });
+});
+
+describe('handleAdminCommand', () => {
+  const group = (text: string) => ({
+    chat: { id: -1001, type: 'supergroup' },
+    text,
+  });
+
+  it('ignores other messages', async () => {
+    expect(await handleAdminCommand(dm('/bands'), env, reply)).toBe(false);
+    expect(await handleAdminCommand(dm('https://x.example'), env, reply)).toBe(
+      false
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it('/band sends a signed admin-suggest call and confirms', async () => {
+    answer = {
+      status: 201,
+      body: { id: 7, name: 'Karate', url: 'https://karate.example' },
+    };
+    expect(
+      await handleAdminCommand(
+        group('/band@tokoro_bot Karate | https://karate.example'),
+        env,
+        reply
+      )
+    ).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].path).toBe('/telegram/admin-suggest');
+    expect(calls[0].body).toEqual({
+      chat_id: '-1001',
+      kind: 'band',
+      name: 'Karate',
+      url: 'https://karate.example',
+    });
+    expect(await verifies(calls[0], 'telegram-admin-suggest')).toBe(true);
+    expect(replies[0]).toContain('Added band <b>Karate</b>');
+  });
+
+  it('/festival without a url omits it', async () => {
+    answer = { status: 201, body: { id: 1, name: 'Tiny Fest', url: null } };
+    await handleAdminCommand(group('/festival Tiny Fest'), env, reply);
+    expect(calls[0].body).toEqual({
+      chat_id: '-1001',
+      kind: 'festival',
+      name: 'Tiny Fest',
+    });
+    expect(replies[0]).toContain('Festivals');
+  });
+
+  it('shows usage without a name, and reports duplicates and errors', async () => {
+    await handleAdminCommand(group('/band'), env, reply);
+    expect(calls).toEqual([]);
+    expect(replies.pop()).toContain('/band Name');
+
+    answer = { status: 200, body: { id: 3, duplicate: true } };
+    await handleAdminCommand(group('/band Karate'), env, reply);
+    expect(replies.pop()).toContain('already waiting');
+
+    answer = { status: 400, body: { error: 'url must be an http(s) URL' } };
+    await handleAdminCommand(group('/band Karate http://'), env, reply);
+    expect(replies.pop()).toContain('Url must be an http(s) URL');
+  });
+
+  it('403: explains in a private chat, stays silent in groups', async () => {
+    answer = { status: 403, body: {} };
+    await handleAdminCommand(group('/band Karate'), env, reply);
+    expect(replies).toEqual([]);
+    await handleAdminCommand(dm('/band Karate'), env, reply);
+    expect(replies[0]).toContain('Only the admin chat');
   });
 });

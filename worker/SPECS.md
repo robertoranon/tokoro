@@ -330,6 +330,7 @@ The member endpoints (`/member/*`) and the admin endpoints (`/admin/members*`, `
 | `telegram-link` | `POST /telegram/link` | the raw JSON request body |
 | `telegram-settings` | `POST /telegram/settings` | the raw JSON request body |
 | `telegram-unlink` | `POST /telegram/unlink` | the raw JSON request body |
+| `telegram-admin-suggest` | `POST /telegram/admin-suggest` | the raw JSON request body |
 | `admin-read` | `GET /admin/members`, `GET /admin/suggestions`, `GET /admin/band-followers`, `GET /admin/festival-suggestions`, `GET /admin/festival-followers`, `GET /admin/conflicts` | the request path with its query string exactly as sent (URL pathname + search, e.g. `/admin/suggestions?detail=1`; without a query, just the path such as `/admin/suggestions`). A signature for one query is refused (`401`) for any other, so a captured read cannot be replayed with `?detail=1` added |
 | `admin-member` | `POST /admin/members` | the raw JSON request body |
 | `admin-member-revoke` | `POST /admin/members/:pubkey/revoke` | the target pubkey from the path, lower-cased |
@@ -1429,15 +1430,16 @@ Tours members can connect one private Telegram chat and receive a daily digest o
 
 The code is 128 random bits, valid for 15 minutes, single use. A fresh request deletes all older codes of the same member (delete and insert run as one batch).
 
-#### 7.15.2 Bot endpoints (POST /telegram/link, /telegram/settings, /telegram/unlink)
+#### 7.15.2 Bot endpoints (POST /telegram/link, /telegram/settings, /telegram/unlink, /telegram/admin-suggest)
 
-Signed by the bot as described in section 3.6 (domains `telegram-link`, `telegram-settings`, `telegram-unlink`; payload the raw body; authorization by `TELEGRAM_BOT_PUBKEY`; `503` if unconfigured, `413`/`401`/`403` as in 3.6). Any other method or path is not handled by these routes. The body must be a JSON object (`400 {"error": "Invalid JSON"}` / `{"error": "Invalid body"}`) with `chat_id` a **JSON string** of 1-20 digits with an optional leading `-` (a number is rejected: `400 {"error": "chat_id is required"}`; the bot sends the decimal string of the Telegram chat id).
+Signed by the bot as described in section 3.6 (domains `telegram-link`, `telegram-settings`, `telegram-unlink`, `telegram-admin-suggest`; payload the raw body; authorization by `TELEGRAM_BOT_PUBKEY`; `503` if unconfigured, `413`/`401`/`403` as in 3.6). Any other method or path is not handled by these routes. The body must be a JSON object (`400 {"error": "Invalid JSON"}` / `{"error": "Invalid body"}`) with `chat_id` a **JSON string** of 1-20 digits with an optional leading `-` (a number is rejected: `400 {"error": "chat_id is required"}`; the bot sends the decimal string of the Telegram chat id).
 
 | Endpoint | Body | Behaviour | Success (200) |
 |---|---|---|---|
 | `POST /telegram/link` | `{code, chat_id}` | Redeems a link code (below) | `{name, bands, festivals, radar_alerts}` (`bands` / `festivals` = number of followed bands / festivals) |
 | `POST /telegram/settings` | `{chat_id, radar_alerts}` (boolean required, else `400 {"error": "radar_alerts must be true or false"}`) | Sets `radar_alerts` of the member linked to the chat | `{radar_alerts}` |
 | `POST /telegram/unlink` | `{chat_id}` | Sets `telegram_chat_id` to null for the chat | `{unlinked: true}` |
+| `POST /telegram/admin-suggest` | `{chat_id, kind, name, url?}` | Adds a pending band or festival suggestion from the admin chat (below) | `201 {id, name, url}`; `200 {id, duplicate: true}` |
 
 `settings` and `unlink` answer `404 {"error": "Chat not linked"}` when no member has that chat.
 
@@ -1450,6 +1452,15 @@ Signed by the bot as described in section 3.6 (domains `telegram-link`, `telegra
 5. The chat is removed from any other member (`telegram_chat_id` is unique) and set on this member (one batch). Linking again from another chat replaces the member's previous chat.
 
 A revoked member keeps the chat id but receives no digests. Deleting a member deletes their link codes (section 7.12.4).
+
+**Adding from the admin chat (`/telegram/admin-suggest`):** the bot's `/band` and `/festival` commands (`crawler-worker/SPECS.md` 3.6).
+
+1. `chat_id` differs from `ADMIN_TELEGRAM_CHAT_ID`, or that variable is unset → `403 {"error": "Not the admin chat"}`.
+2. `kind` is `"band"` (row in `band_suggestions`) or `"festival"` (row in `festival_suggestions`); anything else → `400 {"error": "kind must be band or festival"}`.
+3. `name` and `url` are validated and normalized exactly as in 7.11.3 (same `400` messages).
+4. The row is stored with `status = 'pending'` and `pubkey` = `TELEGRAM_BOT_PUBKEY` (lower-cased). A pending row of the bot key with the same `normalizeName` already in that table → `200 {"id": <existing id>, "duplicate": true}` and nothing is stored.
+
+These rows go through the admin Suggestions tab like members' ones. `GET /admin/suggestions` and `GET /admin/festival-suggestions` with `detail=1` name their suggester `Admin (Telegram)`. Linking them (7.13.3, 7.13.6) writes no follow for the bot key: follows are only inserted for suggesters present in `members`.
 
 #### 7.15.3 Flagging new items (`alert_pending`)
 
@@ -1498,6 +1509,7 @@ Runs from the `0 8 * * *` cron (section 8.3). Does nothing when `TELEGRAM_BOT_TO
 A separate chat identified by `ADMIN_TELEGRAM_CHAT_ID` (not a member; a group with the bot, its id found with a helper bot such as @RawDataBot because the bot's webhook prevents `getUpdates`). Nothing is sent when it or `TELEGRAM_BOT_TOKEN` is unset.
 
 - **Conflict notice:** `notifyConflict` sends one message per newly created conflict, for any band: the band name (`act_name`; if null, the host of the first event URL, else "Unnamed band"), the day, one line per event with title and place (`venue_name`, else `address`), all HTML-escaped, a line telling the admin to resolve it in the admin page's Conflicts tab, and a link to `ADMIN_PAGE_URL` when set. Failures are logged, never thrown.
+- **Adding bands and festivals:** `/band` and `/festival` sent in this chat add a pending suggestion through `POST /telegram/admin-suggest` (7.15.2).
 - **Digest:** the digest job (7.15.4) adds the admin chat as a recipient with `radar_alerts` on and every `act_url` of the claimed shows as followed, so it receives all new shows and all new editions. It is sent first and counts toward the send budget, so it is never the one skipped. A `403` from the admin chat is only logged; no member's `telegram_chat_id` changes.
 
 ### 7.16 Conflicts: Crawler Proposals and Admin Resolution

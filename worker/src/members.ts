@@ -185,26 +185,10 @@ async function handleMemberFollow(
   return jsonResponse({ [kind.urlColumn]: actUrl });
 }
 
-async function handleMemberSuggest(
-  request: Request,
-  env: Env,
-  kind: MemberKindConfig
-): Promise<Response> {
-  const raw = await readSignedBody(request);
-  if (raw instanceof Response) return raw;
-  const m = await authMember(request, env, kind.suggestDomain, raw);
-  if (m instanceof Response) return m;
-
-  let body: any;
-  try {
-    body = JSON.parse(raw);
-  } catch {
-    return jsonResponse({ error: 'Invalid JSON' }, 400);
-  }
-  if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    return jsonResponse({ error: 'Invalid body' }, 400);
-  }
-
+/** Validated name and optional normalized url of a suggestion body, or a 400. */
+export function parseSuggestion(
+  body: any
+): { name: string; url: string | null } | Response {
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   if (
     name === '' ||
@@ -229,6 +213,32 @@ async function handleMemberSuggest(
       );
     }
   }
+  return { name, url };
+}
+
+async function handleMemberSuggest(
+  request: Request,
+  env: Env,
+  kind: MemberKindConfig
+): Promise<Response> {
+  const raw = await readSignedBody(request);
+  if (raw instanceof Response) return raw;
+  const m = await authMember(request, env, kind.suggestDomain, raw);
+  if (m instanceof Response) return m;
+
+  let body: any;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return jsonResponse({ error: 'Invalid JSON' }, 400);
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return jsonResponse({ error: 'Invalid body' }, 400);
+  }
+
+  const parsed = parseSuggestion(body);
+  if (parsed instanceof Response) return parsed;
+  const { name, url } = parsed;
 
   const key = normalizeName(name);
   const pending = await env.DB.prepare(

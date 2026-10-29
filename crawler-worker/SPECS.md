@@ -334,6 +334,7 @@ Events in the response are `PreparedEvent` objects (geocoded, normalised, unsign
 | Photo message | Downloads largest variant, crawls in `image` mode |
 | Image document | Same as photo |
 | `/start <code>`, `/radar on\|off`, `/stop` (private chats only) | Tours alert commands, see "Tours alerts" below |
+| `/band …`, `/festival …` (admin chat only) | Admin commands, see "Admin commands" below. Checked before the URL rule, so the site in the command is never crawled |
 | Anything else | Replies with usage hint |
 
 **Confirmation flow:**
@@ -355,6 +356,29 @@ Each command calls the API worker (service binding `API_WORKER`, else `API_WORKE
 | `/stop` | `POST /telegram/unlink {chat_id}` | "Disconnected. You won't receive alerts."; 404: the "isn't connected" reply |
 
 Any other status or a failed call replies "Something went wrong. Please try again later." The digests themselves are sent by the API worker's 08:00 UTC cron, which needs the same `TELEGRAM_BOT_TOKEN` as this worker (`worker/SPECS.md` 5.6, 7.15.4); this worker sends nothing on a schedule.
+
+**Admin commands:**
+
+In the admin chat (`ADMIN_TELEGRAM_CHAT_ID` of the API worker, `worker/SPECS.md` 7.15.5; a private chat or a group) the admin adds a band to Tours or a festival to Festivals:
+
+```
+/band Karate | https://karate.example
+/festival Tiny Fest https://tinyfest.example
+/band Karate
+```
+
+The text after the command (`/band@botname` accepted, any chat type) is split into a name and an optional site: the first `http(s)://` token is the site, the rest with `|` removed and whitespace collapsed is the name. An empty name replies "Send /band Name | https://site (the site is optional)." (`/festival` likewise) and calls nothing. Otherwise the bot calls `POST /telegram/admin-suggest {chat_id, kind: "band"|"festival", name, url?}`, signed as for the alert commands with domain `telegram-admin-suggest`. The API worker decides whether the chat is the admin chat. Like the alert commands, these run only with `TELEGRAM_WEBHOOK_SECRET` configured. Without it, the command is not crawled: a private chat gets "Adding bands and festivals needs TELEGRAM_WEBHOOK_SECRET." and a group gets no reply.
+
+| Status | Reply |
+|---|---|
+| 201 | "Added band **{name}** ({normalized url}) to the suggestions. Review it in the admin page's Suggestions tab (Bands)." (festival: "Added festival …(Festivals)"; no url part when there is no site) |
+| 200 `duplicate` | "**{name}** is already waiting in the suggestions." |
+| 400 | The API error, capitalized, then the usage line |
+| 403 | Private chat: "Only the admin chat can add bands and festivals."; group: no reply |
+| 503 | "Adding from Telegram is not configured on the server." |
+| other / failed call | "Something went wrong. Please try again later." |
+
+The command only queues a suggestion: the tracked lists (`crawler/bands.yaml`, `crawler/festivals.yaml`) are local files, so the band or festival reaches the public pages through the admin page's Suggestions tab and the usual copy / `bands-scout` / deploy steps.
 
 **Bot identity:** all published events are attributed to `BOT_PUBKEY`. Generate the keypair once:
 

@@ -274,3 +274,118 @@ describe('GET /member/me', () => {
     });
   });
 });
+
+describe('POST /telegram/admin-suggest', () => {
+  const suggest = (obj: object, key = bot) =>
+    botPost('/telegram/admin-suggest', 'telegram-admin-suggest', obj, key);
+  const rows = (table: string) =>
+    env.DB.prepare(`SELECT pubkey, name, url, status FROM ${table}`).all();
+
+  beforeEach(() => {
+    env.ADMIN_TELEGRAM_CHAT_ID = '-1001';
+  });
+
+  it('stores a pending band suggestion under the bot key', async () => {
+    const res = await suggest({
+      chat_id: '-1001',
+      kind: 'band',
+      name: ' Karate ',
+      url: 'https://Toutpartout.be/artist/karate/',
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as any;
+    expect(body.name).toBe('Karate');
+    expect((await rows('band_suggestions')).results).toEqual([
+      {
+        pubkey: bot.pubkey,
+        name: 'Karate',
+        url: body.url,
+        status: 'pending',
+      },
+    ]);
+    expect((await rows('festival_suggestions')).results).toEqual([]);
+  });
+
+  it('stores festivals separately and accepts a missing url', async () => {
+    const res = await suggest({
+      chat_id: '-1001',
+      kind: 'festival',
+      name: 'Tiny Fest',
+    });
+    expect(res.status).toBe(201);
+    expect((await rows('festival_suggestions')).results).toEqual([
+      { pubkey: bot.pubkey, name: 'Tiny Fest', url: null, status: 'pending' },
+    ]);
+  });
+
+  it('answers duplicate for a pending suggestion with the same name', async () => {
+    const first = (await (
+      await suggest({ chat_id: '-1001', kind: 'band', name: 'Karate' })
+    ).json()) as any;
+    const res = await suggest({
+      chat_id: '-1001',
+      kind: 'band',
+      name: 'karate',
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: first.id, duplicate: true });
+  });
+
+  it('403 from any other chat or when no admin chat is configured', async () => {
+    const obj = { chat_id: '4242', kind: 'band', name: 'Karate' };
+    expect((await suggest(obj)).status).toBe(403);
+    delete env.ADMIN_TELEGRAM_CHAT_ID;
+    expect((await suggest({ ...obj, chat_id: '-1001' })).status).toBe(403);
+    expect((await rows('band_suggestions')).results).toEqual([]);
+  });
+
+  it('403 for keys other than the bot', async () => {
+    const obj = { chat_id: '-1001', kind: 'band', name: 'Karate' };
+    expect((await suggest(obj, anna)).status).toBe(403);
+  });
+
+  it('400 for a bad kind, name or url', async () => {
+    const base = { chat_id: '-1001', kind: 'band', name: 'Karate' };
+    expect((await suggest({ ...base, kind: 'venue' })).status).toBe(400);
+    expect((await suggest({ ...base, name: '  ' })).status).toBe(400);
+    expect((await suggest({ ...base, url: 'ftp://x' })).status).toBe(400);
+  });
+
+  it('is labelled in the admin list and linking adds no follow for the bot', async () => {
+    const admin = await makeKey();
+    env.ADMIN_PUBKEY = admin.pubkey;
+    const { id } = (await (
+      await suggest({ chat_id: '-1001', kind: 'band', name: 'Karate' })
+    ).json()) as any;
+
+    const path = '/admin/suggestions?detail=1';
+    const list = await worker.fetch(
+      new Request('https://w.test' + path, {
+        headers: await authHeaders(admin, 'admin-read', path),
+      }),
+      env
+    );
+    const groups = (await list.json()) as any[];
+    expect(groups[0].member_names).toEqual(['Admin (Telegram)']);
+
+    const body = JSON.stringify({
+      ids: [id],
+      act_url: 'https://karate.example',
+    });
+    const headers = await authHeaders(admin, 'admin-suggestion-link', body);
+    headers['Content-Type'] = 'application/json';
+    const res = await worker.fetch(
+      new Request('https://w.test/admin/suggestions/link', {
+        method: 'POST',
+        headers,
+        body,
+      }),
+      env
+    );
+    expect(await res.json()).toEqual({ updated: 1 });
+    const follows = (await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM member_bands'
+    ).first()) as any;
+    expect(follows.n).toBe(0);
+  });
+});

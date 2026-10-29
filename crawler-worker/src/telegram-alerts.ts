@@ -3,6 +3,9 @@
  * Each one calls the API worker's /telegram/* endpoints, signed with the bot
  * key (headers X-Pubkey/X-Signature/X-Timestamp, worker/SPECS.md 3.6). The
  * digests themselves are sent by the API worker's cron.
+ *
+ * Admin commands (admin chat only): /band and /festival add a pending
+ * suggestion, reviewed in the admin page like members' suggestions.
  */
 import * as ed25519 from '@noble/ed25519';
 import { Env } from './types';
@@ -18,6 +21,7 @@ const DOMAINS: Record<string, string> = {
   '/telegram/link': 'telegram-link',
   '/telegram/settings': 'telegram-settings',
   '/telegram/unlink': 'telegram-unlink',
+  '/telegram/admin-suggest': 'telegram-admin-suggest',
 };
 
 const MSG = {
@@ -161,6 +165,76 @@ export async function handleAlertCommand(
     else await reply(MSG.error);
   } catch (err) {
     console.error('[telegram-alerts]', err);
+    await reply(MSG.error);
+  }
+  return true;
+}
+
+const ADMIN_MSG = {
+  usage: (cmd: string) =>
+    `Send ${cmd} Name | https://site (the site is optional).`,
+  notAdmin: 'Only the admin chat can add bands and festivals.',
+  notConfigured: 'Adding from Telegram is not configured on the server.',
+};
+
+/** Splits "Name | https://site", "Name https://site" or "Name" into name and url. */
+export function parseNameAndUrl(rest: string): { name: string; url?: string } {
+  const m = rest.match(/https?:\/\/\S+/i);
+  const url = m ? m[0] : undefined;
+  const name = (m ? rest.replace(m[0], ' ') : rest)
+    .replace(/\s*\|\s*/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return url ? { name, url } : { name };
+}
+
+/**
+ * /band and /festival from the admin chat. True when the message was one of
+ * them (and has been answered; other group chats get no reply).
+ */
+export async function handleAdminCommand(
+  message: AlertCommandMessage,
+  env: Env,
+  reply: Reply
+): Promise<boolean> {
+  if (!message.text) return false;
+  const cmd = message.text
+    .trim()
+    .match(/^\/(band|festival)(?:@\S+)?(?:\s+([\s\S]*))?$/i);
+  if (!cmd) return false;
+  const kind = cmd[1].toLowerCase() as 'band' | 'festival';
+  const isPrivate = message.chat.type === 'private';
+  const { name, url } = parseNameAndUrl(cmd[2] || '');
+  if (!name) {
+    await reply(ADMIN_MSG.usage(`/${kind}`));
+    return true;
+  }
+  try {
+    const { status, data } = await callWorker(env, '/telegram/admin-suggest', {
+      chat_id: String(message.chat.id),
+      kind,
+      name,
+      ...(url ? { url } : {}),
+    });
+    const label = `<b>${escapeHtml(name)}</b>`;
+    if (status === 201) {
+      const site = data?.url ? ` (${escapeHtml(data.url)})` : '';
+      await reply(
+        `Added ${kind} ${label}${site} to the suggestions. Review it in the admin page's Suggestions tab (${kind === 'band' ? 'Bands' : 'Festivals'}).`
+      );
+    } else if (status === 200 && data?.duplicate) {
+      await reply(`${label} is already waiting in the suggestions.`);
+    } else if (status === 400) {
+      const err = typeof data?.error === 'string' ? data.error : '';
+      await reply(
+        `${escapeHtml(err ? err[0].toUpperCase() + err.slice(1) : 'Invalid request')}. ${ADMIN_MSG.usage(`/${kind}`)}`
+      );
+    } else if (status === 403) {
+      if (isPrivate) await reply(ADMIN_MSG.notAdmin);
+    } else if (status === 503) await reply(ADMIN_MSG.notConfigured);
+    else await reply(MSG.error);
+  } catch (err) {
+    console.error('[telegram-admin]', err);
     await reply(MSG.error);
   }
   return true;

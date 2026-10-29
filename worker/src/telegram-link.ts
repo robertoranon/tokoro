@@ -5,7 +5,14 @@ import {
   authErrorResponse,
   readSignedBody,
 } from './member-auth';
-import { authMember, nowIso } from './members';
+import {
+  authMember,
+  nowIso,
+  parseSuggestion,
+  BAND_KIND,
+  FESTIVAL_KIND,
+} from './members';
+import { normalizeName } from './band-keys';
 
 export const LINK_CODE_TTL_MS = 15 * 60 * 1000;
 const LINK_CODE_PATH = '/member/telegram/link-code';
@@ -38,6 +45,8 @@ export async function routeTelegramRequest(
     return botCall(request, env, 'telegram-settings', updateSettings);
   if (path === '/telegram/unlink')
     return botCall(request, env, 'telegram-unlink', unlinkChat);
+  if (path === '/telegram/admin-suggest')
+    return botCall(request, env, 'telegram-admin-suggest', adminSuggest);
   return null;
 }
 
@@ -182,4 +191,50 @@ async function unlinkChat(env: Env, chatId: string): Promise<Response> {
     return jsonResponse({ error: 'Chat not linked' }, 404);
   }
   return jsonResponse({ unlinked: true });
+}
+
+/**
+ * A band or festival sent from the admin Telegram chat: stored as a pending
+ * suggestion under the bot key, so it shows up in the admin Suggestions tab.
+ */
+async function adminSuggest(
+  env: Env,
+  chatId: string,
+  body: any
+): Promise<Response> {
+  if (!env.ADMIN_TELEGRAM_CHAT_ID || chatId !== env.ADMIN_TELEGRAM_CHAT_ID) {
+    return jsonResponse({ error: 'Not the admin chat' }, 403);
+  }
+  const kind =
+    body.kind === 'band'
+      ? BAND_KIND
+      : body.kind === 'festival'
+        ? FESTIVAL_KIND
+        : null;
+  if (!kind) {
+    return jsonResponse({ error: 'kind must be band or festival' }, 400);
+  }
+  const parsed = parseSuggestion(body);
+  if (parsed instanceof Response) return parsed;
+  const { name, url } = parsed;
+  const pubkey = env.TELEGRAM_BOT_PUBKEY!.toLowerCase();
+
+  const key = normalizeName(name);
+  const pending = await env.DB.prepare(
+    `SELECT id, name FROM ${kind.suggestionTable} WHERE pubkey = ? AND status = 'pending'`
+  )
+    .bind(pubkey)
+    .all<{ id: number; name: string }>();
+  const existing = (pending.results || []).find(
+    r => normalizeName(r.name) === key
+  );
+  if (existing) return jsonResponse({ id: existing.id, duplicate: true }, 200);
+
+  const res = await env.DB.prepare(
+    `INSERT INTO ${kind.suggestionTable} (pubkey, name, url, status, created_at)
+     VALUES (?, ?, ?, 'pending', ?)`
+  )
+    .bind(pubkey, name, url, nowIso())
+    .run();
+  return jsonResponse({ id: res.meta.last_row_id, name, url }, 201);
 }

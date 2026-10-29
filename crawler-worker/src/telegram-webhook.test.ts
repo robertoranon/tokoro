@@ -86,4 +86,29 @@ describe('handleTelegram webhook secret', () => {
     expect(apiCalls).toEqual([]);
     expect(tgCalls.some(u => u.includes('sendMessage'))).toBe(true);
   });
+
+  it('never crawls the url of a /band command without the secret', async () => {
+    update.message.text = '/band Karate https://karate.example';
+    try {
+      await handleTelegram(post(), env);
+    } finally {
+      update.message.text = '/stop';
+    }
+    expect(apiCalls).toEqual([]);
+    expect(tgCalls.filter(u => u.includes('sendMessage'))).toHaveLength(1);
+  });
+
+  it('routes /band to the API worker when the secret matches', async () => {
+    env.TELEGRAM_WEBHOOK_SECRET = 's3cret';
+    update.message.text = '/band Karate';
+    try {
+      await handleTelegram(
+        post({ 'X-Telegram-Bot-Api-Secret-Token': 's3cret' }),
+        env
+      );
+    } finally {
+      update.message.text = '/stop';
+    }
+    expect(apiCalls).toEqual(['/telegram/admin-suggest']);
+  });
 });

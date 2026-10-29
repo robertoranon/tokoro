@@ -7,7 +7,7 @@
  */
 
 import { Env } from './types';
-import { handleAlertCommand } from './telegram-alerts';
+import { handleAlertCommand, handleAdminCommand } from './telegram-alerts';
 import { PreparedEvent } from './event-types';
 import { WorkerCrawler } from './crawler-adapter';
 import {
@@ -497,8 +497,11 @@ async function handleMessage(
   // chat id of the update, so they only run when the webhook is authenticated
   // with TELEGRAM_WEBHOOK_SECRET (verified in handleTelegram).
   const reply = (text: string) => tg.sendMessage(chatId, text);
+  // Admin commands (/band, /festival) also trust the chat id, so they need the
+  // secret too; the API worker only accepts them from ADMIN_TELEGRAM_CHAT_ID.
   if (env.TELEGRAM_WEBHOOK_SECRET) {
     if (await handleAlertCommand(message, env, reply)) return;
+    if (await handleAdminCommand(message, env, reply)) return;
   } else if (
     message.chat.type === 'private' &&
     message.text &&
@@ -507,6 +510,14 @@ async function handleMessage(
     )
   ) {
     await reply('Telegram alerts are not enabled on this bot yet.');
+    return;
+  } else if (
+    message.text &&
+    /^\/(?:band|festival)(?:@\S+)?(?:\s|$)/i.test(message.text.trim())
+  ) {
+    // Without the secret, never fall through to crawling the URL in the command.
+    if (message.chat.type === 'private')
+      await reply('Adding bands and festivals needs TELEGRAM_WEBHOOK_SECRET.');
     return;
   }
 
