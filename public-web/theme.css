@@ -16,6 +16,7 @@
   --orange: #ff7a1a;
   --yellow: #ffff00;
   --teal: #00d6b4;
+  --red: #ff3d2e;
   --page: var(--blue);
 
   /* legacy names kept so inline page CSS keeps working */
@@ -68,6 +69,9 @@ body[data-page='festivals'] {
 }
 body[data-page='tours'] {
   --page: var(--teal);
+}
+body[data-page='trips'] {
+  --page: var(--red);
 }
 body[data-page='map'] {
   --page: var(--lime);

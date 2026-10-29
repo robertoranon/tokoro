@@ -1,0 +1,1034 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tokoro Trips – plan a trip around your bands and festivals</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,800..900&family=Poppins:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      body {
+        font-family:
+          'Poppins',
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+      }
+      a {
+        color: var(--link);
+      }
+
+      /* ── Header ─────────────────────────────────────────────────────── */
+      .site-header {
+        background: linear-gradient(
+          135deg,
+          var(--header-dark) 0%,
+          var(--bg) 50%,
+          var(--bg) 100%
+        );
+        color: white;
+        position: relative;
+        overflow: hidden;
+      }
+      .header-inner {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 28px 24px 24px;
+        position: relative;
+      }
+      .header-title {
+        font-family: 'Fraunces', serif;
+        font-size: clamp(2.2rem, 6vw, 3.4rem);
+        font-weight: 800;
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+      }
+      .header-title em {
+        font-style: italic;
+        color: var(--accent-2);
+      }
+      .experimental-badge {
+        position: absolute;
+        top: 16px;
+        right: 24px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: var(--radius-sm);
+        padding: 8px 14px;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.8);
+        line-height: 1.5;
+        text-align: right;
+      }
+      .experimental-badge strong {
+        display: block;
+        color: #fbbf24;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        font-size: 10px;
+      }
+      /* On phones the badge would overlap the title: put it above it. */
+      @media (max-width: 560px) {
+        .experimental-badge {
+          position: static;
+          display: inline-block;
+          margin: 14px 0 0 24px;
+        }
+        .header-inner {
+          padding-top: 12px;
+        }
+      }
+
+      /* ── Layout ─────────────────────────────────────────────────────── */
+      .radar-main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 20px 24px 60px;
+      }
+      .filter-bar {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .planner {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .toggle {
+        flex-shrink: 0;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-2);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 100px;
+        padding: 7px 14px;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          color 0.15s,
+          border-color 0.15s;
+      }
+      .toggle:hover {
+        border-color: var(--accent-2);
+        color: var(--text);
+      }
+      .toggle[aria-pressed='true'] {
+        background: var(--accent);
+        border-color: var(--accent-2);
+        color: var(--header-dark);
+      }
+      .filter-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+      .filter-row select,
+      .filter-row input {
+        font: inherit;
+        font-size: 14px;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 8px 12px;
+      }
+      .filter-row input[type='search'] {
+        flex: 1 1 200px;
+        min-width: 160px;
+      }
+      .filter-row input[type='number'] {
+        width: 5em;
+      }
+      .filter-row input[type='checkbox'] {
+        width: 18px;
+        height: 18px;
+        padding: 0;
+      }
+      .filter-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .status-line,
+      .notice-line {
+        font-size: 13px;
+        color: var(--text-2);
+        min-height: 1.2em;
+      }
+      .notice-line {
+        color: #fbbf24;
+      }
+      .map-panel {
+        height: 340px;
+        border-radius: var(--radius);
+        overflow: hidden;
+        border: 1px solid var(--border);
+        margin-bottom: 24px;
+      }
+      #map {
+        height: 100%;
+        width: 100%;
+        background: var(--surface);
+      }
+      .leaflet-popup-content-wrapper,
+      .leaflet-popup-tip {
+        background: var(--surface);
+        color: var(--text);
+      }
+      .trip-pin {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: var(--red);
+        border: 2px solid #000;
+        color: #000;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      /* ── Trip cards ─────────────────────────────────────────────────── */
+      .trip-list {
+        display: grid;
+        gap: 14px;
+      }
+      .trip-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      .trip-card__summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 16px 20px;
+        display: grid;
+        gap: 4px;
+      }
+      .trip-card__summary::-webkit-details-marker {
+        display: none;
+      }
+      .trip-card__dates {
+        font-family: 'Fraunces', serif;
+        font-size: 1.2rem;
+        font-weight: 700;
+        line-height: 1.25;
+      }
+      .trip-card__dates::after {
+        content: ' ▾';
+        font-size: 0.8em;
+      }
+      .trip-card[open] .trip-card__dates::after {
+        content: ' ▴';
+      }
+      .trip-card__area,
+      .trip-card__meta {
+        font-size: 13px;
+        color: var(--text-2);
+        overflow-wrap: anywhere;
+      }
+      .trip-card__score {
+        font-weight: 600;
+        color: var(--link);
+      }
+      .trip-card__body {
+        padding: 0 20px 16px;
+        border-top: 1px solid var(--border);
+      }
+      .trip-stops {
+        list-style: none;
+        margin: 12px 0 0;
+        display: grid;
+        gap: 12px;
+      }
+      .trip-stop {
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 2px 10px;
+      }
+      .trip-stop__num {
+        grid-row: span 5;
+        width: 26px;
+        height: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: var(--red);
+        border: 2px solid #000;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .trip-stop__date {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--link);
+      }
+      .trip-stop__names {
+        font-weight: 600;
+        overflow-wrap: anywhere;
+      }
+      .trip-stop__place,
+      .trip-stop__distance {
+        font-size: 13px;
+        color: var(--text-2);
+        overflow-wrap: anywhere;
+      }
+      .trip-stop__links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .empty-state,
+      .error-state {
+        color: var(--text-2);
+        padding: 32px 0;
+        text-align: center;
+        font-size: 15px;
+      }
+      .error-state button {
+        margin-left: 8px;
+        font: inherit;
+        font-weight: 600;
+        color: var(--header-dark);
+        background: var(--accent);
+        border: none;
+        border-radius: var(--radius-sm);
+        padding: 6px 14px;
+        cursor: pointer;
+      }
+    </style>
+    <link rel="stylesheet" href="theme.css" />
+  </head>
+  <body data-page="trips">
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker__track">
+        <span>Plan a trip</span><span>Your bands, your festivals</span
+        ><span>Where and when to go</span><span>Plan a trip</span
+        ><span>Your bands, your festivals</span
+        ><span>Where and when to go</span>
+      </div>
+    </div>
+    <nav class="site-bar" aria-label="Trips">
+      <a class="site-bar__logo" href="trips.html">Tokoro Trips</a>
+    </nav>
+    <header class="site-header">
+      <div class="experimental-badge"><strong>⚠ Experimental</strong></div>
+      <div class="header-inner">
+        <h1 class="header-title">Tokoro <em>Trips</em></h1>
+      </div>
+    </header>
+
+    <main class="radar-main">
+      <section class="filter-bar" aria-label="Trip settings">
+        <div class="planner" id="planner" hidden>
+          <div class="filter-row">
+            <select id="source" aria-label="Plan around">
+              <option value="both" selected>Bands and festivals</option>
+              <option value="bands">Bands</option>
+              <option value="festivals">Festivals</option>
+            </select>
+            <label class="filter-label"
+              >Trip length
+              <input
+                id="minDays"
+                type="number"
+                min="1"
+                max="60"
+                step="1"
+                aria-label="Shortest trip (days)"
+              />
+              to
+              <input
+                id="maxDays"
+                type="number"
+                min="1"
+                max="60"
+                step="1"
+                aria-label="Longest trip (days)"
+              />
+              days</label
+            >
+          </div>
+          <div class="filter-row">
+            <button
+              id="modeBase"
+              class="toggle"
+              type="button"
+              aria-pressed="true"
+            >
+              One base
+            </button>
+            <button
+              id="modeHops"
+              class="toggle"
+              type="button"
+              aria-pressed="false"
+            >
+              On the move
+            </button>
+            <select id="radius" aria-label="Radius"></select>
+          </div>
+          <div class="filter-row">
+            <input
+              id="regionPlace"
+              type="search"
+              placeholder="Only near a place… (press Enter)"
+              aria-label="Only near a place"
+            />
+            <select id="regionKm" aria-label="Distance from the place"></select>
+            <button id="regionClear" class="toggle" type="button">
+              Anywhere
+            </button>
+          </div>
+          <div class="filter-row">
+            <label class="filter-label">
+              <input id="dayPasses" type="checkbox" />
+              Day passes (one day of a festival is enough)
+            </label>
+          </div>
+        </div>
+        <p id="status" class="status-line" role="status" aria-live="polite"></p>
+        <p
+          id="noticeLine"
+          class="notice-line"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <p
+          id="memberNote"
+          class="notice-line"
+          role="status"
+          aria-live="polite"
+          hidden
+        ></p>
+      </section>
+
+      <section
+        class="map-panel"
+        id="mapPanel"
+        aria-label="Map of the trip"
+        hidden
+      >
+        <div id="map"></div>
+      </section>
+
+      <section id="tripList" class="trip-list" aria-label="Trips"></section>
+    </main>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="./shared.js"></script>
+    <script src="./member.js"></script>
+    <!-- tours.js, festivals.js and trips.js each declare top-level names
+         (api, DAY_MS, …) that would clash as classic scripts on one page:
+         loaded as modules, each keeps its own scope and sets its global
+         (TokoroTours, TokoroFestivals, TokoroTrips). Modules run in order,
+         after the classic scripts above. -->
+    <script type="module" src="./tours.js"></script>
+    <script type="module" src="./festivals.js"></script>
+    <script type="module" src="./trips.js"></script>
+    <script type="module">
+      const API_URL = '__TOKORO_WORKER_URL__';
+      const T = window.TokoroTours;
+      const F = window.TokoroFestivals;
+      const TT = window.TokoroTrips;
+      const M = window.TokoroMember || null; // null: member.js failed to load
+      const MEMBER_SEED_KEY = 'tokoro_member'; // same key as member.js
+      const MEMBERS_NOTE =
+        'The trip planner is for members. Open your personal link.';
+      const FOLLOW_NOTE =
+        'Follow some bands or festivals on Tours or Festivals first.';
+      const NO_TRIP_NOTE =
+        'No trip found with these settings. Try a larger radius or a longer trip.';
+      const DEBOUNCE_MS = 300;
+      const storage = (() => {
+        try {
+          return window.localStorage;
+        } catch (err) {
+          return null; // private mode: the planner stays off
+        }
+      })();
+      const today = formatLocalDateTime(new Date()).slice(0, 10);
+
+      const member = { bands: [], festivals: [] }; // followed urls
+      // Loaded data, once per source: shows (bands) and festivals.
+      const data = { bands: null, festivals: null };
+      const loads = { bands: null, festivals: null }; // in-flight promises
+      const truncated = { bands: false, festivals: false };
+      const settings = {
+        source: 'both',
+        minDays: TT.DEFAULT_MIN_DAYS,
+        maxDays: TT.DEFAULT_MAX_DAYS,
+        mode: 'base',
+        radiusKm: TT.DEFAULT_RADIUS_KM,
+        dayPasses: false,
+        region: null, // { lat, lng, km } once a place is geocoded
+      };
+      let regionKm = TT.DEFAULT_REGION_KM;
+      let gen = 0; // only the reply for the latest gen is shown
+      let timer = null;
+      let geoReq = 0;
+      let regionNote = ''; // "Looking up…" or a geocoding failure
+      let loadNote = ''; // the truncation notice of the sources in use
+      let pendingSettings = null; // settings of the latest plan() call
+      let shown = { trips: [], radiusKm: settings.radiusKm }; // what the list shows
+
+      const el = id => document.getElementById(id);
+      function setStatus(text) {
+        el('status').textContent = text || '';
+      }
+      function syncNotice() {
+        el('noticeLine').textContent = [regionNote, loadNote]
+          .filter(Boolean)
+          .join(' ');
+      }
+      function setRegionNote(text) {
+        regionNote = text || '';
+        syncNotice();
+      }
+      // The member note is hidden while empty.
+      function setMemberNote(text) {
+        el('memberNote').textContent = text || '';
+        el('memberNote').hidden = !text;
+      }
+
+      // ── Controls ────────────────────────────────────────────────────
+      function fillSelect(id, values, selected) {
+        el(id).innerHTML = values
+          .map(
+            v =>
+              '<option value="' +
+              v +
+              '"' +
+              (v === selected ? ' selected' : '') +
+              '>' +
+              v +
+              ' km</option>'
+          )
+          .join('');
+      }
+      function syncControls() {
+        el('source').value = settings.source;
+        el('minDays').value = String(settings.minDays);
+        el('maxDays').value = String(settings.maxDays);
+        el('modeBase').setAttribute(
+          'aria-pressed',
+          String(settings.mode === 'base')
+        );
+        el('modeHops').setAttribute(
+          'aria-pressed',
+          String(settings.mode === 'hops')
+        );
+        el('radius').value = String(settings.radiusKm);
+        el('regionKm').value = String(regionKm);
+        el('dayPasses').checked = settings.dayPasses;
+      }
+      // Any change: drop pending replies now, plan after a short pause.
+      function schedule() {
+        gen++;
+        setStatus('Planning…');
+        clearTimeout(timer);
+        timer = setTimeout(plan, DEBOUNCE_MS);
+      }
+      function setMode(mode) {
+        settings.mode = mode;
+        syncControls();
+        schedule();
+      }
+
+      fillSelect('radius', TT.RADII_KM, TT.DEFAULT_RADIUS_KM);
+      fillSelect('regionKm', TT.REGION_KM, TT.DEFAULT_REGION_KM);
+      syncControls();
+
+      el('source').addEventListener('change', e => {
+        settings.source = e.target.value;
+        schedule();
+      });
+      for (const id of ['minDays', 'maxDays']) {
+        el(id).addEventListener('change', () => {
+          const s = TT.validSettings({
+            minDays: el('minDays').value,
+            maxDays: el('maxDays').value,
+          });
+          settings.minDays = s.minDays;
+          settings.maxDays = s.maxDays;
+          syncControls();
+          schedule();
+        });
+      }
+      el('modeBase').addEventListener('click', () => setMode('base'));
+      el('modeHops').addEventListener('click', () => setMode('hops'));
+      el('radius').addEventListener('change', e => {
+        settings.radiusKm = Number(e.target.value) || TT.DEFAULT_RADIUS_KM;
+        schedule();
+      });
+      el('dayPasses').addEventListener('change', e => {
+        settings.dayPasses = e.target.checked;
+        schedule();
+      });
+
+      // ── Region: a place (geocoded) and a distance ──────────────────
+      function clearRegion() {
+        geoReq++;
+        settings.region = null;
+        el('regionPlace').value = '';
+        setRegionNote('');
+        schedule();
+      }
+      el('regionPlace').addEventListener('keydown', async e => {
+        if (e.key !== 'Enter') return;
+        const text = e.target.value.trim();
+        if (!text) {
+          clearRegion();
+          return;
+        }
+        const req = ++geoReq;
+        setRegionNote('Looking up ' + text + '…');
+        try {
+          const g = await geocode(text);
+          if (req !== geoReq) return;
+          settings.region = {
+            lat: Number(g.lat),
+            lng: Number(g.lng),
+            km: regionKm,
+          };
+          setRegionNote('');
+        } catch (err) {
+          if (req !== geoReq) return;
+          settings.region = null;
+          setRegionNote('Could not find "' + text + '" — planning anywhere.');
+        }
+        schedule();
+      });
+      el('regionKm').addEventListener('change', e => {
+        regionKm = Number(e.target.value) || TT.DEFAULT_REGION_KM;
+        if (!settings.region) return;
+        settings.region = { ...settings.region, km: regionKm };
+        schedule();
+      });
+      el('regionClear').addEventListener('click', clearRegion);
+
+      // ── Data: only the sources needed, loaded once ─────────────────
+      function loadSource(kind) {
+        if (data[kind]) return Promise.resolve();
+        if (!loads[kind]) {
+          const fetchFn = window.fetch.bind(window);
+          const p =
+            kind === 'bands'
+              ? T.loadTourEvents(fetchFn, API_URL, T.tourWindow(today)).then(
+                  r => {
+                    data.bands = T.toShows(r.events, today);
+                    truncated.bands = r.truncated;
+                  }
+                )
+              : F.loadRadarEvents(fetchFn, API_URL, F.radarWindow(today)).then(
+                  r => {
+                    data.festivals = F.toFestivals(r.events, today);
+                    truncated.festivals = r.truncated;
+                  }
+                );
+          loads[kind] = p.finally(() => {
+            loads[kind] = null; // a failed load is retried next time
+          });
+        }
+        return loads[kind];
+      }
+      function syncTruncated(needBands, needFests) {
+        const notes = [];
+        if (needBands && truncated.bands)
+          notes.push(
+            'Showing the first results only — there are more shows than one page load.'
+          );
+        if (needFests && truncated.festivals)
+          notes.push(
+            'Showing the first results only — the radar is larger than one page load.'
+          );
+        loadNote = notes.join(' ');
+        syncNotice();
+      }
+
+      // ── Planning: one Web Worker, the main thread as a fallback ────
+      let worker; // undefined: not started yet; null: unavailable
+      let lastPost = null; // { gen, input } last sent to the worker
+      function getWorker() {
+        if (worker !== undefined) return worker;
+        try {
+          worker = new Worker('./trips-worker.js');
+        } catch (err) {
+          worker = null; // blocked: compute on the main thread
+          return worker;
+        }
+        worker.onmessage = e => {
+          const reply = e.data || {};
+          if (reply.gen !== gen) return; // stale: the settings changed
+          if (reply.error) computeHere(reply.gen, lastPost.input);
+          else showTrips(reply.trips);
+        };
+        worker.onerror = e => {
+          // the file failed to load or the worker crashed
+          if (e && e.preventDefault) e.preventDefault();
+          worker.terminate();
+          worker = null;
+          if (lastPost) computeHere(lastPost.gen, lastPost.input);
+        };
+        return worker;
+      }
+      function computeHere(g, input) {
+        setTimeout(() => {
+          if (g !== gen) return;
+          let trips;
+          try {
+            trips = TT.computeTrips(input);
+          } catch (err) {
+            showError('Could not plan trips right now.', false);
+            return;
+          }
+          showTrips(trips);
+        }, 0);
+      }
+
+      async function plan() {
+        const g = ++gen;
+        const s = TT.validSettings(settings);
+        const needBands = s.source !== 'festivals';
+        const needFests = s.source !== 'bands';
+        const followsSome =
+          (needBands && member.bands.length > 0) ||
+          (needFests && member.festivals.length > 0);
+        if (!followsSome) {
+          renderTrips([], s);
+          setStatus(FOLLOW_NOTE);
+          return;
+        }
+        if ((needBands && !data.bands) || (needFests && !data.festivals)) {
+          setStatus(
+            needBands && needFests
+              ? 'Loading tour dates and festivals…'
+              : needBands
+                ? 'Loading tour dates…'
+                : 'Loading festivals…'
+          );
+        }
+        try {
+          await Promise.all([
+            needBands ? loadSource('bands') : null,
+            needFests ? loadSource('festivals') : null,
+          ]);
+        } catch (err) {
+          if (g !== gen) return;
+          showError('Could not load the dates right now.', true);
+          return;
+        }
+        if (g !== gen) return;
+        syncTruncated(needBands, needFests);
+        setStatus('Planning…');
+        const input = {
+          shows: needBands ? data.bands : [],
+          festivals: needFests ? data.festivals : [],
+          followedBands: member.bands,
+          followedFestivals: member.festivals,
+          todayYmd: today,
+          settings: s,
+        };
+        pendingSettings = s;
+        if (getWorker()) {
+          lastPost = { gen: g, input };
+          worker.postMessage({ gen: g, input });
+        } else {
+          computeHere(g, input);
+        }
+      }
+      function showError(text, retry) {
+        setStatus('');
+        renderTrips([], pendingSettings || settings);
+        el('tripList').innerHTML =
+          '<p class="error-state">' +
+          escHtml(text) +
+          (retry
+            ? ' <button type="button" id="retryBtn">Try again</button>'
+            : '') +
+          '</p>';
+        if (retry) el('retryBtn').addEventListener('click', plan);
+      }
+      function showTrips(trips) {
+        const list = Array.isArray(trips) ? trips : [];
+        renderTrips(list, pendingSettings || settings);
+        setStatus(
+          list.length
+            ? list.length + (list.length === 1 ? ' trip' : ' trips')
+            : NO_TRIP_NOTE
+        );
+      }
+
+      // ── Trip list ──────────────────────────────────────────────────
+      function bandNames(stop) {
+        return [...new Set(stop.shows.map(s => s.bandName))];
+      }
+      function stopDate(stop) {
+        if (stop.start !== stop.end)
+          return F.fmtFestivalRange(stop.start, stop.end, today);
+        // a single show's time, unless it is a range show seen on one day
+        const one =
+          !stop.fest && stop.shows.length === 1 ? stop.shows[0] : null;
+        const time = one && !one.end ? one.time : '';
+        return T.fmtShowDate(stop.start, time, today);
+      }
+      function linkHtml(rawUrl, label) {
+        const url = safeUrl(rawUrl);
+        return url
+          ? '<a href="' +
+              escHtml(url) +
+              '" target="_blank" rel="noopener">' +
+              escHtml(label) +
+              '</a>'
+          : '';
+      }
+      function stopHtml(stop, i, prev) {
+        const names = [stop.fest ? stop.fest.name : '', ...bandNames(stop)]
+          .filter(Boolean)
+          .join(' · ');
+        const place = [stop.venue, stop.address].filter(Boolean).join(' · ');
+        const many = stop.shows.length > 1;
+        const links = [
+          stop.fest ? linkHtml(stop.fest.url, 'Festival site') : '',
+          ...stop.shows.map(s =>
+            linkHtml(s.url, many ? s.bandName + ' show page' : 'Show page')
+          ),
+        ]
+          .filter(Boolean)
+          .join('');
+        const distance = prev
+          ? T.fmtDistance(TT.haversineKm(prev, stop)) +
+            ' from the previous stop'
+          : '';
+        return (
+          '<li class="trip-stop">' +
+          '<span class="trip-stop__num" aria-hidden="true">' +
+          (i + 1) +
+          '</span>' +
+          '<span class="trip-stop__date">' +
+          escHtml(stopDate(stop)) +
+          '</span>' +
+          '<span class="trip-stop__names">' +
+          escHtml(names) +
+          '</span>' +
+          (place
+            ? '<span class="trip-stop__place">' + escHtml(place) + '</span>'
+            : '') +
+          (links ? '<span class="trip-stop__links">' + links + '</span>' : '') +
+          (distance
+            ? '<span class="trip-stop__distance">' +
+              escHtml(distance) +
+              '</span>'
+            : '') +
+          '</li>'
+        );
+      }
+      function tripHtml(t, i) {
+        const days = TT.daysBetween(t.start, t.end) + 1;
+        return (
+          '<details class="trip-card" data-index="' +
+          i +
+          '"><summary class="trip-card__summary">' +
+          '<span class="trip-card__dates">' +
+          escHtml(F.fmtFestivalRange(t.start, t.end, today)) +
+          '</span>' +
+          '<span class="trip-card__area">' +
+          escHtml(t.area) +
+          '</span>' +
+          '<span class="trip-card__meta"><span class="trip-card__score">' +
+          escHtml(TT.fmtScore(t)) +
+          '</span> · ' +
+          days +
+          (days === 1 ? ' day' : ' days') +
+          '</span></summary><div class="trip-card__body"><ol class="trip-stops">' +
+          t.stops.map((st, j) => stopHtml(st, j, t.stops[j - 1])).join('') +
+          '</ol></div></details>'
+        );
+      }
+      function renderTrips(trips, s) {
+        shown = { trips, radiusKm: s.radiusKm };
+        el('mapPanel').hidden = true;
+        el('tripList').innerHTML = trips.map(tripHtml).join('');
+      }
+      // <details> "toggle" does not bubble: capture it. One trip open at a time.
+      el('tripList').addEventListener(
+        'toggle',
+        e => {
+          const card = e.target;
+          if (!card.classList || !card.classList.contains('trip-card')) return;
+          if (card.open) {
+            for (const other of el('tripList').querySelectorAll(
+              '.trip-card[open]'
+            )) {
+              if (other !== card) other.open = false;
+            }
+            drawTrip(shown.trips[Number(card.getAttribute('data-index'))]);
+          } else if (!el('tripList').querySelector('.trip-card[open]')) {
+            el('mapPanel').hidden = true;
+          }
+        },
+        true
+      );
+
+      // ── Map (optional: the list works without Leaflet) ─────────────
+      const hasMap = typeof L !== 'undefined';
+      let map = null;
+      let tripLayer = null;
+      function ensureMap() {
+        if (map || !hasMap) return;
+        map = L.map('map', {
+          scrollWheelZoom: false,
+          dragging: !L.Browser.mobile,
+        }).setView([50, 12], 4);
+        const tileOpts = {
+          attribution:
+            'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, OpenStreetMap contributors',
+          maxNativeZoom: 16,
+          maxZoom: 18,
+        };
+        L.tileLayer(
+          'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+          tileOpts
+        ).addTo(map);
+        L.tileLayer(
+          'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+          { ...tileOpts, attribution: '' }
+        ).addTo(map);
+        tripLayer = L.layerGroup().addTo(map);
+      }
+      function popupHtml(stop) {
+        const names = [stop.fest ? stop.fest.name : '', ...bandNames(stop)]
+          .filter(Boolean)
+          .join(' · ');
+        return (
+          '<strong>' +
+          escHtml(names) +
+          '</strong><div>' +
+          escHtml(stopDate(stop)) +
+          '</div><div>' +
+          escHtml([stop.venue, stop.address].filter(Boolean).join(' · ')) +
+          '</div>'
+        );
+      }
+      function drawTrip(trip) {
+        if (!hasMap || !trip) return;
+        el('mapPanel').hidden = false;
+        ensureMap();
+        map.invalidateSize();
+        tripLayer.clearLayers();
+        const points = trip.stops.map(st => [st.lat, st.lng]);
+        trip.stops.forEach((st, i) => {
+          L.marker([st.lat, st.lng], {
+            icon: L.divIcon({
+              className: 'trip-pin',
+              html: String(i + 1),
+              iconSize: [26, 26],
+            }),
+          })
+            .bindPopup(popupHtml(st))
+            .addTo(tripLayer);
+        });
+        if (trip.centre) {
+          L.circle([trip.centre.lat, trip.centre.lng], {
+            radius: shown.radiusKm * 1000,
+            color: '#000000',
+            weight: 2,
+            fillColor: '#ff3d2e',
+            fillOpacity: 0.1,
+          }).addTo(tripLayer);
+        } else if (points.length > 1) {
+          L.polyline(points, { color: '#000000', weight: 3 }).addTo(tripLayer);
+        }
+        if (points.length)
+          map.fitBounds(F.fitPoints(points), { padding: [30, 30], maxZoom: 9 });
+      }
+
+      // ── Member activation (the page is members-only) ───────────────
+      async function initMember() {
+        const hash = window.location.hash;
+        if (/^#k=[A-Za-z0-9_-]+$/.test(hash)) {
+          // Never leave the link in the address bar or the history.
+          history.replaceState(
+            null,
+            '',
+            window.location.pathname + window.location.search
+          );
+        }
+        if (API_URL.indexOf('__TOKORO') === 0) {
+          el('tripList').innerHTML =
+            '<p class="error-state">The API address is not configured (the deploy step replaces the placeholder).</p>';
+          return;
+        }
+        if (!storage || !M) {
+          setMemberNote(MEMBERS_NOTE);
+          return;
+        }
+        let hasStored = false;
+        try {
+          hasStored = !!storage.getItem(MEMBER_SEED_KEY);
+        } catch (err) {}
+        if (!hash.startsWith('#k=') && !hasStored) {
+          setMemberNote(MEMBERS_NOTE);
+          return;
+        }
+        const res = await M.activateMember({
+          hash,
+          storage,
+          fetchFn: window.fetch.bind(window),
+          apiBase: API_URL,
+        });
+        if (!res.ok) {
+          setMemberNote([res.note, MEMBERS_NOTE].filter(Boolean).join(' '));
+          return; // never show the planner
+        }
+        const urls = v => (Array.isArray(v) ? v.filter(Boolean) : []);
+        member.bands = urls(res.data && res.data.bands);
+        member.festivals = urls(res.data && res.data.festivals); // absent on old servers
+        el('planner').hidden = false;
+        plan();
+      }
+
+      initMember();
+    </script>
+    <!-- build: __BUILD_VERSION__ -->
+  </body>
+</html>
