@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Member logic for tours.html (no DOM): the personal link, the signed API
+ * Member logic for tours.html and festivals.html (no DOM): the personal link, the signed API
  * client, and the matching of a member's suggestions against the tracked bands.
  * Loaded as a classic script in the browser (window.TokoroMember) and via
  * require() in the Node tests.
@@ -13,6 +13,8 @@
 const MEMBER_SEED_KEY = 'tokoro_member';
 const MEMBER_VIEW_KEY = 'tokoro_member_view';
 const AUTO_FOLLOWED_KEY = 'tokoro_member_autofollowed';
+const FESTIVAL_VIEW_KEY = 'tokoro_member_festival_view';
+const FESTIVAL_AUTO_FOLLOWED_KEY = 'tokoro_member_festival_autofollowed';
 
 // PKCS8 wrapper of a raw 32-byte Ed25519 seed (RFC 8410), so WebCrypto can import it.
 const PKCS8_PREFIX = Uint8Array.from([
@@ -133,19 +135,17 @@ function clearSeed(storage) {
   } catch {}
 }
 
-function loadAutoFollowed(storage) {
+function loadAutoFollowed(storage, key = AUTO_FOLLOWED_KEY) {
   try {
-    const arr = JSON.parse(
-      (storage && storage.getItem(AUTO_FOLLOWED_KEY)) || '[]'
-    );
+    const arr = JSON.parse((storage && storage.getItem(key)) || '[]');
     return new Set(Array.isArray(arr) ? arr.filter(Number.isInteger) : []);
   } catch {
     return new Set();
   }
 }
-function saveAutoFollowed(storage, set) {
+function saveAutoFollowed(storage, set, key = AUTO_FOLLOWED_KEY) {
   try {
-    storage.setItem(AUTO_FOLLOWED_KEY, JSON.stringify([...set]));
+    storage.setItem(key, JSON.stringify([...set]));
   } catch {}
 }
 
@@ -261,23 +261,44 @@ function createMemberApi(
     return { ok: res.ok, status: res.status, data };
   }
 
-  function bandCall(method, domain, bandUrl) {
-    const url = normalizeActUrl(bandUrl);
+  // A followed band or festival: the normalized url is the signed payload and,
+  // base64url-encoded, the last path segment.
+  function urlCall(method, prefix, domain, rawUrl) {
+    const url = normalizeActUrl(rawUrl);
     if (!url) return Promise.resolve({ ok: false, status: 400, data: null });
     const enc = b64urlEncode(new TextEncoder().encode(url));
-    return call(method, '/member/bands/' + enc, domain, url);
+    return call(method, prefix + enc, domain, url);
+  }
+  function bandCall(method, domain, bandUrl) {
+    return urlCall(method, '/member/bands/', domain, bandUrl);
+  }
+  function festivalCall(method, domain, festivalUrl) {
+    return urlCall(method, '/member/festivals/', domain, festivalUrl);
+  }
+  function suggestCall(path, domain, name, url) {
+    const obj = { name };
+    if (url) obj.url = url;
+    const body = JSON.stringify(obj);
+    return call('POST', path, domain, body, body);
   }
 
   return {
     me: () => call('GET', '/member/me', 'member-read', '/member/me'),
     follow: bandUrl => bandCall('POST', 'band-follow', bandUrl),
     unfollow: bandUrl => bandCall('DELETE', 'band-unfollow', bandUrl),
-    suggest: (name, url) => {
-      const obj = { name };
-      if (url) obj.url = url;
-      const body = JSON.stringify(obj);
-      return call('POST', '/member/suggestions', 'band-suggest', body, body);
-    },
+    suggest: (name, url) =>
+      suggestCall('/member/suggestions', 'band-suggest', name, url),
+    followFestival: festivalUrl =>
+      festivalCall('POST', 'festival-follow', festivalUrl),
+    unfollowFestival: festivalUrl =>
+      festivalCall('DELETE', 'festival-unfollow', festivalUrl),
+    suggestFestival: (name, url) =>
+      suggestCall(
+        '/member/festival-suggestions',
+        'festival-suggest',
+        name,
+        url
+      ),
     telegramLinkCode: () =>
       call(
         'POST',
@@ -288,10 +309,75 @@ function createMemberApi(
   };
 }
 
+// ── Activation (public-web/SPECS.md FR-8.9) ──────────────────────────────────
+
+const NOTE_TOO_OLD =
+  'This browser is too old for personal links. Please update it or open the link in another browser.';
+const NOTE_BAD_LINK = 'This link does not look right. Ask for a new one.';
+const NOTE_INACTIVE =
+  'This personal link is no longer active. Ask for a new one.';
+
+/**
+ * The member rules that run once member.js is loaded (the page has already
+ * removed the link from the address bar and decided this is not a visitor).
+ * Resolves to { ok: true, api, data } (data: the GET /member/me body) or
+ * { ok: false, note } where note is the message to show, or null for none.
+ * `subtle` is injectable for tests (see supportsEd25519).
+ */
+async function activateMember({ hash, storage, fetchFn, apiBase, subtle }) {
+  if (!(await supportsEd25519(subtle))) {
+    // Not the link's fault: keep any stored seed, save nothing.
+    return { ok: false, note: NOTE_TOO_OLD };
+  }
+  const link = readLinkSeed(hash);
+  const fromLink = link.status === 'found';
+  const seed = fromLink ? link.seed : loadStoredSeed(storage);
+  if (!seed) {
+    return {
+      ok: false,
+      note: link.status === 'invalid' ? NOTE_BAD_LINK : null,
+    };
+  }
+  let imported;
+  try {
+    imported = await importMember(seed);
+  } catch {
+    if (!fromLink) clearSeed(storage);
+    return { ok: false, note: NOTE_BAD_LINK };
+  }
+  const api = createMemberApi(fetchFn, apiBase, imported);
+  let res;
+  try {
+    res = await api.me();
+  } catch {
+    res = null; // offline
+  }
+  if (!res || !res.ok) {
+    if (res && (res.status === 401 || res.status === 403)) {
+      // Only a rejected stored seed is cleared: a dead link must not wipe a
+      // working stored one.
+      if (!fromLink) clearSeed(storage);
+      return { ok: false, note: NOTE_INACTIVE };
+    }
+    if (fromLink) {
+      // Offline or server error: keep the (unverified) link so a reload
+      // works later; a later 401/403 clears it. It never replaces a
+      // different stored seed, which may be the working one.
+      const stored = loadStoredSeed(storage);
+      if (!stored || stored === seed) saveSeed(storage, seed);
+    }
+    return { ok: false, note: null }; // visitor view this time
+  }
+  if (fromLink) saveSeed(storage, seed);
+  return { ok: true, api, data: res.data };
+}
+
 // Not named `api`: tours.js declares a top-level `api` too, and classic
 // scripts share one global scope (a duplicate `const` fails to load).
 const memberApi = {
   MEMBER_VIEW_KEY,
+  FESTIVAL_VIEW_KEY,
+  FESTIVAL_AUTO_FOLLOWED_KEY,
   b64urlEncode,
   b64urlDecode,
   normalizeActUrl,
@@ -308,6 +394,7 @@ const memberApi = {
   followedSet,
   isFollowed,
   createMemberApi,
+  activateMember,
 };
 
 if (typeof module !== 'undefined') module.exports = memberApi;

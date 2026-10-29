@@ -224,3 +224,181 @@ test('telegramLinkCode signs a POST to the link-code endpoint', async () => {
   assert.equal(calls[0].init.method, 'POST');
   assert.equal(await verifies(member, calls[0].init.headers, 'telegram-link-code', '/member/telegram/link-code'), true);
 });
+
+// ── Festivals ─────────────────────────────────────────────────────────────────
+
+test('followFestival/unfollowFestival sign the normalized url and encode it in the path', async () => {
+  const member = await M.importMember(RFC_SEED_B64);
+  const calls = [];
+  const api = M.createMemberApi(async (url, init) => { calls.push({ url, init }); return jsonRes(200, {}); }, 'https://w.test', member);
+  await api.followFestival('https://Fest.example/Edition/');
+  await api.unfollowFestival('https://Fest.example/Edition/');
+  const enc = M.b64urlEncode(new TextEncoder().encode('https://fest.example/Edition'));
+  assert.equal(calls[0].url, 'https://w.test/member/festivals/' + enc);
+  assert.equal(calls[0].init.method, 'POST');
+  assert.equal(await verifies(member, calls[0].init.headers, 'festival-follow', 'https://fest.example/Edition'), true);
+  assert.equal(calls[1].url, 'https://w.test/member/festivals/' + enc);
+  assert.equal(calls[1].init.method, 'DELETE');
+  assert.equal(await verifies(member, calls[1].init.headers, 'festival-unfollow', 'https://fest.example/Edition'), true);
+});
+
+test('followFestival with a non-http url makes no request', async () => {
+  const member = await M.importMember(RFC_SEED_B64);
+  const calls = [];
+  const api = M.createMemberApi(async (url, init) => { calls.push({ url, init }); return jsonRes(200, {}); }, 'https://w.test', member);
+  assert.deepEqual(await api.followFestival('ftp://x'), { ok: false, status: 400, data: null });
+  assert.deepEqual(await api.unfollowFestival('nonsense'), { ok: false, status: 400, data: null });
+  assert.equal(calls.length, 0);
+});
+
+test('suggestFestival signs the exact body it sends', async () => {
+  const member = await M.importMember(RFC_SEED_B64);
+  const calls = [];
+  const api = M.createMemberApi(async (url, init) => { calls.push({ url, init }); return jsonRes(201, { id: 1 }); }, 'https://w.test', member);
+  await api.suggestFestival('Small Fest', 'https://small.example');
+  await api.suggestFestival('No Site');
+  assert.equal(calls[0].url, 'https://w.test/member/festival-suggestions');
+  assert.equal(calls[0].init.method, 'POST');
+  assert.equal(calls[0].init.body, JSON.stringify({ name: 'Small Fest', url: 'https://small.example' }));
+  assert.equal(calls[1].init.body, JSON.stringify({ name: 'No Site' }));
+  assert.equal(await verifies(member, calls[0].init.headers, 'festival-suggest', calls[0].init.body), true);
+  assert.equal(calls[0].init.headers['Content-Type'], 'application/json');
+});
+
+test('festival storage keys and auto-followed ids are separate from the band ones', () => {
+  assert.equal(M.FESTIVAL_VIEW_KEY, 'tokoro_member_festival_view');
+  assert.equal(M.FESTIVAL_AUTO_FOLLOWED_KEY, 'tokoro_member_festival_autofollowed');
+  const s = fakeStorage();
+  M.saveAutoFollowed(s, new Set([1]));
+  M.saveAutoFollowed(s, new Set([7, 9]), M.FESTIVAL_AUTO_FOLLOWED_KEY);
+  assert.deepEqual([...M.loadAutoFollowed(s)], [1]);
+  assert.deepEqual([...M.loadAutoFollowed(s, M.FESTIVAL_AUTO_FOLLOWED_KEY)].sort(), [7, 9]);
+  assert.equal(s.getItem('tokoro_member_autofollowed'), '[1]');
+});
+
+// ── activateMember ────────────────────────────────────────────────────────────
+
+const OTHER_SEED_B64 = M.b64urlEncode(new Uint8Array(32).fill(9));
+const ME = { name: 'Anna', bands: [], suggestions: [] };
+const fetchStatus = (status, data = {}) => {
+  const calls = [];
+  const fn = async (url, init) => { calls.push({ url, init }); return jsonRes(status, data); };
+  fn.calls = calls;
+  return fn;
+};
+
+test('activateMember: a link seed the server accepts is stored', async () => {
+  const s = fakeStorage();
+  s.setItem('tokoro_member', OTHER_SEED_B64);
+  const fetchFn = fetchStatus(200, ME);
+  const r = await M.activateMember({ hash: '#k=' + RFC_SEED_B64, storage: s, fetchFn, apiBase: 'https://w.test' });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.data, ME);
+  assert.equal(typeof r.api.followFestival, 'function');
+  assert.equal(fetchFn.calls[0].url, 'https://w.test/member/me');
+  assert.equal(fetchFn.calls[0].init.headers['X-Pubkey'], RFC_PUB);
+  assert.equal(s.getItem('tokoro_member'), RFC_SEED_B64);
+});
+
+test('activateMember: a stored seed alone is used', async () => {
+  const s = fakeStorage();
+  s.setItem('tokoro_member', RFC_SEED_B64);
+  const fetchFn = fetchStatus(200, ME);
+  const r = await M.activateMember({ hash: '', storage: s, fetchFn, apiBase: 'https://w.test' });
+  assert.equal(r.ok, true);
+  assert.equal(fetchFn.calls[0].init.headers['X-Pubkey'], RFC_PUB);
+});
+
+test('activateMember: a rejected stored seed is cleared', async () => {
+  const s = fakeStorage();
+  s.setItem('tokoro_member', RFC_SEED_B64);
+  const r = await M.activateMember({ hash: '', storage: s, fetchFn: fetchStatus(403), apiBase: 'https://w.test' });
+  assert.deepEqual(r, { ok: false, note: 'This personal link is no longer active. Ask for a new one.' });
+  assert.equal(s.getItem('tokoro_member'), null);
+});
+
+test('activateMember: a rejected link keeps a different stored seed', async () => {
+  const s = fakeStorage();
+  s.setItem('tokoro_member', OTHER_SEED_B64);
+  const r = await M.activateMember({ hash: '#k=' + RFC_SEED_B64, storage: s, fetchFn: fetchStatus(403), apiBase: 'https://w.test' });
+  assert.deepEqual(r, { ok: false, note: 'This personal link is no longer active. Ask for a new one.' });
+  assert.equal(s.getItem('tokoro_member'), OTHER_SEED_B64);
+});
+
+test('activateMember: offline with a link and nothing stored stores the link seed', async () => {
+  const s = fakeStorage();
+  const r = await M.activateMember({
+    hash: '#k=' + RFC_SEED_B64, storage: s, apiBase: 'https://w.test',
+    fetchFn: async () => { throw new TypeError('Failed to fetch'); },
+  });
+  assert.deepEqual(r, { ok: false, note: null });
+  assert.equal(s.getItem('tokoro_member'), RFC_SEED_B64);
+});
+
+test('activateMember: a 5xx with a link and nothing stored stores the link seed', async () => {
+  const s = fakeStorage();
+  const r = await M.activateMember({ hash: '#k=' + RFC_SEED_B64, storage: s, fetchFn: fetchStatus(503), apiBase: 'https://w.test' });
+  assert.deepEqual(r, { ok: false, note: null });
+  assert.equal(s.getItem('tokoro_member'), RFC_SEED_B64);
+});
+
+test('activateMember: offline with a link never replaces a different stored seed', async () => {
+  const s = fakeStorage();
+  s.setItem('tokoro_member', OTHER_SEED_B64);
+  const r = await M.activateMember({
+    hash: '#k=' + RFC_SEED_B64, storage: s, apiBase: 'https://w.test',
+    fetchFn: async () => { throw new TypeError('Failed to fetch'); },
+  });
+  assert.deepEqual(r, { ok: false, note: null });
+  assert.equal(s.getItem('tokoro_member'), OTHER_SEED_B64);
+});
+
+test('activateMember: a link of the wrong length', async () => {
+  const s = fakeStorage();
+  const fetchFn = fetchStatus(200, ME);
+  const short = M.b64urlEncode(new Uint8Array(31).fill(1));
+  const r = await M.activateMember({ hash: '#k=' + short, storage: s, fetchFn, apiBase: 'https://w.test' });
+  assert.deepEqual(r, { ok: false, note: 'This link does not look right. Ask for a new one.' });
+  assert.equal(fetchFn.calls.length, 0);
+  assert.equal(s.getItem('tokoro_member'), null);
+});
+
+test('activateMember: a malformed link falls back to a stored seed', async () => {
+  const s = fakeStorage();
+  s.setItem('tokoro_member', RFC_SEED_B64);
+  const short = M.b64urlEncode(new Uint8Array(31).fill(1));
+  const r = await M.activateMember({ hash: '#k=' + short, storage: s, fetchFn: fetchStatus(200, ME), apiBase: 'https://w.test' });
+  assert.equal(r.ok, true);
+});
+
+test('activateMember: nothing to use → no note', async () => {
+  const s = fakeStorage();
+  const fetchFn = fetchStatus(200, ME);
+  const r = await M.activateMember({ hash: '', storage: s, fetchFn, apiBase: 'https://w.test' });
+  assert.deepEqual(r, { ok: false, note: null });
+  assert.equal(fetchFn.calls.length, 0);
+});
+
+test('activateMember: a stored seed that cannot be imported is cleared', async () => {
+  const s = fakeStorage();
+  s.setItem('tokoro_member', 'abc');
+  const fetchFn = fetchStatus(200, ME);
+  const r = await M.activateMember({ hash: '', storage: s, fetchFn, apiBase: 'https://w.test' });
+  assert.deepEqual(r, { ok: false, note: 'This link does not look right. Ask for a new one.' });
+  assert.equal(s.getItem('tokoro_member'), null);
+  assert.equal(fetchFn.calls.length, 0);
+});
+
+test('activateMember: a browser without Ed25519 touches nothing', async () => {
+  const s = fakeStorage();
+  s.setItem('tokoro_member', OTHER_SEED_B64);
+  const fetchFn = fetchStatus(200, ME);
+  const noEd25519 = { importKey: async () => { throw new DOMException('Unrecognized name', 'NotSupportedError'); } };
+  const r = await M.activateMember({ hash: '#k=' + RFC_SEED_B64, storage: s, fetchFn, apiBase: 'https://w.test', subtle: noEd25519 });
+  assert.deepEqual(r, {
+    ok: false,
+    note: 'This browser is too old for personal links. Please update it or open the link in another browser.',
+  });
+  assert.equal(s.getItem('tokoro_member'), OTHER_SEED_B64);
+  assert.equal(fetchFn.calls.length, 0);
+});

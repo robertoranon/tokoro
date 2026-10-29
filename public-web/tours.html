@@ -1452,61 +1452,17 @@
           if (!hash.startsWith('#k=') && !hasStored) return; // a visitor
           M = await loadMemberScript();
           if (!M) return; // no member.js: visitor view
-          if (!(await M.supportsEd25519())) {
-            // Not the link's fault: keep any stored seed, save nothing.
-            setMemberNote(
-              'This browser is too old for personal links. Please update it or open the link in another browser.'
-            );
-            return;
-          }
-          const link = M.readLinkSeed(hash);
-          const fromLink = link.status === 'found';
-          const seed = fromLink ? link.seed : M.loadStoredSeed(storage);
-          if (!seed) {
-            if (link.status === 'invalid') {
-              setMemberNote(
-                'This link does not look right. Ask for a new one.'
-              );
-            }
-            return;
-          }
-          let imported;
-          try {
-            imported = await M.importMember(seed);
-          } catch (err) {
-            if (!fromLink) M.clearSeed(storage);
-            setMemberNote('This link does not look right. Ask for a new one.');
-            return;
-          }
-          member.api = M.createMemberApi(
-            window.fetch.bind(window),
-            API_URL,
-            imported
-          );
-          let res;
-          try {
-            res = await member.api.me();
-          } catch (err) {
-            res = null; // offline
-          }
-          if (!res || !res.ok) {
-            if (res && (res.status === 401 || res.status === 403)) {
-              // Only a rejected stored seed is cleared: a dead link must
-              // not wipe a working stored one.
-              if (!fromLink) M.clearSeed(storage);
-              setMemberNote(
-                'This personal link is no longer active. Ask for a new one.'
-              );
-            } else if (fromLink) {
-              // Offline or server error: keep the (unverified) link so a
-              // reload works later; a later 401/403 clears it. It never
-              // replaces a different stored seed, which may be the working one.
-              const stored = M.loadStoredSeed(storage);
-              if (!stored || stored === seed) M.saveSeed(storage, seed);
-            }
+          const res = await M.activateMember({
+            hash,
+            storage,
+            fetchFn: window.fetch.bind(window),
+            apiBase: API_URL,
+          });
+          if (!res.ok) {
+            if (res.note) setMemberNote(res.note);
             return; // visitor view this time
           }
-          if (fromLink) M.saveSeed(storage, seed);
+          member.api = res.api;
           member.ok = true;
           member.name = res.data.name || '';
           member.followed = M.followedSet(res.data.bands);
