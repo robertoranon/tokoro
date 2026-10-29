@@ -53,9 +53,7 @@ function festivalsYaml(groups, today) {
         .replace(/\s+/g, ' ')
         .trim();
       if (!name) return '';
-      const yamlName = /[:#]/.test(name)
-        ? '"' + name.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'
-        : name;
+      const yamlName = JSON.stringify(name);
       const url = g.urls && g.urls[0] ? g.urls[0] : '';
       return (
         (url ? '' : '  # TODO url\n') +

@@ -74,12 +74,12 @@ test('festivalsYaml: entries for festivals.yaml, TODO marker when no site', () =
   assert.equal(
     A.festivalsYaml(groups, '2026-10-29'),
     '  - url: https://terraforma.example\n' +
-      '    name: Terraforma\n' +
+      '    name: "Terraforma"\n' +
       '    added: 2026-10-29\n' +
       '\n' +
       '  # TODO url\n' +
       '  - url:\n' +
-      '    name: No Site\n' +
+      '    name: "No Site"\n' +
       '    added: 2026-10-29\n'
   );
 });
@@ -90,6 +90,16 @@ test('festivalsYaml double-quotes names with : or # and escapes quotes', () => {
     '2026-10-29'
   );
   assert.match(out, /^ {4}name: "Fest: \\"One\\" #1"$/m);
+});
+
+test('festivalsYaml always quotes names so YAML keeps them strings', () => {
+  const names = ['2024', 'No', '"Quoted"', 'a: b # c'];
+  const out = A.festivalsYaml(
+    names.map(n => ({ name_variants: [n], urls: ['https://f.example'] })),
+    '2026-10-29'
+  );
+  for (const n of names)
+    assert.ok(out.includes('    name: ' + JSON.stringify(n) + '\n'), n);
 });
 
 test('festival admin methods call the right path and sign with the right domain', async () => {

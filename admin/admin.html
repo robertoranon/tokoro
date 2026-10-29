@@ -1543,15 +1543,16 @@
       document
         .getElementById('s-reject-btn')
         .addEventListener('click', async () => {
+          const kind = suggestionKind;
           const picked = selectedGroups();
           if (!picked.length)
-            return say('s-status', KIND_TEXT[suggestionKind].pick, 'error');
+            return say('s-status', KIND_TEXT[kind].pick, 'error');
           const reason = prompt('Reason (optional, shown to the members):', '');
           if (reason === null) return;
           const { failures, firstError } = await inChunks(
             picked.flatMap(g => g.ids),
             ids =>
-              suggestionKind === 'festivals'
+              kind === 'festivals'
                 ? adminApi().rejectFestivalSuggestions(ids, reason)
                 : adminApi().rejectSuggestions(ids, reason)
           );
@@ -1561,15 +1562,16 @@
       document
         .getElementById('s-link-btn')
         .addEventListener('click', async () => {
+          const kind = suggestionKind;
           const picked = selectedGroups();
           if (!picked.length)
-            return say('s-status', KIND_TEXT[suggestionKind].pick, 'error');
-          const url = prompt(KIND_TEXT[suggestionKind].linkPrompt, '');
+            return say('s-status', KIND_TEXT[kind].pick, 'error');
+          const url = prompt(KIND_TEXT[kind].linkPrompt, '');
           if (!url) return;
           const { failures, firstError } = await inChunks(
             picked.flatMap(g => g.ids),
             ids =>
-              suggestionKind === 'festivals'
+              kind === 'festivals'
                 ? adminApi().linkFestivalSuggestions(ids, url)
                 : adminApi().linkSuggestions(ids, url)
           );

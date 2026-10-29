@@ -1337,13 +1337,18 @@
           member.inFlight.add(key);
           refreshFollowView();
           // Unfollow the url the server holds (it may differ in case).
-          const res = await (
-            was
-              ? member.api.unfollowFestival(removed[0] || url)
-              : member.api.followFestival(url)
-          ).catch(() => null);
+          // Every case-variant duplicate the server holds must be deleted.
+          const calls = was
+            ? (removed.length ? removed : [url]).map(u =>
+                member.api.unfollowFestival(u)
+              )
+            : [member.api.followFestival(url)];
+          const results = await Promise.all(
+            calls.map(c => Promise.resolve(c).catch(() => null))
+          );
+          const res = { ok: results.every(r => r && r.ok) };
           member.inFlight.delete(key);
-          if (!res || !res.ok) {
+          if (!res.ok) {
             if (was) {
               member.followed.add(key);
               member.followedUrls.push(...removed);
