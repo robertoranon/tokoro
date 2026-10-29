@@ -575,6 +575,8 @@ On the festival radar (`festivals.html`) the same member works without opening t
 - **Suggest a festival:** open **Suggest a festival**, type the name and, if they know it, the website. The statuses are the same as for bands; a festival counts as **Added** once it is in the Tracked festivals list or on the radar.
 - **Telegram alerts:** the **🔔 Telegram alerts** button is on both pages. The daily message lists new editions of followed festivals under "Festivals you follow". With `/radar on` in Telegram they also get every other newly announced festival.
 
+- **Plan a trip:** the **Plan a trip** link in the member bar of Tours and Festivals opens `trips.html`, which suggests up to five trips (a date span in one area, or a route) where the member can see the most of the bands and festivals they follow. They choose what to plan around (bands, festivals or both), the trip length and a radius, and either **One base** (everything within the radius of one place) or **On the move** (each stop within the radius of the previous one). Optionally they limit it to the area around a place, or allow day passes for festivals. Opening a trip shows the day-by-day list and a map. It needs at least one followed band or festival.
+
 If the page says "This personal link is no longer active", the member was revoked or deleted.
 
 ### Add bands and festivals from Telegram
