@@ -23,6 +23,10 @@ const {
   fitPoints,
   freshness,
   FRESH_DAYS,
+  festivalKey,
+  parseTrackedFestivals,
+  trackedRows,
+  filterMine,
 } = createRequire(import.meta.url)('../festivals.js');
 
 const ev = over => ({
@@ -329,6 +333,41 @@ const sample = [
   assert.equal(f.updatedAt, '2026-10-05T19:09:02');
   assert.equal(toFestival(ev({})).updatedAt, '');
   console.log('✅ toFestival: carries created_at / updated_at'); }
+
+{ assert.equal(festivalKey('https://Fest.example/X/'), festivalKey('https://fest.example/x'));
+  assert.equal(festivalKey('  https://a.example//  '), 'https://a.example');
+  assert.equal(festivalKey(null), '');
+  assert.equal(toFestival(ev({ festival_url: 'https://f.example/x', url: 'https://f.example/e' })).festivalUrl, 'https://f.example/x');
+  assert.equal(toFestival(ev({ festival_url: null, url: null })).festivalUrl, '');
+  console.log('✅ festivalKey / toFestival.festivalUrl'); }
+
+{ for (const bad of [null, [], 'x', { festivals: 3 }, {}]) assert.equal(parseTrackedFestivals(bad), null);
+  const r = parseTrackedFestivals({ generated: '2026-10-29', festivals: [
+    { name: 'A', url: 'https://a.example' }, { name: '', url: 'https://b.example' },
+    { name: 'C', url: 'javascript:x' }, null, { name: 'D' }] });
+  assert.deepEqual(r, { generated: '2026-10-29', festivals: [{ name: 'A', url: 'https://a.example' }] });
+  assert.equal(parseTrackedFestivals({ festivals: [] }).generated, null);
+  console.log('✅ parseTrackedFestivals'); }
+
+{ const fest = (name, u) => toFestival(ev({ festival_name: name, festival_url: u }));
+  const tracked = { generated: null, festivals: [
+    { name: 'Zeta', url: 'https://zeta.example/' }, { name: 'Alpha', url: 'https://alpha.example' },
+    { name: 'Alpha dup', url: 'https://ALPHA.example/' }] };
+  const radar = [fest('Zeta Fest', 'https://zeta.example'), fest('Extra', 'https://extra.example/e')];
+  const rows = trackedRows(tracked, radar, ['https://Gone.example/Ed', 'https://alpha.example/']);
+  assert.deepEqual(rows.map(r => [r.name, r.onRadar, r.followedOnly]), [
+    ['Alpha', false, false], ['Zeta', true, false], ['Extra', true, false], ['gone.example', false, true]]);
+  assert.equal(rows[3].url, 'https://Gone.example/Ed');
+  const noFile = trackedRows(null, radar, ['https://gone.example']);
+  assert.deepEqual(noFile.map(r => r.name), ['Extra', 'Zeta Fest', 'gone.example']);
+  assert.deepEqual(trackedRows(null, [], []), []);
+  assert.deepEqual(trackedRows(null, [], ['not a url']), []);
+  console.log('✅ trackedRows'); }
+
+{ const list = [toFestival(ev({ festival_url: 'https://Fest.example/Ed/' })), toFestival(ev({ festival_url: 'https://o.example' })), toFestival(ev({ festival_url: null, url: null }))];
+  assert.equal(filterMine(list, new Set([festivalKey('https://fest.example/ed')])).length, 1);
+  assert.equal(filterMine(list, new Set()).length, 0);
+  console.log('✅ filterMine'); }
 
 // --- add new test sections above this line ---
 

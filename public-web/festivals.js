@@ -58,6 +58,7 @@ function toFestival(e) {
     name: String(e.festival_name || e.title || '').trim(),
     title: e.title || e.festival_name || '',
     url: e.url || e.festival_url || null,
+    festivalUrl: e.festival_url || e.url || '',
     start: e.start_time.slice(0, 10),
     end: e.end_time.slice(0, 10),
     category: e.category || 'other',
@@ -343,7 +344,83 @@ function fitPoints(points) {
   return inside.length ? inside : points;
 }
 
+/** Comparison key for festival urls: trimmed, lower-case, no trailing slashes. */
+function festivalKey(url) {
+  return typeof url === 'string'
+    ? url.trim().toLowerCase().replace(/\/+$/, '')
+    : '';
+}
+
+/** Validate tracked-festivals.json; null when unusable. */
+function parseTrackedFestivals(json) {
+  if (!json || typeof json !== 'object' || !Array.isArray(json.festivals))
+    return null;
+  const festivals = [];
+  for (const f of json.festivals) {
+    if (!f || typeof f.name !== 'string' || typeof f.url !== 'string') continue;
+    const name = f.name.trim();
+    const url = f.url.trim();
+    if (name && /^https?:\/\//i.test(url)) festivals.push({ name, url });
+  }
+  return {
+    generated: typeof json.generated === 'string' ? json.generated : null,
+    festivals,
+  };
+}
+
+const byName = (a, b) => a.name.localeCompare(b.name);
+
+/**
+ * Rows of the Tracked festivals pane: file entries (alphabetical), then radar
+ * festivals missing from the file, then followed urls matching neither.
+ * Duplicates by festivalKey appear once.
+ */
+function trackedRows(tracked, festivals, followedUrls) {
+  const rows = [];
+  const seen = new Set();
+  const radarKeys = new Set(
+    (festivals || []).map(f => festivalKey(f.festivalUrl)).filter(Boolean)
+  );
+  const add = (name, url, onRadar, followedOnly) => {
+    const key = festivalKey(url);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    rows.push({ name, url, onRadar, followedOnly });
+  };
+  const file =
+    tracked && Array.isArray(tracked.festivals)
+      ? [...tracked.festivals].sort(byName)
+      : [];
+  for (const t of file)
+    add(t.name, t.url, radarKeys.has(festivalKey(t.url)), false);
+  const extra = [];
+  for (const f of festivals || []) {
+    const key = festivalKey(f.festivalUrl);
+    if (key && !seen.has(key)) extra.push({ name: f.name, url: f.festivalUrl });
+  }
+  for (const r of extra.sort(byName)) add(r.name, r.url, true, false);
+  for (const u of followedUrls || []) {
+    let host;
+    try {
+      host = new URL(u).hostname;
+    } catch {
+      continue;
+    }
+    add(host, u, false, true);
+  }
+  return rows;
+}
+
+/** Keep festivals whose url is in the followed key set. */
+function filterMine(list, followedKeys) {
+  return list.filter(f => followedKeys.has(festivalKey(f.festivalUrl)));
+}
+
 const api = {
+  festivalKey,
+  parseTrackedFestivals,
+  trackedRows,
+  filterMine,
   RADAR_TAG,
   addDays,
   isRadarEntry,
