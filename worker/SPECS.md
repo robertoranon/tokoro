@@ -1409,6 +1409,8 @@ Same as 7.13.3, signed with domain `admin-festival-suggestion-link`. Body `{ "id
 
 Same as 7.14 over `member_festivals`: active members only, most followed first, ties by url. Response `[ { "festival_url": "https://fest.example", "followers": 3 } ]`.
 
+**Admin page.** The Suggestions tab has a Bands / Festivals switch. In Festivals mode it reads `GET /admin/festival-suggestions` and `GET /admin/festival-followers`, rejects and links through the endpoints above, and its copy button produces entries to paste under `festivals:` in `crawler/festivals.yaml` (`url`, `name`, `added` = today; a `# TODO url` marker and an empty `url:` when no site is known). Band mode is unchanged.
+
 ### 7.15 Telegram Alerts
 
 Tours members can connect one private Telegram chat and receive a daily digest of new shows by the bands they follow, new editions of the festivals they follow and, if they opt in, of all newly announced festival editions. The API worker detects new items and sends the digests from its cron; the crawler-worker bot only handles linking and settings commands (`crawler-worker/SPECS.md` 3.6).

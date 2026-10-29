@@ -41,6 +41,39 @@ function bandsTxt(groups) {
     .join('');
 }
 
+/**
+ * Entries to paste under `festivals:` in crawler/festivals.yaml: the first
+ * spelling and first site of each group; a "# TODO url" marker when no site is known.
+ */
+function festivalsYaml(groups, today) {
+  const entries = groups
+    .map(g => {
+      const name = String(g.name_variants[0] || '')
+        .replace(/[\r\n]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!name) return '';
+      const yamlName = /[:#]/.test(name)
+        ? '"' + name.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'
+        : name;
+      const url = g.urls && g.urls[0] ? g.urls[0] : '';
+      return (
+        (url ? '' : '  # TODO url\n') +
+        '  - url:' +
+        (url ? ' ' + url : '') +
+        '\n' +
+        '    name: ' +
+        yamlName +
+        '\n' +
+        '    added: ' +
+        today +
+        '\n'
+      );
+    })
+    .filter(Boolean);
+  return entries.length ? entries.join('\n') : '';
+}
+
 function createAdminApi({ ed, fetchFn, workerUrl, privKeyHex }) {
   const base = String(workerUrl).replace(/\/+$/, '');
 
@@ -116,6 +149,29 @@ function createAdminApi({ ed, fetchFn, workerUrl, privKeyHex }) {
         ids,
         act_url: actUrl,
       }),
+    listFestivalSuggestions: ({ detail = false } = {}) => {
+      const path = '/admin/festival-suggestions' + (detail ? '?detail=1' : '');
+      return call('GET', path, 'admin-read', path);
+    },
+    rejectFestivalSuggestions: (ids, reason) =>
+      postJson(
+        '/admin/festival-suggestions/reject',
+        'admin-festival-suggestion-reject',
+        { ids, reason: reason || '' }
+      ),
+    linkFestivalSuggestions: (ids, festivalUrl) =>
+      postJson(
+        '/admin/festival-suggestions/link',
+        'admin-festival-suggestion-link',
+        { ids, festival_url: festivalUrl }
+      ),
+    festivalFollowers: () =>
+      call(
+        'GET',
+        '/admin/festival-followers',
+        'admin-read',
+        '/admin/festival-followers'
+      ),
     followers: () =>
       call(
         'GET',
@@ -132,6 +188,7 @@ const adminMembersApi = {
   b64urlEncode,
   buildMemberLink,
   bandsTxt,
+  festivalsYaml,
   createAdminApi,
 };
 if (typeof module !== 'undefined') module.exports = adminMembersApi;

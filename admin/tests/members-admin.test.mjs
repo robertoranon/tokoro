@@ -65,3 +65,71 @@ test('admin reads sign the exact path they request, query string included', asyn
     assert.equal(signed[i], digest(payload, sent[i].init.headers['X-Timestamp']));
   });
 });
+
+test('festivalsYaml: entries for festivals.yaml, TODO marker when no site', () => {
+  const groups = [
+    { name_variants: ['Terraforma'], urls: ['https://terraforma.example'] },
+    { name_variants: ['No Site'], urls: [] },
+  ];
+  assert.equal(
+    A.festivalsYaml(groups, '2026-10-29'),
+    '  - url: https://terraforma.example\n' +
+      '    name: Terraforma\n' +
+      '    added: 2026-10-29\n' +
+      '\n' +
+      '  # TODO url\n' +
+      '  - url:\n' +
+      '    name: No Site\n' +
+      '    added: 2026-10-29\n'
+  );
+});
+
+test('festivalsYaml double-quotes names with : or # and escapes quotes', () => {
+  const out = A.festivalsYaml(
+    [{ name_variants: ['Fest: "One" #1'], urls: ['https://f.example'] }],
+    '2026-10-29'
+  );
+  assert.match(out, /^ {4}name: "Fest: \\"One\\" #1"$/m);
+});
+
+test('festival admin methods call the right path and sign with the right domain', async () => {
+  const sent = [];
+  const fetchFn = async (url, init) => {
+    sent.push({ url, init });
+    return { ok: true, status: 200, json: async () => [] };
+  };
+  const signed = [];
+  const ed = {
+    getPublicKeyAsync: async () => new Uint8Array(32),
+    signAsync: async msg => {
+      signed.push(Buffer.from(msg).toString('hex'));
+      return new Uint8Array(64);
+    },
+  };
+  const api = A.createAdminApi({ ed, fetchFn, workerUrl: 'https://w.test/', privKeyHex: '00'.repeat(32) });
+  await api.listFestivalSuggestions({ detail: true });
+  await api.listFestivalSuggestions();
+  await api.rejectFestivalSuggestions([1, 2], 'nope');
+  await api.linkFestivalSuggestions([3], 'https://f.example');
+  await api.festivalFollowers();
+  const rejectBody = JSON.stringify({ ids: [1, 2], reason: 'nope' });
+  const linkBody = JSON.stringify({ ids: [3], festival_url: 'https://f.example' });
+  const expected = [
+    ['/admin/festival-suggestions?detail=1', 'admin-read', '/admin/festival-suggestions?detail=1', 'GET'],
+    ['/admin/festival-suggestions', 'admin-read', '/admin/festival-suggestions', 'GET'],
+    ['/admin/festival-suggestions/reject', 'admin-festival-suggestion-reject', rejectBody, 'POST'],
+    ['/admin/festival-suggestions/link', 'admin-festival-suggestion-link', linkBody, 'POST'],
+    ['/admin/festival-followers', 'admin-read', '/admin/festival-followers', 'GET'],
+  ];
+  expected.forEach(([path, domain, payload, method], i) => {
+    assert.equal(sent[i].url, 'https://w.test' + path);
+    assert.equal(sent[i].init.method, method);
+    const d = crypto
+      .createHash('sha256')
+      .update(domain + ':' + payload + ':' + sent[i].init.headers['X-Timestamp'])
+      .digest('hex');
+    assert.equal(signed[i], d);
+  });
+  assert.equal(sent[2].init.body, rejectBody);
+  assert.equal(sent[3].init.body, linkBody);
+});

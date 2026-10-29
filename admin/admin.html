@@ -519,8 +519,24 @@
 
       <div id="tab-suggestions" hidden>
         <div class="card">
-          <h2>Suggested bands</h2>
-          <p>
+          <div>
+            <button
+              class="btn btn-secondary"
+              id="s-kind-bands"
+              aria-pressed="true"
+            >
+              Bands
+            </button>
+            <button
+              class="btn btn-secondary"
+              id="s-kind-festivals"
+              aria-pressed="false"
+            >
+              Festivals
+            </button>
+          </div>
+          <h2 id="s-heading">Suggested bands</h2>
+          <p id="s-intro">
             Most requested first. Select bands, then copy the list for
             bands-scout, reject, or link to an existing band.
           </p>
@@ -548,7 +564,7 @@
               <thead>
                 <tr>
                   <th></th>
-                  <th>Band</th>
+                  <th id="s-name-th">Band</th>
                   <th>Site</th>
                   <th>Members</th>
                   <th>Asked by</th>
@@ -559,7 +575,7 @@
           </div>
         </div>
         <div class="card">
-          <h2>Most followed bands</h2>
+          <h2 id="s-followers-heading">Most followed bands</h2>
           <ul id="s-followers"></ul>
         </div>
       </div>
@@ -1366,6 +1382,55 @@
           showToast('Link copied');
         });
 
+      const KIND_TEXT = {
+        bands: {
+          heading: 'Suggested bands',
+          intro:
+            'Most requested first. Select bands, then copy the list for bands-scout, reject, or link to an existing band.',
+          column: 'Band',
+          copy: 'Copy list for bands-scout',
+          link: 'Link selected to an existing band',
+          pick: 'Select at least one band.',
+          linkPrompt: 'Site URL of the existing tracked band:',
+          empty: 'No pending suggestions.',
+          followers: 'Most followed bands',
+        },
+        festivals: {
+          heading: 'Suggested festivals',
+          intro:
+            'Most requested first. Select festivals, then copy them for festivals.yaml, reject, or link to an existing festival.',
+          column: 'Festival',
+          copy: 'Copy for festivals.yaml',
+          link: 'Link selected to an existing festival',
+          pick: 'Select at least one festival.',
+          linkPrompt: 'Site URL of the existing festival:',
+          empty: 'No pending suggestions.',
+          followers: 'Most followed festivals',
+        },
+      };
+      let suggestionKind = 'bands';
+      function applySuggestionKind() {
+        const t = KIND_TEXT[suggestionKind];
+        const set = (id, text) =>
+          (document.getElementById(id).textContent = text);
+        set('s-heading', t.heading);
+        set('s-intro', t.intro);
+        set('s-name-th', t.column);
+        set('s-copy-btn', t.copy);
+        set('s-link-btn', t.link);
+        set('s-followers-heading', t.followers);
+        for (const k of ['bands', 'festivals'])
+          document
+            .getElementById('s-kind-' + k)
+            .setAttribute('aria-pressed', String(k === suggestionKind));
+      }
+      for (const k of ['bands', 'festivals'])
+        document.getElementById('s-kind-' + k).addEventListener('click', () => {
+          if (suggestionKind === k) return;
+          suggestionKind = k;
+          applySuggestionKind();
+          refreshSuggestions();
+        });
       let suggestionGroups = [];
       async function refreshSuggestions(keepStatus = false) {
         try {
@@ -1374,7 +1439,10 @@
             document
               .getElementById('s-who-btn')
               .getAttribute('aria-pressed') === 'true';
-          suggestionGroups = await api.listSuggestions({ detail });
+          const festivals = suggestionKind === 'festivals';
+          suggestionGroups = await (festivals
+            ? api.listFestivalSuggestions({ detail })
+            : api.listSuggestions({ detail }));
           const body = document.getElementById('s-body');
           body.replaceChildren();
           suggestionGroups.forEach((g, i) => {
@@ -1395,9 +1463,12 @@
           });
           const list = document.getElementById('s-followers');
           list.replaceChildren();
-          for (const f of await api.followers()) {
+          for (const f of await (festivals
+            ? api.festivalFollowers()
+            : api.followers())) {
             const li = document.createElement('li');
-            li.textContent = f.act_url + ' — ' + f.followers;
+            li.textContent =
+              (festivals ? f.festival_url : f.act_url) + ' — ' + f.followers;
             list.append(li);
           }
           if (!keepStatus)
@@ -1439,7 +1510,18 @@
         .addEventListener('click', async () => {
           const picked = selectedGroups();
           if (!picked.length)
-            return say('s-status', 'Select at least one band.', 'error');
+            return say('s-status', KIND_TEXT[suggestionKind].pick, 'error');
+          if (suggestionKind === 'festivals') {
+            await navigator.clipboard.writeText(
+              AM.festivalsYaml(picked, new Date().toISOString().slice(0, 10))
+            );
+            say(
+              's-status',
+              'Copied. Paste it under festivals: in crawler/festivals.yaml.',
+              'success'
+            );
+            return;
+          }
           await navigator.clipboard.writeText(AM.bandsTxt(picked));
           say(
             's-status',
@@ -1452,12 +1534,15 @@
         .addEventListener('click', async () => {
           const picked = selectedGroups();
           if (!picked.length)
-            return say('s-status', 'Select at least one band.', 'error');
+            return say('s-status', KIND_TEXT[suggestionKind].pick, 'error');
           const reason = prompt('Reason (optional, shown to the members):', '');
           if (reason === null) return;
           const { failures, firstError } = await inChunks(
             picked.flatMap(g => g.ids),
-            ids => adminApi().rejectSuggestions(ids, reason)
+            ids =>
+              suggestionKind === 'festivals'
+                ? adminApi().rejectFestivalSuggestions(ids, reason)
+                : adminApi().rejectSuggestions(ids, reason)
           );
           if (failures) say('s-status', firstError.message, 'error');
           refreshSuggestions(failures > 0);
@@ -1467,12 +1552,15 @@
         .addEventListener('click', async () => {
           const picked = selectedGroups();
           if (!picked.length)
-            return say('s-status', 'Select at least one band.', 'error');
-          const url = prompt('Site URL of the existing tracked band:', '');
+            return say('s-status', KIND_TEXT[suggestionKind].pick, 'error');
+          const url = prompt(KIND_TEXT[suggestionKind].linkPrompt, '');
           if (!url) return;
           const { failures, firstError } = await inChunks(
             picked.flatMap(g => g.ids),
-            ids => adminApi().linkSuggestions(ids, url)
+            ids =>
+              suggestionKind === 'festivals'
+                ? adminApi().linkFestivalSuggestions(ids, url)
+                : adminApi().linkSuggestions(ids, url)
           );
           if (failures) say('s-status', firstError.message, 'error');
           refreshSuggestions(failures > 0);
