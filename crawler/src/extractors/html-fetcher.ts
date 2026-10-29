@@ -1,9 +1,12 @@
-import { chromium, Browser, BrowserContext } from 'playwright';
+import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import { spawn, spawnSync, ChildProcess } from 'child_process';
 import { createConnection } from 'net';
 import { extractCleanText } from '../../../shared/extractors/html-cleaner.js';
 import { FetchedPage } from '../types/event.js';
-import { looksBlocked } from '../utils/block-page.js';
+import { CHALLENGE_TITLE, looksBlocked } from '../utils/block-page.js';
+
+// How long a self-clearing JS challenge (e.g. SiteGround's) may take.
+const CHALLENGE_WAIT_MS = 15000;
 
 export type { FetchedPage };
 export type BrowserEngine = 'obscura' | 'chrome';
@@ -200,6 +203,13 @@ export class HTMLFetcher {
       // Wait a bit for any dynamic content to render
       await page.waitForTimeout(2000);
 
+      // A JS challenge reloads the real page once it has verified the
+      // browser: give it time, then let that page render too.
+      if (await this.waitOutChallenge(page)) {
+        await page.waitForLoadState('load').catch(() => {});
+        await page.waitForTimeout(2000);
+      }
+
       // Get the full HTML from the main frame
       const html = await page.content();
 
@@ -234,6 +244,24 @@ export class HTMLFetcher {
       await page.close();
       if (context) await context.close();
     }
+  }
+
+  /**
+   * While the page shows a self-clearing JS challenge, wait (up to
+   * CHALLENGE_WAIT_MS). Returns true if a challenge was there and cleared.
+   */
+  private async waitOutChallenge(page: Page): Promise<boolean> {
+    const onChallenge = async () =>
+      CHALLENGE_TITLE.test(await page.title().catch(() => 'Just a moment'));
+    if (!(await onChallenge())) return false;
+    console.log('  Waiting for a bot-protection challenge to clear...');
+    const deadline = Date.now() + CHALLENGE_WAIT_MS;
+    while (Date.now() < deadline) {
+      await page.waitForTimeout(500);
+      if (!(await onChallenge())) return true;
+    }
+    console.log('  The challenge did not clear');
+    return false;
   }
 
   async fetchMultiple(urls: string[]): Promise<FetchedPage[]> {

@@ -28,6 +28,12 @@ const TOUR_PAGE = `<!doctype html><html><head><title>Test Band - Live Tour Dates
 // A long, legitimate page that happens to quote block phrases.
 const LONG_PAGE = `<!doctype html><html><head><title>Access denied news</title></head><body>${'<p>Tour dates and news about the band.</p>'.repeat(200)}<p>Sorry, you have been blocked from commenting.</p></body></html>`;
 
+// A JS challenge (like SiteGround's) that sets a cookie and reloads by itself,
+// later than the fetcher's fixed 2 s wait.
+const CHALLENGE_PAGE = `<!doctype html><html><head><title>One moment, please...</title></head>
+<body><h1>Please wait while your request is being verified...</h1>
+<script>setTimeout(() => { document.cookie = 'verified=1; path=/'; location.reload(); }, 3500);</script></body></html>`;
+
 const requests: Record<string, string[]> = {};
 let flakyHits = 0;
 
@@ -48,6 +54,9 @@ const server = http.createServer((req, res) => {
     flakyHits++;
     res.statusCode = flakyHits <= 2 ? 403 : 200;
     res.end(flakyHits <= 2 ? BLOCK_PAGE : TOUR_PAGE);
+  } else if (path === '/challenge') {
+    const verified = String(req.headers.cookie ?? '').includes('verified=1');
+    res.end(verified ? TOUR_PAGE : CHALLENGE_PAGE);
   } else if (path === '/long') {
     res.end(LONG_PAGE);
   } else {
@@ -114,6 +123,21 @@ async function main() {
       assert(
         !looksBlocked(p.title, p.text) && p.text.includes('Udine'),
         'the second retry result is returned'
+      );
+    }
+
+    console.log(
+      '\n=== a JS challenge that clears by itself is waited for ===\n'
+    );
+    {
+      const p = await fetcher.fetchPage(`${base}/challenge`);
+      assert(
+        requests['/challenge'].length === 2,
+        'the challenge, then its own reload; no user-agent retry'
+      );
+      assert(
+        !looksBlocked(p.title, p.text) && p.text.includes('Udine'),
+        'the page after the challenge is returned'
       );
     }
 

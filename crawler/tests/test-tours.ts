@@ -1368,6 +1368,13 @@ sources:
       'challenge interstitial'
     );
     assert(
+      looksBlocked(
+        'One moment, please...',
+        'One moment, please... Please wait while your request is being verified...'
+      ),
+      'SiteGround challenge interstitial'
+    );
+    assert(
       looksBlocked('Access Denied', 'You do not have permission'),
       'short page with a block title'
     );

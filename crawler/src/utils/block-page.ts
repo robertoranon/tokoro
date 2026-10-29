@@ -5,10 +5,14 @@ import type { FetchedPage } from '../types/event.js';
 const MAX_BLOCK_PAGE_CHARS = 3000;
 
 const BLOCK_TITLE =
-  /attention required|just a moment|access denied|you have been blocked|are you a (?:robot|human)|human verification|security check/i;
+  /attention required|just a moment|one moment, please|access denied|you have been blocked|are you a (?:robot|human)|human verification|security check/i;
 
 const BLOCK_TEXT =
-  /sorry, you have been blocked|verify (?:that )?you are (?:a )?human|checking your browser before accessing|enable javascript and cookies to continue|unusual traffic from your computer|complete the captcha/i;
+  /sorry, you have been blocked|verify (?:that )?you are (?:a )?human|checking your browser before accessing|enable javascript and cookies to continue|unusual traffic from your computer|complete the captcha|please wait while your request is being verified/i;
+
+// Interstitials that verify the browser with JavaScript and then load the real
+// page by themselves (Cloudflare, SiteGround), unlike a hard block.
+export const CHALLENGE_TITLE = /just a moment|one moment, please/i;
 
 /** True when a fetched page looks like a bot-protection page, not content. */
 export function looksBlocked(title: string, text: string): boolean {
