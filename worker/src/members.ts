@@ -24,6 +24,9 @@ export interface MemberKindConfig {
   unfollowDomain: string;
   suggestDomain: string;
   invalidUrlMessage: string;
+  /** Admin signature domains for rejecting / linking suggestions. */
+  adminRejectDomain: string;
+  adminLinkDomain: string;
 }
 
 export const BAND_KIND: MemberKindConfig = {
@@ -34,6 +37,8 @@ export const BAND_KIND: MemberKindConfig = {
   unfollowDomain: 'band-unfollow',
   suggestDomain: 'band-suggest',
   invalidUrlMessage: 'Invalid band url',
+  adminRejectDomain: 'admin-suggestion-reject',
+  adminLinkDomain: 'admin-suggestion-link',
 };
 
 export const FESTIVAL_KIND: MemberKindConfig = {
@@ -44,6 +49,8 @@ export const FESTIVAL_KIND: MemberKindConfig = {
   unfollowDomain: 'festival-unfollow',
   suggestDomain: 'festival-suggest',
   invalidUrlMessage: 'Invalid festival url',
+  adminRejectDomain: 'admin-festival-suggestion-reject',
+  adminLinkDomain: 'admin-festival-suggestion-link',
 };
 
 interface ActiveMember {

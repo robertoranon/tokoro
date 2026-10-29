@@ -809,3 +809,168 @@ describe('few D1 queries for bulk link / reject', () => {
     expect(db.stats.prepares).toBeLessThanOrEqual(2 + 3 + 6);
   });
 });
+
+describe('festival suggestions and followers', () => {
+  const member = (p: string, revoked: string | null = null) =>
+    env.DB.prepare(
+      'INSERT INTO members (pubkey, name, created_at, revoked_at) VALUES (?, ?, ?, ?)'
+    )
+      .bind(p, 'M' + p, 'x', revoked)
+      .run();
+  async function addFestSuggestion(
+    pubkey: string,
+    name: string,
+    status = 'pending'
+  ) {
+    const r = await env.DB.prepare(
+      `INSERT INTO festival_suggestions (pubkey, name, url, status, created_at) VALUES (?, ?, ?, ?, ?)`
+    )
+      .bind(pubkey, name, null, status, '2026-10-13T10:00:00')
+      .run();
+    return r.meta.last_row_id as number;
+  }
+  const post = (path: string, domain: string, obj: object) => {
+    const body = JSON.stringify(obj);
+    return call(admin, 'POST', path, domain, body, body);
+  };
+  const get = (path: string) => call(admin, 'GET', path, 'admin-read', path);
+
+  it('lists only festival suggestions, grouped by normalized name', async () => {
+    await member('a');
+    await member('b');
+    await addFestSuggestion('a', 'Sonic Fest');
+    await addFestSuggestion('b', 'sonic  fest');
+    await addSuggestion('a', 'Band Only');
+    const groups: any[] = (await (
+      await get('/admin/festival-suggestions')
+    ).json()) as any[];
+    expect(groups).toHaveLength(1);
+    expect(groups[0].members).toBe(2);
+    expect(groups[0].ids).toHaveLength(2);
+    expect(groups[0].member_names).toBeUndefined();
+  });
+
+  it('rejects only pending festival rows', async () => {
+    await member('a');
+    const f = await addFestSuggestion('a', 'Fest');
+    const done = await addFestSuggestion('a', 'Done', 'linked');
+    const b = await addSuggestion('a', 'Band');
+    const res = await post(
+      '/admin/festival-suggestions/reject',
+      'admin-festival-suggestion-reject',
+      { ids: [f, done, b], reason: 'nope' }
+    );
+    expect(await res.json()).toEqual({ updated: 1 });
+    const rows = await env.DB.prepare(
+      'SELECT id, status FROM festival_suggestions ORDER BY id'
+    ).all();
+    expect(rows.results.map((r: any) => r.status)).toEqual([
+      'rejected',
+      'linked',
+    ]);
+    const band = await env.DB.prepare(
+      'SELECT status FROM band_suggestions WHERE id = ?'
+    )
+      .bind(b)
+      .first();
+    expect(band.status).toBe('pending');
+  });
+
+  it('links (also a rejected one) and follows for the suggesting members', async () => {
+    await member('a');
+    const id = await addFestSuggestion('a', 'Fest', 'rejected');
+    const res = await post(
+      '/admin/festival-suggestions/link',
+      'admin-festival-suggestion-link',
+      { ids: [id], festival_url: 'https://Fest.example/' }
+    );
+    expect(await res.json()).toEqual({ updated: 1 });
+    expect(
+      await env.DB.prepare(
+        'SELECT status, festival_url FROM festival_suggestions WHERE id = ?'
+      )
+        .bind(id)
+        .first()
+    ).toEqual({ status: 'linked', festival_url: 'https://fest.example' });
+    expect(
+      await env.DB.prepare(
+        'SELECT festival_url FROM member_festivals WHERE pubkey = ?'
+      )
+        .bind('a')
+        .first()
+    ).toEqual({ festival_url: 'https://fest.example' });
+    expect(
+      (await env.DB.prepare('SELECT * FROM member_bands').all()).results
+    ).toHaveLength(0);
+  });
+
+  it('refuses an invalid festival_url with the festival message', async () => {
+    const res = await post(
+      '/admin/festival-suggestions/link',
+      'admin-festival-suggestion-link',
+      { ids: [1], festival_url: 'x' }
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: 'festival_url must be an http(s) URL (max 500 characters)',
+    });
+  });
+
+  it('counts festival followers of active members, most followed first', async () => {
+    await member('a');
+    await member('b');
+    await member('r', '2026-10-13T10:00:00');
+    const ins = (p: string, u: string) =>
+      env.DB.prepare(
+        'INSERT INTO member_festivals (pubkey, festival_url, created_at) VALUES (?, ?, ?)'
+      )
+        .bind(p, u, 'x')
+        .run();
+    await ins('a', 'https://two.example');
+    await ins('b', 'https://two.example');
+    await ins('a', 'https://one.example');
+    await ins('r', 'https://one.example');
+    await ins('r', 'https://only-revoked.example');
+    expect(await (await get('/admin/festival-followers')).json()).toEqual([
+      { festival_url: 'https://two.example', followers: 2 },
+      { festival_url: 'https://one.example', followers: 1 },
+    ]);
+  });
+
+  it('deleting a member removes festival follows and suggestions; band admin is unchanged', async () => {
+    await member('a');
+    await env.DB.prepare(
+      'INSERT INTO member_festivals (pubkey, festival_url, created_at) VALUES (?, ?, ?)'
+    )
+      .bind('a', 'https://f.example', 'x')
+      .run();
+    await addFestSuggestion('a', 'Fest');
+    await addSuggestion('b', 'Band');
+    const res = await call(
+      admin,
+      'DELETE',
+      '/admin/members/a',
+      'admin-member-delete',
+      'a'
+    );
+    expect(res.status).toBe(200);
+    expect(
+      (await env.DB.prepare('SELECT * FROM member_festivals').all()).results
+    ).toHaveLength(0);
+    expect(
+      (await env.DB.prepare('SELECT * FROM festival_suggestions').all()).results
+    ).toHaveLength(0);
+    const groups: any[] = (await (
+      await get('/admin/suggestions')
+    ).json()) as any[];
+    expect(groups.map(g => g.key)).toEqual(['band']);
+    expect(Object.keys(groups[0]).sort()).toEqual([
+      'created_at',
+      'ids',
+      'key',
+      'members',
+      'name_variants',
+      'urls',
+    ]);
+  });
+});

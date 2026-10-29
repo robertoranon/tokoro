@@ -71,6 +71,7 @@ API Endpoints:
 - `GET /admin/suggestions?status=&detail=1` - Suggestions grouped by band name (admin)
 - `POST /admin/suggestions/reject|link` - Reject, or link to a tracked band (admin)
 - `GET /admin/band-followers` - Follower count per band (admin)
+- `GET /admin/festival-suggestions?status=&detail=1`, `POST /admin/festival-suggestions/reject|link`, `GET /admin/festival-followers` - Same for festival suggestions and follows (admin)
 - `GET /admin/conflicts?status=` - Conflicts with their events (held included) and proposals (admin)
 - `POST /admin/conflicts/:id/resolve` - `keep_both`, `delete` an event, or `apply_proposal` (admin)
 - `POST /admin/conflicts/sweep` - Detect conflicts already in the data, up to 200 band-days per call (`truncated: true` when more remain; admin, explicit only)

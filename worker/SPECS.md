@@ -283,7 +283,7 @@ The reference implementation pins this format with a fixed cross-package test ve
 
 ### 3.6 Member and Admin Request Signatures
 
-The member endpoints (`/member/*`) and the admin endpoints (`/admin/members*`, `/admin/suggestions*`, `/admin/band-followers`, `/admin/conflicts*`) authenticate with headers instead of body fields. Reads are signed too, because member data is private.
+The member endpoints (`/member/*`) and the admin endpoints (`/admin/members*`, `/admin/suggestions*`, `/admin/band-followers`, `/admin/festival-suggestions*`, `/admin/festival-followers`, `/admin/conflicts*`) authenticate with headers instead of body fields. Reads are signed too, because member data is private.
 
 **Headers:**
 
@@ -306,7 +306,7 @@ The member endpoints (`/member/*`) and the admin endpoints (`/admin/members*`, `
 
    - Telegram bot endpoints (`POST /telegram/*`): if `TELEGRAM_BOT_PUBKEY` is not configured → `503 {"error": "Telegram not configured"}` (checked **before** steps 1-3); the pubkey must equal it (case-insensitive), else `403 {"error": "Unauthorized"}`.
 
-**Endpoints with a body** (`POST /member/suggestions`, `POST /member/festival-suggestions`, `POST /admin/members`, `POST /admin/suggestions/reject`, `POST /admin/suggestions/link`, `POST /telegram/*`) are signed over the raw body, so the body must be read before step 3. To avoid buffering bodies for unauthenticated requests, the order of checks is:
+**Endpoints with a body** (`POST /member/suggestions`, `POST /member/festival-suggestions`, `POST /admin/members`, `POST /admin/suggestions/reject`, `POST /admin/suggestions/link`, `POST /admin/festival-suggestions/reject`, `POST /admin/festival-suggestions/link`, `POST /telegram/*`) are signed over the raw body, so the body must be read before step 3. To avoid buffering bodies for unauthenticated requests, the order of checks is:
 
 1. `Content-Length` header present and greater than 8192 bytes → `413 {"error": "Payload too large"}` (before any other check).
 2. Admin endpoints only: `ADMIN_PUBKEY` not configured → `503`.
@@ -330,12 +330,14 @@ The member endpoints (`/member/*`) and the admin endpoints (`/admin/members*`, `
 | `telegram-link` | `POST /telegram/link` | the raw JSON request body |
 | `telegram-settings` | `POST /telegram/settings` | the raw JSON request body |
 | `telegram-unlink` | `POST /telegram/unlink` | the raw JSON request body |
-| `admin-read` | `GET /admin/members`, `GET /admin/suggestions`, `GET /admin/band-followers`, `GET /admin/conflicts` | the request path with its query string exactly as sent (URL pathname + search, e.g. `/admin/suggestions?detail=1`; without a query, just the path such as `/admin/suggestions`). A signature for one query is refused (`401`) for any other, so a captured read cannot be replayed with `?detail=1` added |
+| `admin-read` | `GET /admin/members`, `GET /admin/suggestions`, `GET /admin/band-followers`, `GET /admin/festival-suggestions`, `GET /admin/festival-followers`, `GET /admin/conflicts` | the request path with its query string exactly as sent (URL pathname + search, e.g. `/admin/suggestions?detail=1`; without a query, just the path such as `/admin/suggestions`). A signature for one query is refused (`401`) for any other, so a captured read cannot be replayed with `?detail=1` added |
 | `admin-member` | `POST /admin/members` | the raw JSON request body |
 | `admin-member-revoke` | `POST /admin/members/:pubkey/revoke` | the target pubkey from the path, lower-cased |
 | `admin-member-delete` | `DELETE /admin/members/:pubkey` | the target pubkey from the path, lower-cased |
 | `admin-suggestion-reject` | `POST /admin/suggestions/reject` | the raw JSON request body |
 | `admin-suggestion-link` | `POST /admin/suggestions/link` | the raw JSON request body |
+| `admin-festival-suggestion-reject` | `POST /admin/festival-suggestions/reject` | the raw JSON request body |
+| `admin-festival-suggestion-link` | `POST /admin/festival-suggestions/link` | the raw JSON request body |
 | `admin-conflict-resolve` | `POST /admin/conflicts/:id/resolve` | the raw JSON request body |
 | `admin-conflict-sweep` | `POST /admin/conflicts/sweep` | the raw JSON request body (the admin page sends `{}`) |
 
@@ -1292,7 +1294,7 @@ Signed with domain `admin-member-revoke` over the lower-cased `:pubkey`. Sets `r
 
 #### 7.12.4 DELETE /admin/members/:pubkey (Delete Member)
 
-Signed with domain `admin-member-delete` over the lower-cased `:pubkey`. Deletes the member's rows from `member_bands`, then `band_suggestions`, then `telegram_link_codes`, then `members`, as one atomic unit (a D1 `batch`, which runs as a single transaction): either all four deletes take effect or, if any of them fails, none does and the request fails (`500`) with the member and their data unchanged.
+Signed with domain `admin-member-delete` over the lower-cased `:pubkey`. Deletes the member's rows from `member_bands`, `band_suggestions`, `member_festivals`, `festival_suggestions` and `telegram_link_codes`, then `members`, as one atomic unit (a D1 `batch`, which runs as a single transaction): either all six deletes take effect or, if any of them fails, none does and the request fails (`500`) with the member and their data unchanged.
 
 **Response (200 OK):** `{ "message": "Member deleted", "pubkey": "<pubkey>" }`
 
@@ -1386,6 +1388,26 @@ Only follows of active members count: follows of revoked members (`revoked_at` s
 ```json
 [ { "act_url": "https://band.example", "followers": 3 } ]
 ```
+
+### 7.14a Festival Suggestion and Follower Endpoints
+
+Festivals reuse the band admin handlers (7.13.1-7.13.3 and 7.14), parameterised by the same per-kind config as the member endpoints (`BAND_KIND`, `FESTIVAL_KIND` in `members.ts`, which also holds the admin signature domains). Band endpoints, payloads and domains are unchanged.
+
+#### 7.13.4 GET /admin/festival-suggestions
+
+Same as 7.13.1 (query `status`, `detail`; `admin-read` over path and query; same grouping and response), reading only `festival_suggestions`.
+
+#### 7.13.5 POST /admin/festival-suggestions/reject
+
+Same as 7.13.2, signed with domain `admin-festival-suggestion-reject`; only pending rows of `festival_suggestions` are touched. Response `{ "updated": n }`.
+
+#### 7.13.6 POST /admin/festival-suggestions/link
+
+Same as 7.13.3, signed with domain `admin-festival-suggestion-link`. Body `{ "ids": [...], "festival_url": "https://..." }`; the url is normalized with `normalizeActUrl`; an invalid one is `400 {"error": "festival_url must be an http(s) URL (max 500 characters)"}`. Each linkable suggestion (any status but `linked`, so a rejected one can be linked) gets `status = 'linked'` and `festival_url`, and its suggesting member follows the festival (`INSERT OR IGNORE INTO member_festivals`), all in one D1 `batch`. Response `{ "updated": n }`.
+
+#### 7.14.1 GET /admin/festival-followers
+
+Same as 7.14 over `member_festivals`: active members only, most followed first, ties by url. Response `[ { "festival_url": "https://fest.example", "followers": 3 } ]`.
 
 ### 7.15 Telegram Alerts
 
@@ -1787,7 +1809,7 @@ The reference implementation covers these in `worker/src/band-keys.test.ts`, `me
 
 **Member endpoints (`members`):** `/member/me` returns name, bands and suggestions of an active member; `403` for unknown and revoked keys; `401` without valid auth; follow stores the normalized URL and is idempotent; unfollow is idempotent; `400` for a path that is not base64url or not an http(s) URL; each member has their own list; a suggestion is created pending and listed in `/member/me`; a duplicate pending name from the same member returns the existing id; two members may suggest the same name; invalid input → `400`. Festivals: follow/unfollow idempotent, the url is normalized, a non-http url is `400 Invalid festival url` before auth, a band-follow signature is refused (`401`); festival suggestions validate like band ones, dedupe pending names and land in `festival_suggestions`; `/member/me` returns `festivals` and `festival_suggestions`; `BACKUP_TABLES` includes both new tables.
 
-**Admin endpoints (`admin-members`):** `503` without `ADMIN_PUBKEY`; `403` for a valid signature from another key; `401` for a bad signature; create, list, revoke and delete a member; a revoke signature cannot be used to delete; `409` for an existing pubkey, `400` for bad input, `404` for an unknown member; delete cascades to follows and suggestions; grouping by normalized name, counting distinct members, ordering by demand, member names only with `detail=1`; reject with a reason; link marks `linked`, stores the normalized `act_url` and follows it for the suggester; reject/link bodies are validated; follower counts are ordered and contain no names.
+**Admin endpoints (`admin-members`):** `503` without `ADMIN_PUBKEY`; `403` for a valid signature from another key; `401` for a bad signature; create, list, revoke and delete a member; a revoke signature cannot be used to delete; `409` for an existing pubkey, `400` for bad input, `404` for an unknown member; delete cascades to follows and suggestions (bands and festivals); grouping by normalized name, counting distinct members, ordering by demand, member names only with `detail=1`; reject with a reason; link marks `linked`, stores the normalized `act_url` and follows it for the suggester; reject/link bodies are validated; follower counts are ordered and contain no names. Festivals: suggestions are listed and grouped from `festival_suggestions` only; reject touches only pending festival rows; link (also of a rejected suggestion) sets `linked`, the normalized `festival_url` and the member's follow; an invalid `festival_url` is `400` with the festival message; festival follower counts leave out revoked members; deleting a member removes `member_festivals` and `festival_suggestions`; the band admin responses are unchanged.
 
 **Through the Worker (`members-routes`):** the lifecycle create → follow → suggest → link → revoke through the main fetch handler; a member key is rejected by the allowlist on `POST /events` and `POST /events/:id/act`; CORS preflight allows the new headers; the unauthenticated blocklist read and the `404` for unknown routes are unchanged.
 
@@ -1833,6 +1855,7 @@ The reference implementation covers these in `worker/src/band-keys.test.ts`, `me
 - [x] GET|POST /admin/members, POST /admin/members/:pubkey/revoke, DELETE /admin/members/:pubkey
 - [x] GET /admin/suggestions, POST /admin/suggestions/reject, POST /admin/suggestions/link
 - [x] GET /admin/band-followers
+- [x] GET /admin/festival-suggestions, POST /admin/festival-suggestions/reject, POST /admin/festival-suggestions/link, GET /admin/festival-followers
 
 ### 11.3 Database Operations
 - [x] Event insertion with geohash
@@ -1873,7 +1896,7 @@ The reference implementation (TypeScript/Cloudflare Workers) can be found in:
 - `worker/src/band-keys.ts` — `normalizeActUrl`, `normalizeName`, base64url helpers
 - `worker/src/member-auth.ts` — signed-request message and verification (section 3.6)
 - `worker/src/members.ts` — member endpoints (section 7.11)
-- `worker/src/admin-members.ts` — admin member and suggestion endpoints (sections 7.12-7.14)
+- `worker/src/admin-members.ts` — admin member and suggestion endpoints (sections 7.12-7.14a)
 - `worker/src/telegram-link.ts` — link-code and bot endpoints (section 7.15.1-7.15.2)
 - `worker/src/alerts.ts` — digest selection, formatting and sending (section 7.15.4)
 - `worker/migrations/0007_add_members.sql` — member tables
@@ -1953,7 +1976,7 @@ To delete all data for a user (identified by `pubkey`):
 DELETE FROM events WHERE pubkey = ?;
 ```
 
-For a member, `DELETE /admin/members/:pubkey` (section 7.12.4) removes the member, their followed bands and their suggestions.
+For a member, `DELETE /admin/members/:pubkey` (section 7.12.4) removes the member, their followed bands and festivals and their suggestions.
 
 **Note:** Implement as authenticated endpoint `/users/:pubkey/delete` (requires signature).
 

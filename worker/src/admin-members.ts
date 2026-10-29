@@ -6,7 +6,13 @@ import {
   readSignedBody,
 } from './member-auth';
 import { normalizeActUrl, normalizeName } from './band-keys';
-import { nowIso, MAX_URL_LENGTH } from './members';
+import {
+  nowIso,
+  MAX_URL_LENGTH,
+  BAND_KIND,
+  FESTIVAL_KIND,
+  type MemberKindConfig,
+} from './members';
 
 const HEX_64 = /^[0-9a-f]{64}$/i;
 const MAX_MEMBER_NAME = 60;
@@ -96,13 +102,21 @@ export async function routeAdminMemberRequest(
   const del = path.match(/^\/admin\/members\/([^/]+)$/);
   if (m === 'DELETE' && del) return deleteMember(request, env, del[1]);
   if (m === 'GET' && path === '/admin/suggestions')
-    return listSuggestions(request, env);
+    return listSuggestions(request, env, BAND_KIND);
   if (m === 'POST' && path === '/admin/suggestions/reject')
-    return rejectSuggestions(request, env);
+    return rejectSuggestions(request, env, BAND_KIND);
   if (m === 'POST' && path === '/admin/suggestions/link')
-    return linkSuggestions(request, env);
+    return linkSuggestions(request, env, BAND_KIND);
   if (m === 'GET' && path === '/admin/band-followers')
-    return listBandFollowers(request, env);
+    return listFollowers(request, env, BAND_KIND);
+  if (m === 'GET' && path === '/admin/festival-suggestions')
+    return listSuggestions(request, env, FESTIVAL_KIND);
+  if (m === 'POST' && path === '/admin/festival-suggestions/reject')
+    return rejectSuggestions(request, env, FESTIVAL_KIND);
+  if (m === 'POST' && path === '/admin/festival-suggestions/link')
+    return linkSuggestions(request, env, FESTIVAL_KIND);
+  if (m === 'GET' && path === '/admin/festival-followers')
+    return listFollowers(request, env, FESTIVAL_KIND);
   return null;
 }
 
@@ -198,6 +212,12 @@ async function deleteMember(
     env.DB.prepare('DELETE FROM band_suggestions WHERE pubkey = ?').bind(
       target
     ),
+    env.DB.prepare('DELETE FROM member_festivals WHERE pubkey = ?').bind(
+      target
+    ),
+    env.DB.prepare('DELETE FROM festival_suggestions WHERE pubkey = ?').bind(
+      target
+    ),
     env.DB.prepare('DELETE FROM telegram_link_codes WHERE pubkey = ?').bind(
       target
     ),
@@ -271,7 +291,11 @@ export function groupSuggestions(rows: SuggestionRow[], detail: boolean) {
   return out;
 }
 
-async function listSuggestions(request: Request, env: Env): Promise<Response> {
+async function listSuggestions(
+  request: Request,
+  env: Env,
+  kind: MemberKindConfig
+): Promise<Response> {
   const a = await authAdmin(request, env, 'admin-read', readPayload(request));
   if (a !== true) return a;
   const params = new URL(request.url).searchParams;
@@ -281,7 +305,7 @@ async function listSuggestions(request: Request, env: Env): Promise<Response> {
   }
   const res = await env.DB.prepare(
     `SELECT s.id, s.pubkey, s.name, s.url, s.created_at, m.name AS member_name
-     FROM band_suggestions s LEFT JOIN members m ON m.pubkey = s.pubkey
+     FROM ${kind.suggestionTable} s LEFT JOIN members m ON m.pubkey = s.pubkey
      WHERE s.status = ? ORDER BY s.id`
   )
     .bind(status)
@@ -293,11 +317,12 @@ async function listSuggestions(request: Request, env: Env): Promise<Response> {
 
 async function rejectSuggestions(
   request: Request,
-  env: Env
+  env: Env,
+  kind: MemberKindConfig
 ): Promise<Response> {
   const raw = await readAdminBody(request, env);
   if (raw instanceof Response) return raw;
-  const a = await authAdmin(request, env, 'admin-suggestion-reject', raw);
+  const a = await authAdmin(request, env, kind.adminRejectDomain, raw);
   if (a !== true) return a;
   const body = parseJson(raw);
   const ids = body ? validIds(body.ids) : null;
@@ -313,7 +338,7 @@ async function rejectSuggestions(
   // One UPDATE per chunk of ids (one for up to ID_CHUNK ids), all in one batch.
   const writes = chunks([...new Set(ids)]).map(chunk =>
     env.DB.prepare(
-      `UPDATE band_suggestions SET status = 'rejected', reject_reason = ?
+      `UPDATE ${kind.suggestionTable} SET status = 'rejected', reject_reason = ?
        WHERE status = 'pending' AND id IN (${placeholders(chunk.length)})`
     ).bind(reason || null, ...chunk)
   );
@@ -322,20 +347,24 @@ async function rejectSuggestions(
   return jsonResponse({ updated });
 }
 
-async function linkSuggestions(request: Request, env: Env): Promise<Response> {
+async function linkSuggestions(
+  request: Request,
+  env: Env,
+  kind: MemberKindConfig
+): Promise<Response> {
   const raw = await readAdminBody(request, env);
   if (raw instanceof Response) return raw;
-  const a = await authAdmin(request, env, 'admin-suggestion-link', raw);
+  const a = await authAdmin(request, env, kind.adminLinkDomain, raw);
   if (a !== true) return a;
   const body = parseJson(raw);
   const ids = body ? validIds(body.ids) : null;
   if (!body || !ids)
     return jsonResponse({ error: 'ids must be a non-empty list of ids' }, 400);
-  const actUrl = normalizeActUrl(body.act_url);
+  const actUrl = normalizeActUrl(body[kind.urlColumn]);
   if (!actUrl || actUrl.length > MAX_URL_LENGTH)
     return jsonResponse(
       {
-        error: `act_url must be an http(s) URL (max ${MAX_URL_LENGTH} characters)`,
+        error: `${kind.urlColumn} must be an http(s) URL (max ${MAX_URL_LENGTH} characters)`,
       },
       400
     );
@@ -348,7 +377,7 @@ async function linkSuggestions(request: Request, env: Env): Promise<Response> {
   const linkable: number[] = [];
   for (const chunk of chunks([...new Set(ids)])) {
     const res = await env.DB.prepare(
-      `SELECT id, pubkey, status FROM band_suggestions
+      `SELECT id, pubkey, status FROM ${kind.suggestionTable}
        WHERE id IN (${placeholders(chunk.length)})`
     )
       .bind(...chunk)
@@ -362,11 +391,11 @@ async function linkSuggestions(request: Request, env: Env): Promise<Response> {
     const inList = placeholders(chunk.length);
     writes.push(
       env.DB.prepare(
-        `INSERT OR IGNORE INTO member_bands (pubkey, act_url, created_at)
-         SELECT DISTINCT pubkey, ?, ? FROM band_suggestions WHERE id IN (${inList})`
+        `INSERT OR IGNORE INTO ${kind.followTable} (pubkey, ${kind.urlColumn}, created_at)
+         SELECT DISTINCT pubkey, ?, ? FROM ${kind.suggestionTable} WHERE id IN (${inList})`
       ).bind(actUrl, now, ...chunk),
       env.DB.prepare(
-        `UPDATE band_suggestions SET status = 'linked', act_url = ?
+        `UPDATE ${kind.suggestionTable} SET status = 'linked', ${kind.urlColumn} = ?
          WHERE id IN (${inList})`
       ).bind(actUrl, ...chunk)
     );
@@ -375,17 +404,18 @@ async function linkSuggestions(request: Request, env: Env): Promise<Response> {
   return jsonResponse({ updated: linkable.length });
 }
 
-async function listBandFollowers(
+async function listFollowers(
   request: Request,
-  env: Env
+  env: Env,
+  kind: MemberKindConfig
 ): Promise<Response> {
   const a = await authAdmin(request, env, 'admin-read', readPayload(request));
   if (a !== true) return a;
   const res = await env.DB.prepare(
-    `SELECT b.act_url, COUNT(*) AS followers
-     FROM member_bands b JOIN members m ON m.pubkey = b.pubkey
+    `SELECT b.${kind.urlColumn}, COUNT(*) AS followers
+     FROM ${kind.followTable} b JOIN members m ON m.pubkey = b.pubkey
      WHERE m.revoked_at IS NULL
-     GROUP BY b.act_url ORDER BY followers DESC, b.act_url`
+     GROUP BY b.${kind.urlColumn} ORDER BY followers DESC, b.${kind.urlColumn}`
   ).all();
   return jsonResponse(res.results || []);
 }
