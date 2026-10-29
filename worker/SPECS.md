@@ -1609,6 +1609,8 @@ After the delete, one batch cleans the conflict tables (section 2.1): it deletes
 
 **Schedule:** Daily at 08:00 UTC (`0 8 * * *`). Runs the digest job of section 7.15.4. Deployment: apply `worker/migrations/0008_add_telegram_alerts.sql` to the remote database **before** deploying a Worker version that includes it, e.g. `wrangler d1 execute tokoro-db --remote --file=migrations/0008_add_telegram_alerts.sql` (see `worker/README.md`), and add the second cron to the (gitignored) `wrangler.toml`.
 
+**Member festivals deployment:** apply `worker/migrations/0010_add_member_festivals.sql` (tables `member_festivals`, `festival_suggestions`) to the remote database **before** deploying a Worker version that includes the festival member endpoints, e.g. `wrangler d1 execute tokoro-db --remote --file=migrations/0010_add_member_festivals.sql`. Deploy order: migration, API worker, crawler-worker (bot), public web.
+
 ---
 
 ## 9. Error Handling

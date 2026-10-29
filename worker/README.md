@@ -63,6 +63,14 @@ wrangler d1 execute tokoro-db --remote --file=migrations/0007_add_members.sql
 
 The new routes are additive; existing clients are unaffected.
 
+**Member festivals (`0010_add_member_festivals.sql`):** creates `member_festivals` and `festival_suggestions`. Apply it to the remote database **before** deploying a Worker version that includes the festival member endpoints:
+
+```bash
+wrangler d1 execute tokoro-db --remote --file=migrations/0010_add_member_festivals.sql
+```
+
+Deploy order: migration, then the API worker, then the crawler-worker (Telegram bot), then the public web (`scripts/deploy-public-web.sh`, which also exports `tracked-festivals.json`). The changes are additive; existing clients are unaffected.
+
 ### 4. Deploy
 
 ```bash
