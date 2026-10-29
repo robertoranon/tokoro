@@ -189,12 +189,15 @@ console.log('✅ show stops');
     followedFestivals: [FEST],
   };
   const both = build(args);
-  assert.equal(both.length, 1);
+  // festival stop plus the shorter band-only stop
+  assert.equal(both.length, 2);
   assert.equal(both[0].start, D(5));
   assert.equal(both[0].end, D(7));
   assert.deepEqual(both[0].keys, ['band:' + ALPHA, 'fest:' + FEST]);
   assert.equal(both[0].fest.id, 'f1');
   assert.equal(placeLabel(both[0]), 'Fest');
+  assert.equal(both[1].fest, null);
+  assert.deepEqual([both[1].start, both[1].end], [D(6), D(6)]);
 
   const fonly = build(args, { source: 'festivals' });
   assert.equal(fonly.length, 1);
@@ -219,6 +222,8 @@ console.log('✅ show stops');
     passes.map(s => s.keys.length),
     [1, 2, 1]
   );
+  // the day-2 band stop is covered by the single-day festival stop
+  assert.ok(passes.every(s => s.fest));
 }
 {
   const long = [fest('f1', 'Fest', D(2), D(41), 50, 8)];
@@ -252,3 +257,17 @@ console.log('✅ festival stops');
   assert.equal(stops[0].shows[0].id, 'a1');
 }
 console.log('✅ region');
+
+// determinism
+{
+  const shows = [
+    show('a1', 'Alpha', D(3), 50, 8),
+    show('b1', 'Beta', D(3), 50.0045, 8),
+    show('a2', 'Alpha', D(4), 51, 9),
+  ];
+  const args = { shows, followedBands: [ALPHA, BETA] };
+  const fwd = build(args);
+  const rev = build({ ...args, shows: [...shows].reverse() });
+  assert.deepEqual(rev, fwd);
+}
+console.log('✅ determinism');

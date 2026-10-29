@@ -161,6 +161,18 @@ function buildStops({
   for (const s of followedShows) {
     for (const d of showDays(s, todayYmd)) available.push({ d, s });
   }
+  // fixed order so a stop's anchor (its lat/lng) does not depend on input order
+  available.sort((x, y) =>
+    x.d !== y.d
+      ? x.d < y.d
+        ? -1
+        : 1
+      : x.s.id < y.s.id
+        ? -1
+        : x.s.id > y.s.id
+          ? 1
+          : 0
+  );
 
   const festStops = [];
   if (useFests) {
@@ -214,11 +226,12 @@ function buildStops({
       const id = `show:${d}:${ids.join(',')}`;
       if (seen.has(id)) continue;
       seen.add(id);
-      // already part of a festival stop covering that day
+      // already part of a single-day festival stop (a multi-day festival stop
+      // leaves the shorter band-only stop as a legitimate option)
       const covered = festStops.some(
         f =>
-          d >= f.start &&
-          d <= f.end &&
+          f.start === f.end &&
+          f.start === d &&
           ids.every(i => f.shows.some(x => x.id === i))
       );
       if (covered) continue;
