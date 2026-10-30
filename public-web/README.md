@@ -11,6 +11,7 @@ A simple web interface for querying events from the Tokoro API.
 - `festivals.html`: Festival radar. Browse under-the-radar festivals by month on a map, plus a public Tracked festivals pane (list generated from `crawler/festivals.yaml` at deploy time, also festivals with no dates yet); independent of the event pages. Members (same personal link and stored seed as `tours.html`) can follow festivals (♡/♥ on cards and tracked rows), switch to "My festivals", suggest festivals and connect Telegram alerts; visitors see none of this and never download `member.js`. See `SPECS.md` FR-7.6/FR-7.7
 - `tours.html`: Band tours. Upcoming shows of the followed bands, band by band, with filters, a NEW badge for shows first published in the last 7 days (and a "New only" filter), saved queries via "Copy link", an optional map, and a tracked-bands pane (list generated from `crawler/bands.yaml` at deploy time); independent of the other pages. Band shows are excluded from the other pages (`has_act=0`)
 - `tours.html` members: people who received a personal link from the admin (`tours.html#k=…`, created on the admin page's Members tab) can follow bands (♡/♥, on the band cards and on every row of the Tracked bands pane), switch to "My bands", and suggest bands for the admin to review. Visitors see none of this. The member logic is in `member.js`, which ships with the page but is loaded only for a personal link or a stored member seed (visitors never download it); see `SPECS.md` FR-8.9
+- `trips.html`: Trip planner, members only. Ranks the trips (date span and area, or a route) where a member can see the most of the bands and festivals they follow, for a chosen trip length and radius; each opens as a day-by-day list and a map. Computed in the browser (`trips.js`, `trips-worker.js`) from the same data as Tours and Festivals; reached from the "Plan a trip" link in the members' bars there. See `SPECS.md` FR-9
 
 ## Deployment to Cloudflare Pages
 
@@ -91,6 +92,8 @@ node public-web/tests/member.test.mjs     # member.js unit tests (personal link,
 node public-web/tests/inject.test.mjs      # every page with the API placeholder is handled by the deploy injector
 node public-web/tests/festivals.smoke.mjs  # festivals.html offline in headless Chromium (Playwright from crawler/node_modules)
 node public-web/tests/tours.smoke.mjs     # tours.html offline in headless Chromium (visitor and member views); TOURS_SMOKE_MAP=1 adds the Leaflet checks (needs internet)
+node public-web/tests/trips.test.mjs      # trips.js unit tests (trip planner: stops, rules, scoring, ranking)
+node public-web/tests/trips.smoke.mjs     # trips.html offline in headless Chromium (non-member, member results, empty states, member-bar link); TRIPS_SMOKE_MAP=1 adds the Leaflet checks (needs internet)
 ```
 
 ## Bookmarklet Publisher

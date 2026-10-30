@@ -58,10 +58,10 @@ Events are queryable through a simple API. Point it at a location, a radius, and
 | [**Bookmarklet**](public-web/)            | Same capability in any browser, no extension install needed                       |
 | [**Telegram Bot**](crawler-worker/)       | Send a URL or image to extract and publish events; query the calendar with `/events in Milan next weekend` |
 | [**Web Publisher**](web-publisher/)       | Static HTML form for manually composing and publishing events                     |
-| [**Public Web**](public-web/)             | Example event browser — query by location, date, category; embeds the bookmarklet; festival radar and band-tours pages |
+| [**Public Web**](public-web/)             | Example event browser — query by location, date, category; embeds the bookmarklet; festival radar, band-tours and members-only trip planner pages |
 | [**Admin Panel**](admin/)                 | Static HTML moderation UI — browse and delete events with admin key auth; manages tours members and reviews their band suggestions |
 
-**Members: My bands and My festivals.** The band-tours page (`tours.html`) and the festival radar (`festivals.html`) are public. In addition, the admin can give a small group of people a personal link (created in the Admin Panel's Members tab). Opening it once lets that person follow bands and festivals (♡), switch the pages to "My bands" / "My festivals", suggest new bands and festivals, and get Telegram alerts for them. The admin reviews suggestions in the Suggestions tab, adds bands with `bands-scout` and festivals by pasting entries into `festivals.yaml` (see [HOW-TO-USE](HOW-TO-USE.md#10-members-my-bands-and-my-festivals)). Members cannot publish events.
+**Members: My bands and My festivals.** The band-tours page (`tours.html`) and the festival radar (`festivals.html`) are public. In addition, the admin can give a small group of people a personal link (created in the Admin Panel's Members tab). Opening it once lets that person follow bands and festivals (♡), switch the pages to "My bands" / "My festivals", suggest new bands and festivals, and get Telegram alerts for them. Members also get a trip planner (`trips.html`, linked as "Plan a trip") that ranks the dates and areas where they can see the most of their followed bands and festivals. The admin reviews suggestions in the Suggestions tab, adds bands with `bands-scout` and festivals by pasting entries into `festivals.yaml` (see [HOW-TO-USE](HOW-TO-USE.md#10-members-my-bands-and-my-festivals)). Members cannot publish events.
 
 ---
 
