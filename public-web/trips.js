@@ -20,6 +20,9 @@ const DEFAULT_REGION_KM = 500;
 const DEFAULT_MIN_DAYS = 14;
 const DEFAULT_MAX_DAYS = 21;
 const MAX_TRIP_DAYS = 60;
+// On the move searches grow with radius x length: keep them bounded
+const HOPS_MAX_RADIUS_KM = 500;
+const HOPS_MAX_DAYS = 15;
 const MAX_TRIPS = 5;
 const MIN_SCORE = 2;
 const SAME_PLACE_KM = 1; // shows this close on one day share a stop
@@ -36,6 +39,23 @@ function urlKey(url) {
     .trim()
     .toLowerCase()
     .replace(/\/+$/, '');
+}
+
+/**
+ * Band site URL as the server stores follows: protocol//host+path, no query,
+ * fragment or trailing slash; null when not an http(s) URL. Copy of
+ * normalizeActUrl in member.js (which MUST match worker/src/band-keys.ts).
+ */
+function bandKey(raw) {
+  if (typeof raw !== 'string') return null;
+  let u;
+  try {
+    u = new URL(raw.trim());
+  } catch {
+    return null;
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+  return u.protocol + '//' + u.host + u.pathname.replace(/\/+$/, '');
 }
 
 /** Add `n` days to a "YYYY-MM-DD" string (UTC arithmetic, no timezone drift). */
@@ -72,14 +92,31 @@ function clampInt(raw, fallback, min, max) {
   return Math.min(max, Math.max(min, Math.round(n)));
 }
 
+/** Longest trip allowed in a mode. */
+function maxDaysFor(mode) {
+  return mode === 'hops' ? HOPS_MAX_DAYS : MAX_TRIP_DAYS;
+}
+
+/** Radius choices allowed in a mode. */
+function radiiFor(mode) {
+  return mode === 'hops'
+    ? RADII_KM.filter(km => km <= HOPS_MAX_RADIUS_KM)
+    : RADII_KM;
+}
+
 /** Coerce untrusted settings (URL, storage) into a complete valid object. */
 function validSettings(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
-  const minDays = clampInt(r.minDays, DEFAULT_MIN_DAYS, 1, MAX_TRIP_DAYS);
+  const mode = MODES.includes(r.mode) ? r.mode : 'base';
+  const cap = maxDaysFor(mode);
+  const minDays = clampInt(r.minDays, DEFAULT_MIN_DAYS, 1, cap);
   const maxDays = Math.max(
     minDays,
-    clampInt(r.maxDays, DEFAULT_MAX_DAYS, 1, MAX_TRIP_DAYS)
+    clampInt(r.maxDays, DEFAULT_MAX_DAYS, 1, cap)
   );
+  const radii = radiiFor(mode);
+  const radiusKm = Number(r.radiusKm);
+  const radiusOk = RADII_KM.includes(radiusKm);
   let region = null;
   const g = r.region;
   if (g && typeof g === 'object') {
@@ -103,13 +140,31 @@ function validSettings(raw) {
     source: SOURCES.includes(r.source) ? r.source : 'both',
     minDays,
     maxDays,
-    mode: MODES.includes(r.mode) ? r.mode : 'base',
-    radiusKm: RADII_KM.includes(Number(r.radiusKm))
-      ? Number(r.radiusKm)
-      : DEFAULT_RADIUS_KM,
+    mode,
+    // a radius too wide for the mode falls to the widest allowed one
+    radiusKm: !radiusOk
+      ? DEFAULT_RADIUS_KM
+      : radii.includes(radiusKm)
+        ? radiusKm
+        : radii[radii.length - 1],
     dayPasses: r.dayPasses === true,
     region,
   };
+}
+
+/**
+ * Settings after the member types `value` into `field` ('minDays' or
+ * 'maxDays'): the edited field wins, the other one moves to match.
+ * Unusable input keeps the current value.
+ */
+function withDays(settings, field, value) {
+  const s = validSettings(settings);
+  const v = clampInt(value, s[field], 1, maxDaysFor(s.mode));
+  return validSettings(
+    field === 'maxDays'
+      ? { ...s, maxDays: v, minDays: Math.min(v, s.minDays) }
+      : { ...s, minDays: v, maxDays: Math.max(v, s.maxDays) }
+  );
 }
 
 /** Days a show is on, clipped to today onwards (a range show spans start..end). */
@@ -148,13 +203,13 @@ function buildStops({
   todayYmd,
   settings,
 }) {
-  const bandSet = new Set((followedBands || []).map(urlKey));
+  const bandSet = new Set((followedBands || []).map(bandKey).filter(Boolean));
   const festSet = new Set((followedFestivals || []).map(urlKey));
   const useBands = settings.source !== 'festivals';
   const useFests = settings.source !== 'bands';
 
   const followedShows = (shows || []).filter(
-    s => bandSet.has(urlKey(s.bandUrl)) && validPoint(s)
+    s => bandSet.has(bandKey(s.bandUrl)) && validPoint(s)
   );
   // [day, show] pairs: a show is available on every day it runs
   const available = [];
@@ -198,7 +253,8 @@ function buildStops({
           }
         }
         const keys = ['fest:' + urlKey(f.festivalUrl)];
-        for (const s of inside.values()) keys.push('band:' + urlKey(s.bandUrl));
+        for (const s of inside.values())
+          keys.push('band:' + bandKey(s.bandUrl));
         festStops.push({
           id: `fest:${f.id}:${a}:${b}`,
           start: a,
@@ -217,15 +273,30 @@ function buildStops({
 
   const showStops = [];
   if (useBands) {
-    const seen = new Set();
+    // each day's shows, in id order (available is sorted by day, then id)
+    const byDay = new Map();
     for (const { d, s } of available) {
-      const group = available
-        .filter(o => o.d === d && haversineKm(s, o.s) <= SAME_PLACE_KM)
-        .map(o => o.s);
-      const ids = [...new Set(group.map(g => g.id))].sort();
+      if (!byDay.has(d)) byDay.set(d, []);
+      byDay.get(d).push(s);
+    }
+    // same bill: a show joins the first group whose shows are all within
+    // SAME_PLACE_KM of it, so every show is in one stop per day
+    const groups = [];
+    for (const [d, list] of byDay) {
+      const day = [];
+      for (const s of list) {
+        const g = day.find(g =>
+          g.every(o => haversineKm(o, s) <= SAME_PLACE_KM)
+        );
+        if (g) g.push(s);
+        else day.push([s]);
+      }
+      for (const g of day) groups.push({ d, group: g });
+    }
+    for (const { d, group } of groups) {
+      const s = group[0]; // the anchor
+      const ids = group.map(g => g.id);
       const id = `show:${d}:${ids.join(',')}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
       // already part of a single-day festival stop (a multi-day festival stop
       // leaves the shorter band-only stop as a legitimate option)
       const covered = festStops.some(
@@ -235,8 +306,7 @@ function buildStops({
           ids.every(i => f.shows.some(x => x.id === i))
       );
       if (covered) continue;
-      const byId = new Map(group.map(g => [g.id, g]));
-      const list = ids.map(i => byId.get(i));
+      const list = group;
       showStops.push({
         id,
         start: d,
@@ -247,7 +317,7 @@ function buildStops({
         address: s.address || '',
         fest: null,
         shows: list,
-        keys: [...new Set(list.map(g => 'band:' + urlKey(g.bandUrl)))].sort(),
+        keys: [...new Set(list.map(g => 'band:' + bandKey(g.bandUrl)))].sort(),
       });
     }
   }
@@ -290,14 +360,17 @@ function idsOf(stops) {
   return stops.map(s => s.id).join('|');
 }
 
-/** Sort key of a trip; compareKeys orders these as compareTrips orders trips. */
+/**
+ * Sort key of a trip; compareKeys orders these as compareTrips orders trips.
+ * Travel only ranks On the move trips (One base trips have a centre).
+ */
 function rankKey(t) {
   return {
     t,
     score: t.score,
     span: dayNum(t.lastDay) - dayNum(t.firstDay),
     firstDay: t.firstDay,
-    travelKm: t.travelKm,
+    travelKm: t.centre ? 0 : t.travelKm,
     ids: idsOf(t.stops),
   };
 }
@@ -312,7 +385,7 @@ function compareKeys(a, b) {
   );
 }
 
-/** Ranking: score desc, span asc, firstDay asc, travelKm asc, stop ids. */
+/** Ranking: score desc, span asc, firstDay asc, travelKm asc (On the move), stop ids. */
 function compareTrips(a, b) {
   return compareKeys(rankKey(a), rankKey(b));
 }
@@ -562,9 +635,13 @@ function toTrip(c, settings) {
   const last = c.stops[c.stops.length - 1];
   const from = placeLabel(first);
   const to = placeLabel(last);
+  // base: the centre's name, else the first named stop; none when nothing is named
+  const centreLabel = c.centre
+    ? placeLabel(c.centreStop) || c.stops.map(placeLabel).find(Boolean) || ''
+    : '';
   // hops: one label when they match or one is missing
   const area = c.centre
-    ? 'around ' + placeLabel(c.centreStop)
+    ? centreLabel && 'around ' + centreLabel
     : !from || !to || from === to
       ? from || to
       : from + ' → ' + to;
@@ -647,16 +724,22 @@ const api = {
   DEFAULT_MIN_DAYS,
   DEFAULT_MAX_DAYS,
   MAX_TRIP_DAYS,
+  HOPS_MAX_RADIUS_KM,
+  HOPS_MAX_DAYS,
   MAX_TRIPS,
   MIN_SCORE,
   SAME_PLACE_KM,
   FESTIVAL_PLACE_KM,
   BEAM_WIDTH,
   urlKey,
+  bandKey,
   addDays,
   daysBetween,
   haversineKm,
   validSettings,
+  maxDaysFor,
+  radiiFor,
+  withDays,
   buildStops,
   placeLabel,
   compareTrips,

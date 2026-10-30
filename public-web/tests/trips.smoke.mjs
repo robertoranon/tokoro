@@ -472,7 +472,20 @@ try {
     );
     await page.click('#regionClear');
 
+    // trip length: the edited field wins
+    await page.fill('#maxDays', '10');
+    await page.dispatchEvent('#maxDays', 'change');
+    check(
+      'days: longest trip below shortest lowers the shortest',
+      (await page.inputValue('#minDays')) === '10' &&
+        (await page.inputValue('#maxDays')) === '10',
+      [await page.inputValue('#minDays'), await page.inputValue('#maxDays')]
+    );
+    await page.fill('#maxDays', '60');
+    await page.dispatchEvent('#maxDays', 'change');
+
     // "On the move" mode
+    const radiusBefore = await page.inputValue('#radius');
     await page.click('#modeHops');
     await new Promise(r => setTimeout(r, 400));
     await waitStatus(page, /^\d+ trips?$/);
@@ -482,6 +495,21 @@ try {
         (await page.getAttribute('#modeBase', 'aria-pressed')) === 'false' &&
         (await page.locator('#tripList details').count()) >= 1,
       await statusText(page)
+    );
+    check(
+      'hops mode: capped at 500 km and 15 days, wider radii disabled',
+      radiusBefore === '1000' &&
+        (await page.inputValue('#radius')) === '500' &&
+        (await page.inputValue('#maxDays')) === '15' &&
+        (await page.getAttribute('#maxDays', 'max')) === '15' &&
+        (await page.locator('#radius option[value="1000"]').isDisabled()) &&
+        !(await page.locator('#radius option[value="500"]').isDisabled()) &&
+        (await page.isVisible('#modeNote')),
+      [
+        radiusBefore,
+        await page.inputValue('#radius'),
+        await page.inputValue('#maxDays'),
+      ]
     );
 
     // source festivals: no band request

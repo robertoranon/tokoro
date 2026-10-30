@@ -412,7 +412,7 @@ A members-only page that ranks the trips (a date span in one area, or a route) o
 **FR-9.2: Data**
 
 - MUST load only the sources the selected setting needs, once per page visit: band shows with the Tours loader (`loadTourEvents` over `tourWindow(today)`, `toShows`, FR-8.1) and festivals with the Radar loader (`loadRadarEvents` over `radarWindow(today)`, `toFestivals`, FR-7.1); no data is copied. A failed load shows "Could not load the dates right now." with a "Try again" button (the next attempt retries); a truncated load shows the Tours / Radar notice ("Showing the first results only — …")
-- MUST keep only followed items: shows whose `act_url` and festivals whose `festival_url` match the member's followed lists, compared lower-case with trailing slashes dropped (`urlKey`). Festivals that already ended are dropped
+- MUST keep only followed items, matched as on the Tours and Festivals pages: shows whose `act_url` matches a followed band after `normalizeActUrl` (`bandKey`, a copy of the `member.js` function: protocol, host and path, no query, fragment or trailing slash), and festivals whose `festival_url` matches a followed festival compared lower-case with trailing slashes dropped (`urlKey`, as `festivalKey`). Festivals that already ended are dropped
 - MUST NOT fetch band shows when the source is Festivals, nor festivals when it is Bands
 - Dates are venue-local `YYYY-MM-DD` strings; the planner uses UTC day arithmetic only
 
@@ -421,8 +421,9 @@ A members-only page that ranks the trips (a date span in one area, or a route) o
 All controls recompute after a 300 ms debounce; the status line (`#status`) reads "Planning…" meanwhile.
 
 - **Plan around** (`#source`): Bands and festivals (default) / Bands / Festivals
-- **Trip length:** `#minDays`, `#maxDays`, integers 1..60, default 14 and 21; invalid input falls back to the default, and max is raised to min if lower
+- **Trip length:** `#minDays`, `#maxDays`, integers 1..60, default 14 and 21; the edited field wins (`withDays`): a shortest trip above the longest raises the longest, a longest trip below the shortest lowers the shortest; unusable input keeps the current value
 - **Radius mode:** "One base" (default, `#modeBase`) / "On the move" (`#modeHops`), toggle buttons with `aria-pressed`; **Radius** `#radius`: 25 / 50 / 100 / 250 / 500 / 1000 km, default 250
+- **On the move is capped** (its search grows with radius × length): radius at most 500 km (`HOPS_MAX_RADIUS_KM`; 1000 km is disabled in `#radius`) and trips at most 15 days (`HOPS_MAX_DAYS`; the day inputs' `max`). Switching to it lowers a wider radius to 500 km and longer lengths to 15 days; `#modeNote` reads "On the move: up to 500 km between stops and 15 days". `validSettings` applies the same caps
 - **Region (optional):** `#regionPlace` (geocoded with `geocode()` on Enter; empty Enter clears it; failure reads `Could not find "<text>" — planning anywhere.`), `#regionKm` 100 / 250 / 500 / 1000 km (default 500), "Anywhere" (`#regionClear`) clears it. Every attended place must lie within the region
 - **Day passes** (`#dayPasses`, default off): "Day passes (one day of a festival is enough)"
 - Settings are not saved or shared (no storage, no URL)
@@ -432,7 +433,7 @@ All controls recompute after a 300 ms debounce; the status line (`#status`) read
 - A **stop** is a place and a day range where at least one followed band or festival is on. A day belongs to at most one stop in a trip (one place per day)
 - A band show is one day; a show whose `end` is on a later day (FR-8.3) can be attended on any one day of its range and occupies only that day. Days before today are not offered
 - A festival is one stop covering its remaining days (today to end). With day passes off it occupies all of them; with day passes on, or when its remaining range is longer than the maximum trip length, it yields one single-day stop per day
-- Everything followed at a place that day counts: shows of followed bands within 1 km of each other on one day share a stop ("same bill" is by distance, not venue identity), and on a festival's stop the followed bands' shows within 5 km of the festival join it. A band at a multi-day festival (day passes off) yields both the festival stop and a one-day band stop; a band stop already covered by a single-day festival stop is dropped. Stop anchors (the stop's location) are deterministic: shows are sorted by day, then id
+- Everything followed at a place that day counts: shows of followed bands within 1 km of each other on one day share a stop ("same bill" is by distance, not venue identity): taking the day's shows by id, each joins the first stop whose shows are all within 1 km of it, else starts a new one, so every pair in a stop is within 1 km and each show is in one band stop per day, and on a festival's stop the followed bands' shows within 5 km of the festival join it. A band at a multi-day festival (day passes off) yields both the festival stop and a one-day band stop; a band stop already covered by a single-day festival stop is dropped. Stop anchors (the stop's location: its first show by id) are deterministic
 - **Radius rule:** *One base*: every stop within R km (great circle) of one centre; the candidate centres are the stop locations. *On the move*: each consecutive pair of stops, in date order, at most R km apart (a festival is one place for all its days)
 - **Region rule:** stops outside the region are discarded
 - **Span:** first to last attended day, inclusive, at most the maximum length. If it is shorter than the minimum, the trip stays valid and its displayed end is extended to the minimum length from the first attended day
@@ -448,7 +449,7 @@ All controls recompute after a 300 ms debounce; the status line (`#status`) read
 
 **FR-9.6: Results and map**
 
-- Each trip is a `<details class="trip-card">` whose summary shows the dates ("12–28 Jun 2027" style, `fmtFestivalRange`), the area (One base: "around <place of the centre stop>"; On the move: "<first place> → <last place>", one label when they match or one is missing; the place is the festival name, else address, else venue), the score ("7 bands · 1 festival") and the number of days
+- Each trip is a `<details class="trip-card">` whose summary shows the dates ("12–28 Jun 2027" style, `fmtFestivalRange`), the area (One base: "around <place of the centre stop>", else of the first stop with a place, no area when no stop has one; On the move: "<first place> → <last place>", one label when they match or one is missing; the place is the festival name, else address, else venue), the score ("7 bands · 1 festival") and the number of days
 - Opening a card lists its stops in date order: number, date (with the show's time for a single show), festival and band names, "venue · address", links ("Festival site", "Show page" / "<band> show page"; only http(s) urls) and the distance "from the previous stop". Days without a stop are not listed. One card is open at a time
 - Opening a card shows the map (`#mapPanel`, Leaflet 1.9.4 with SRI as in Visual style): numbered pins (`.trip-pin`) with a popup; One base also draws the radius circle around the centre, On the move a line joining the pins in order. The list works without Leaflet. Closing the card hides the map
 
@@ -463,11 +464,11 @@ All controls recompute after a 300 ms debounce; the status line (`#status`) read
 **FR-9.8: Safety and build**
 
 - `trips.js` is standalone (no dependency on `tours.js` / `festivals.js`; its date and distance helpers are its own) and loads as a classic script in the worker (`importScripts`), as a module in the page (it sets `globalThis.TokoroTrips`) and via `require()` in Node
-- `trips-worker.js` receives `{gen, input}` and answers `{gen, trips}` or `{gen, error}`; the page ignores replies whose `gen` is not the latest. If the worker cannot start, fails to load, crashes or answers with an error, the page computes on the main thread
+- `trips-worker.js` receives `{gen, input}` and answers `{gen, trips}` or `{gen, error}`; the page ignores replies whose `gen` is not the latest, and when the settings change while the worker is computing it terminates that worker and starts a new one, so a stale run never delays the next. If the worker cannot start, fails to load, crashes or answers with an error, the page computes on the main thread
 - All page text from data is escaped (`escHtml`) and links pass `safeUrl`
 - Tests: `tests/trips.test.mjs` (stops, rules, scoring, radius modes, region, day passes, date-range shows, tie-breaks, de-duplication, determinism, performance) and `tests/trips.smoke.mjs` (page in headless Chromium against a fake API: non-member, member results, empty states, the member-bar link on Tours / Festivals for members and its absence for visitors)
 
-**Known limitations:** the search is heuristic, so a better trip than the ones shown may exist (measured worst case, One base, 1000 km, 60 days, ~1000 stops: about 1.1 s in Node); One base centres are stop locations, not arbitrary points; "same bill" is by distance (1 km), not venue identity; a computation already running in the worker is not cancelled when settings change (the newer result replaces it); settings are not saved or shareable; no travel times, transport or prices.
+**Known limitations:** the search is heuristic, so a better trip than the ones shown may exist (measured in Node: One base, 1000 km, 60 days, ~1000 stops: about 1.1 s; On the move at its cap, 500 km, 15 days: about 0.1 s for 50 bands with 20 shows each over 18 months, about 3 s for 4000 shows within 4 months); One base centres are stop locations, not arbitrary points; "same bill" is by distance (1 km), not venue identity; settings are not saved or shareable; no travel times, transport or prices.
 
 ---
 

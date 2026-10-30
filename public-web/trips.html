@@ -181,6 +181,7 @@
         font-size: 14px;
         font-weight: 600;
       }
+      .mode-note,
       .status-line,
       .notice-line {
         font-size: 13px;
@@ -402,6 +403,7 @@
               On the move
             </button>
             <select id="radius" aria-label="Radius"></select>
+            <span id="modeNote" class="mode-note" hidden></span>
           </div>
           <div class="filter-row">
             <input
@@ -557,6 +559,20 @@
           'aria-pressed',
           String(settings.mode === 'hops')
         );
+        // On the move is capped: wider choices are disabled
+        const cap = TT.maxDaysFor(settings.mode);
+        const radii = TT.radiiFor(settings.mode);
+        for (const o of el('radius').options)
+          o.disabled = !radii.includes(Number(o.value));
+        el('minDays').max = String(cap);
+        el('maxDays').max = String(cap);
+        el('modeNote').hidden = settings.mode !== 'hops';
+        el('modeNote').textContent =
+          'On the move: up to ' +
+          TT.HOPS_MAX_RADIUS_KM +
+          ' km between stops and ' +
+          TT.HOPS_MAX_DAYS +
+          ' days';
         el('radius').value = String(settings.radiusKm);
         el('regionKm').value = String(regionKm);
         el('dayPasses').checked = settings.dayPasses;
@@ -564,12 +580,14 @@
       // Any change: drop pending replies now, plan after a short pause.
       function schedule() {
         gen++;
+        stopWorkerJob();
         setStatus('Planning…');
         clearTimeout(timer);
         timer = setTimeout(plan, DEBOUNCE_MS);
       }
       function setMode(mode) {
-        settings.mode = mode;
+        // the mode's caps may lower the radius and the trip length
+        Object.assign(settings, TT.validSettings({ ...settings, mode }));
         syncControls();
         schedule();
       }
@@ -584,10 +602,8 @@
       });
       for (const id of ['minDays', 'maxDays']) {
         el(id).addEventListener('change', () => {
-          const s = TT.validSettings({
-            minDays: el('minDays').value,
-            maxDays: el('maxDays').value,
-          });
+          // the edited field wins: a shorter longest trip lowers the shortest
+          const s = TT.withDays(settings, id, el(id).value);
           settings.minDays = s.minDays;
           settings.maxDays = s.maxDays;
           syncControls();
@@ -688,6 +704,14 @@
       // ── Planning: one Web Worker, the main thread as a fallback ────
       let worker; // undefined: not started yet; null: unavailable
       let lastPost = null; // { gen, input } last sent to the worker
+      let busy = false; // the worker is computing lastPost
+      // A stale job would delay the next one: stop the worker, start afresh.
+      function stopWorkerJob() {
+        if (!worker || !busy) return;
+        worker.terminate();
+        worker = undefined;
+        busy = false;
+      }
       function getWorker() {
         if (worker !== undefined) return worker;
         try {
@@ -697,6 +721,7 @@
           return worker;
         }
         worker.onmessage = e => {
+          busy = false;
           const reply = e.data || {};
           if (reply.gen !== gen) return; // stale: the settings changed
           if (reply.error) computeHere(reply.gen, lastPost.input);
@@ -707,6 +732,7 @@
           if (e && e.preventDefault) e.preventDefault();
           worker.terminate();
           worker = null;
+          busy = false;
           if (lastPost) computeHere(lastPost.gen, lastPost.input);
         };
         return worker;
@@ -727,6 +753,7 @@
 
       async function plan() {
         const g = ++gen;
+        stopWorkerJob(); // plan() also runs directly (start, "Try again")
         const s = TT.validSettings(settings);
         const needBands = s.source !== 'festivals';
         const needFests = s.source !== 'bands';
@@ -734,6 +761,8 @@
           (needBands && member.bands.length > 0) ||
           (needFests && member.festivals.length > 0);
         if (!followsSome) {
+          loadNote = ''; // no source in use: no truncation notice
+          syncNotice();
           renderTrips([], s);
           setStatus(FOLLOW_NOTE);
           return;
@@ -771,6 +800,7 @@
         pendingSettings = s;
         if (getWorker()) {
           lastPost = { gen: g, input };
+          busy = true;
           worker.postMessage({ gen: g, input });
         } else {
           computeHere(g, input);

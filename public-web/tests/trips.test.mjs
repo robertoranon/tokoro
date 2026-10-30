@@ -9,7 +9,11 @@ const {
   DEFAULT_MIN_DAYS,
   DEFAULT_MAX_DAYS,
   MAX_TRIP_DAYS,
+  HOPS_MAX_RADIUS_KM,
+  HOPS_MAX_DAYS,
   urlKey,
+  bandKey,
+  withDays,
   addDays,
   daysBetween,
   haversineKm,
@@ -130,6 +134,42 @@ assert.equal(
   validSettings({ region: { lat: 50, lng: 8, km: 77 } }).region.km,
   DEFAULT_REGION_KM
 );
+// On the move is capped: radius and length
+assert.equal(HOPS_MAX_RADIUS_KM, 500);
+assert.equal(HOPS_MAX_DAYS, 15);
+{
+  const h = validSettings({
+    mode: 'hops',
+    radiusKm: 1000,
+    minDays: 45,
+    maxDays: 60,
+  });
+  assert.deepEqual([h.radiusKm, h.minDays, h.maxDays], [500, 15, 15]);
+  assert.equal(validSettings({ mode: 'hops', radiusKm: 100 }).radiusKm, 100);
+  assert.equal(validSettings({ mode: 'base', radiusKm: 1000 }).radiusKm, 1000);
+}
+// withDays: the edited field wins
+{
+  const s0 = validSettings({});
+  assert.deepEqual(
+    [withDays(s0, 'maxDays', '10')].map(s => [s.minDays, s.maxDays])[0],
+    [10, 10]
+  );
+  assert.deepEqual(
+    [withDays(s0, 'minDays', '30')].map(s => [s.minDays, s.maxDays])[0],
+    [30, 30]
+  );
+  assert.deepEqual(
+    [withDays(s0, 'maxDays', 'abc')].map(s => [s.minDays, s.maxDays])[0],
+    [14, 21]
+  );
+  assert.deepEqual(
+    [withDays(s0, 'minDays', '')].map(s => [s.minDays, s.maxDays])[0],
+    [14, 21]
+  );
+  const h = validSettings({ mode: 'hops' });
+  assert.equal(withDays(h, 'maxDays', '99').maxDays, 15);
+}
 console.log('✅ validSettings');
 
 // show stops
@@ -180,6 +220,53 @@ console.log('✅ validSettings');
     1
   );
   assert.equal(build({ shows, followedBands: [] }).length, 0);
+}
+{
+  // bands match as the server stores follows (as on the Tours page)
+  assert.equal(
+    bandKey('https://Band.example/x/?lang=en#top'),
+    'https://band.example/x'
+  );
+  assert.equal(
+    bandKey('https://band.example/ä'),
+    'https://band.example/%C3%A4'
+  );
+  assert.equal(bandKey('mailto:a@b.c'), null);
+  assert.equal(bandKey(''), null);
+  const shows = [
+    show('a1', 'Alpha', D(3), 50, 8, {
+      bandUrl: 'https://alpha.example/?lang=en',
+    }),
+    show('b1', 'Beta', D(4), 50, 8, { bandUrl: 'https://beta.example/ä' }),
+  ];
+  const stops = build({
+    shows,
+    followedBands: [ALPHA, 'https://beta.example/%C3%A4'],
+  });
+  assert.deepEqual(
+    stops.map(s => s.keys),
+    [['band:' + ALPHA], ['band:https://beta.example/%C3%A4']]
+  );
+}
+{
+  // same bill is pairwise: a 0.8 km chain a-b-c (a-c 1.6 km) is two stops,
+  // and every show is in exactly one stop that day
+  const shows = [
+    show('a1', 'Alpha', D(3), 50, 8),
+    show('b1', 'Beta', D(3), 50.0072, 8),
+    show('c1', 'Gamma', D(3), 50.0144, 8),
+  ];
+  const stops = build({
+    shows,
+    followedBands: [ALPHA, BETA, 'https://gamma.example'],
+  });
+  assert.deepEqual(
+    stops.map(s => s.shows.map(x => x.id)),
+    [['a1', 'b1'], ['c1']]
+  );
+  for (const st of stops)
+    for (const x of st.shows)
+      for (const y of st.shows) assert.ok(haversineKm(x, y) <= 1);
 }
 console.log('✅ show stops');
 
@@ -418,6 +505,16 @@ console.log('✅ planner rules');
   assert.deepEqual(planTrips([], validSettings({})), []);
   assert.deepEqual(planTrips([], validSettings({ mode: 'hops' })), []);
 }
+{
+  // a One base trip whose stops have no name has no area label
+  const shows = [
+    show('a1', 'Alpha', D(1), 50, 8, { venue: '', address: '' }),
+    show('b1', 'Beta', D(2), 50, 8, { venue: '', address: '' }),
+  ];
+  const trips = compute({ shows, followedBands: [ALPHA, BETA] });
+  assert.equal(trips.length, 1);
+  assert.equal(trips[0].area, '');
+}
 console.log('✅ planner empty');
 
 // festival on top
@@ -461,6 +558,9 @@ console.log('✅ festival on top');
     ) < 0
   );
   assert.equal(compareTrips(span3, mk(3, D(10), D(12), 50)), 0);
+  // One base (with a centre): travel does not rank, stop ids do
+  const base = (km, ids) => ({ ...mk(3, D(10), D(12), km, ids), centre: {} });
+  assert.ok(compareTrips(base(90, ['a']), base(10, ['b'])) < 0);
 }
 console.log('✅ compareTrips');
 
@@ -592,7 +692,7 @@ console.log('✅ planner validity + determinism');
     { mode: 'base' },
     { mode: 'hops' },
     { mode: 'base', radiusKm: 1000, maxDays: 60 },
-    { mode: 'hops', radiusKm: 1000, maxDays: 60 },
+    { mode: 'hops', radiusKm: 500, maxDays: 15 },
   ]) {
     const label = JSON.stringify(s);
     const t0 = performance.now();
