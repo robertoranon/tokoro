@@ -409,7 +409,8 @@
             <input
               id="regionPlace"
               type="search"
-              placeholder="Only near a place… (press Enter)"
+              placeholder="Only near a place…"
+              enterkeyhint="search"
               aria-label="Only near a place"
             />
             <select id="regionKm" aria-label="Distance from the place"></select>
@@ -625,17 +626,15 @@
       function clearRegion() {
         geoReq++;
         settings.region = null;
-        el('regionPlace').value = '';
+        region.set('');
         setRegionNote('');
         schedule();
       }
-      el('regionPlace').addEventListener('keydown', async e => {
-        if (e.key !== 'Enter') return;
-        const text = e.target.value.trim();
-        if (!text) {
-          clearRegion();
-          return;
-        }
+      const region = placeField(el('regionPlace'), {
+        clear: clearRegion,
+        apply: lookUpRegion,
+      });
+      async function lookUpRegion(text) {
         const req = ++geoReq;
         setRegionNote('Looking up ' + text + '…');
         try {
@@ -653,10 +652,12 @@
           setRegionNote('Could not find "' + text + '" — planning anywhere.');
         }
         schedule();
-      });
-      el('regionKm').addEventListener('change', e => {
+      }
+      el('regionKm').addEventListener('change', async e => {
         regionKm = Number(e.target.value) || TT.DEFAULT_REGION_KM;
-        if (!settings.region) return;
+        // a place typed but not yet looked up applies first (with this km)
+        await region.commit();
+        if (!settings.region || settings.region.km === regionKm) return;
         settings.region = { ...settings.region, km: regionKm };
         schedule();
       });

@@ -498,7 +498,8 @@
           <input
             id="placeInput"
             type="search"
-            placeholder="Near a place… (press Enter)"
+            placeholder="Near a place…"
+            enterkeyhint="search"
             aria-label="Near a place"
           />
           <select id="radiusFilter" aria-label="Radius">
@@ -988,16 +989,25 @@
           clearTimeout(keywordTimer);
           keywordTimer = setTimeout(render, 150);
         });
-        el('fromDate').addEventListener('change', e => {
-          state.from = e.target.value;
-          render();
-        });
-        el('toDate').addEventListener('change', e => {
-          state.to = e.target.value;
-          render();
-        });
-        el('radiusFilter').addEventListener('change', e => {
+        // Mobile date pickers may fire only one of "input" / "change".
+        for (const ev of ['input', 'change']) {
+          el('fromDate').addEventListener(ev, e => {
+            if (state.from === e.target.value) return;
+            state.from = e.target.value;
+            render();
+          });
+          el('toDate').addEventListener(ev, e => {
+            if (state.to === e.target.value) return;
+            state.to = e.target.value;
+            render();
+          });
+        }
+        el('radiusFilter').addEventListener('change', async e => {
           state.radius = Number(e.target.value) || 100;
+          // a place typed but not yet looked up applies first
+          await place.commit();
+          if (!state.origin && !el('placeInput').value.trim())
+            setNotice('Type a place or tap Near me to filter by distance.');
           render();
         });
         // <details> "toggle" does not bubble; capture it so open cards stay
@@ -1037,16 +1047,17 @@
           state.place = '';
           syncNearToggle();
         }
-        el('placeInput').addEventListener('keydown', async e => {
-          if (e.key !== 'Enter') return;
-          const text = e.target.value.trim();
-          const req = ++geoReq;
-          if (!text) {
+        const place = placeField(el('placeInput'), {
+          clear() {
+            geoReq++;
             if (state.originSource === 'place') clearOrigin();
             setNotice('');
             render();
-            return;
-          }
+          },
+          apply: lookUpPlace,
+        });
+        async function lookUpPlace(text) {
+          const req = ++geoReq;
           setNotice('Looking up ' + text + '…');
           try {
             const g = await geocode(text);
@@ -1062,7 +1073,7 @@
             if (state.originSource === 'place') clearOrigin();
           }
           render();
-        });
+        }
         el('nearToggle').addEventListener('click', () => {
           if (state.originSource === 'gps') {
             clearOrigin();
@@ -1087,7 +1098,7 @@
               };
               state.originSource = 'gps';
               state.place = '';
-              el('placeInput').value = '';
+              place.set('');
               syncNearToggle();
               setNotice('');
               render();
@@ -1248,9 +1259,10 @@
             state.origin = saved.origin;
             state.originSource = 'place';
             state.place = saved.place;
-            el('placeInput').value =
+            place.set(
               saved.place ||
-              saved.origin.lat.toFixed(4) + ', ' + saved.origin.lng.toFixed(4);
+                saved.origin.lat.toFixed(4) + ', ' + saved.origin.lng.toFixed(4)
+            );
           }
         })();
 

@@ -154,6 +154,50 @@ async function geocode(address) {
   };
 }
 
+/**
+ * Wire a "near a place" input so the typed place applies without Enter,
+ * which mobile keyboards make awkward. The text is applied on Enter (which
+ * also closes the keyboard), when the field is left, and on demand through
+ * `commit()` (call it before acting on a setting that needs the place, e.g.
+ * a radius). Emptying the field clears the place at once. The same text is
+ * not applied twice in a row, except on Enter (a retry after a failed lookup).
+ * @param {HTMLInputElement} input
+ * @param {{apply: (text: string) => any, clear: () => any}} handlers
+ *   `apply` looks the place up and uses it (may return a promise)
+ * @returns {{commit: (force?: boolean) => Promise<void>, set: (text: string) => void}}
+ *   `set` fills the field without applying it (restored or cleared by code)
+ */
+function placeField(input, { apply, clear }) {
+  let applied = input.value.trim(); // text last applied or being applied
+  let pending = Promise.resolve();
+  function commit(force) {
+    const text = input.value.trim();
+    if (text === applied && !force) return pending;
+    applied = text;
+    pending = Promise.resolve(text ? apply(text) : clear()).then(() => {});
+    return pending;
+  }
+  input.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    commit(true);
+    input.blur();
+  });
+  // "change" can be skipped (text emptied then retyped as before), so blur too
+  input.addEventListener('change', () => commit());
+  input.addEventListener('blur', () => commit());
+  input.addEventListener('input', () => {
+    if (!input.value.trim()) commit();
+  });
+  return {
+    commit,
+    set(text) {
+      input.value = text;
+      applied = text.trim();
+    },
+  };
+}
+
 // Node.js / browser compatibility
 if (typeof module !== 'undefined') {
   module.exports = {
@@ -163,6 +207,7 @@ if (typeof module !== 'undefined') {
     safeUrl,
     buildQueryUrl,
     geocode,
+    placeField,
   };
 }
 if (typeof window !== 'undefined') {
@@ -172,4 +217,5 @@ if (typeof window !== 'undefined') {
   window.safeUrl = safeUrl;
   window.buildQueryUrl = buildQueryUrl;
   window.geocode = geocode;
+  window.placeField = placeField;
 }

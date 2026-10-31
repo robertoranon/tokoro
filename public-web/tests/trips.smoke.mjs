@@ -453,6 +453,22 @@ try {
     await page.click('#regionClear');
     rsum = await firstHas('4 bands');
     check('region cleared: Berlin is back', rsum.includes('4 bands'), rsum);
+    await page.fill('#regionPlace', 'Udine');
+    await page.selectOption('#regionKm', '1000');
+    await page.selectOption('#regionKm', '500');
+    rsum = await firstHas('3 bands');
+    check(
+      'region typed without Enter: applied by the distance change',
+      rsum.includes('3 bands'),
+      rsum
+    );
+    await page.fill('#regionPlace', '');
+    rsum = await firstHas('4 bands');
+    check(
+      'region field emptied: Berlin is back',
+      rsum.includes('4 bands'),
+      rsum
+    );
     await page.route('**/nominatim.openstreetmap.org/**', r =>
       r.fulfill({
         status: 200,

@@ -1,6 +1,6 @@
 // public-web/tests/shared.test.mjs
 import { createRequire } from 'module';
-const { fmtRange, escHtml, safeUrl, buildQueryUrl, formatLocalDateTime } =
+const { fmtRange, escHtml, safeUrl, buildQueryUrl, formatLocalDateTime, placeField } =
   createRequire(import.meta.url)('../shared.js');
 import assert from 'node:assert/strict';
 
@@ -74,5 +74,63 @@ import assert from 'node:assert/strict';
 { const d = new Date(2026, 2, 15, 21, 30, 5); // local: 2026-03-15T21:30:05
   assert.equal(formatLocalDateTime(d), '2026-03-15T21:30:05');
   console.log('✅ formatLocalDateTime: formats correctly'); }
+
+// ── placeField ────────────────────────────────────────────────────────────────
+function fakeInput(value = '') {
+  const handlers = {};
+  return {
+    value,
+    blurred: 0,
+    blur() { this.blurred++; },
+    addEventListener(type, fn) { (handlers[type] ||= []).push(fn); },
+    fire(type, extra = {}) {
+      for (const fn of handlers[type] || []) fn({ preventDefault() {}, ...extra });
+    },
+  };
+}
+function trackedField(value) {
+  const input = fakeInput(value);
+  const calls = [];
+  const field = placeField(input, {
+    apply: t => calls.push('apply:' + t),
+    clear: () => calls.push('clear'),
+  });
+  return { input, calls, field };
+}
+
+{ const { input, calls } = trackedField();
+  input.value = ' Udine ';
+  input.fire('change');
+  input.fire('blur');
+  assert.deepEqual(calls, ['apply:Udine']);
+  console.log('✅ placeField: leaving the field applies the place, once'); }
+
+{ const { input, calls } = trackedField();
+  input.value = 'Udine';
+  input.fire('keydown', { key: 'Enter' });
+  input.fire('keydown', { key: 'Enter' });
+  input.fire('keydown', { key: 'a' });
+  assert.deepEqual(calls, ['apply:Udine', 'apply:Udine']);
+  assert.equal(input.blurred, 2);
+  console.log('✅ placeField: Enter applies (and retries), closing the keyboard'); }
+
+{ const { input, calls, field } = trackedField();
+  input.value = 'Udine';
+  await field.commit();
+  await field.commit();
+  input.value = 'Udin';
+  input.fire('input');
+  input.value = '';
+  input.fire('input');
+  assert.deepEqual(calls, ['apply:Udine', 'clear']);
+  console.log('✅ placeField: commit() applies pending text; emptying clears at once'); }
+
+{ const { input, calls, field } = trackedField();
+  field.set('46.0637, 13.2353');
+  assert.equal(input.value, '46.0637, 13.2353');
+  await field.commit();
+  input.fire('change');
+  assert.deepEqual(calls, []);
+  console.log('✅ placeField: set() fills the field without a lookup'); }
 
 console.log('\n✅ All shared.js tests passed');

@@ -374,6 +374,35 @@ try {
       [near, placeTexts]
     );
 
+    // 9. the place applies without Enter (mobile): emptying the field clears
+    // it at once; a typed place is looked up before a radius change applies
+    await page.fill('#placeInput', '');
+    const cleared = await settleNames(page, ['Alpha', 'Beta']);
+    check(
+      'place: emptying the field clears the area filter',
+      JSON.stringify(cleared) === JSON.stringify(['Alpha', 'Beta']),
+      cleared
+    );
+    await page.selectOption('#radiusFilter', '50');
+    await page.fill('#placeInput', 'Udine');
+    await page.selectOption('#radiusFilter', '25');
+    const noEnter = await settleNames(page, ['Alpha']);
+    check(
+      'place: typed without Enter, applied by the radius change',
+      JSON.stringify(noEnter) === JSON.stringify(['Alpha']),
+      noEnter
+    );
+    await page.fill('#placeInput', '');
+    await settleNames(page, ['Alpha', 'Beta']);
+    await page.fill('#placeInput', 'Udine');
+    await page.locator('#placeInput').blur();
+    const onBlur = await settleNames(page, ['Alpha']);
+    check(
+      'place: applied when the field is left',
+      JSON.stringify(onBlur) === JSON.stringify(['Alpha']),
+      onBlur
+    );
+
     // 10. no page errors
     check('no uncaught page errors', errors.length === 0, errors);
     await context.close();

@@ -187,7 +187,7 @@ A full-viewport map-first page for discovering events spatially.
 
 - MUST provide: location input (geocoded via Nominatim), radius (km), time range preset (Today / Next 7 days / Next 30 days / Next 3 months / Custom), category dropdown, Search button, Search here button
 - Custom time range MUST reveal from/to `datetime-local` inputs
-- MUST load `shared.js` for `fmtRange`, `escHtml`, `safeUrl`, `formatLocalDateTime`, `buildQueryUrl`, `geocode`
+- MUST load `shared.js` for `fmtRange`, `escHtml`, `safeUrl`, `formatLocalDateTime`, `buildQueryUrl`, `geocode` (it also holds `placeField`, the place-input wiring used by Tours and Trips)
 
 **FR-6.2: Map and Markers**
 
@@ -322,7 +322,7 @@ A band-first browse page for the shows published by the crawler's `npm run tours
 **FR-8.4: Filters**
 
 - MUST offer a keyword field (accent- and case-insensitive substring over band name, title, venue, address and tags; debounced) and from/to date inputs (inclusive, on the show date); filters combine with AND
-- MUST offer an area filter: a place typed into the input and geocoded with `geocode()` on Enter (Nominatim), or a "Near me" toggle using browser geolocation, plus a radius select (25 / 50 / 100 / 250 / 500 km, default 100); with an origin set, shows farther than the radius are hidden and each show gets its distance
+- MUST offer an area filter: a place typed into the input and geocoded with `geocode()` (Nominatim), or a "Near me" toggle using browser geolocation, plus a radius select (25 / 50 / 100 / 250 / 500 km, default 100); with an origin set, shows farther than the radius are hidden and each show gets its distance. Enter is not required (mobile keyboards): the place is looked up on Enter (which also closes the keyboard), when the field is left, and before a radius change applies; emptying the field clears a typed place at once; the same text is not looked up twice in a row except on Enter. A radius change with no area set and an empty field shows "Type a place or tap Near me to filter by distance." (`placeField()` in `shared.js`, shared with Trips). The date inputs apply on both `input` and `change`, since mobile pickers may fire only one
 - MUST, when geocoding or geolocation fails, show a notice and keep all shows visible
 
 **FR-8.4a: Saved queries**
@@ -424,7 +424,7 @@ All controls recompute after a 300 ms debounce; the status line (`#status`) read
 - **Trip length:** `#minDays`, `#maxDays`, integers 1..60, default 14 and 21; the edited field wins (`withDays`): a shortest trip above the longest raises the longest, a longest trip below the shortest lowers the shortest; unusable input keeps the current value
 - **Radius mode:** "One base" (default, `#modeBase`) / "On the move" (`#modeHops`), toggle buttons with `aria-pressed`; **Radius** `#radius`: 25 / 50 / 100 / 250 / 500 / 1000 km, default 250
 - **On the move is capped** (its search grows with radius × length): radius at most 500 km (`HOPS_MAX_RADIUS_KM`; 1000 km is disabled in `#radius`) and trips at most 15 days (`HOPS_MAX_DAYS`; the day inputs' `max`). Switching to it lowers a wider radius to 500 km and longer lengths to 15 days; `#modeNote` reads "On the move: up to 500 km between stops and 15 days". `validSettings` applies the same caps
-- **Region (optional):** `#regionPlace` (geocoded with `geocode()` on Enter; empty Enter clears it; failure reads `Could not find "<text>" — planning anywhere.`), `#regionKm` 100 / 250 / 500 / 1000 km (default 500), "Anywhere" (`#regionClear`) clears it. Every attended place must lie within the region
+- **Region (optional):** `#regionPlace` (geocoded with `geocode()` through `placeField()`, as the Tours place: on Enter, on leaving the field and before a `#regionKm` change applies; emptying it clears the region; failure reads `Could not find "<text>" — planning anywhere.`), `#regionKm` 100 / 250 / 500 / 1000 km (default 500), "Anywhere" (`#regionClear`) clears it. Every attended place must lie within the region
 - **Day passes** (`#dayPasses`, default off): "Day passes (one day of a festival is enough)"
 - Settings are not saved or shared (no storage, no URL)
 
