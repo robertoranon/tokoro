@@ -7,7 +7,7 @@ import {
   formatDigest,
   fmtAlertDate,
   fmtDayRange,
-  MAX_DIGEST_LINES,
+  MAX_DIGEST_CHARS,
   MAX_SENDS_PER_RUN,
   type AlertEvent,
   type Recipient,
@@ -187,7 +187,7 @@ describe('formatDigest followed festivals', () => {
     place: 'Berlin',
   });
   it('formatDigest orders sections', () => {
-    const text = formatDigest(
+    const [text] = formatDigest(
       [
         ev({
           id: 's',
@@ -211,7 +211,7 @@ describe('formatDigest followed festivals', () => {
     );
   });
   it('adds the Festivals link when only followed is non-empty', () => {
-    const text = formatDigest(
+    const [text] = formatDigest(
       [],
       [],
       { year: 2026, publicWebUrl: 'https://tokoro.example' },
@@ -224,8 +224,22 @@ describe('formatDigest followed festivals', () => {
 });
 
 describe('formatDigest', () => {
+  const plain = (t: string) =>
+    t
+      .replace(/<[^>]+>/g, '')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&');
+  const ed0 = {
+    festival_url: 'https://fest.example',
+    name: 'Fest',
+    start: '2027-06-18T00:00:00',
+    end: '2027-06-21T00:00:00',
+    place: 'Park',
+  };
   it('a range show in the digest uses fmtDayRange', () => {
-    const text = formatDigest(
+    const [text] = formatDigest(
       [
         ev({
           act_name: 'A',
@@ -248,7 +262,7 @@ describe('formatDigest', () => {
     expect(text).not.toContain('Fri 18 Jun –');
   });
   it('escapes dates and edition ranges', () => {
-    const text = formatDigest(
+    const [text] = formatDigest(
       [
         ev({
           act_name: 'A',
@@ -270,7 +284,7 @@ describe('formatDigest', () => {
     expect(text).not.toContain('<b>x');
   });
   it('groups shows by band (alphabetical), escapes text and adds links', () => {
-    const text = formatDigest(
+    const [text] = formatDigest(
       [
         ev({
           act_name: 'Zeta',
@@ -320,22 +334,41 @@ describe('formatDigest', () => {
     );
   });
 
-  it(`caps at ${MAX_DIGEST_LINES} item lines`, () => {
-    const many = Array.from({ length: 30 }, (_, i) =>
+  it('splits a long digest over several messages, listing every item', () => {
+    const many = Array.from({ length: 120 }, (_, i) =>
       ev({
-        act_name: 'A',
-        act_url: 'https://a.example',
-        start_time: `2026-12-${String(i + 1).padStart(2, '0')}T00:00:00`,
+        act_name: `Band ${Math.floor(i / 40)}`,
+        act_url: `https://b${Math.floor(i / 40)}.example`,
+        start_time: `2026-12-${String((i % 28) + 1).padStart(2, '0')}T20:00:00`,
+        venue_name: 'V'.repeat(60),
+        url: `https://club.example/${i}`,
       })
     );
-    const text = formatDigest(many, [], { year: 2026 });
-    expect(text.split('\n').filter(l => l.startsWith('• '))).toHaveLength(
-      MAX_DIGEST_LINES
-    );
-    expect(text.endsWith('…and 5 more')).toBe(true);
+    const msgs = formatDigest(many, [ed0], {
+      year: 2026,
+      publicWebUrl: 'https://t.example',
+    });
+    expect(msgs.length).toBeGreaterThan(1);
+    const all = msgs.join('\n');
+    expect(all.split('\n').filter(l => l.startsWith('• '))).toHaveLength(121);
+    expect(all).not.toContain('more');
+    for (const m of msgs) {
+      expect(plain(m).length).toBeLessThanOrEqual(MAX_DIGEST_CHARS);
+      // A message continuing a section starts with its heading again.
+      expect(/^(🎸|🎪) <b>/.test(m)).toBe(true);
+    }
+    // A band split across messages gets its name repeated after the heading.
+    for (const m of msgs.slice(1)) {
+      const ls = m.split('\n');
+      if (ls[0] === '🎸 <b>New shows</b>')
+        expect(ls[1]).toMatch(/^<b>Band \d<\/b>$/);
+    }
+    // The links line closes the last message only.
+    expect(msgs.at(-1)!.endsWith('Festivals</a>')).toBe(true);
+    expect(msgs.slice(0, -1).some(m => m.includes('tours.html'))).toBe(false);
   });
 
-  it('stays within the Telegram length limit', () => {
+  it('stays within the Telegram length limit with long fields', () => {
     const long = 'V'.repeat(150);
     const many = Array.from({ length: 25 }, (_, i) =>
       ev({
@@ -346,24 +379,21 @@ describe('formatDigest', () => {
         address: long,
       })
     );
-    const text = formatDigest(many, [], {
+    const msgs = formatDigest(many, [], {
       year: 2026,
       publicWebUrl: 'https://t.example',
     });
-    const plain = text
-      .replace(/<[^>]+>/g, '')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&amp;/g, '&');
-    expect(plain.length).toBeLessThanOrEqual(4096);
-    expect(text).toMatch(
-      /…and \d+ more\n\n<a href="https:\/\/t\.example\/tours\.html">/
-    );
+    for (const m of msgs) expect(plain(m).length).toBeLessThanOrEqual(4096);
+    expect(
+      msgs
+        .join('\n')
+        .split('\n')
+        .filter(l => l.startsWith('• '))
+    ).toHaveLength(25);
   });
 
   it('never links a non-http url', () => {
-    const text = formatDigest(
+    const [text] = formatDigest(
       [
         ev({
           act_name: 'A',
@@ -707,6 +737,27 @@ describe('sendAlertDigests', () => {
     expect(warn).toHaveBeenCalledTimes(1);
     warn.mockRestore();
   });
+  it('sends a long digest as several messages, all counted in the budget', async () => {
+    const s = await setup();
+    for (let i = 0; i < 300; i++)
+      await s.addEvent('a' + i, {
+        act_name: 'Alpha',
+        act_url: 'https://alpha.example',
+        start: `2027-${String((i % 12) + 1).padStart(2, '0')}-${String((i % 28) + 1).padStart(2, '0')}T21:00:00`,
+      });
+    await s.addMember('anna', '1', 0, ['https://alpha.example']);
+    const r = await sendAlertDigests(s.env, {
+      fetchFn: s.fetchFn as any,
+      today: TODAY,
+    });
+    expect(s.sent.length).toBeGreaterThan(1);
+    expect(r.sent).toBe(s.sent.length);
+    const items = s.sent
+      .flatMap(m => m.text.split('\n'))
+      .filter(l => l.startsWith('• '));
+    expect(items).toHaveLength(300);
+  });
+
   describe('admin chat', () => {
     const A = 'https://alpha.example';
     it('digest gives the admin chat every show and edition, even with no follows', async () => {

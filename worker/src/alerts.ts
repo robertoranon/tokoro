@@ -40,8 +40,7 @@ export interface Edition {
 /** Marker pubkey of the synthetic admin recipient (not a member). */
 const ADMIN_PUBKEY = 'admin';
 
-export const MAX_DIGEST_LINES = 25;
-/** Visible-text budget; Telegram rejects messages over 4096 characters. */
+/** Visible-text budget per message; Telegram rejects messages over 4096 characters. */
 export const MAX_DIGEST_CHARS = 3800;
 /** Worker subrequest ceiling (50 on the free plan) minus DB and slack. */
 export const MAX_SENDS_PER_RUN = 45;
@@ -165,26 +164,32 @@ export function digestFor(
     : null;
 }
 
-/** The Telegram HTML message for one member. */
+/** Length of a Telegram HTML string as displayed (tags dropped, entities as one character). */
+const visibleLength = (html: string) =>
+  html.replace(/<[^>]+>/g, '').replace(/&(?:amp|lt|gt|quot);/g, '_').length;
+
+interface DigestGroup {
+  header: string | null; // band name line, repeated when the group spans messages
+  items: string[];
+}
+interface DigestSection {
+  heading: string; // repeated when the section spans messages
+  groups: DigestGroup[];
+}
+
+/**
+ * The Telegram HTML messages for one member: every item is listed, split over
+ * as many messages as the MAX_DIGEST_CHARS budget needs. A section heading (and
+ * a band name) is repeated at the top of a message that continues it; the links
+ * line goes at the end of the last message.
+ */
 export function formatDigest(
   shows: AlertEvent[],
   editions: Edition[],
   opts: { year: number; publicWebUrl?: string },
   followed: Edition[] = []
-): string {
-  let used = 0;
-  let chars = 0;
-  let omitted = 0;
-  const take = (cost: number) => {
-    if (used < MAX_DIGEST_LINES && chars + cost <= MAX_DIGEST_CHARS) {
-      used++;
-      chars += cost;
-      return true;
-    }
-    omitted++;
-    return false;
-  };
-  const blocks: string[] = [];
+): string[] {
+  const sections: DigestSection[] = [];
 
   if (shows.length) {
     const byBand = new Map<string, { name: string; list: AlertEvent[] }>();
@@ -194,14 +199,13 @@ export function formatDigest(
       b.list.push(e);
       byBand.set(k, b);
     }
-    const lines = ['🎸 <b>New shows</b>'];
     const bands = [...byBand.values()].sort((a, b) =>
       a.name.localeCompare(b.name)
     );
+    const groups: DigestGroup[] = [];
     for (const b of bands) {
       b.list.sort((x, y) => (x.start_time < y.start_time ? -1 : 1));
       const items: string[] = [];
-      const name = clip(b.name);
       for (const e of b.list) {
         const place = clip(
           [e.venue_name, e.address].filter(Boolean).join(', ')
@@ -212,61 +216,92 @@ export function formatDigest(
             : fmtAlertDate(e.start_time, opts.year)
         );
         const a = link(e.url, 'page');
-        const cost =
-          2 +
-          date.length +
-          (place ? 3 + place.length : 0) +
-          (a ? 7 : 0) +
-          (items.length ? 0 : name.length + 1);
-        if (!take(cost)) continue;
         const bits = [date];
         if (place) bits.push(esc(place));
         if (a) bits.push(a);
         items.push('• ' + bits.join(' · '));
       }
-      if (items.length) lines.push(`<b>${esc(name)}</b>`, ...items);
+      groups.push({ header: `<b>${esc(clip(b.name))}</b>`, items });
     }
-    if (lines.length > 1) blocks.push(lines.join('\n'));
+    sections.push({ heading: '🎸 <b>New shows</b>', groups });
   }
 
-  const editionBlock = (heading: string, list: Edition[]) => {
+  const editionSection = (heading: string, list: Edition[]) => {
     if (!list.length) return;
-    const lines = [heading];
-    for (const ed of list) {
-      const name = clip(ed.name);
-      const range = esc(fmtDayRange(ed.start, ed.end));
+    const items = list.map(ed => {
       const place = ed.place ? clip(ed.place) : '';
       const a = link(ed.festival_url, 'site');
-      const cost =
-        2 +
-        name.length +
-        3 +
-        range.length +
-        (place ? 3 + place.length : 0) +
-        (a ? 7 : 0);
-      if (!take(cost)) continue;
-      const bits = [`<b>${esc(name)}</b>`, range];
+      const bits = [
+        `<b>${esc(clip(ed.name))}</b>`,
+        esc(fmtDayRange(ed.start, ed.end)),
+      ];
       if (place) bits.push(esc(place));
       if (a) bits.push(a);
-      lines.push('• ' + bits.join(' · '));
-    }
-    if (lines.length > 1) blocks.push(lines.join('\n'));
+      return '• ' + bits.join(' · ');
+    });
+    sections.push({ heading, groups: [{ header: null, items }] });
   };
-  editionBlock('🎪 <b>Festivals you follow</b>', followed);
-  editionBlock('🎪 <b>New festival editions</b>', editions);
+  editionSection('🎪 <b>Festivals you follow</b>', followed);
+  editionSection('🎪 <b>New festival editions</b>', editions);
 
-  if (omitted) blocks.push(`…and ${omitted} more`);
+  const messages: string[] = [];
+  let lines: string[] = [];
+  let chars = 0;
+  let openSection: DigestSection | null = null;
+  let openGroup: DigestGroup | null = null;
+  const flush = () => {
+    if (lines.length) messages.push(lines.join('\n'));
+    lines = [];
+    chars = 0;
+    openSection = null;
+    openGroup = null;
+  };
+  // The lines that put `item` in the current message, headings included.
+  const linesFor = (s: DigestSection, g: DigestGroup, item: string) => {
+    const out: string[] = [];
+    if (openSection !== s) {
+      if (lines.length) out.push('');
+      out.push(s.heading);
+    }
+    if (g.header && (openSection !== s || openGroup !== g)) out.push(g.header);
+    out.push(item);
+    return out;
+  };
+  const cost = (ls: string[]) =>
+    ls.reduce((n, l) => n + visibleLength(l) + 1, 0);
+  const add = (ls: string[]) => {
+    lines.push(...ls);
+    chars += cost(ls);
+  };
 
-  if (opts.publicWebUrl) {
+  for (const s of sections) {
+    for (const g of s.groups) {
+      for (const item of g.items) {
+        let ls = linesFor(s, g, item);
+        if (lines.length && chars + cost(ls) > MAX_DIGEST_CHARS) {
+          flush();
+          ls = linesFor(s, g, item);
+        }
+        add(ls);
+        openSection = s;
+        openGroup = g;
+      }
+    }
+  }
+
+  if (opts.publicWebUrl && sections.length) {
     const base = opts.publicWebUrl.replace(/\/+$/, '');
     const links: string[] = [];
     if (shows.length)
       links.push(`<a href="${esc(base)}/tours.html">All shows</a>`);
     if (editions.length || followed.length)
       links.push(`<a href="${esc(base)}/festivals.html">Festivals</a>`);
-    blocks.push(links.join(' · '));
+    const ls = ['', links.join(' · ')];
+    if (chars + cost(ls) > MAX_DIGEST_CHARS) flush();
+    add(lines.length ? ls : ls.slice(1));
   }
-  return blocks.join('\n\n');
+  flush();
+  return messages;
 }
 
 export interface DigestOptions {
@@ -424,28 +459,40 @@ export async function sendAlertDigests(
   const targets = recipients
     .map(r => ({ r, d: digestFor(r, shows, editions) }))
     .filter(t => t.d);
-  if (targets.length > MAX_SENDS_PER_RUN) {
-    console.warn(
-      `[alerts] ${targets.length} recipients exceed MAX_SENDS_PER_RUN; extra members are skipped this run`
-    );
-  }
-  for (const { r, d: dg } of targets.slice(0, MAX_SENDS_PER_RUN)) {
+  // The budget counts messages: a long digest takes several. A member whose
+  // messages do not all fit is skipped; the admin chat gets what fits.
+  let budget = MAX_SENDS_PER_RUN;
+  let skipped = 0;
+  for (const { r, d: dg } of targets) {
     const d = dg!;
-    const text = formatDigest(
+    let texts = formatDigest(
       d.shows,
       d.editions,
       { year, publicWebUrl: env.PUBLIC_WEB_URL },
       d.followed
     );
-    const result = await sendTelegram(
-      fetchFn,
-      env.TELEGRAM_BOT_TOKEN,
-      r.chat_id,
-      text,
-      sleep
-    );
-    if (result === 'ok') sent++;
-    else if (result === 'blocked' && r.pubkey === ADMIN_PUBKEY) {
+    if (texts.length > budget) {
+      if (r.pubkey !== ADMIN_PUBKEY || !budget) {
+        skipped++;
+        continue;
+      }
+      texts = texts.slice(0, budget);
+    }
+    let result: SendResult = 'ok';
+    for (const text of texts) {
+      budget--;
+      result = await sendTelegram(
+        fetchFn,
+        env.TELEGRAM_BOT_TOKEN,
+        r.chat_id,
+        text,
+        sleep
+      );
+      if (result !== 'ok') break;
+      sent++;
+    }
+    if (result === 'ok') continue;
+    if (result === 'blocked' && r.pubkey === ADMIN_PUBKEY) {
       console.error('[alerts] the admin chat blocked the bot (403)');
     } else if (result === 'blocked') {
       await env.DB.prepare(
@@ -456,6 +503,11 @@ export async function sendAlertDigests(
     } else {
       console.error(`[alerts] sending to ${r.pubkey.slice(0, 8)} failed`);
     }
+  }
+  if (skipped) {
+    console.warn(
+      `[alerts] ${skipped} recipients exceed MAX_SENDS_PER_RUN; they are skipped this run`
+    );
   }
 
   const cleared = (
